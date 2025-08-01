@@ -1,4 +1,3 @@
-
 import threading
 import datetime
 import os
@@ -6,6 +5,7 @@ import time
 import requests
 import psutil
 import discord
+import json  # ✅ Penting untuk load/save settings
 from functools import wraps
 from flask import Flask, render_template, redirect, session, request, jsonify
 
@@ -37,6 +37,10 @@ except Exception as e:
 @app.route("/ping")
 def ping():
     return "✅ Bot is alive!", 200
+
+@app.route("/")
+def index():
+    return redirect("/login")  # ✅ Redirect root ke login
 
 @app.route("/login")
 def login():
@@ -167,4 +171,11 @@ def notify_crash():
 
 # === Log saat startup
 def log_startup():
-    print(f"[{datetime.datetime.now():%Y-%m-%d %H:%M:%S}] 🚀 SatpamBot berhasil dijalankan.")
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{now}] 🚀 SatpamBot berhasil dijalankan.")
+
+    if NOTIFY_WEBHOOK:
+        try:
+            requests.post(NOTIFY_WEBHOOK, json={"content": f"🟢 Bot aktif dan online! (🕒 {now})"})
+        except Exception as e:
+            print("❌ Gagal kirim notifikasi startup:", e)
