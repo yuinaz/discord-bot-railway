@@ -39,3 +39,11 @@ async def save_log(user_id, username, action, content):
             print(f"[📄] Log disimpan untuk {username} ({user_id}) - {action}")
     except Exception as e:
         print(f"[❌] Gagal menyimpan log: {e}")
+
+import sqlite3
+
+def log_admin_history(username, action):
+    with sqlite3.connect("superadmin.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO admin_history (username, action) VALUES (?, ?)", (username, action))
+        conn.commit()

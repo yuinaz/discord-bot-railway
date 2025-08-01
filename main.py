@@ -1,21 +1,32 @@
+import os
+import asyncio
+import threading
+from dotenv import load_dotenv
+
+# Load token & variabel dari .env
+load_dotenv()
+
 from modules import utils
 from modules.discord_bot import bot
 from modules.database import init_db
-import asyncio, os, time
 
-# ✅ Panggil log_startup hanya satu kali
+# Log saat startup
 utils.log_startup()
 
+# Jalankan Flask + Heartbeat di background thread
+def start_flask_background():
+    utils.keep_alive()
+
+threading.Thread(target=start_flask_background, daemon=True).start()
+
+# Main bot Discord
 async def main():
     await init_db()
-    utils.keep_alive()
-    await bot.start(os.getenv("DISCORD_TOKEN"))
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("❌ DISCORD_TOKEN tidak ditemukan di .env!")
+        return
+    await bot.start(token)
 
 if __name__ == "__main__":
-    while True:
-        try:
-            asyncio.run(main())
-        except Exception as e:
-            print(f"[❌ ERROR] {e}")
-            time.sleep(5)
-            print("🔁 Restarting...")
+    asyncio.run(main())
