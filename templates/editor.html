@@ -1,0 +1,22 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit main.py</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #121212; color: #e0e0e0; }
+    textarea { width: 100%; height: 80vh; background: #1e1e1e; color: #fff; border: none; padding: 1rem; font-family: monospace; }
+    .btn-save { margin-top: 1rem; }
+  </style>
+</head>
+<body class="p-4">
+  <h2>📝 Editor main.py</h2>
+  <form method="POST">
+    <textarea name="code">{{ code }}</textarea>
+    <button class="btn btn-outline-light btn-save" type="submit">💾 Simpan</button>
+    <a href="/dashboard" class="btn btn-outline-secondary btn-save">⬅️ Kembali</a>
+  </form>
+</body>
+</html>

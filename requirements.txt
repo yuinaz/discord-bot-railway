@@ -1,0 +1,12 @@
+discord.py>=2.3.2
+aiohttp
+aiosqlite
+requests
+openai
+python-dotenv
+tldextract
+pytesseract
+Pillow
+psutil
+flask
+gunicorn
