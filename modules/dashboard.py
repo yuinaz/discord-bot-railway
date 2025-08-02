@@ -8,7 +8,10 @@ from modules.database import get_stats_last_7_days, get_stats_all_guilds, get_ho
 
 DB_PATH = "superadmin.db"
 
-# ========= Superadmin DB & Auth ==========
+# ====================================
+# 🔐 Superadmin DB & Autentikasi
+# ====================================
+
 def get_user(username):
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
@@ -21,7 +24,6 @@ def log_activity(username, action):
         cursor.execute("INSERT INTO admin_history (username, action) VALUES (?, ?)", (username, action))
         conn.commit()
 
-# ========= LOGIN ==========
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -29,28 +31,28 @@ def login():
         password = request.form.get("password")
         user = get_user(username)
 
-        if user:
-            if check_password_hash(user[2], password):
-                session["logged_in"] = True
-                session["username"] = username
-                if "remember" in request.form:
-                    session.permanent = True
-                log_activity(username, "Login")
-                return redirect("/dashboard")
-            else:
-                flash("Password salah", "danger")
+        if user and check_password_hash(user[2], password):
+            session["logged_in"] = True
+            session["username"] = username
+            if "remember" in request.form:
+                session.permanent = True
+            log_activity(username, "Login")
+            return redirect("/dashboard")
         else:
-            flash("User tidak ditemukan", "danger")
+            flash("Login gagal. Username atau password salah.", "danger")
+
     return render_template("login.html")
 
-# ========= LOGOUT ==========
 @app.route("/logout")
 def logout():
     session.clear()
     flash("Anda telah logout", "info")
     return redirect("/login")
 
-# ========= DASHBOARD ==========
+# ====================================
+# 📊 Dashboard
+# ====================================
+
 @app.route("/dashboard")
 def dashboard():
     if "logged_in" not in session:
@@ -60,11 +62,15 @@ def dashboard():
                            ram_usage=get_ram_usage(),
                            cpu_usage=get_cpu_usage())
 
-# ========= GANTI PASSWORD ==========
+# ====================================
+# 🔑 Ganti Password
+# ====================================
+
 @app.route("/change-password", methods=["GET", "POST"])
 def change_password():
     if "logged_in" not in session:
         return redirect("/login")
+
     username = session["username"]
     user = get_user(username)
 
@@ -76,6 +82,7 @@ def change_password():
         if not check_password_hash(user[2], old_password):
             flash("Password lama salah", "danger")
             return redirect("/change-password")
+
         if new_password != confirm_password:
             flash("Konfirmasi password tidak cocok", "danger")
             return redirect("/change-password")
@@ -92,22 +99,31 @@ def change_password():
 
     return render_template("change_password.html")
 
-# ========= LOG AKTIVITAS ==========
+# ====================================
+# 📜 Log Aktivitas Admin
+# ====================================
+
 @app.route("/admin-log")
 def admin_log():
     if "logged_in" not in session:
         return redirect("/login")
+
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT username, action, timestamp FROM admin_history ORDER BY timestamp DESC")
-        rows = cursor.fetchall()
-    return render_template("admin_log.html", logs=rows)
+        logs = cursor.fetchall()
 
-# ========= PENGATURAN BOT ==========
+    return render_template("admin_log.html", logs=logs)
+
+# ====================================
+# ⚙️ Pengaturan Bot
+# ====================================
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     if "logged_in" not in session:
         return redirect("/login")
+
     config = load_config()
 
     if request.method == "POST":
@@ -119,32 +135,38 @@ def settings():
 
     return render_template("settings.html", config=config)
 
-# ========= HALAMAN GRAFIK ==========
+# ====================================
+# 📈 Grafik Statistik & API
+# ====================================
+
 @app.route("/grafik")
 def grafik():
     if "logged_in" not in session:
         return redirect("/login")
     return render_template("grafik.html")
 
-# ========= API STATISTIK ==========
 @app.route("/api/stats/<guild_id>")
 def api_stats_per_server(guild_id):
     if "logged_in" not in session:
         return redirect("/login")
+
     data = get_stats_last_7_days(guild_id)
-    dates = [d[0] for d in data]
-    counts = [d[1] for d in data]
-    return jsonify({"dates": dates, "counts": counts})
+    return jsonify({
+        "dates": [d[0] for d in data],
+        "counts": [d[1] for d in data]
+    })
 
 @app.route("/api/join-leave/<guild_id>")
 def api_join_leave(guild_id):
     if "logged_in" not in session:
         return redirect("/login")
+
     rows = get_hourly_join_leave(guild_id)
-    hours = [f"{r[0]}:00" for r in rows]
-    joins = [r[1] for r in rows]
-    leaves = [r[2] for r in rows]
-    return jsonify({"hours": hours, "joins": joins, "leaves": leaves})
+    return jsonify({
+        "hours": [f"{r[0]}:00" for r in rows],
+        "joins": [r[1] for r in rows],
+        "leaves": [r[2] for r in rows]
+    })
 
 @app.route("/api/server_stats")
 def api_all_stats():

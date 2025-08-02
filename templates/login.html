@@ -1,4 +1,3 @@
-<!-- templates/login.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,14 +49,19 @@
 
         <h2 class="mb-3">Login ke Dashboard</h2>
 
-        <!-- Alert jika login gagal -->
-        {% if request.args.get('error') == 'gagal' %}
-        <div class="alert alert-danger" role="alert">
-            Login gagal. Periksa kembali username dan password.
-        </div>
-        {% endif %}
+        <!-- Flash message jika login gagal -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
 
-        <!-- Login Superadmin Lokal -->
+        <!-- Form Login -->
         <form method="POST" action="/login">
             <div class="mb-3">
                 <input type="text" name="username" class="form-control" placeholder="Username Admin" required>

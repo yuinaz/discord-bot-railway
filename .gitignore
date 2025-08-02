@@ -10,6 +10,7 @@ __pycache__/
 *.log
 *.sqlite
 *.db
+!superadmin.db
 *.bak
 
 # Virtualenv
