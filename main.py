@@ -3,6 +3,7 @@ import os
 import sqlite3
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
+from flask import request, render_template, redirect, session, flash
 
 # === Load environment ===
 load_dotenv()
@@ -19,7 +20,7 @@ def ensure_superadmin():
     username = "admin"
     password = "Musedash123"
 
-    # 🔥 Hapus file lama (opsional, hanya untuk deploy pertama!)
+    # 🔥 Hapus file lama (opsional, hanya saat deploy pertama kali!)
     if os.path.exists(db_path):
         os.remove(db_path)
         print("🗑️ superadmin.db lama dihapus.")
@@ -56,24 +57,48 @@ def ensure_superadmin():
     except Exception as e:
         print("❌ Gagal setup superadmin:", e)
 
-# === Main async ===
+# === Editor Route untuk edit main.py ===
+@app.route("/editor", methods=["GET"])
+def editor_page():
+    if "logged_in" not in session:
+        return redirect("/login")
+
+    try:
+        with open("main.py", "r", encoding="utf-8") as f:
+            code = f.read()
+    except Exception as e:
+        code = f"# Error loading file: {e}"
+    return render_template("editor.html", code=code)
+
+@app.route("/editor/save", methods=["POST"])
+def editor_save():
+    if "logged_in" not in session:
+        return redirect("/login")
+
+    new_code = request.form.get("code")
+    try:
+        with open("main.py", "w", encoding="utf-8") as f:
+            f.write(new_code)
+        flash("✅ File berhasil disimpan", "success")
+    except Exception as e:
+        flash(f"❌ Gagal menyimpan file: {e}", "danger")
+
+    return redirect("/editor")
+
+# === Fungsi utama ===
 async def main():
-    # Setup DB
     generate_empty_stats_db()
     await init_db()
     ensure_superadmin()
 
-    # Aktifkan Flask & heartbeat
     keep_alive()
     log_startup()
 
-    # Ambil token
     token = os.getenv("DISCORD_TOKEN")
     if not token:
         raise ValueError("❌ DISCORD_TOKEN belum diatur di .env")
     print(f"🔐 Token dimuat, panjang: {len(token)} karakter")
 
-    # Jalankan bot
     await bot.start(token)
 
 # === Jalankan ===
