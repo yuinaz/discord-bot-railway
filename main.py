@@ -8,10 +8,13 @@ load_dotenv()
 # === Import dari modul internal ===
 from modules.discord_bot import bot
 from modules.utils import keep_alive, log_startup
-from modules.database import init_db
+from modules.database import init_db, generate_empty_stats_db
 from modules.dashboard import app
 
 async def main():
+    # Auto-setup stats.db
+    generate_empty_stats_db()
+
     # Inisialisasi database log async
     await init_db()
 

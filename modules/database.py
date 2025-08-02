@@ -45,6 +45,34 @@ def get_stats_all_guilds():
         """)
         return [{"guild_id": row[0], "user_count": row[1]} for row in cursor.fetchall()]
 
+def generate_empty_stats_db():
+    """Buat file stats.db kosong jika belum ada."""
+    if not os.path.exists(STATS_DB):
+        try:
+            with sqlite3.connect(STATS_DB) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS user_activity (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        guild_id TEXT,
+                        date TEXT
+                    )
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS join_leave (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        guild_id TEXT,
+                        hour INTEGER,
+                        joins INTEGER,
+                        leaves INTEGER
+                    )
+                """)
+                conn.commit()
+            print("[📊] stats.db berhasil digenerate (kosong)")
+        except Exception as e:
+            print(f"[❌] Gagal membuat stats.db: {e}")
+
 # ======================
 # 🧠 Log Aktifitas Bot
 # ======================
