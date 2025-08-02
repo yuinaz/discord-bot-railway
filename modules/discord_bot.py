@@ -103,6 +103,6 @@ async def servers(ctx):
     info = "\n".join([f"{g.name} - {g.member_count} anggota" for g in bot.guilds])
     await ctx.send(f"```{info}```")
 
-# === Untuk testing manual run ===
+# === Untuk manual run (opsional)
 def run_bot():
     bot.run(os.getenv("DISCORD_TOKEN"))
