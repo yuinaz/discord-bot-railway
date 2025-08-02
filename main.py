@@ -19,6 +19,11 @@ def ensure_superadmin():
     username = "admin"
     password = "Musedash123"
 
+    # 🔥 Hapus file lama (opsional, hanya untuk deploy pertama!)
+    if os.path.exists(db_path):
+        os.remove(db_path)
+        print("🗑️ superadmin.db lama dihapus.")
+
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
