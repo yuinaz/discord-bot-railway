@@ -10,3 +10,4 @@ pillow
 aiosqlite
 tldextract
 pytesseract
+psutil
