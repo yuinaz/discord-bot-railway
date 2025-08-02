@@ -1,0 +1,12 @@
+flask
+gunicorn
+werkzeug
+discord.py
+python-dotenv
+aiohttp
+requests
+openai
+pillow
+aiosqlite
+tldextract
+pytesseract

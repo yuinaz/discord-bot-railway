@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Statistik Bot</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f2f2f2;
+    }
+    .container {
+      max-width: 960px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    canvas {
+      margin-top: 20px;
+    }
+    select {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2>📈 Statistik Mingguan User Online</h2>
+  <label for="serverSelect">Pilih Server:</label>
+  <select id="serverSelect" onchange="fetchCharts()">
+    <option value="123456789012345678">Server A</option>
+    <option value="987654321098765432">Server B</option>
+  </select>
+  <canvas id="onlineChart"></canvas>
+
+  <h2>📊 Statistik Join / Leave Hari Ini</h2>
+  <canvas id="joinLeaveChart"></canvas>
+</div>
+
+<script>
+  async function fetchCharts() {
+    const guildId = document.getElementById("serverSelect").value;
+    const onlineRes = await fetch(`/api/stats/${guildId}`);
+    const onlineData = await onlineRes.json();
+
+    const joinRes = await fetch(`/api/join-leave/${guildId}`);
+    const joinData = await joinRes.json();
+
+    renderCharts(onlineData, joinData);
+  }
+
+  let onlineChart, joinLeaveChart;
+
+  function renderCharts(onlineData, joinData) {
+    if (onlineChart) onlineChart.destroy();
+    if (joinLeaveChart) joinLeaveChart.destroy();
+
+    const ctx1 = document.getElementById("onlineChart").getContext("2d");
+    onlineChart = new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: onlineData.dates,
+        datasets: [{
+          label: 'User Online',
+          data: onlineData.counts,
+          borderColor: 'blue',
+          backgroundColor: 'lightblue',
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true }
+        }
+      }
+    });
+
+    const ctx2 = document.getElementById("joinLeaveChart").getContext("2d");
+    joinLeaveChart = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: joinData.hours,
+        datasets: [
+          {
+            label: 'Joins',
+            data: joinData.joins,
+            backgroundColor: 'green'
+          },
+          {
+            label: 'Leaves',
+            data: joinData.leaves,
+            backgroundColor: 'red'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true }
+        }
+      }
+    });
+  }
+
+  fetchCharts();
+</script>
+</body>
+</html>

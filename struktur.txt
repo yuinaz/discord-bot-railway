@@ -1,0 +1,802 @@
+.:
+app.py        discord-bot-railway/  main.py   README.md         static/        templates/                         venv/
+auto_push.py  Dockerfile            modules/  requirements.txt  struktur.txt   update_requirements_satpambot.bat
+data.db       install.sh*           Procfile  settings.json     superadmin.db  UPTIME_ROBOT_SETUP.md
+
+./discord-bot-railway:
+auto_push.py  Dockerfile   modules/   requirements.txt  struktur.txt                       UPTIME_ROBOT_SETUP.md
+backups/      install.sh*  Procfile   settings.json     templates/
+dashboard.py  main.py      README.md  static/           update_requirements_satpambot.bat
+
+./discord-bot-railway/backups:
+settings_2025-08-01.json
+
+./discord-bot-railway/modules:
+backup.py    discord_bot.py  gpt_chat.py  notify_ngobrol_ban.py  phishing_filter.py  utils.py
+database.py  editor.py       logger.py    oauth.py               updater.py          whitelist.py
+
+./discord-bot-railway/static:
+bg.jpg  bot_avatar.gif  bot_avatar.png
+
+./discord-bot-railway/templates:
+admin_log.html  change_password.html  dashboard.html  editor.html  grafik.html  login.html  profil.html  settings.html
+
+./modules:
+__init__.py   dashboard.py  discord_bot.py  gpt_chat.py  oauth.py            updater.py  whitelist.py
+__pycache__/  database.py   editor.py       logger.py    phishing_filter.py  utils.py
+
+./modules/__pycache__:
+__init__.cpython-310.pyc   database.cpython-310.pyc     logger.cpython-310.pyc           whitelist.cpython-310.pyc
+__init__.cpython-311.pyc   discord_bot.cpython-310.pyc  phishing_filter.cpython-310.pyc
+dashboard.cpython-310.pyc  discord_bot.cpython-311.pyc  utils.cpython-310.pyc
+
+./static:
+bg.jpg  bot_avatar.png
+
+./templates:
+change-password.html  dashboard.html  grafik.html  login.html  logout.html  profil.html  settings.html
+
+./venv:
+Include/  Lib/  pyvenv.cfg  Scripts/
+
+./venv/Include:
+
+./venv/Lib:
+site-packages/
+
+./venv/Lib/site-packages:
+_distutils_hack/          pip/                   pkg_resources/  setuptools-65.5.0.dist-info/
+distutils-precedence.pth  pip-23.0.1.dist-info/  setuptools/
+
+./venv/Lib/site-packages/_distutils_hack:
+__init__.py  __pycache__/  override.py
+
+./venv/Lib/site-packages/_distutils_hack/__pycache__:
+__init__.cpython-310.pyc  override.cpython-310.pyc
+
+./venv/Lib/site-packages/pip:
+__init__.py  __main__.py  __pip-runner__.py  __pycache__/  _internal/  _vendor/  py.typed
+
+./venv/Lib/site-packages/pip/__pycache__:
+__init__.cpython-310.pyc  __main__.cpython-310.pyc  __pip-runner__.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal:
+__init__.py   cli/              exceptions.py  metadata/    pyproject.py            utils/
+__pycache__/  commands/         index/         models/      req/                    vcs/
+build_env.py  configuration.py  locations/     network/     resolution/             wheel_builder.py
+cache.py      distributions/    main.py        operations/  self_outdated_check.py
+
+./venv/Lib/site-packages/pip/_internal/__pycache__:
+__init__.cpython-310.pyc   configuration.cpython-310.pyc  pyproject.cpython-310.pyc
+build_env.cpython-310.pyc  exceptions.cpython-310.pyc     self_outdated_check.cpython-310.pyc
+cache.cpython-310.pyc      main.cpython-310.pyc           wheel_builder.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/cli:
+__init__.py   autocompletion.py  cmdoptions.py       main.py         parser.py         req_command.py  status_codes.py
+__pycache__/  base_command.py    command_context.py  main_parser.py  progress_bars.py  spinners.py
+
+./venv/Lib/site-packages/pip/_internal/cli/__pycache__:
+__init__.cpython-310.pyc        command_context.cpython-310.pyc  progress_bars.cpython-310.pyc
+autocompletion.cpython-310.pyc  main.cpython-310.pyc             req_command.cpython-310.pyc
+base_command.cpython-310.pyc    main_parser.cpython-310.pyc      spinners.cpython-310.pyc
+cmdoptions.cpython-310.pyc      parser.cpython-310.pyc           status_codes.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/commands:
+__init__.py   check.py          debug.py     hash.py   inspect.py  search.py     wheel.py
+__pycache__/  completion.py     download.py  help.py   install.py  show.py
+cache.py      configuration.py  freeze.py    index.py  list.py     uninstall.py
+
+./venv/Lib/site-packages/pip/_internal/commands/__pycache__:
+__init__.cpython-310.pyc       debug.cpython-310.pyc     index.cpython-310.pyc    show.cpython-310.pyc
+cache.cpython-310.pyc          download.cpython-310.pyc  inspect.cpython-310.pyc  uninstall.cpython-310.pyc
+check.cpython-310.pyc          freeze.cpython-310.pyc    install.cpython-310.pyc  wheel.cpython-310.pyc
+completion.cpython-310.pyc     hash.cpython-310.pyc      list.cpython-310.pyc
+configuration.cpython-310.pyc  help.cpython-310.pyc      search.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/distributions:
+__init__.py  __pycache__/  base.py  installed.py  sdist.py  wheel.py
+
+./venv/Lib/site-packages/pip/_internal/distributions/__pycache__:
+__init__.cpython-310.pyc  base.cpython-310.pyc  installed.cpython-310.pyc  sdist.cpython-310.pyc  wheel.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/index:
+__init__.py  __pycache__/  collector.py  package_finder.py  sources.py
+
+./venv/Lib/site-packages/pip/_internal/index/__pycache__:
+__init__.cpython-310.pyc  collector.cpython-310.pyc  package_finder.cpython-310.pyc  sources.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/locations:
+__init__.py  __pycache__/  _distutils.py  _sysconfig.py  base.py
+
+./venv/Lib/site-packages/pip/_internal/locations/__pycache__:
+__init__.cpython-310.pyc  _distutils.cpython-310.pyc  _sysconfig.cpython-310.pyc  base.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/metadata:
+__init__.py  __pycache__/  _json.py  base.py  importlib/  pkg_resources.py
+
+./venv/Lib/site-packages/pip/_internal/metadata/__pycache__:
+__init__.cpython-310.pyc  _json.cpython-310.pyc  base.cpython-310.pyc  pkg_resources.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/metadata/importlib:
+__init__.py  __pycache__/  _compat.py  _dists.py  _envs.py
+
+./venv/Lib/site-packages/pip/_internal/metadata/importlib/__pycache__:
+__init__.cpython-310.pyc  _compat.cpython-310.pyc  _dists.cpython-310.pyc  _envs.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/models:
+__init__.py   candidate.py   format_control.py  installation_report.py  scheme.py        selection_prefs.py  wheel.py
+__pycache__/  direct_url.py  index.py           link.py                 search_scope.py  target_python.py
+
+./venv/Lib/site-packages/pip/_internal/models/__pycache__:
+__init__.cpython-310.pyc        index.cpython-310.pyc                search_scope.cpython-310.pyc
+candidate.cpython-310.pyc       installation_report.cpython-310.pyc  selection_prefs.cpython-310.pyc
+direct_url.cpython-310.pyc      link.cpython-310.pyc                 target_python.cpython-310.pyc
+format_control.cpython-310.pyc  scheme.cpython-310.pyc               wheel.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/network:
+__init__.py  __pycache__/  auth.py  cache.py  download.py  lazy_wheel.py  session.py  utils.py  xmlrpc.py
+
+./venv/Lib/site-packages/pip/_internal/network/__pycache__:
+__init__.cpython-310.pyc  cache.cpython-310.pyc     lazy_wheel.cpython-310.pyc  utils.cpython-310.pyc
+auth.cpython-310.pyc      download.cpython-310.pyc  session.cpython-310.pyc     xmlrpc.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/operations:
+__init__.py  __pycache__/  build/  check.py  freeze.py  install/  prepare.py
+
+./venv/Lib/site-packages/pip/_internal/operations/__pycache__:
+__init__.cpython-310.pyc  check.cpython-310.pyc  freeze.cpython-310.pyc  prepare.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/operations/build:
+__init__.py   build_tracker.py  metadata_editable.py  wheel.py           wheel_legacy.py
+__pycache__/  metadata.py       metadata_legacy.py    wheel_editable.py
+
+./venv/Lib/site-packages/pip/_internal/operations/build/__pycache__:
+__init__.cpython-310.pyc       metadata_editable.cpython-310.pyc  wheel_editable.cpython-310.pyc
+build_tracker.cpython-310.pyc  metadata_legacy.cpython-310.pyc    wheel_legacy.cpython-310.pyc
+metadata.cpython-310.pyc       wheel.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/operations/install:
+__init__.py  __pycache__/  editable_legacy.py  legacy.py  wheel.py
+
+./venv/Lib/site-packages/pip/_internal/operations/install/__pycache__:
+__init__.cpython-310.pyc  editable_legacy.cpython-310.pyc  legacy.cpython-310.pyc  wheel.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/req:
+__init__.py  __pycache__/  constructors.py  req_file.py  req_install.py  req_set.py  req_uninstall.py
+
+./venv/Lib/site-packages/pip/_internal/req/__pycache__:
+__init__.cpython-310.pyc      req_file.cpython-310.pyc     req_set.cpython-310.pyc
+constructors.cpython-310.pyc  req_install.cpython-310.pyc  req_uninstall.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/resolution:
+__init__.py  __pycache__/  base.py  legacy/  resolvelib/
+
+./venv/Lib/site-packages/pip/_internal/resolution/__pycache__:
+__init__.cpython-310.pyc  base.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/resolution/legacy:
+__init__.py  __pycache__/  resolver.py
+
+./venv/Lib/site-packages/pip/_internal/resolution/legacy/__pycache__:
+__init__.cpython-310.pyc  resolver.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/resolution/resolvelib:
+__init__.py   base.py        factory.py           provider.py  requirements.py
+__pycache__/  candidates.py  found_candidates.py  reporter.py  resolver.py
+
+./venv/Lib/site-packages/pip/_internal/resolution/resolvelib/__pycache__:
+__init__.cpython-310.pyc    factory.cpython-310.pyc           reporter.cpython-310.pyc
+base.cpython-310.pyc        found_candidates.cpython-310.pyc  requirements.cpython-310.pyc
+candidates.cpython-310.pyc  provider.cpython-310.pyc          resolver.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/utils:
+__init__.py   compatibility_tags.py  egg_link.py     glibc.py                   models.py            unpacking.py
+__pycache__/  datetime.py            encoding.py     hashes.py                  packaging.py         urls.py
+_log.py       deprecation.py         entrypoints.py  inject_securetransport.py  setuptools_build.py  virtualenv.py
+appdirs.py    direct_url_helpers.py  filesystem.py   logging.py                 subprocess.py        wheel.py
+compat.py     distutils_args.py      filetypes.py    misc.py                    temp_dir.py
+
+./venv/Lib/site-packages/pip/_internal/utils/__pycache__:
+__init__.cpython-310.pyc            encoding.cpython-310.pyc                packaging.cpython-310.pyc
+_log.cpython-310.pyc                entrypoints.cpython-310.pyc             setuptools_build.cpython-310.pyc
+appdirs.cpython-310.pyc             filesystem.cpython-310.pyc              subprocess.cpython-310.pyc
+compat.cpython-310.pyc              filetypes.cpython-310.pyc               temp_dir.cpython-310.pyc
+compatibility_tags.cpython-310.pyc  glibc.cpython-310.pyc                   unpacking.cpython-310.pyc
+datetime.cpython-310.pyc            hashes.cpython-310.pyc                  urls.cpython-310.pyc
+deprecation.cpython-310.pyc         inject_securetransport.cpython-310.pyc  virtualenv.cpython-310.pyc
+direct_url_helpers.cpython-310.pyc  logging.cpython-310.pyc                 wheel.cpython-310.pyc
+distutils_args.cpython-310.pyc      misc.cpython-310.pyc
+egg_link.cpython-310.pyc            models.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_internal/vcs:
+__init__.py  __pycache__/  bazaar.py  git.py  mercurial.py  subversion.py  versioncontrol.py
+
+./venv/Lib/site-packages/pip/_internal/vcs/__pycache__:
+__init__.cpython-310.pyc  git.cpython-310.pyc        subversion.cpython-310.pyc
+bazaar.cpython-310.pyc    mercurial.cpython-310.pyc  versioncontrol.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor:
+__init__.py    chardet/   idna/           platformdirs/     requests/    tenacity/             vendor.txt
+__pycache__/   colorama/  msgpack/        pygments/         resolvelib/  tomli/                webencodings/
+cachecontrol/  distlib/   packaging/      pyparsing/        rich/        typing_extensions.py
+certifi/       distro/    pkg_resources/  pyproject_hooks/  six.py       urllib3/
+
+./venv/Lib/site-packages/pip/_vendor/__pycache__:
+__init__.cpython-310.pyc  six.cpython-310.pyc  typing_extensions.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/cachecontrol:
+__init__.py   _cmd.py     cache.py  compat.py      filewrapper.py  serialize.py
+__pycache__/  adapter.py  caches/   controller.py  heuristics.py   wrapper.py
+
+./venv/Lib/site-packages/pip/_vendor/cachecontrol/__pycache__:
+__init__.cpython-310.pyc  cache.cpython-310.pyc       filewrapper.cpython-310.pyc  wrapper.cpython-310.pyc
+_cmd.cpython-310.pyc      compat.cpython-310.pyc      heuristics.cpython-310.pyc
+adapter.cpython-310.pyc   controller.cpython-310.pyc  serialize.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/cachecontrol/caches:
+__init__.py  __pycache__/  file_cache.py  redis_cache.py
+
+./venv/Lib/site-packages/pip/_vendor/cachecontrol/caches/__pycache__:
+__init__.cpython-310.pyc  file_cache.cpython-310.pyc  redis_cache.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/certifi:
+__init__.py  __main__.py  __pycache__/  cacert.pem  core.py
+
+./venv/Lib/site-packages/pip/_vendor/certifi/__pycache__:
+__init__.cpython-310.pyc  __main__.cpython-310.pyc  core.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/chardet:
+__init__.py                cp949prober.py  gb2312prober.py        langrussianmodel.py  sbcharsetprober.py
+__pycache__/               enums.py        hebrewprober.py        langthaimodel.py     sbcsgroupprober.py
+big5freq.py                escprober.py    jisfreq.py             langturkishmodel.py  sjisprober.py
+big5prober.py              escsm.py        johabfreq.py           latin1prober.py      universaldetector.py
+chardistribution.py        eucjpprober.py  johabprober.py         macromanprober.py    utf1632prober.py
+charsetgroupprober.py      euckrfreq.py    jpcntx.py              mbcharsetprober.py   utf8prober.py
+charsetprober.py           euckrprober.py  langbulgarianmodel.py  mbcsgroupprober.py   version.py
+cli/                       euctwfreq.py    langgreekmodel.py      mbcssm.py
+codingstatemachine.py      euctwprober.py  langhebrewmodel.py     metadata/
+codingstatemachinedict.py  gb2312freq.py   langhungarianmodel.py  resultdict.py
+
+./venv/Lib/site-packages/pip/_vendor/chardet/__pycache__:
+__init__.cpython-310.pyc                euctwfreq.cpython-310.pyc           langturkishmodel.cpython-310.pyc
+big5freq.cpython-310.pyc                euctwprober.cpython-310.pyc         latin1prober.cpython-310.pyc
+big5prober.cpython-310.pyc              gb2312freq.cpython-310.pyc          macromanprober.cpython-310.pyc
+chardistribution.cpython-310.pyc        gb2312prober.cpython-310.pyc        mbcharsetprober.cpython-310.pyc
+charsetgroupprober.cpython-310.pyc      hebrewprober.cpython-310.pyc        mbcsgroupprober.cpython-310.pyc
+charsetprober.cpython-310.pyc           jisfreq.cpython-310.pyc             mbcssm.cpython-310.pyc
+codingstatemachine.cpython-310.pyc      johabfreq.cpython-310.pyc           resultdict.cpython-310.pyc
+codingstatemachinedict.cpython-310.pyc  johabprober.cpython-310.pyc         sbcharsetprober.cpython-310.pyc
+cp949prober.cpython-310.pyc             jpcntx.cpython-310.pyc              sbcsgroupprober.cpython-310.pyc
+enums.cpython-310.pyc                   langbulgarianmodel.cpython-310.pyc  sjisprober.cpython-310.pyc
+escprober.cpython-310.pyc               langgreekmodel.cpython-310.pyc      universaldetector.cpython-310.pyc
+escsm.cpython-310.pyc                   langhebrewmodel.cpython-310.pyc     utf1632prober.cpython-310.pyc
+eucjpprober.cpython-310.pyc             langhungarianmodel.cpython-310.pyc  utf8prober.cpython-310.pyc
+euckrfreq.cpython-310.pyc               langrussianmodel.cpython-310.pyc    version.cpython-310.pyc
+euckrprober.cpython-310.pyc             langthaimodel.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/chardet/cli:
+__init__.py  __pycache__/  chardetect.py
+
+./venv/Lib/site-packages/pip/_vendor/chardet/cli/__pycache__:
+__init__.cpython-310.pyc  chardetect.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/chardet/metadata:
+__init__.py  __pycache__/  languages.py
+
+./venv/Lib/site-packages/pip/_vendor/chardet/metadata/__pycache__:
+__init__.cpython-310.pyc  languages.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/colorama:
+__init__.py  __pycache__/  ansi.py  ansitowin32.py  initialise.py  tests/  win32.py  winterm.py
+
+./venv/Lib/site-packages/pip/_vendor/colorama/__pycache__:
+__init__.cpython-310.pyc  ansitowin32.cpython-310.pyc  win32.cpython-310.pyc
+ansi.cpython-310.pyc      initialise.cpython-310.pyc   winterm.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/colorama/tests:
+__init__.py   ansi_test.py         initialise_test.py  utils.py
+__pycache__/  ansitowin32_test.py  isatty_test.py      winterm_test.py
+
+./venv/Lib/site-packages/pip/_vendor/colorama/tests/__pycache__:
+__init__.cpython-310.pyc   ansitowin32_test.cpython-310.pyc  isatty_test.cpython-310.pyc  winterm_test.cpython-310.pyc
+ansi_test.cpython-310.pyc  initialise_test.cpython-310.pyc   utils.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/distlib:
+__init__.py   database.py  manifest.py  resources.py  t64.exe*      version.py  w64-arm.exe*
+__pycache__/  index.py     markers.py   scripts.py    t64-arm.exe*  w32.exe*    wheel.py
+compat.py     locators.py  metadata.py  t32.exe*      util.py       w64.exe*
+
+./venv/Lib/site-packages/pip/_vendor/distlib/__pycache__:
+__init__.cpython-310.pyc  locators.cpython-310.pyc  resources.cpython-310.pyc  wheel.cpython-310.pyc
+compat.cpython-310.pyc    manifest.cpython-310.pyc  scripts.cpython-310.pyc
+database.cpython-310.pyc  markers.cpython-310.pyc   util.cpython-310.pyc
+index.cpython-310.pyc     metadata.cpython-310.pyc  version.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/distro:
+__init__.py  __main__.py  __pycache__/  distro.py*
+
+./venv/Lib/site-packages/pip/_vendor/distro/__pycache__:
+__init__.cpython-310.pyc  __main__.cpython-310.pyc  distro.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/idna:
+__init__.py  __pycache__/  codec.py  compat.py  core.py  idnadata.py  intranges.py  package_data.py  uts46data.py
+
+./venv/Lib/site-packages/pip/_vendor/idna/__pycache__:
+__init__.cpython-310.pyc  compat.cpython-310.pyc  idnadata.cpython-310.pyc   package_data.cpython-310.pyc
+codec.cpython-310.pyc     core.cpython-310.pyc    intranges.cpython-310.pyc  uts46data.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/msgpack:
+__init__.py  __pycache__/  exceptions.py  ext.py  fallback.py
+
+./venv/Lib/site-packages/pip/_vendor/msgpack/__pycache__:
+__init__.cpython-310.pyc  exceptions.cpython-310.pyc  ext.cpython-310.pyc  fallback.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/packaging:
+__about__.py  __pycache__/   _musllinux.py   markers.py       specifiers.py  utils.py
+__init__.py   _manylinux.py  _structures.py  requirements.py  tags.py        version.py
+
+./venv/Lib/site-packages/pip/_vendor/packaging/__pycache__:
+__about__.cpython-310.pyc   _musllinux.cpython-310.pyc   requirements.cpython-310.pyc  utils.cpython-310.pyc
+__init__.cpython-310.pyc    _structures.cpython-310.pyc  specifiers.cpython-310.pyc    version.cpython-310.pyc
+_manylinux.cpython-310.pyc  markers.cpython-310.pyc      tags.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pkg_resources:
+__init__.py  __pycache__/  py31compat.py
+
+./venv/Lib/site-packages/pip/_vendor/pkg_resources/__pycache__:
+__init__.cpython-310.pyc  py31compat.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/platformdirs:
+__init__.py  __main__.py  __pycache__/  android.py  api.py  macos.py  unix.py  version.py  windows.py
+
+./venv/Lib/site-packages/pip/_vendor/platformdirs/__pycache__:
+__init__.cpython-310.pyc  android.cpython-310.pyc  macos.cpython-310.pyc  version.cpython-310.pyc
+__main__.cpython-310.pyc  api.cpython-310.pyc      unix.cpython-310.pyc   windows.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pygments:
+__init__.py   cmdline.py  filters/      lexer.py     plugin.py    sphinxext.py  token.py
+__main__.py   console.py  formatter.py  lexers/      regexopt.py  style.py      unistring.py
+__pycache__/  filter.py   formatters/   modeline.py  scanner.py   styles/       util.py
+
+./venv/Lib/site-packages/pip/_vendor/pygments/__pycache__:
+__init__.cpython-310.pyc  filter.cpython-310.pyc     plugin.cpython-310.pyc     style.cpython-310.pyc
+__main__.cpython-310.pyc  formatter.cpython-310.pyc  regexopt.cpython-310.pyc   token.cpython-310.pyc
+cmdline.cpython-310.pyc   lexer.cpython-310.pyc      scanner.cpython-310.pyc    unistring.cpython-310.pyc
+console.cpython-310.pyc   modeline.cpython-310.pyc   sphinxext.cpython-310.pyc  util.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pygments/filters:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/pip/_vendor/pygments/filters/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pygments/formatters:
+__init__.py   _mapping.py  groff.py  img.py  latex.py  pangomarkup.py  svg.py       terminal256.py
+__pycache__/  bbcode.py    html.py   irc.py  other.py  rtf.py          terminal.py
+
+./venv/Lib/site-packages/pip/_vendor/pygments/formatters/__pycache__:
+__init__.cpython-310.pyc  html.cpython-310.pyc   other.cpython-310.pyc        terminal.cpython-310.pyc
+_mapping.cpython-310.pyc  img.cpython-310.pyc    pangomarkup.cpython-310.pyc  terminal256.cpython-310.pyc
+bbcode.cpython-310.pyc    irc.cpython-310.pyc    rtf.cpython-310.pyc
+groff.cpython-310.pyc     latex.cpython-310.pyc  svg.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pygments/lexers:
+__init__.py  __pycache__/  _mapping.py  python.py
+
+./venv/Lib/site-packages/pip/_vendor/pygments/lexers/__pycache__:
+__init__.cpython-310.pyc  _mapping.cpython-310.pyc  python.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pygments/styles:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/pip/_vendor/pygments/styles/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pyparsing:
+__init__.py   actions.py  core.py   exceptions.py  results.py  unicode.py
+__pycache__/  common.py   diagram/  helpers.py     testing.py  util.py
+
+./venv/Lib/site-packages/pip/_vendor/pyparsing/__pycache__:
+__init__.cpython-310.pyc  core.cpython-310.pyc        results.cpython-310.pyc  util.cpython-310.pyc
+actions.cpython-310.pyc   exceptions.cpython-310.pyc  testing.cpython-310.pyc
+common.cpython-310.pyc    helpers.cpython-310.pyc     unicode.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pyparsing/diagram:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/pip/_vendor/pyparsing/diagram/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pyproject_hooks:
+__init__.py  __pycache__/  _compat.py  _impl.py  _in_process/
+
+./venv/Lib/site-packages/pip/_vendor/pyproject_hooks/__pycache__:
+__init__.cpython-310.pyc  _compat.cpython-310.pyc  _impl.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/pyproject_hooks/_in_process:
+__init__.py  __pycache__/  _in_process.py
+
+./venv/Lib/site-packages/pip/_vendor/pyproject_hooks/_in_process/__pycache__:
+__init__.cpython-310.pyc  _in_process.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/requests:
+__init__.py     _internal_utils.py  auth.py    cookies.py     hooks.py     sessions.py      utils.py
+__pycache__/    adapters.py         certs.py*  exceptions.py  models.py    status_codes.py
+__version__.py  api.py              compat.py  help.py        packages.py  structures.py
+
+./venv/Lib/site-packages/pip/_vendor/requests/__pycache__:
+__init__.cpython-310.pyc         auth.cpython-310.pyc        help.cpython-310.pyc      status_codes.cpython-310.pyc
+__version__.cpython-310.pyc      certs.cpython-310.pyc       hooks.cpython-310.pyc     structures.cpython-310.pyc
+_internal_utils.cpython-310.pyc  compat.cpython-310.pyc      models.cpython-310.pyc    utils.cpython-310.pyc
+adapters.cpython-310.pyc         cookies.cpython-310.pyc     packages.cpython-310.pyc
+api.cpython-310.pyc              exceptions.cpython-310.pyc  sessions.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/resolvelib:
+__init__.py  __pycache__/  compat/  providers.py  reporters.py  resolvers.py  structs.py
+
+./venv/Lib/site-packages/pip/_vendor/resolvelib/__pycache__:
+__init__.cpython-310.pyc   reporters.cpython-310.pyc  structs.cpython-310.pyc
+providers.cpython-310.pyc  resolvers.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/resolvelib/compat:
+__init__.py  __pycache__/  collections_abc.py
+
+./venv/Lib/site-packages/pip/_vendor/resolvelib/compat/__pycache__:
+__init__.cpython-310.pyc  collections_abc.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/rich:
+__init__.py        _pick.py              box.py             file_proxy.py   palette.py       spinner.py
+__main__.py        _ratio.py             cells.py           filesize.py     panel.py         status.py
+__pycache__/       _spinners.py          color.py           highlighter.py  pretty.py        style.py
+_cell_widths.py    _stack.py             color_triplet.py   json.py         progress.py      styled.py
+_emoji_codes.py    _timer.py             columns.py         jupyter.py      progress_bar.py  syntax.py
+_emoji_replace.py  _win32_console.py     console.py         layout.py       prompt.py        table.py
+_export_format.py  _windows.py           constrain.py       live.py         protocol.py      terminal_theme.py
+_extension.py      _windows_renderer.py  containers.py      live_render.py  region.py        text.py
+_inspect.py        _wrap.py              control.py         logging.py      repr.py          theme.py
+_log_render.py     abc.py                default_styles.py  markup.py       rule.py          themes.py
+_loop.py           align.py              diagnose.py        measure.py      scope.py         traceback.py
+_null_file.py      ansi.py               emoji.py           padding.py      screen.py        tree.py
+_palettes.py       bar.py                errors.py          pager.py        segment.py
+
+./venv/Lib/site-packages/pip/_vendor/rich/__pycache__:
+__init__.cpython-310.pyc           cells.cpython-310.pyc           panel.cpython-310.pyc
+__main__.cpython-310.pyc           color.cpython-310.pyc           pretty.cpython-310.pyc
+_cell_widths.cpython-310.pyc       color_triplet.cpython-310.pyc   progress.cpython-310.pyc
+_emoji_codes.cpython-310.pyc       columns.cpython-310.pyc         progress_bar.cpython-310.pyc
+_emoji_replace.cpython-310.pyc     console.cpython-310.pyc         prompt.cpython-310.pyc
+_export_format.cpython-310.pyc     constrain.cpython-310.pyc       protocol.cpython-310.pyc
+_extension.cpython-310.pyc         containers.cpython-310.pyc      region.cpython-310.pyc
+_inspect.cpython-310.pyc           control.cpython-310.pyc         repr.cpython-310.pyc
+_log_render.cpython-310.pyc        default_styles.cpython-310.pyc  rule.cpython-310.pyc
+_loop.cpython-310.pyc              diagnose.cpython-310.pyc        scope.cpython-310.pyc
+_null_file.cpython-310.pyc         emoji.cpython-310.pyc           screen.cpython-310.pyc
+_palettes.cpython-310.pyc          errors.cpython-310.pyc          segment.cpython-310.pyc
+_pick.cpython-310.pyc              file_proxy.cpython-310.pyc      spinner.cpython-310.pyc
+_ratio.cpython-310.pyc             filesize.cpython-310.pyc        status.cpython-310.pyc
+_spinners.cpython-310.pyc          highlighter.cpython-310.pyc     style.cpython-310.pyc
+_stack.cpython-310.pyc             json.cpython-310.pyc            styled.cpython-310.pyc
+_timer.cpython-310.pyc             jupyter.cpython-310.pyc         syntax.cpython-310.pyc
+_win32_console.cpython-310.pyc     layout.cpython-310.pyc          table.cpython-310.pyc
+_windows.cpython-310.pyc           live.cpython-310.pyc            terminal_theme.cpython-310.pyc
+_windows_renderer.cpython-310.pyc  live_render.cpython-310.pyc     text.cpython-310.pyc
+_wrap.cpython-310.pyc              logging.cpython-310.pyc         theme.cpython-310.pyc
+abc.cpython-310.pyc                markup.cpython-310.pyc          themes.cpython-310.pyc
+align.cpython-310.pyc              measure.cpython-310.pyc         traceback.cpython-310.pyc
+ansi.cpython-310.pyc               padding.cpython-310.pyc         tree.cpython-310.pyc
+bar.cpython-310.pyc                pager.cpython-310.pyc
+box.cpython-310.pyc                palette.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/tenacity:
+__init__.py   _asyncio.py  after.py   before_sleep.py  retry.py  tornadoweb.py
+__pycache__/  _utils.py    before.py  nap.py           stop.py   wait.py
+
+./venv/Lib/site-packages/pip/_vendor/tenacity/__pycache__:
+__init__.cpython-310.pyc  after.cpython-310.pyc         nap.cpython-310.pyc    tornadoweb.cpython-310.pyc
+_asyncio.cpython-310.pyc  before.cpython-310.pyc        retry.cpython-310.pyc  wait.cpython-310.pyc
+_utils.cpython-310.pyc    before_sleep.cpython-310.pyc  stop.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/tomli:
+__init__.py  __pycache__/  _parser.py  _re.py  _types.py
+
+./venv/Lib/site-packages/pip/_vendor/tomli/__pycache__:
+__init__.cpython-310.pyc  _parser.cpython-310.pyc  _re.cpython-310.pyc  _types.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/urllib3:
+__init__.py   _collections.py  connection.py      contrib/       fields.py    packages/       request.py   util/
+__pycache__/  _version.py      connectionpool.py  exceptions.py  filepost.py  poolmanager.py  response.py
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/__pycache__:
+__init__.cpython-310.pyc      connection.cpython-310.pyc      fields.cpython-310.pyc       request.cpython-310.pyc
+_collections.cpython-310.pyc  connectionpool.cpython-310.pyc  filepost.cpython-310.pyc     response.cpython-310.pyc
+_version.cpython-310.pyc      exceptions.cpython-310.pyc      poolmanager.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/contrib:
+__init__.py   _appengine_environ.py  appengine.py  pyopenssl.py        socks.py
+__pycache__/  _securetransport/      ntlmpool.py   securetransport.py
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/contrib/__pycache__:
+__init__.cpython-310.pyc            appengine.cpython-310.pyc  pyopenssl.cpython-310.pyc        socks.cpython-310.pyc
+_appengine_environ.cpython-310.pyc  ntlmpool.cpython-310.pyc   securetransport.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/contrib/_securetransport:
+__init__.py  __pycache__/  bindings.py  low_level.py
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/contrib/_securetransport/__pycache__:
+__init__.cpython-310.pyc  bindings.cpython-310.pyc  low_level.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/packages:
+__init__.py  __pycache__/  backports/  six.py
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/packages/__pycache__:
+__init__.cpython-310.pyc  six.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/packages/backports:
+__init__.py  __pycache__/  makefile.py
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/packages/backports/__pycache__:
+__init__.cpython-310.pyc  makefile.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/util:
+__init__.py   connection.py  queue.py    response.py  ssl_.py                ssltransport.py  url.py
+__pycache__/  proxy.py       request.py  retry.py     ssl_match_hostname.py  timeout.py       wait.py
+
+./venv/Lib/site-packages/pip/_vendor/urllib3/util/__pycache__:
+__init__.cpython-310.pyc    request.cpython-310.pyc   ssl_match_hostname.cpython-310.pyc  wait.cpython-310.pyc
+connection.cpython-310.pyc  response.cpython-310.pyc  ssltransport.cpython-310.pyc
+proxy.cpython-310.pyc       retry.cpython-310.pyc     timeout.cpython-310.pyc
+queue.cpython-310.pyc       ssl_.cpython-310.pyc      url.cpython-310.pyc
+
+./venv/Lib/site-packages/pip/_vendor/webencodings:
+__init__.py  __pycache__/  labels.py  mklabels.py  tests.py  x_user_defined.py
+
+./venv/Lib/site-packages/pip/_vendor/webencodings/__pycache__:
+__init__.cpython-310.pyc  mklabels.cpython-310.pyc  x_user_defined.cpython-310.pyc
+labels.cpython-310.pyc    tests.cpython-310.pyc
+
+./venv/Lib/site-packages/pip-23.0.1.dist-info:
+entry_points.txt  INSTALLER  LICENSE.txt  METADATA  RECORD  REQUESTED  top_level.txt  WHEEL
+
+./venv/Lib/site-packages/pkg_resources:
+__init__.py  __pycache__/  _vendor/  extern/
+
+./venv/Lib/site-packages/pkg_resources/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor:
+__init__.py  __pycache__/  appdirs.py*  importlib_resources/  jaraco/  more_itertools/  packaging/  pyparsing/  zipp.py
+
+./venv/Lib/site-packages/pkg_resources/_vendor/__pycache__:
+__init__.cpython-310.pyc  appdirs.cpython-310.pyc  zipp.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/importlib_resources:
+__init__.py   _adapters.py  _compat.py     _legacy.py  readers.py
+__pycache__/  _common.py    _itertools.py  abc.py      simple.py
+
+./venv/Lib/site-packages/pkg_resources/_vendor/importlib_resources/__pycache__:
+__init__.cpython-310.pyc   _compat.cpython-310.pyc     abc.cpython-310.pyc
+_adapters.cpython-310.pyc  _itertools.cpython-310.pyc  readers.cpython-310.pyc
+_common.cpython-310.pyc    _legacy.cpython-310.pyc     simple.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/jaraco:
+__init__.py  __pycache__/  context.py  functools.py  text/
+
+./venv/Lib/site-packages/pkg_resources/_vendor/jaraco/__pycache__:
+__init__.cpython-310.pyc  context.cpython-310.pyc  functools.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/jaraco/text:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/pkg_resources/_vendor/jaraco/text/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/more_itertools:
+__init__.py  __pycache__/  more.py  recipes.py
+
+./venv/Lib/site-packages/pkg_resources/_vendor/more_itertools/__pycache__:
+__init__.cpython-310.pyc  more.cpython-310.pyc  recipes.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/packaging:
+__about__.py  __pycache__/   _musllinux.py   markers.py       specifiers.py  utils.py
+__init__.py   _manylinux.py  _structures.py  requirements.py  tags.py        version.py
+
+./venv/Lib/site-packages/pkg_resources/_vendor/packaging/__pycache__:
+__about__.cpython-310.pyc   _musllinux.cpython-310.pyc   requirements.cpython-310.pyc  utils.cpython-310.pyc
+__init__.cpython-310.pyc    _structures.cpython-310.pyc  specifiers.cpython-310.pyc    version.cpython-310.pyc
+_manylinux.cpython-310.pyc  markers.cpython-310.pyc      tags.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/pyparsing:
+__init__.py   actions.py  core.py   exceptions.py  results.py  unicode.py
+__pycache__/  common.py   diagram/  helpers.py     testing.py  util.py
+
+./venv/Lib/site-packages/pkg_resources/_vendor/pyparsing/__pycache__:
+__init__.cpython-310.pyc  core.cpython-310.pyc        results.cpython-310.pyc  util.cpython-310.pyc
+actions.cpython-310.pyc   exceptions.cpython-310.pyc  testing.cpython-310.pyc
+common.cpython-310.pyc    helpers.cpython-310.pyc     unicode.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/_vendor/pyparsing/diagram:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/pkg_resources/_vendor/pyparsing/diagram/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/pkg_resources/extern:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/pkg_resources/extern/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools:
+ __init__.py               _path.py          cli-arm64.exe*   extension.py     launch.py         'script (dev).tmpl'
+ __pycache__/              _reqs.py          command/         extern/          logging.py         script.tmpl
+ _deprecation_warning.py   _vendor/          config/          glob.py          monkey.py          unicode_utils.py
+ _distutils/               archive_util.py   dep_util.py      gui.exe*         msvc.py            version.py
+ _entry_points.py          build_meta.py     depends.py       gui-32.exe*      namespaces.py      wheel.py
+ _imp.py                   cli.exe*          discovery.py     gui-64.exe*      package_index.py   windows_support.py
+ _importlib.py             cli-32.exe*       dist.py          gui-arm64.exe*   py34compat.py
+ _itertools.py             cli-64.exe*       errors.py        installer.py     sandbox.py
+
+./venv/Lib/site-packages/setuptools/__pycache__:
+__init__.cpython-310.pyc              dep_util.cpython-310.pyc   monkey.cpython-310.pyc
+_deprecation_warning.cpython-310.pyc  depends.cpython-310.pyc    msvc.cpython-310.pyc
+_entry_points.cpython-310.pyc         discovery.cpython-310.pyc  namespaces.cpython-310.pyc
+_imp.cpython-310.pyc                  dist.cpython-310.pyc       package_index.cpython-310.pyc
+_importlib.cpython-310.pyc            errors.cpython-310.pyc     py34compat.cpython-310.pyc
+_itertools.cpython-310.pyc            extension.cpython-310.pyc  sandbox.cpython-310.pyc
+_path.cpython-310.pyc                 glob.cpython-310.pyc       unicode_utils.cpython-310.pyc
+_reqs.cpython-310.pyc                 installer.cpython-310.pyc  version.cpython-310.pyc
+archive_util.cpython-310.pyc          launch.cpython-310.pyc     wheel.cpython-310.pyc
+build_meta.cpython-310.pyc            logging.cpython-310.pyc    windows_support.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_distutils:
+__init__.py       archive_util.py  core.py             errors.py        msvc9compiler.py  text_file.py
+__pycache__/      bcppcompiler.py  cygwinccompiler.py  extension.py     msvccompiler.py   unixccompiler.py
+_collections.py   ccompiler.py     debug.py            fancy_getopt.py  py38compat.py     util.py
+_functools.py     cmd.py           dep_util.py         file_util.py     py39compat.py     version.py
+_macos_compat.py  command/         dir_util.py         filelist.py      spawn.py          versionpredicate.py
+_msvccompiler.py  config.py        dist.py             log.py           sysconfig.py
+
+./venv/Lib/site-packages/setuptools/_distutils/__pycache__:
+__init__.cpython-310.pyc       cygwinccompiler.cpython-310.pyc  msvc9compiler.cpython-310.pyc
+_collections.cpython-310.pyc   debug.cpython-310.pyc            msvccompiler.cpython-310.pyc
+_functools.cpython-310.pyc     dep_util.cpython-310.pyc         py38compat.cpython-310.pyc
+_macos_compat.cpython-310.pyc  dir_util.cpython-310.pyc         py39compat.cpython-310.pyc
+_msvccompiler.cpython-310.pyc  dist.cpython-310.pyc             spawn.cpython-310.pyc
+archive_util.cpython-310.pyc   errors.cpython-310.pyc           sysconfig.cpython-310.pyc
+bcppcompiler.cpython-310.pyc   extension.cpython-310.pyc        text_file.cpython-310.pyc
+ccompiler.cpython-310.pyc      fancy_getopt.cpython-310.pyc     unixccompiler.cpython-310.pyc
+cmd.cpython-310.pyc            file_util.cpython-310.pyc        util.cpython-310.pyc
+config.cpython-310.pyc         filelist.cpython-310.pyc         version.cpython-310.pyc
+core.cpython-310.pyc           log.cpython-310.pyc              versionpredicate.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_distutils/command:
+__init__.py           bdist_dumb.py  build_ext.py      clean.py         install_egg_info.py  py37compat.py
+__pycache__/          bdist_rpm.py   build_py.py       config.py        install_headers.py   register.py
+_framework_compat.py  build.py       build_scripts.py  install.py       install_lib.py       sdist.py
+bdist.py              build_clib.py  check.py          install_data.py  install_scripts.py   upload.py
+
+./venv/Lib/site-packages/setuptools/_distutils/command/__pycache__:
+__init__.cpython-310.pyc           build_py.cpython-310.pyc          install_headers.cpython-310.pyc
+_framework_compat.cpython-310.pyc  build_scripts.cpython-310.pyc     install_lib.cpython-310.pyc
+bdist.cpython-310.pyc              check.cpython-310.pyc             install_scripts.cpython-310.pyc
+bdist_dumb.cpython-310.pyc         clean.cpython-310.pyc             py37compat.cpython-310.pyc
+bdist_rpm.cpython-310.pyc          config.cpython-310.pyc            register.cpython-310.pyc
+build.cpython-310.pyc              install.cpython-310.pyc           sdist.cpython-310.pyc
+build_clib.cpython-310.pyc         install_data.cpython-310.pyc      upload.cpython-310.pyc
+build_ext.cpython-310.pyc          install_egg_info.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor:
+__init__.py   importlib_metadata/   jaraco/          ordered_set.py  pyparsing/  typing_extensions.py
+__pycache__/  importlib_resources/  more_itertools/  packaging/      tomli/      zipp.py
+
+./venv/Lib/site-packages/setuptools/_vendor/__pycache__:
+__init__.cpython-310.pyc  ordered_set.cpython-310.pyc  typing_extensions.cpython-310.pyc  zipp.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/importlib_metadata:
+__init__.py  __pycache__/  _adapters.py  _collections.py  _compat.py  _functools.py  _itertools.py  _meta.py  _text.py
+
+./venv/Lib/site-packages/setuptools/_vendor/importlib_metadata/__pycache__:
+__init__.cpython-310.pyc   _collections.cpython-310.pyc  _functools.cpython-310.pyc  _meta.cpython-310.pyc
+_adapters.cpython-310.pyc  _compat.cpython-310.pyc       _itertools.cpython-310.pyc  _text.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/importlib_resources:
+__init__.py   _adapters.py  _compat.py     _legacy.py  readers.py
+__pycache__/  _common.py    _itertools.py  abc.py      simple.py
+
+./venv/Lib/site-packages/setuptools/_vendor/importlib_resources/__pycache__:
+__init__.cpython-310.pyc   _compat.cpython-310.pyc     abc.cpython-310.pyc
+_adapters.cpython-310.pyc  _itertools.cpython-310.pyc  readers.cpython-310.pyc
+_common.cpython-310.pyc    _legacy.cpython-310.pyc     simple.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/jaraco:
+__init__.py  __pycache__/  context.py  functools.py  text/
+
+./venv/Lib/site-packages/setuptools/_vendor/jaraco/__pycache__:
+__init__.cpython-310.pyc  context.cpython-310.pyc  functools.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/jaraco/text:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/setuptools/_vendor/jaraco/text/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/more_itertools:
+__init__.py  __pycache__/  more.py  recipes.py
+
+./venv/Lib/site-packages/setuptools/_vendor/more_itertools/__pycache__:
+__init__.cpython-310.pyc  more.cpython-310.pyc  recipes.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/packaging:
+__about__.py  __pycache__/   _musllinux.py   markers.py       specifiers.py  utils.py
+__init__.py   _manylinux.py  _structures.py  requirements.py  tags.py        version.py
+
+./venv/Lib/site-packages/setuptools/_vendor/packaging/__pycache__:
+__about__.cpython-310.pyc   _musllinux.cpython-310.pyc   requirements.cpython-310.pyc  utils.cpython-310.pyc
+__init__.cpython-310.pyc    _structures.cpython-310.pyc  specifiers.cpython-310.pyc    version.cpython-310.pyc
+_manylinux.cpython-310.pyc  markers.cpython-310.pyc      tags.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/pyparsing:
+__init__.py   actions.py  core.py   exceptions.py  results.py  unicode.py
+__pycache__/  common.py   diagram/  helpers.py     testing.py  util.py
+
+./venv/Lib/site-packages/setuptools/_vendor/pyparsing/__pycache__:
+__init__.cpython-310.pyc  core.cpython-310.pyc        results.cpython-310.pyc  util.cpython-310.pyc
+actions.cpython-310.pyc   exceptions.cpython-310.pyc  testing.cpython-310.pyc
+common.cpython-310.pyc    helpers.cpython-310.pyc     unicode.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/pyparsing/diagram:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/setuptools/_vendor/pyparsing/diagram/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/_vendor/tomli:
+__init__.py  __pycache__/  _parser.py  _re.py  _types.py
+
+./venv/Lib/site-packages/setuptools/_vendor/tomli/__pycache__:
+__init__.cpython-310.pyc  _parser.cpython-310.pyc  _re.cpython-310.pyc  _types.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/command:
+ __init__.py    build.py        dist_info.py        install_egg_info.py      register.py   test.py
+ __pycache__/   build_clib.py   easy_install.py     install_lib.py           rotate.py     upload.py
+ alias.py       build_ext.py    editable_wheel.py   install_scripts.py       saveopts.py   upload_docs.py
+ bdist_egg.py   build_py.py     egg_info.py        'launcher manifest.xml'   sdist.py
+ bdist_rpm.py   develop.py      install.py          py36compat.py            setopt.py
+
+./venv/Lib/site-packages/setuptools/command/__pycache__:
+__init__.cpython-310.pyc    dist_info.cpython-310.pyc         register.cpython-310.pyc
+alias.cpython-310.pyc       easy_install.cpython-310.pyc      rotate.cpython-310.pyc
+bdist_egg.cpython-310.pyc   editable_wheel.cpython-310.pyc    saveopts.cpython-310.pyc
+bdist_rpm.cpython-310.pyc   egg_info.cpython-310.pyc          sdist.cpython-310.pyc
+build.cpython-310.pyc       install.cpython-310.pyc           setopt.cpython-310.pyc
+build_clib.cpython-310.pyc  install_egg_info.cpython-310.pyc  test.cpython-310.pyc
+build_ext.cpython-310.pyc   install_lib.cpython-310.pyc       upload.cpython-310.pyc
+build_py.cpython-310.pyc    install_scripts.cpython-310.pyc   upload_docs.cpython-310.pyc
+develop.cpython-310.pyc     py36compat.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/config:
+__init__.py  __pycache__/  _apply_pyprojecttoml.py  _validate_pyproject/  expand.py  pyprojecttoml.py  setupcfg.py
+
+./venv/Lib/site-packages/setuptools/config/__pycache__:
+__init__.cpython-310.pyc              expand.cpython-310.pyc         setupcfg.cpython-310.pyc
+_apply_pyprojecttoml.cpython-310.pyc  pyprojecttoml.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/config/_validate_pyproject:
+__init__.py   error_reporting.py    fastjsonschema_exceptions.py   formats.py
+__pycache__/  extra_validations.py  fastjsonschema_validations.py
+
+./venv/Lib/site-packages/setuptools/config/_validate_pyproject/__pycache__:
+__init__.cpython-310.pyc         extra_validations.cpython-310.pyc          fastjsonschema_validations.cpython-310.pyc
+error_reporting.cpython-310.pyc  fastjsonschema_exceptions.cpython-310.pyc  formats.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools/extern:
+__init__.py  __pycache__/
+
+./venv/Lib/site-packages/setuptools/extern/__pycache__:
+__init__.cpython-310.pyc
+
+./venv/Lib/site-packages/setuptools-65.5.0.dist-info:
+entry_points.txt  INSTALLER  LICENSE  METADATA  RECORD  REQUESTED  top_level.txt  WHEEL
+
+./venv/Scripts:
+activate  activate.bat  Activate.ps1  deactivate.bat  pip.exe*  pip3.10.exe*  pip3.exe*  python.exe*  pythonw.exe*
