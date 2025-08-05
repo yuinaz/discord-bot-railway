@@ -1,13 +1,103 @@
+from flask import Blueprint
+database_bp = Blueprint("database", __name__)
+
 import aiosqlite
+import sqlite3
 import os
 
-# Path database (bisa diatur lewat environment)
+# 🔄 Lokasi file database
 DB_PATH = os.getenv("DB_PATH", "data.db")
+STATS_DB = "stats.db"
+
+# ======================
+# 📊 Statistik Bot
+# ======================
+
+def init_stats_db():
+    """Inisialisasi stats.db untuk menyimpan data statistik aktivitas server."""
+    if not os.path.exists(STATS_DB):
+        try:
+            with sqlite3.connect(STATS_DB) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS user_activity (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT,
+                        guild_id TEXT,
+                        date TEXT
+                    )
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS join_leave (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        guild_id TEXT,
+                        hour INTEGER,
+                        joins INTEGER,
+                        leaves INTEGER
+                    )
+                """)
+                conn.commit()
+            print("[📊] stats.db berhasil digenerate (kosong)")
+        except Exception as e:
+            print(f"[❌] Gagal membuat stats.db: {e}")
+
+def get_last_7_days():
+    """Mengambil statistik total aktivitas dari semua guild 7 hari terakhir"""
+    with sqlite3.connect(STATS_DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT date, COUNT(*) 
+            FROM user_activity 
+            GROUP BY date 
+            ORDER BY date DESC 
+            LIMIT 7
+        """)
+        return cursor.fetchall()
+
+def get_stats_last_7_days(guild_id):
+    """Mengambil statistik 7 hari terakhir untuk guild tertentu"""
+    with sqlite3.connect(STATS_DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT date, COUNT(*) 
+            FROM user_activity 
+            WHERE guild_id = ? 
+            GROUP BY date 
+            ORDER BY date DESC 
+            LIMIT 7
+        """, (guild_id,))
+        return cursor.fetchall()
+
+def get_hourly_join_leave(guild_id):
+    """Mengambil data join/leave per jam dari guild tertentu"""
+    with sqlite3.connect(STATS_DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT hour, SUM(joins), SUM(leaves) 
+            FROM join_leave 
+            WHERE guild_id = ? 
+            GROUP BY hour 
+            ORDER BY hour
+        """, (guild_id,))
+        return cursor.fetchall()
+
+def get_stats_all_guilds():
+    """Mengambil total aktivitas user per guild"""
+    with sqlite3.connect(STATS_DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT guild_id, COUNT(DISTINCT user_id) 
+            FROM user_activity 
+            GROUP BY guild_id
+        """)
+        return [{"guild_id": row[0], "user_count": row[1]} for row in cursor.fetchall()]
+
+# ======================
+# 🧠 Log Aktifitas Bot
+# ======================
 
 async def init_db():
-    """
-    Inisialisasi database SQLite dan buat tabel logs jika belum ada.
-    """
+    """Inisialisasi database log async dan buat tabel jika belum ada."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("""
@@ -26,9 +116,7 @@ async def init_db():
         print(f"[❌] Gagal inisialisasi database: {e}")
 
 async def save_log(user_id, username, action, content):
-    """
-    Simpan satu entri log ke database.
-    """
+    """Simpan log ke tabel logs."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
@@ -39,11 +127,3 @@ async def save_log(user_id, username, action, content):
             print(f"[📄] Log disimpan untuk {username} ({user_id}) - {action}")
     except Exception as e:
         print(f"[❌] Gagal menyimpan log: {e}")
-
-import sqlite3
-
-def log_admin_history(username, action):
-    with sqlite3.connect("superadmin.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO admin_history (username, action) VALUES (?, ?)", (username, action))
-        conn.commit()

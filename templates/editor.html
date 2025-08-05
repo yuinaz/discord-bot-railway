@@ -1,22 +1,20 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Edit main.py</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #121212; color: #e0e0e0; }
-    textarea { width: 100%; height: 80vh; background: #1e1e1e; color: #fff; border: none; padding: 1rem; font-family: monospace; }
-    .btn-save { margin-top: 1rem; }
-  </style>
-</head>
-<body class="p-4">
-  <h2>📝 Editor main.py</h2>
-  <form method="POST">
-    <textarea name="code">{{ code }}</textarea>
-    <button class="btn btn-outline-light btn-save" type="submit">💾 Simpan</button>
-    <a href="/dashboard" class="btn btn-outline-secondary btn-save">⬅️ Kembali</a>
+{% extends "layout.html" %}
+{% block title %}📝 Editor main.py{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
+    <h3>📝 Editor Kode main.py</h3>
+    <span class="text-muted">👤 {{ session.username }}</span>
+  </div>
+  {% if message %}
+    <div class="alert alert-info">{{ message }}</div>
+  {% endif %}
+  <form method="POST" action="/editor/save">
+    <div class="mb-3">
+      <textarea name="code" class="form-control" style="height: 600px; font-family: monospace;">{{ code }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-success">💾 Simpan</button>
   </form>
-</body>
-</html>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block title %}🎨 Ganti Tema{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
+    <h3>🎨 Ganti Tema Tampilan</h3>
+    <span class="text-muted">👤 {{ session.username }}</span>
+  </div>
+  <form method="POST">
+    <div class="mb-3">
+      <label for="theme">Pilih Tema:</label>
+      <select name="theme" class="form-select">
+        <option value="default.css">Default Dark</option>
+        <option value="light.css">Light</option>
+        <option value="matrix.css">Matrix Green</option>
+        <option value="blue.css">Blue Modern</option>
+        <option value="glass.css">Glass Blur</option>
+        <option value="minimal.css">Minimalist</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-success">💾 Simpan Tema</button>
+  </form>
+</div>
+{% endblock %}

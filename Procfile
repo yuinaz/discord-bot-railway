@@ -1,1 +1,1 @@
-web: gunicorn modules.utils:app
+web: python3 main.py

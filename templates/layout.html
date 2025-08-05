@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}SatpamBot{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="dark">
+  <nav class="navbar navbar-dark bg-dark px-4 py-3">
+    <span class="navbar-brand">🤖 SatpamBot</span>
+    <div class="d-flex">
+      {% if 'username' in session %}
+      <span class="text-light me-3">👤 {{ session['username'] }}</span>
+      {% endif %}
+      <a href="/logout" class="btn btn-sm btn-danger">Logout</a>
+    
+<!-- === Panel Tambahan === -->
+<a href="/log-ai">🧠 AI Log Detection</a>
+<a href="/sso">🔐 SSO Login</a>
+<a href="/server-summary">📝 Server Summary</a>
+<a href="/event-log">📡 Event Log</a>
+<a href="/user-locator">🌍 User Locator</a>
+<a href="/resource">📊 Resource Monitor</a>
+<a href="/plugin">🧩 Plugin Manager</a>
+<a href="/theme">🎨 Theme Manager</a>
+<a href="/scheduler">⏰ Schedule Command</a>
+<a href="/embed-builder">🎨 Embed Builder 2.0</a>
+<a href="/role-maker">🎨 Role & Channel Maker</a>
+</div>
+  </nav>
+  <div class="container-fluid">
+    <div class="row">
+      <aside class="col-md-2 sidebar py-4 bg-dark">
+        <ul class="nav flex-column text-light">
+          <li class="nav-item"><a class="nav-link" href="/dashboard">📊 Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="/editor">📝 Editor</a></li>
+          <li class="nav-item"><a class="nav-link" href="/grafik">📈 Statistik</a></li>
+          <li class="nav-item"><a class="nav-link" href="/upload">📂 Upload</a></li>
+          <li class="nav-item"><a class="nav-link" href="/change-password">🔒 Ganti Password</a></li>
+        
+<li class="nav-item dropdown">
+  <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    🎨 Theme
+  </a>
+  <ul class="dropdown-menu" aria-labelledby="themeDropdown">
+    <li><a class="dropdown-item" href="/theme?set=default.css">Default</a></li>
+    <li><a class="dropdown-item" href="/theme?set=dark.css">Dark</a></li>
+    <li><a class="dropdown-item" href="/theme?set=blue.css">Blue</a></li>
+    <li><a class="dropdown-item" href="/theme?set=glass.css">Glass</a></li>
+    <li><a class="dropdown-item" href="/theme?set=minimal.css">Minimal</a></li>
+  </ul>
+</li>
+
+</ul>
+      </aside>
+      <main class="col-md-10 py-4">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+</body>
+</html>

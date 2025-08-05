@@ -1,3 +1,6 @@
+from flask import Blueprint
+gpt_chat_bp = Blueprint("gpt_chat", __name__)
+
 import openai, os
 from discord.ext import commands
 from modules.discord_bot import bot

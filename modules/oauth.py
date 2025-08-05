@@ -1,40 +1,53 @@
-from flask import request, redirect, session
-from modules.utils import app
-import os, requests
+from flask import Blueprint, render_template, request, redirect, session
+import sqlite3
+from werkzeug.security import check_password_hash
 
-CLIENT_ID = os.getenv("CLIENT_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
-ADMIN_IDS = os.getenv("ADMIN_IDS", "").split(",")
+oauth_bp = Blueprint("oauth", __name__)
+print("✅ oauth_bp loaded and registered.")  # DEBUG: memastikan blueprint dimuat
 
-@app.route("/login")
+DB_PATH = "superadmin.db"
+
+# === Login Page ===
+@oauth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    return redirect("https://discord.com/api/oauth2/authorize?" +
-        f"client_id={CLIENT_ID}&redirect_uri={OAUTH_REDIRECT_URI}&response_type=code&scope=identify")
+    print("🔐 /login route accessed.")  # DEBUG: memastikan route dijalankan
 
-@app.route("/callback")
-def callback():
-    code = request.args.get("code")
-    data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": OAUTH_REDIRECT_URI,
-        "scope": "identify"
-    }
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    r = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
-    if r.status_code != 200: return "OAuth failed", 403
-    access_token = r.json().get("access_token")
-    user = requests.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {access_token}"}).json()
-    if str(user.get("id")) in ADMIN_IDS:
-        session["admin"] = True
-        session["admin_name"] = user.get("username")
+    if session.get("logged_in"):
+        print("ℹ️ Sudah login. Redirect ke /dashboard.")
         return redirect("/dashboard")
-    return "Akses ditolak", 403
 
-@app.route("/logout")
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        print(f"📝 Login POST - Username: {username}")
+
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                user = conn.execute("SELECT * FROM superadmin WHERE username=?", (username,)).fetchone()
+                if user:
+                    print("✅ User ditemukan di database.")
+                else:
+                    print("❌ Username tidak ditemukan di database.")
+
+                if user and check_password_hash(user[2], password):
+                    print("🔓 Password valid. Login sukses.")
+                    session["logged_in"] = True
+                    session["admin"] = True
+                    session["username"] = username
+                    return redirect("/dashboard")
+                else:
+                    print("❌ Password salah.")
+        except Exception as e:
+            print(f"🔥 ERROR saat login: {e}")
+
+        return render_template("login.html", error="❌ Username atau password salah.")
+
+    # Jika GET, tampilkan form login
+    return render_template("login.html")
+
+# === Logout ===
+@oauth_bp.route("/logout")
 def logout():
+    print("🚪 Logout berhasil. Session dibersihkan.")
     session.clear()
     return redirect("/login")

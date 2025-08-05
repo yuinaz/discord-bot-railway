@@ -1,14 +1,39 @@
-from flask import request, redirect, session
-from modules.utils import app
+from flask import Blueprint, request, redirect, session
+import json
+import os
 import datetime
 
-@app.route("/whitelist", methods=["POST"])
+whitelist_bp = Blueprint("whitelist", __name__)
+
+WHITELIST_FILE = "whitelist.json"
+
+# === Untuk dashboard.py
+def load_config():
+    if not os.path.exists(WHITELIST_FILE):
+        return {"whitelist": []}
+    try:
+        with open(WHITELIST_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {"whitelist": []}
+
+def save_config(config):
+    try:
+        with open(WHITELIST_FILE, "w") as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        print("❌ Gagal menyimpan whitelist:", e)
+
+# === Untuk route POST whitelist editor dari dashboard
+@whitelist_bp.route("/whitelist", methods=["POST"])
 def save_whitelist():
-    if not session.get("admin"): return redirect("/login")
+    if not session.get("admin"):
+        return redirect("/login")
     try:
         text = request.form.get("domains", "")
-        with open("whitelist.txt", "w") as f:
-            f.write(text.strip() + "\n")
+        domains = [d.strip() for d in text.splitlines() if d.strip()]
+        config = {"whitelist": domains}
+        save_config(config)
         with open("whitelist_log.txt", "a") as log:
             log.write(f"[{datetime.datetime.now():%Y-%m-%d %H:%M:%S}] Whitelist diperbarui oleh admin\n")
     except Exception as e:

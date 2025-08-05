@@ -1,3 +1,6 @@
+from flask import Blueprint
+logger_bp = Blueprint("logger", __name__)
+
 import discord, datetime
 
 async def send_log_embed(bot, message, reason, ocr_text=""):

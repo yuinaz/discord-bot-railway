@@ -1,13 +1,11 @@
-
-import os
-import shutil
+from flask import Blueprint, jsonify
 import datetime
 
-def backup_settings():
-    today = datetime.datetime.now().strftime("%Y-%m-%d")
-    os.makedirs("backups", exist_ok=True)
-    try:
-        shutil.copy("settings.json", f"backups/settings_{today}.json")
-        print(f"✅ Backup settings.json ke backups/settings_{today}.json")
-    except Exception as e:
-        print("❌ Gagal backup settings.json:", e)
+backup_bp = Blueprint("backup", __name__)
+
+@backup_bp.route("/backup")
+def backup():
+    return jsonify({
+        "message": "📦 Backup route is active",
+        "timestamp": datetime.datetime.now().isoformat()
+    })

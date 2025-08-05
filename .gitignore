@@ -1,30 +1,6 @@
-# Python
-__pycache__/
-*.pyc
-
-# Environment & Secrets
 .env
-.env.*
-
-# Logs & Cache
-*.log
-*.sqlite
 *.db
-*.bak
-
-# Virtualenv
-venv/
-.venv/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Backup
+__pycache__/
+*.log
 *.zip
-*.tar
-*.gz
-
-# Editor
-.vscode/
-.idea/
+.env.*
