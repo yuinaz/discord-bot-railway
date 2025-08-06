@@ -1,65 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}SatpamBot{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
+
+  <!-- Theme CSS (with ID for JS to swap) -->
+  <link id="theme-css" rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
+
+  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: url('{{ url_for("static", filename="images/background.jpg") }}') no-repeat center center fixed;
+      background-size: cover;
+      position: relative;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    #particles-js, .gradient-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+    }
+
+    .gradient-overlay {
+      background: linear-gradient(-45deg, rgba(30, 60, 114, 0.6), rgba(42, 82, 152, 0.6), rgba(30, 60, 114, 0.6));
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+      z-index: -1;
+    }
+
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .navbar, .sidebar {
+      background-color: rgba(0, 0, 0, 0.6) !important;
+      backdrop-filter: blur(8px);
+    }
+
+    .nav-link, .navbar-brand, .text-light {
+      color: #fff !important;
+    }
+
+    main {
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 12px;
+      padding: 20px;
+      color: #fff;
+    }
+  </style>
 </head>
-<body class="dark">
-  <nav class="navbar navbar-dark bg-dark px-4 py-3">
+<body>
+  <!-- Efek partikel dan gradien -->
+  <div id="particles-js"></div>
+  <div class="gradient-overlay"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-dark px-4 py-3">
     <span class="navbar-brand">🤖 SatpamBot</span>
-    <div class="d-flex">
+    <div class="d-flex flex-wrap align-items-center">
       {% if 'username' in session %}
-      <span class="text-light me-3">👤 {{ session['username'] }}</span>
+        <span class="text-light me-3">👤 {{ session['username'] }}</span>
       {% endif %}
-      <a href="/logout" class="btn btn-sm btn-danger">Logout</a>
-    
-<!-- === Panel Tambahan === -->
-<a href="/log-ai">🧠 AI Log Detection</a>
-<a href="/sso">🔐 SSO Login</a>
-<a href="/server-summary">📝 Server Summary</a>
-<a href="/event-log">📡 Event Log</a>
-<a href="/user-locator">🌍 User Locator</a>
-<a href="/resource">📊 Resource Monitor</a>
-<a href="/plugin">🧩 Plugin Manager</a>
-<a href="/theme">🎨 Theme Manager</a>
-<a href="/scheduler">⏰ Schedule Command</a>
-<a href="/embed-builder">🎨 Embed Builder 2.0</a>
-<a href="/role-maker">🎨 Role & Channel Maker</a>
-</div>
+      <a href="/logout" class="btn btn-sm btn-danger me-3">Logout</a>
+
+      <a href="/log-ai" class="text-light me-3">🧠 AI Log Detection</a>
+      <a href="/sso" class="text-light me-3">🔐 SSO Login</a>
+      <a href="/server-summary" class="text-light me-3">📝 Server Summary</a>
+      <a href="/event-log" class="text-light me-3">📡 Event Log</a>
+      <a href="/user-locator" class="text-light me-3">🌍 User Locator</a>
+      <a href="/resource" class="text-light me-3">📊 Resource Monitor</a>
+      <a href="/plugin" class="text-light me-3">🧩 Plugin Manager</a>
+      <a href="/themes" class="text-light me-3">🎨 Theme Manager</a>
+      <a href="/scheduler" class="text-light me-3">⏰ Schedule Command</a>
+      <a href="/embed-builder" class="text-light me-3">🧱 Embed Builder</a>
+      <a href="/role-maker" class="text-light me-3">🏗️ Role Maker</a>
+    </div>
   </nav>
-  <div class="container-fluid">
+
+  <!-- Content -->
+  <div class="container-fluid mt-4">
     <div class="row">
-      <aside class="col-md-2 sidebar py-4 bg-dark">
-        <ul class="nav flex-column text-light">
+      <!-- Sidebar -->
+      <aside class="col-md-2 sidebar py-4">
+        <ul class="nav flex-column">
           <li class="nav-item"><a class="nav-link" href="/dashboard">📊 Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="/editor">📝 Editor</a></li>
           <li class="nav-item"><a class="nav-link" href="/grafik">📈 Statistik</a></li>
           <li class="nav-item"><a class="nav-link" href="/upload">📂 Upload</a></li>
           <li class="nav-item"><a class="nav-link" href="/change-password">🔒 Ganti Password</a></li>
-        
-<li class="nav-item dropdown">
-  <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-    🎨 Theme
-  </a>
-  <ul class="dropdown-menu" aria-labelledby="themeDropdown">
-    <li><a class="dropdown-item" href="/theme?set=default.css">Default</a></li>
-    <li><a class="dropdown-item" href="/theme?set=dark.css">Dark</a></li>
-    <li><a class="dropdown-item" href="/theme?set=blue.css">Blue</a></li>
-    <li><a class="dropdown-item" href="/theme?set=glass.css">Glass</a></li>
-    <li><a class="dropdown-item" href="/theme?set=minimal.css">Minimal</a></li>
-  </ul>
-</li>
 
-</ul>
+          <!-- Tema -->
+          <li class="nav-item mt-3">
+            <div class="dropdown">
+              <button class="btn btn-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
+                🎨 Ganti Tema
+              </button>
+              <ul class="dropdown-menu w-100">
+                {% for t in ['default.css', 'dark.css', 'blue.css', 'glass.css', 'minimal.css'] %}
+                <li>
+                  <form method="POST" action="/themes">
+                    <input type="hidden" name="theme" value="{{ t }}">
+                    <button type="submit" class="dropdown-item">{{ t.replace('.css', '').capitalize() }}</button>
+                  </form>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </li>
+        </ul>
       </aside>
-      <main class="col-md-10 py-4">
+
+      <!-- Main -->
+      <main class="col-md-10">
         {% block content %}{% endblock %}
       </main>
     </div>
   </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/particles.min.js') }}"></script>
+  <script>
+    particlesJS("particles-js", {
+      particles: {
+        number: { value: 60 },
+        color: { value: "#ffffff" },
+        shape: { type: "circle" },
+        opacity: { value: 0.4 },
+        size: { value: 2 },
+        line_linked: {
+          enable: true,
+          distance: 120,
+          color: "#ffffff",
+          opacity: 0.4,
+          width: 1
+        },
+        move: {
+          enable: true,
+          speed: 1.5
+        }
+      }
+    });
+  </script>
+
+  <!-- AJAX Theme Switch -->
+  <script>
+    document.querySelectorAll('form[action="/themes"]').forEach(form => {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        const selectedTheme = this.querySelector('input[name="theme"]').value;
+
+        fetch("/theme", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ theme: selectedTheme })
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "success") {
+            const cssLink = document.getElementById("theme-css");
+            if (cssLink) {
+              cssLink.href = "/static/themes/" + data.theme;
+            }
+          } else {
+            alert("❌ Gagal mengganti tema.");
+          }
+        })
+        .catch(err => {
+          console.error("AJAX error:", err);
+        });
+      });
+    });
+  </script>
 </body>
 </html>

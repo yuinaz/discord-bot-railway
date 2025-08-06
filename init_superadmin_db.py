@@ -5,19 +5,17 @@ import os
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
 
-# Load dari .env jika ada
 load_dotenv()
 
-# Konfigurasi
 DB_PATH = "superadmin.db"
 USERNAME = os.getenv("SUPER_ADMIN_USER", "admin")
-PASSWORD = os.getenv("SUPER_ADMIN_PASS", "Musedash123")
+PASSWORD = os.getenv("SUPER_ADMIN_PASS", "Musedash1234")
 
-# Koneksi ke database
+hashed = generate_password_hash(PASSWORD)
+
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-# Buat tabel superadmin
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS superadmin (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +24,6 @@ CREATE TABLE IF NOT EXISTS superadmin (
 )
 """)
 
-# Buat tabel histori admin (login/ganti password)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS admin_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,11 +33,14 @@ CREATE TABLE IF NOT EXISTS admin_history (
 )
 """)
 
-# Masukkan user admin (jika belum ada)
-hashed = generate_password_hash(PASSWORD)
-cursor.execute("INSERT OR IGNORE INTO superadmin (username, password) VALUES (?, ?)", (USERNAME, hashed))
+# Update jika sudah ada
+cursor.execute("SELECT * FROM superadmin WHERE username = ?", (USERNAME,))
+if cursor.fetchone():
+    cursor.execute("UPDATE superadmin SET password = ? WHERE username = ?", (hashed, USERNAME))
+    print(f"🔄 Password admin '{USERNAME}' diupdate.")
+else:
+    cursor.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)", (USERNAME, hashed))
+    print(f"✅ Admin baru '{USERNAME}' ditambahkan.")
 
 conn.commit()
 conn.close()
-
-print(f"✅ superadmin.db berhasil dibuat. Akun admin: {USERNAME}")

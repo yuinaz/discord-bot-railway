@@ -1,245 +1,124 @@
-.
-├── .env
-├── .git
-│   ├── COMMIT_EDITMSG
-│   ├── HEAD
-│   ├── config
-│   ├── description
-│   ├── hooks
-│   │   ├── applypatch-msg.sample
-│   │   ├── commit-msg.sample
-│   │   ├── fsmonitor-watchman.sample
-│   │   ├── post-update.sample
-│   │   ├── pre-applypatch.sample
-│   │   ├── pre-commit.sample
-│   │   ├── pre-merge-commit.sample
-│   │   ├── pre-push.sample
-│   │   ├── pre-rebase.sample
-│   │   ├── pre-receive.sample
-│   │   ├── prepare-commit-msg.sample
-│   │   ├── push-to-checkout.sample
-│   │   ├── sendemail-validate.sample
-│   │   └── update.sample
-│   ├── index
-│   ├── info
-│   │   └── exclude
-│   ├── logs
-│   │   ├── HEAD
-│   │   └── refs
-│   │       ├── heads
-│   │       │   └── main
-│   │       └── remotes
-│   │           └── origin
-│   │               └── main
-│   ├── objects
-│   │   ├── 01
-│   │   │   └── 33abb76931f39697eaba294cec7c1544828cb2
-│   │   ├── 05
-│   │   │   └── 803ea7af091984886185b25e0ff8878e4898af
-│   │   ├── 09
-│   │   │   └── fa8624ae6792a543c7e758d1837395e08719a8
-│   │   ├── 0a
-│   │   │   └── f2c99fab93995c5bd69a92126f49bc0a8fd575
-│   │   ├── 10
-│   │   │   └── 922960ab45ecfcade6bfb452e4f25bb508721a
-│   │   ├── 13
-│   │   │   └── 31314f83cc6c782557b44845c7b79e749f7b16
-│   │   ├── 1b
-│   │   │   └── 89de361404d623a71a36510e2f5d5183559656
-│   │   ├── 1f
-│   │   │   └── f98fe22730b64d6a4d811265ec6c1f5df982b7
-│   │   ├── 23
-│   │   │   └── dcd831c2639ef8072f3e6be108890e25b67cb6
-│   │   ├── 26
-│   │   │   ├── 3b18d9596e90fbd28f8980ac0bd47dbb1e10fb
-│   │   │   └── c2f40ac185efc8a426b2a8e3018ad36eac98ba
-│   │   ├── 31
-│   │   │   └── 4c8dad0f47d1cf73eb386c27a83e3d6b9d4dbd
-│   │   ├── 35
-│   │   │   └── 72ea7c8a5458aedcdb2e82c21fbae56caacfa9
-│   │   ├── 36
-│   │   │   ├── 1dc0e00aa447c790e3ef7aa8dfa6b804ca73d0
-│   │   │   └── 89af18e653d482aa9ef9e2251815b08b09a74b
-│   │   ├── 3c
-│   │   │   └── b80bd205683c6a8acf2ec9f635a83162f4ebc9
-│   │   ├── 40
-│   │   │   └── f86739fdf1f42886d31de01c83301d392f98ac
-│   │   ├── 45
-│   │   │   └── 6e392447aee5cf95ec062645ae0abfa1bd2810
-│   │   ├── 48
-│   │   │   ├── 966646fe8518447dd7e09f7a3b13b96531b57f
-│   │   │   └── bf1c4b3f5520fe916a90891270bd317154a559
-│   │   ├── 49
-│   │   │   └── b35dfc743c69e3b1ecae1bce6e4552ee1aa88e
-│   │   ├── 50
-│   │   │   └── 57fb3106474992dd7e1d925c4615689fd1c3fe
-│   │   ├── 52
-│   │   │   └── ded4213e5a2e7a4598f36b9873176b1417b229
-│   │   ├── 54
-│   │   │   └── 5ce2b0fb1b44f8542e41e043292c162e42c02c
-│   │   ├── 58
-│   │   │   ├── 08c30f39cfba52b6c531670b2999ec0bcdaf71
-│   │   │   └── 25cdd469d50faa9c686ce907a84df3d459cea0
-│   │   ├── 5c
-│   │   │   └── 096c4d4d6b3eace3353ef9ec37fea2473bbc49
-│   │   ├── 5d
-│   │   │   ├── d1cac3c0bb5b6bdc1a1f9b0128e3a810cded83
-│   │   │   └── ef511a382a1f617dc8911ca64df8bedacc8277
-│   │   ├── 69
-│   │   │   └── fb67fe52734fbab8bffca169e48ddf08327b81
-│   │   ├── 6d
-│   │   │   └── 6fdb48f62a1d2602500123e66a42e415221199
-│   │   ├── 70
-│   │   │   └── bf3c0d2c6df260f3f728f039eccb9a90d93f05
-│   │   ├── 77
-│   │   │   └── b15108ee894be3118e8537eb25c8c2359af066
-│   │   ├── 79
-│   │   │   └── af44ceb13a82ce4f934c7f6f0d428ad06f6373
-│   │   ├── 7d
-│   │   │   └── 1494146f55838fc38a10e3a6a60c0ed21a59b2
-│   │   ├── 7e
-│   │   │   └── f750b9e623923db573523f45505d04d0844078
-│   │   ├── 82
-│   │   │   └── 5e143e86aec23030fcb83be3f26d35d461dd85
-│   │   ├── 84
-│   │   │   └── ea968e0ae7b12ecd3b23fcd49263d6e36934ed
-│   │   ├── 87
-│   │   │   └── b4851d3aad0c51afd0dff8b4cb48b4aa009655
-│   │   ├── 8f
-│   │   │   └── 9c956db4da2152170a0404ba9c538ac7741f28
-│   │   ├── 99
-│   │   │   └── b247427dd1a153930ff4103ca87e50727f9e21
-│   │   ├── 9e
-│   │   │   └── 37444137825bd3f5af21aada1e09c1886f661e
-│   │   ├── a4
-│   │   │   ├── 4a776e8da07c22ce16f8e64687c37179603a32
-│   │   │   └── cfac718ebb72f01e9365e8406945572d9a5136
-│   │   ├── aa
-│   │   │   └── be3ea3d7b81e03b01f2350be40432be86efb95
-│   │   ├── ab
-│   │   │   └── 601d3cf205fa09abbdd4d220d3a99764826346
-│   │   ├── ad
-│   │   │   ├── 4350da9622a329dd6cd86d3e9d42ab93fd56c7
-│   │   │   └── d3f31226ce89fa6f4fbbffeb8e4da04f11ba42
-│   │   ├── bd
-│   │   │   └── 2059aaaef94e67ebf6a8a7ae5c8a2be12b3014
-│   │   ├── bf
-│   │   │   └── 0d37de5d5e48eef11a10aed65dd4cf89f29d45
-│   │   ├── c1
-│   │   │   └── 852ae0c4712a7226ddb51fa09ac14f4ce30b6e
-│   │   ├── ca
-│   │   │   └── 064528aa275a3f3a02b8f8ccfce18e02723d11
-│   │   ├── cc
-│   │   │   └── 5a716febbb06e81d16df28c7cf25ec5104e13b
-│   │   ├── d4
-│   │   │   └── e8125b3109bc5c67222aa4a5b6678300a95cb2
-│   │   ├── d5
-│   │   │   ├── 16e5d3821faf5278021fbe29f6d815b0c0d345
-│   │   │   └── fc11e0d20f32e2b09868e29c58959693415995
-│   │   ├── e0
-│   │   │   └── f6f3d09c251e6e92ad03fe9ffe57f81bd30898
-│   │   ├── eb
-│   │   │   └── 7bc22f135c405012f0b11ced9e55b82e118c0d
-│   │   ├── ee
-│   │   │   └── 4babc9f1a84f0b4c7688b74d26946623253b3e
-│   │   ├── f1
-│   │   │   └── 32bdd90fb11f41cd94e49f6abb890bead84907
-│   │   ├── f3
-│   │   │   └── 1febaf33b728a8cb9babf0b791513b484a4bc7
-│   │   ├── fe
-│   │   │   └── 4a653292bc4bdb8a66046e8fe65d365a81b57e
-│   │   ├── info
-│   │   └── pack
-│   └── refs
-│       ├── heads
-│       │   └── main
-│       ├── remotes
-│       │   └── origin
-│       │       └── main
-│       └── tags
-├── .gitignore
-├── CHANGELOG.md
-├── Dockerfile
-├── Procfile
-├── ProjectDiscord.zip
-├── README.md
-├── UPTIME_ROBOT_SETUP.md
-├── app.py
-├── auto_push.py
-├── config
-│   └── theme.json
-├── data.db
-├── error.log
-├── init_superadmin_db.py
-├── install.sh
-├── keep_alive.py
-├── main.py
-├── modules
-│   ├── __init__.py
-│   ├── backup.py
-│   ├── dashboard.py
-│   ├── database.py
-│   ├── discord_bot.py
-│   ├── discord_dashboard_task.py
-│   ├── editor.py
-│   ├── gpt_chat.py
-│   ├── logger.py
-│   ├── notifier.py
-│   ├── notify_ngobrol_ban.py
-│   ├── oauth.py
-│   ├── phishing_filter.py
-│   ├── updater.py
-│   ├── utils.py
-│   └── whitelist.py
-├── requirements.txt
-├── settings.json
-├── static
-│   ├── bg.jpg
-│   ├── bot_avatar.gif
-│   ├── bot_avatar.png
-│   ├── css
-│   │   └── responsive.css
-│   └── themes
-│       ├── blue.css
-│       ├── dark.css
-│       ├── default.css
-│       ├── glass.css
-│       ├── light.css
-│       ├── matrix.css
-│       └── minimal.css
-├── struktur.txt
-├── superadmin.db
-├── templates
-│   ├── admin_log.html
-│   ├── backup.html
-│   ├── change-password.html
-│   ├── change_password.html
-│   ├── chat.html
-│   ├── dashboard.html
-│   ├── editor.html
-│   ├── embed2.html
-│   ├── event_log.html
-│   ├── grafik.html
-│   ├── heatmap.html
-│   ├── landing.html
-│   ├── layout.html
-│   ├── log_ai.html
-│   ├── login.html
-│   ├── logout.html
-│   ├── notifikasi.html
-│   ├── phishing.html
-│   ├── plugin.html
-│   ├── poll.html
-│   ├── profil.html
-│   ├── resource.html
-│   ├── role_maker.html
-│   ├── scheduler.html
-│   ├── server_summary.html
-│   ├── settings.html
-│   ├── sso.html
-│   ├── themes.html
-│   └── user_locator.html
-├── tree.py
-└── update_requirements_satpambot.bat
-
-77 directories, 166 files
+Folder PATH listing
+Volume serial number is C02B-01C3
+C:.
+�   .env
+�   .gitignore
+�   app.py
+�   auto_push.py
+�   CHANGELOG.md
+�   checker.py
+�   data.db
+�   Dockerfile
+�   error.log
+�   init_superadmin_db.py
+�   install.sh
+�   keep_alive.py
+�   main.py
+�   Procfile
+�   README.md
+�   requirements.txt
+�   settings.json
+�   struktur.txt
+�   superadmin.db
+�   tree.py
+�   update_requirements_satpambot.bat
+�   UPTIME_ROBOT_SETUP.md
+�   
++---config
+�       theme.json
+�       
++---modules
+�   �   backup.py
+�   �   dashboard.py
+�   �   database.py
+�   �   discord_bot.py
+�   �   discord_dashboard_task.py
+�   �   editor.py
+�   �   gpt_chat.py
+�   �   logger.py
+�   �   notifier.py
+�   �   notify_ngobrol_ban.py
+�   �   oauth.py
+�   �   phishing_filter.py
+�   �   updater.py
+�   �   utils.py
+�   �   whitelist.py
+�   �   __init__.py
+�   �   
+�   +---__pycache__
+�           backup.cpython-310.pyc
+�           dashboard.cpython-310.pyc
+�           database.cpython-310.pyc
+�           discord_bot.cpython-310.pyc
+�           discord_bot.cpython-311.pyc
+�           editor.cpython-310.pyc
+�           gpt_chat.cpython-310.pyc
+�           logger.cpython-310.pyc
+�           notifier.cpython-310.pyc
+�           notify_ngobrol_ban.cpython-310.pyc
+�           oauth.cpython-310.pyc
+�           phishing_filter.cpython-310.pyc
+�           updater.cpython-310.pyc
+�           utils.cpython-310.pyc
+�           utils.cpython-313.pyc
+�           whitelist.cpython-310.pyc
+�           __init__.cpython-310.pyc
+�           __init__.cpython-311.pyc
+�           __init__.cpython-313.pyc
+�           
++---static
+�   �   bg.jpg
+�   �   bot_avatar.gif
+�   �   bot_avatar.png
+�   �   
+�   +---css
+�   �       custom.css
+�   �       responsive.css
+�   �       
+�   +---themes
+�           blue.css
+�           dark.css
+�           default.css
+�           glass.css
+�           light.css
+�           matrix.css
+�           minimal.css
+�           
++---templates
+�       admin_log.html
+�       backup.html
+�       base.html
+�       change_password.html
+�       chat.html
+�       dashboard.html
+�       editor.html
+�       embed2.html
+�       event_log.html
+�       grafik.html
+�       heatmap.html
+�       landing.html
+�       layout.html
+�       login.html
+�       logout.html
+�       log_ai.html
+�       notifikasi.html
+�       phishing.html
+�       plugin.html
+�       poll.html
+�       profil.html
+�       resource.html
+�       role_maker.html
+�       scheduler.html
+�       server_summary.html
+�       settings.html
+�       sidebar.html
+�       sso.html
+�       themes.html
+�       topbar.html
+�       user_locator.html
+�       
++---__pycache__
+        app.cpython-310.pyc
+        keep_alive.cpython-310.pyc
+        main.cpython-310.pyc
+        

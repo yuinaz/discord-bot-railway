@@ -10,6 +10,35 @@ from modules.utils import get_current_theme
 # === Load .env
 load_dotenv()
 
+# === Pastikan Folder & File Penting Ada ===
+os.makedirs("data", exist_ok=True)
+os.makedirs("backup", exist_ok=True)
+os.makedirs("logs", exist_ok=True)
+os.makedirs("config", exist_ok=True)
+
+# === Fungsi: Pastikan File Ada ===
+def ensure_file_exists(path, default_content):
+    if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as f:
+            if isinstance(default_content, (dict, list)):
+                json.dump(default_content, f)
+            else:
+                f.write(default_content)
+        print(f"✅ {path} dibuat.")
+
+# === Cek dan Buat File Default ===
+ensure_file_exists("config/theme.json", {"theme": "default"})
+ensure_file_exists("data/whitelist.json", [])
+ensure_file_exists("logs/error.log", "")
+
+# === Cek ENV
+if not os.getenv("DISCORD_TOKEN"):
+    print("❌ DISCORD_TOKEN tidak ditemukan di .env")
+    exit(1)
+if not os.getenv("SECRET_KEY"):
+    print("❌ SECRET_KEY tidak ditemukan di .env")
+    exit(1)
+
 # === Setup Logging
 class SafeStreamHandler(logging.StreamHandler):
     def emit(self, record):
@@ -25,7 +54,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
     handlers=[
-        logging.FileHandler("error.log", encoding="utf-8"),
+        logging.FileHandler("logs/error.log", encoding="utf-8"),
         SafeStreamHandler(sys.stdout)
     ]
 )
@@ -36,6 +65,8 @@ def safe_log(msg, level="info"):
             logging.error(msg)
         elif level == "warning":
             logging.warning(msg)
+        elif level == "critical":
+            logging.critical(msg)
         else:
             logging.info(msg)
     except UnicodeEncodeError:
@@ -45,7 +76,10 @@ def safe_log(msg, level="info"):
 # === Init Flask
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = os.getenv("SECRET_KEY", "defaultsecret")
-app.config["DEBUG"] = True  # Matikan jika produksi
+app.config["DEBUG"] = os.getenv("DEBUG", "false").lower() == "true"
+
+# === Inject fungsi tema ke template
+app.jinja_env.globals['get_current_theme'] = get_current_theme
 
 # === Import Blueprints
 from modules.backup import backup_bp
@@ -62,52 +96,43 @@ from modules.updater import updater_bp
 from modules.utils import utils_bp
 from modules.whitelist import whitelist_bp
 
-# === Register semua Blueprints
-app.register_blueprint(backup_bp)
-app.register_blueprint(dashboard_bp)
-app.register_blueprint(database_bp)
-app.register_blueprint(discord_bot_bp)
-app.register_blueprint(editor_bp)
-app.register_blueprint(gpt_chat_bp)
-app.register_blueprint(logger_bp)
-app.register_blueprint(notify_ngobrol_ban_bp)
-app.register_blueprint(oauth_bp, url_prefix="/")  # ✅ Penting untuk /login dan /logout
-app.register_blueprint(phishing_filter_bp)
-app.register_blueprint(updater_bp)
-app.register_blueprint(utils_bp)
-app.register_blueprint(whitelist_bp)
+# === Register Blueprints
+blueprints = {
+    backup_bp: None,
+    dashboard_bp: None,
+    database_bp: None,
+    discord_bot_bp: None,
+    editor_bp: None,
+    gpt_chat_bp: None,
+    logger_bp: None,
+    notify_ngobrol_ban_bp: None,
+    oauth_bp: "/",
+    phishing_filter_bp: None,
+    updater_bp: None,
+    utils_bp: None,
+    whitelist_bp: None,
+}
+for bp, prefix in blueprints.items():
+    app.register_blueprint(bp, url_prefix=prefix)
 
-# === Inject Flask ke Discord bot
+# === Inject Flask ke bot Discord
 set_flask_app(app)
 
-# === Redirect root ke login
+# === Redirect root ke /login
 @app.route("/")
 def root():
     return redirect("/login")
 
-# === Theme switcher
-@app.route("/theme")
-def theme():
-    theme_name = request.args.get("set")
-    if theme_name:
-        try:
-            os.makedirs("config", exist_ok=True)
-            with open("config/theme.json", "w", encoding="utf-8") as f:
-                json.dump({"theme": theme_name}, f)
-        except Exception as e:
-            logging.error("❌ Gagal menyimpan tema:", exc_info=True)
-    return redirect(request.referrer or "/")
-
-# === 404 Error
+# === 404 Handler
 @app.errorhandler(404)
 def not_found(e):
-    logging.warning(f"404 Not Found: {request.path}")
+    safe_log(f"404 Not Found: {request.path}", level="warning")
     return "❌ Halaman tidak ditemukan. Cek apakah route atau nama file HTML valid.", 404
 
-# === Global Error
+# === Global Exception Handler
 @app.errorhandler(Exception)
 def handle_exception(e):
-    logging.error("❌ Unhandled Exception:", exc_info=True)
+    safe_log("❌ Unhandled Exception:", level="error")
     return "❌ Terjadi error internal di server. Silakan cek log.", 500
 
 # === Jalankan Bot Discord Async
@@ -119,9 +144,9 @@ async def run_bot_async():
         safe_log("🔁 Menjalankan Discord bot...")
         await bot.start(token)
     except Exception:
-        logging.error("❌ Bot gagal dijalankan:", exc_info=True)
+        safe_log("❌ Bot gagal dijalankan:", level="error")
 
-# === Jalankan Flask + Discord
+# === Jalankan Flask + Discord Bot
 async def start_all():
     asyncio.create_task(run_bot_async())
 
@@ -129,11 +154,8 @@ async def start_all():
         from hypercorn.asyncio import serve
         from hypercorn.config import Config
 
-        if os.getenv("RENDER") == "true" and not os.getenv("PORT"):
-            os.environ["PORT"] = "8080"
-
+        port = os.getenv("PORT") or ("8080" if os.getenv("RENDER") == "true" else "5000")
         config = Config()
-        port = os.getenv("PORT", "8080")
         config.bind = [f"0.0.0.0:{port}"]
 
         safe_log("✅ Menjalankan Flask server via Hypercorn...")
@@ -153,7 +175,9 @@ async def start_all():
 
 # === Entry Point
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     try:
         loop.run_until_complete(start_all())
     except KeyboardInterrupt:
@@ -163,10 +187,11 @@ if __name__ == "__main__":
             if not bot.is_closed():
                 safe_log("🛑 Menutup bot...")
                 await bot.close()
+
         try:
             loop.run_until_complete(shutdown())
         except Exception:
-            logging.error("❌ Gagal menutup bot:", exc_info=True)
+            safe_log("❌ Gagal menutup bot:", level="error")
         finally:
             pending = asyncio.all_tasks(loop)
             for task in pending:

@@ -4,11 +4,25 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import sqlite3
 import threading
 import os
+import json
+import datetime
 
 # ===== INIT APP & SOCKET =====
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 app.secret_key = os.getenv("FLASK_SECRET", "supersecretkey")
+
+# === TEMA GLOBAL ===
+@app.context_processor
+def inject_theme():
+    try:
+        with open("config/theme.json", "r", encoding="utf-8") as f:
+            theme_file = json.load(f).get("theme", "default.css")
+            if not theme_file.endswith(".css"):
+                theme_file += ".css"
+    except:
+        theme_file = "default.css"
+    return {"theme_css": f"themes/{theme_file}"}
 
 # ===== DATABASE SETUP =====
 DB_PATH = "superadmin.db"
@@ -25,6 +39,12 @@ def init_db():
         if cur.fetchone()[0] == 0:
             conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)",
                          ("admin", generate_password_hash("admin123")))
+
+# ===== SAFE LOG =====
+def safe_log(msg, level="info"):
+    now = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    tag = {"info": "ℹ️", "error": "❌", "success": "✅"}.get(level, "")
+    print(f"{now} {tag} {msg}")
 
 # ===== IMPORT MODULES =====
 from modules.discord_bot import run_bot as run_discord_bot
@@ -142,6 +162,38 @@ def api_join_leave(guild_id):
         leaves.append(l)
     return jsonify({"hours": hours, "joins": joins, "leaves": leaves})
 
+# ===== GANTI TEMA (Form Manual) =====
+@app.route("/themes", methods=["GET", "POST"])
+def themes():
+    if not session.get("logged_in"):
+        return redirect("/login")
+    if request.method == "POST":
+        theme = request.form.get("theme", "")
+        if theme and theme.endswith(".css"):
+            os.makedirs("config", exist_ok=True)
+            with open("config/theme.json", "w", encoding="utf-8") as f:
+                json.dump({"theme": theme}, f)
+            safe_log(f"🎨 Tema diubah via form: {theme}")
+        return redirect("/dashboard")
+    return render_template("themes.html", username=session.get("username", "Admin"))
+
+# ===== GANTI TEMA (AJAX) =====
+@app.route("/theme", methods=["POST"])
+def change_theme():
+    try:
+        data = request.get_json()
+        theme_name = data.get("theme", "")
+        if theme_name and theme_name.endswith(".css"):
+            os.makedirs("config", exist_ok=True)
+            with open("config/theme.json", "w", encoding="utf-8") as f:
+                json.dump({"theme": theme_name}, f)
+            safe_log(f"🎨 Tema diubah via AJAX: {theme_name}")
+            return jsonify({"status": "success", "theme": theme_name})
+        return jsonify({"status": "error", "message": "Theme kosong atau format salah"}), 400
+    except Exception as e:
+        safe_log(f"❌ Gagal ubah tema via AJAX: {e}", level="error")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # ===== SOCKETIO EVENTS =====
 @socketio.on('connect')
 def handle_connect():
@@ -158,4 +210,21 @@ def broadcast_stat_update():
 if __name__ == "__main__":
     init_db()
     init_stats_db()
+
+    # === PASTIKAN TEMA DEFAULT ADA DAN FORMAT VALID ===
+    os.makedirs("config", exist_ok=True)
+    theme_file = "config/theme.json"
+    if not os.path.exists(theme_file):
+        with open(theme_file, "w", encoding="utf-8") as f:
+            json.dump({"theme": "default.css"}, f)
+    else:
+        try:
+            with open(theme_file, "r", encoding="utf-8") as f:
+                current = json.load(f).get("theme", "")
+            if not current.endswith(".css"):
+                raise ValueError("Invalid theme format")
+        except:
+            with open(theme_file, "w", encoding="utf-8") as f:
+                json.dump({"theme": "default.css"}, f)
+
     socketio.run(app, debug=True, port=5000)

@@ -1,6 +1,8 @@
+# .gitignore
 .env
-*.db
-__pycache__/
 *.log
 *.zip
+__pycache__/
 .env.*
+# Jangan abaikan superadmin.db
+# *.db
