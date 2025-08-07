@@ -13,11 +13,11 @@ async def send_log_embed(ctx_or_msg, reason, ocr_text=""):
             channel = ctx_or_msg.channel
             content = ctx_or_msg.content
             guild = ctx_or_msg.guild
-        else:
+        else:  # ctx
             author = ctx_or_msg.author
             channel = ctx_or_msg.channel
-            content = ctx_or_msg.message.content
             guild = ctx_or_msg.guild
+            content = getattr(ctx_or_msg.message, "content", "")
 
         embed = discord.Embed(
             title="🚨 Aktivitas SatpamBot",
@@ -26,7 +26,8 @@ async def send_log_embed(ctx_or_msg, reason, ocr_text=""):
                 f"📢 **Channel:** {channel.mention}\n"
                 f"🛠️ **Aksi:** {reason}"
             ),
-            color=discord.Color.red()
+            color=discord.Color.red(),
+            timestamp=datetime.datetime.utcnow()
         )
 
         if content:
@@ -35,8 +36,9 @@ async def send_log_embed(ctx_or_msg, reason, ocr_text=""):
         if ocr_text:
             embed.add_field(name="OCR Deteksi Gambar", value=f"```{ocr_text[:500]}```", inline=False)
 
-        embed.set_footer(text=f"SatpamBot | {datetime.datetime.now():%d %b %Y %H:%M}")
+        embed.set_footer(text="SatpamBot")
 
+        # Broadcast ke semua log channel
         for name in ["log-satpam-chat", "log-botphising", "mod-command"]:
             ch = discord.utils.get(guild.text_channels, name=name)
             if ch:
@@ -59,17 +61,17 @@ async def notify_to_ngobrol(message):
         embed = discord.Embed(
             title="💀 Pengguna Terkick SatpamBot",
             description=f"{message.author.mention} telah dibanned karena mengirim link mencurigakan.",
-            color=discord.Color.orange()
+            color=discord.Color.orange(),
+            timestamp=datetime.datetime.utcnow()
         )
         embed.set_footer(text="🧹 Dibersihkan oleh SatpamBot")
-        embed.timestamp = datetime.datetime.utcnow()
 
         await ngobrol_ch.send(embed=embed)
 
         # Kirim sticker "FibiLaugh" jika ada
         sticker = discord.utils.get(message.guild.stickers, name="FibiLaugh")
         if sticker:
-            await ngobrol_ch.send(sticker=sticker)
+            await ngobrol_ch.send(stickers=[sticker])  # <- perbaikan di sini
 
     except Exception as e:
         print("❌ Gagal kirim ke #💬︲ngobrol:", e)

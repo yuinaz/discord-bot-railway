@@ -22,8 +22,16 @@ def load_list(file):
     except:
         return []
 
+def load_hashes(file):
+    try:
+        with open(file) as f:
+            return set(line.strip().lower() for line in f if line.strip())
+    except:
+        return set()
+
 WHITELISTED_DOMAINS = load_list("whitelist.txt")
 BLACKLISTED_KEYWORDS = load_list("blacklist.txt")
+BLACKLISTED_IMAGE_HASHES = load_hashes("blacklist_image_hashes.txt")
 
 def extract_root_domain(url):
     ext = tldextract.extract(url)
@@ -45,7 +53,13 @@ async def scan_image_for_phishing(message):
                     async with session.get(att.url) as resp:
                         image_bytes = await resp.read()
                         image_hash = hashlib.md5(image_bytes).hexdigest()
-                        
+
+                        # 🔒 Cek apakah hash gambar masuk blacklist
+                        if image_hash in BLACKLISTED_IMAGE_HASHES:
+                            print(f"[⚠️] Gambar terdeteksi dari blacklist hash: {image_hash}")
+                            return True, "[TERDETEKSI HASH PHISHING]"
+
+                        # 📥 Cek OCR cache
                         if image_hash in ocr_cache:
                             text = ocr_cache[image_hash]
                         else:
@@ -54,6 +68,7 @@ async def scan_image_for_phishing(message):
 
                         if not text:
                             continue
+
                         text = text.lower()
                         if any(k in text for k in STATIC_KEYWORDS + BLACKLISTED_KEYWORDS):
                             return True, text

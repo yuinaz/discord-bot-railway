@@ -13,7 +13,7 @@ from modules.phishing_filter import (
     scan_image_for_phishing
 )
 from modules.logger import send_log_embed, notify_to_ngobrol
-from modules.utils import START_TIME
+from modules.utils import START_TIME, get_uptime
 from modules.database import init_db, save_log
 
 # === Blueprint
@@ -124,11 +124,10 @@ async def servers(ctx):
 
 @bot.command()
 async def status(ctx):
-    uptime = datetime.timedelta(seconds=int(datetime.datetime.utcnow().timestamp() - START_TIME))
     embed = discord.Embed(title="📊 Bot Status", color=0x00ff00)
     embed.add_field(name="Servers", value=str(len(bot.guilds)))
     embed.add_field(name="Total Members", value=sum(g.member_count for g in bot.guilds))
-    embed.add_field(name="Uptime", value=str(uptime).split(".")[0])
+    embed.add_field(name="Uptime", value=get_uptime())
     await ctx.send(embed=embed)
     await send_log_embed(ctx.author, f"Menjalankan command: `{ctx.message.content}`", ctx.channel)
 
@@ -159,20 +158,41 @@ async def botinfo(ctx):
 @commands.has_role("Moderator")
 async def testban(ctx):
     try:
-        ngobrol_ch = discord.utils.get(ctx.guild.text_channels, name="\ud83d\udcac\ufe0f")
-        if not ngobrol_ch:
-            await ctx.send("\u274c Channel #\ud83d\udcac\ufe0f tidak ditemukan.")
-            return
         embed = discord.Embed(
-            title="\ud83d\udc80 Simulasi Teringat SatpamBot",
-            description=f"{ctx.author.mention} **terdeteksi** mengirim pesan mencurigakan.\n(Pesan ini hanya simulasi.)",
+            title="💀 Simulasi Ban oleh SatpamBot",
+            description=(
+                f"{ctx.author.mention} terdeteksi mengirim pesan mencurigakan.\n"
+                "(Pesan ini hanya simulasi untuk pengujian.)"
+            ),
             color=discord.Color.orange()
         )
-        await ngobrol_ch.send(embed=embed)
-        await ctx.send("\u2705 Simulasi terkirim.")
+        embed.set_footer(text="🧪 Simulasi testban")
+
+        await ctx.send(embed=embed)
+
+        # Coba kirim sticker jika tersedia
+        try:
+            sticker = discord.utils.get(ctx.guild.stickers, name="FibiLaugh")
+            if sticker:
+                await ctx.send(stickers=[sticker])
+        except Exception as e:
+            print(f"[⚠️ STICKER ERROR] {e}")
+
         await send_log_embed(ctx.author, f"Menjalankan command: `{ctx.message.content}`", ctx.channel)
+
     except Exception as e:
-        await ctx.send(f"\u274c Error saat simulasi testban: {e}")
+        await ctx.send(f"❌ Gagal menjalankan testban: {e}")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def unban(ctx, user_id: int, *, reason="Unban via command"):
+    try:
+        user = await bot.fetch_user(user_id)
+        await ctx.guild.unban(user, reason=reason)
+        await ctx.send(f"✅ {user} berhasil di-unban.")
+        await send_log_embed(ctx.author, f"Unban user `{user}`: {reason}", ctx.channel)
+    except Exception as e:
+        await ctx.send(f"❌ Gagal unban: {e}")
 
 @bot.command()
 @commands.has_role("Moderator")
