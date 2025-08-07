@@ -6,8 +6,33 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
     <h3>⚙️ Pengaturan Bot</h3>
-    <span class="text-muted">👤 { '{ session.username }' }</span>
+    <span class="text-muted">👤 {{ session.username }}</span>
   </div>
-  <!-- Konten untuk settings.html akan ditambahkan di sini -->
+
+  <!-- Upload Background -->
+  <div class="card bg-dark text-light mb-4">
+    <div class="card-header">
+      🖼️ Upload Background Dashboard
+    </div>
+    <div class="card-body">
+      {% if background_url %}
+        <p>🌄 Background saat ini:</p>
+        <div class="mb-3">
+          <img src="{{ background_url }}" alt="Current Background" class="img-fluid rounded shadow" style="max-height: 300px;">
+        </div>
+      {% else %}
+        <p class="text-muted">Belum ada background diatur.</p>
+      {% endif %}
+
+      <form action="/upload-background" method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label for="background" class="form-label">Pilih Gambar:</label>
+          <input type="file" class="form-control" name="background" accept="image/*" required>
+        </div>
+        <button type="submit" class="btn btn-primary">🚀 Upload & Terapkan</button>
+      </form>
+    </div>
+  </div>
+
 </div>
 {% endblock %}

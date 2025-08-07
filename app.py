@@ -6,11 +6,16 @@ import threading
 import os
 import json
 import datetime
+import psutil
+import time
 
 # ===== INIT APP & SOCKET =====
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode='threading')
 app.secret_key = os.getenv("FLASK_SECRET", "supersecretkey")
+
+# Waktu mulai untuk uptime
+start_time = time.time()
 
 # === TEMA GLOBAL ===
 @app.context_processor
@@ -162,20 +167,64 @@ def api_join_leave(guild_id):
         leaves.append(l)
     return jsonify({"hours": hours, "joins": joins, "leaves": leaves})
 
-# ===== GANTI TEMA (Form Manual) =====
+# ===== API REAL-TIME: Semua Server Stats =====
+@app.route("/api/servers/summary")
+def api_servers_summary():
+    if not session.get("logged_in"):
+        return redirect("/login")
+    try:
+        stats = get_stats_all_guilds()
+        return jsonify(stats)
+    except Exception as e:
+        safe_log(f"❌ Gagal ambil summary stats: {e}", level="error")
+        return jsonify({"error": "Gagal mengambil data"}), 500
+
+# ===== API: Live System Stats =====
+@app.route("/api/live_stats")
+def live_stats():
+    if not session.get("logged_in"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    uptime_seconds = time.time() - start_time
+    uptime_str = str(datetime.timedelta(seconds=int(uptime_seconds)))
+
+    ram_usage = round(psutil.virtual_memory().used / (1024 * 1024), 2)
+    cpu_usage = psutil.cpu_percent(interval=0.5)
+
+    return jsonify({
+        "uptime": uptime_str,
+        "ram": ram_usage,
+        "cpu": cpu_usage
+    })
+
+# ===== GANTI TEMA (Form Manual + Dropdown Otomatis) =====
 @app.route("/themes", methods=["GET", "POST"])
 def themes():
     if not session.get("logged_in"):
         return redirect("/login")
+
+    theme_folder = "static/themes"
+    os.makedirs(theme_folder, exist_ok=True)
+
+    available_themes = [
+        f for f in os.listdir(theme_folder)
+        if f.endswith(".css") and not f.startswith("_")
+    ]
+
     if request.method == "POST":
         theme = request.form.get("theme", "")
-        if theme and theme.endswith(".css"):
+        if theme in available_themes:
             os.makedirs("config", exist_ok=True)
             with open("config/theme.json", "w", encoding="utf-8") as f:
                 json.dump({"theme": theme}, f)
             safe_log(f"🎨 Tema diubah via form: {theme}")
         return redirect("/dashboard")
-    return render_template("themes.html", username=session.get("username", "Admin"))
+
+    return render_template(
+        "themes.html",
+        username=session.get("username", "Admin"),
+        themes=available_themes
+    )
 
 # ===== GANTI TEMA (AJAX) =====
 @app.route("/theme", methods=["POST"])
@@ -183,13 +232,15 @@ def change_theme():
     try:
         data = request.get_json()
         theme_name = data.get("theme", "")
-        if theme_name and theme_name.endswith(".css"):
+        theme_path = os.path.join("static/themes", theme_name)
+
+        if os.path.exists(theme_path) and theme_name.endswith(".css"):
             os.makedirs("config", exist_ok=True)
             with open("config/theme.json", "w", encoding="utf-8") as f:
                 json.dump({"theme": theme_name}, f)
             safe_log(f"🎨 Tema diubah via AJAX: {theme_name}")
             return jsonify({"status": "success", "theme": theme_name})
-        return jsonify({"status": "error", "message": "Theme kosong atau format salah"}), 400
+        return jsonify({"status": "error", "message": "File tema tidak ditemukan atau format salah"}), 400
     except Exception as e:
         safe_log(f"❌ Gagal ubah tema via AJAX: {e}", level="error")
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -204,14 +255,24 @@ def handle_disconnect():
     print("📴 Client terputus")
 
 def broadcast_stat_update():
-    socketio.emit("update_stats", {"data": get_stats_all_guilds()})
+    data = get_stats_all_guilds()
+    socketio.emit("update_stats", {"data": data})
+
+# Auto broadcast tiap 60 detik
+def start_broadcast_loop():
+    def loop():
+        while True:
+            socketio.sleep(60)
+            broadcast_stat_update()
+    thread = threading.Thread(target=loop)
+    thread.daemon = True
+    thread.start()
 
 # ===== MAIN =====
 if __name__ == "__main__":
     init_db()
     init_stats_db()
 
-    # === PASTIKAN TEMA DEFAULT ADA DAN FORMAT VALID ===
     os.makedirs("config", exist_ok=True)
     theme_file = "config/theme.json"
     if not os.path.exists(theme_file):
@@ -227,4 +288,5 @@ if __name__ == "__main__":
             with open(theme_file, "w", encoding="utf-8") as f:
                 json.dump({"theme": "default.css"}, f)
 
+    start_broadcast_loop()
     socketio.run(app, debug=True, port=5000)

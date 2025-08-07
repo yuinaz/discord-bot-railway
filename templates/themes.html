@@ -13,12 +13,11 @@
     <div class="mb-3">
       <label for="theme">Pilih Tema:</label>
       <select id="ajax-theme" name="theme" class="form-select">
-        <option value="default.css">Default Dark</option>
-        <option value="light.css">Light</option>
-        <option value="matrix.css">Matrix Green</option>
-        <option value="blue.css">Blue Modern</option>
-        <option value="glass.css">Glass Blur</option>
-        <option value="minimal.css">Minimalist</option>
+        {% for theme in themes %}
+          <option value="{{ theme.name }}" {% if 'themes/' ~ theme.name == theme_css %}selected{% endif %}>
+            {{ theme.name.replace('.css', '').replace('-', ' ').title() }}
+          </option>
+        {% endfor %}
       </select>
     </div>
     <div class="d-flex gap-2">
@@ -48,7 +47,6 @@ document.getElementById("ajax-save").addEventListener("click", function () {
       status.innerText = `✅ Tema berhasil diubah ke ${data.theme}`;
       status.className = "mt-3 text-success";
 
-      // Ganti link stylesheet tanpa reload
       const themeLink = document.getElementById("theme-style");
       if (themeLink) {
         themeLink.href = `/static/themes/${data.theme}`;
@@ -58,22 +56,11 @@ document.getElementById("ajax-save").addEventListener("click", function () {
       status.className = "mt-3 text-danger";
     }
   })
-  .catch(err => {
+  .catch(() => {
     const status = document.getElementById("ajax-status");
     status.innerText = "❌ Gagal menghubungi server.";
     status.className = "mt-3 text-danger";
   });
 });
-
-// Isi dropdown sesuai isi theme.json
-fetch("/static/config/theme.json")
-  .then(res => res.json())
-  .then(data => {
-    const current = data.theme;
-    const select = document.getElementById("ajax-theme");
-    if (select && current) {
-      select.value = current;
-    }
-  });
 </script>
 {% endblock %}

@@ -125,10 +125,33 @@ async def servers(ctx):
 @bot.command()
 async def status(ctx):
     uptime = datetime.timedelta(seconds=int(datetime.datetime.utcnow().timestamp() - START_TIME))
-    embed = discord.Embed(title="\ud83d\udcca Bot Status", color=0x00ff00)
+    embed = discord.Embed(title="📊 Bot Status", color=0x00ff00)
     embed.add_field(name="Servers", value=str(len(bot.guilds)))
     embed.add_field(name="Total Members", value=sum(g.member_count for g in bot.guilds))
     embed.add_field(name="Uptime", value=str(uptime).split(".")[0])
+    await ctx.send(embed=embed)
+    await send_log_embed(ctx.author, f"Menjalankan command: `{ctx.message.content}`", ctx.channel)
+
+@bot.command()
+async def botinfo(ctx):
+    embed = discord.Embed(
+        title="🤖 SatpamBot - Anti Phishing Discord Guard",
+        description=(
+            "**Fitur Utama:**\n"
+            "🔒 Anti-Phishing (keyword & OCR)\n"
+            "🚫 Auto Ban + Log ke #mod-command\n"
+            "📊 Dashboard monitoring real-time\n"
+            "🎨 Ganti tema + upload background\n"
+            "📋 Statistik user & server\n"
+            "🧩 Plugin Manager & Role Maker\n"
+            "📡 Polling & perintah admin lainnya\n"
+        ),
+        color=0x00bfff
+    )
+    embed.add_field(name="Prefix", value="`!`", inline=True)
+    embed.add_field(name="Server Aktif", value=f"`{len(bot.guilds)}`", inline=True)
+    embed.add_field(name="Creator", value="`Tim Developer SatpamBot`", inline=True)
+    embed.set_footer(text="Versi commit: bb88d91")
     await ctx.send(embed=embed)
     await send_log_embed(ctx.author, f"Menjalankan command: `{ctx.message.content}`", ctx.channel)
 
@@ -320,10 +343,23 @@ async def on_command_error(ctx, error):
     else:
         await ctx.send(f"\u274c Error: {str(error)}")
 
+# === Error Handler ===
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingRole):
+        await ctx.send("🚫 Kamu tidak punya izin untuk menjalankan perintah ini.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("⚠️ Argumen kurang. Silakan cek format command.")
+    elif isinstance(error, commands.CommandNotFound):
+        await ctx.send("❓ Command tidak ditemukan.")
+    else:
+        await ctx.send(f"❌ Error: {str(error)}")
+
 # === Bot runner
 def run_bot():
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        print("\u274c DISCORD_TOKEN tidak ditemukan di environment.")
+        print("❌ DISCORD_TOKEN tidak ditemukan di environment.")
         return
     bot.run(token)
+
