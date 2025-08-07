@@ -16,7 +16,6 @@ os.makedirs("backup", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 os.makedirs("config", exist_ok=True)
 
-# === Fungsi: Pastikan File Ada ===
 def ensure_file_exists(path, default_content):
     if not os.path.exists(path):
         with open(path, "w", encoding="utf-8") as f:
@@ -26,7 +25,6 @@ def ensure_file_exists(path, default_content):
                 f.write(default_content)
         print(f"✅ {path} dibuat.")
 
-# === Cek dan Buat File Default ===
 ensure_file_exists("config/theme.json", {"theme": "default"})
 ensure_file_exists("data/whitelist.json", [])
 ensure_file_exists("logs/error.log", "")
@@ -118,10 +116,15 @@ for bp, prefix in blueprints.items():
 # === Inject Flask ke bot Discord
 set_flask_app(app)
 
-# === Redirect root ke /login
+# === Route: Redirect root ke /login
 @app.route("/")
 def root():
     return redirect("/login")
+
+# ✅ Route: Healthcheck untuk Render
+@app.route("/healthcheck")
+def healthcheck():
+    return "✅ OK", 200
 
 # === 404 Handler
 @app.errorhandler(404)
@@ -143,8 +146,11 @@ async def run_bot_async():
             raise Exception("DISCORD_TOKEN tidak ditemukan di .env")
         safe_log("🔁 Menjalankan Discord bot...")
         await bot.start(token)
-    except Exception:
-        safe_log("❌ Bot gagal dijalankan:", level="error")
+        safe_log("⚠️ bot.start() selesai — kemungkinan token salah atau bot crash.")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        safe_log(f"❌ Bot gagal dijalankan: {e}", level="error")
 
 # === Jalankan Flask + Discord Bot
 async def start_all():
@@ -160,18 +166,21 @@ async def start_all():
 
         safe_log("✅ Menjalankan Flask server via Hypercorn...")
         await serve(app, config)
-
     except ModuleNotFoundError:
         safe_log("⚠️ Hypercorn tidak ditemukan. Menjalankan Flask dev server fallback.", level="warning")
         port = int(os.getenv("PORT", "8080"))
         app.run(host="0.0.0.0", port=port, debug=False)
-
+        return
     except OSError as e:
         if e.errno == 98:
             safe_log("⚠️ Port sudah digunakan. Menjalankan Flask dev server fallback.", level="warning")
             app.run(host="0.0.0.0", port=int(port), debug=False)
+            return
         else:
             raise
+
+    # ✅ Cegah shutdown otomatis
+    await asyncio.Event().wait()
 
 # === Entry Point
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ import json
 import datetime
 import asyncio
 import discord
+import time
+from collections import defaultdict, deque
 from discord.ext import commands, tasks
 from flask import Blueprint, session, request, redirect, render_template
 
@@ -83,36 +85,65 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     global AUTO_BAN_ENABLED
+
+    # Abaikan pesan dari bot
     if message.author.bot:
+        return
+
+    # Channel whitelist
+    WHITELISTED_CHANNELS = ["forum", "pengumuman", "trusted", "rules", "faq"]
+    if message.channel.name.lower() in WHITELISTED_CHANNELS:
+        print(f"[🔕] Channel '{message.channel.name}' dilewati dari filter.")
         return
 
     reason, ocr_text = None, ""
     content = message.content.lower()
 
+    # Deteksi phishing dari teks
     if any(k in content for k in STATIC_KEYWORDS + BLACKLISTED_KEYWORDS) and not is_whitelisted(content):
         reason = "Phishing / scam detected via keyword"
 
+    # Deteksi phishing dari gambar
     ocr_flag, ocr_text = await scan_image_for_phishing(message)
+    print(f"[🧪] OCR Flag: {ocr_flag} | OCR Text: {ocr_text}")
     if ocr_flag:
-        reason = "Phishing via image (OCR)"
+        reason = "Phishing via image (OCR/Hash)"
 
+    # Eksekusi ban jika reason ditemukan
     if reason and AUTO_BAN_ENABLED:
+        # Lewati user admin
+        if isinstance(message.author, discord.Member):
+            if message.author.guild_permissions.administrator:
+                print(f"⛔ Admin {message.author} terdeteksi phishing, dilewati.")
+                return
+            # Lewati user dengan role tertentu jika perlu
+            trusted_roles = ["Moderator", "Admin", "Whitelist"]
+            user_roles = [role.name for role in message.author.roles]
+            if any(role in trusted_roles for role in user_roles):
+                print(f"⛔ User {message.author} memiliki role yang dikecualikan: {user_roles}")
+                return
+
         try:
             await message.delete()
             await message.guild.ban(message.author, reason=reason)
             await save_log(str(message.author.id), str(message.author), reason, message.content)
             await notify_to_ngobrol(message)
+            await send_log_embed(message, reason, ocr_text)
+
             if flask_app:
                 with flask_app.app_context():
                     flask_app.config["phishing_count"] += 1
             return
         except Exception as e:
-            print("\u274c Gagal ban user:", e)
+            print("❌ Gagal ban user:", e)
 
+    # Tambahkan hitungan pesan
     if flask_app:
         with flask_app.app_context():
             flask_app.config["messages_checked"] += 1
+
     await bot.process_commands(message)
+
 
 # === Commands
 @bot.command()
