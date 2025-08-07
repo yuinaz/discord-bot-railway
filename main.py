@@ -126,6 +126,12 @@ def root():
 def healthcheck():
     return "✅ OK", 200
 
+# ✅ Route: Ping dari UptimeRobot — hanya log ke console
+@app.route("/ping")
+def uptime_ping():
+    safe_log("💓 Ping dari UptimeRobot diterima.")
+    return "✅ Ping OK", 200
+
 # === 404 Handler
 @app.errorhandler(404)
 def not_found(e):
