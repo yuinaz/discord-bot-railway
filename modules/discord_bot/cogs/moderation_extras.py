@@ -22,14 +22,25 @@ def _load_font(pref_list, size):
             continue
     return ImageFont.load_default()
 
-def _load_sticker_image():
-    # Prefer local asset to avoid remote fetch
-    candidates = [
-        "assets/fibilaugh.png",
-        "assets/fibilaugh.jpg",
-        "assets/fibilaugh.webp",
-    ]
-    for p in candidates:
+async def _get_fibilaugh_image(ctx):
+    # Try sticker in guild
+    sticker = None
+    try:
+        sticker = discord.utils.find(lambda s: getattr(s, "name", "").lower() == "fibilaugh", getattr(ctx.guild, "stickers", []))
+    except Exception:
+        sticker = None
+    if sticker:
+        try:
+            asset = getattr(sticker, "url", None)
+            if asset:
+                data = await asset.read()
+                import io as _io
+                from PIL import Image as _Image
+                return _Image.open(_io.BytesIO(data)).convert("RGBA")
+        except Exception:
+            pass
+    # Fallback local asset
+    for p in ("assets/fibilaugh.png","assets/fibilaugh.jpg","assets/fibilaugh.webp","static/fibilaugh.png"):
         if os.path.exists(p):
             try:
                 return Image.open(p).convert("RGBA")
@@ -37,24 +48,25 @@ def _load_sticker_image():
                 continue
     return None
 
-def build_ban_card(title, desc_lines, reason_line, sticker_img=None, width=900, height=420):
+def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40,167,69)):
     # Colors
     bg = (24, 26, 32)
     text_primary = (255, 255, 255)
     text_secondary = (220, 220, 220)
     text_warn = (255, 230, 170)
-    badge_green = (40, 167, 69)
 
     img = Image.new("RGB", (width, height), bg)
     draw = ImageDraw.Draw(img)
 
     # Fonts (common Windows/Linux/Mac fallbacks)
     font_title = _load_font([
-        "C:/Windows/Fonts/arialbd.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/System/Library/Fonts/SFNSRounded.ttf"
     ], 36)
     font_text = _load_font([
-        "C:/Windows/Fonts/arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/System/Library/Fonts/SFNS.ttf"
     ], 24)
 
@@ -67,25 +79,25 @@ def build_ban_card(title, desc_lines, reason_line, sticker_img=None, width=900, 
         y += 32
     y += 10
     # badge
-    badge_w, badge_h = 260, 38
-    draw.rounded_rectangle([x, y, x+badge_w, y+badge_h], radius=9, fill=badge_green)
-    draw.text((x+12, y+7), "✅ Simulasi testban", fill=text_primary, font=font_text)
+    badge_w, badge_h = 320, 40
+    draw.rounded_rectangle([x, y, x+badge_w, y+badge_h], radius=10, fill=badge_color)
+    by = y + (badge_h - 28)//2
+    draw.text((x+12, by), badge_text, fill=text_primary, font=font_text)
     y += badge_h + 18
     draw.text((x, y), reason_line, fill=text_warn, font=font_text)
 
     # Sticker (right)
     if sticker_img:
         max_w, max_h = 360, 360
-        sticker_img = sticker_img.copy()
-        sticker_img.thumbnail((max_w, max_h))
-        sx = width - sticker_img.width - 30
+        s = sticker_img.copy()
+        s.thumbnail((max_w, max_h))
+        sx = width - s.width - 30
         sy = 30
         try:
-            img.paste(sticker_img, (sx, sy), sticker_img)
+            img.paste(s, (sx, sy), s)
         except Exception:
-            img.paste(sticker_img, (sx, sy))
+            img.paste(s, (sx, sy))
 
-    # Output buffer
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
@@ -124,8 +136,8 @@ class ModerationExtras(commands.Cog):
         desc_lines = [f"{member.display_name} terdeteksi mengirim pesan mencurigakan.",
                       "(Pesan ini hanya simulasi untuk pengujian.)"]
         reason_line = f"📝 {reason}"
-        sticker_img = _load_sticker_image()
-        buf = build_ban_card(title, desc_lines, reason_line, sticker_img=sticker_img)
+        sticker_img = await _get_fibilaugh_image(ctx)
+        buf = _compose_card(title, desc_lines, "✅ Simulasi testban", reason_line, sticker_img=sticker_img, badge_color=(40,167,69))
 
         file = discord.File(buf, filename="testban_card.png")
         embed = discord.Embed(
@@ -157,12 +169,11 @@ class ModerationExtras(commands.Cog):
         except Exception as e:
             return await ctx.send(f"❌ Gagal memban: {e}")
 
-        # Compose final card (bukan simulasi)
         title = "🚫 User Dibanned"
         desc_lines = [f"{member.display_name} telah dibanned.", "Aksi dilakukan oleh moderator."]
         reason_line = f"📝 {reason}"
-        sticker_img = _load_sticker_image()
-        buf = build_ban_card(title, desc_lines, reason_line, sticker_img=sticker_img)
+        sticker_img = await _get_fibilaugh_image(ctx)
+        buf = _compose_card(title, desc_lines, "🔨 Ban", reason_line, sticker_img=sticker_img, badge_color=(220, 53, 69))
 
         file = discord.File(buf, filename="ban_card.png")
         embed = discord.Embed(

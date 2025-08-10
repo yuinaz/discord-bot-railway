@@ -27,10 +27,10 @@ async def load_all_cogs(bot):
     except Exception as e:
         print('[cogs_loader] gagal enumerasi cogs:', e)
 
-    # Wajib dimuat, dan aman tanpa konflik
+    # Wajib dimuat, tanpa konflik nama
     for ext in (
         PKG_ROOT + '.events.bot_online_announce',
-        PKG_ROOT + '.cogs.moderation_extras',  # hanya serverinfo, testban, ban
+        PKG_ROOT + '.cogs.moderation_extras',
     ):
         try:
             await _maybe_await(bot.load_extension(ext))
