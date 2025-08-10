@@ -17,7 +17,6 @@ async def load_all_cogs(bot):
     COGS_LOADED = True
 
     base = PKG_ROOT + '.cogs'
-    # Auto-load all cogs under cogs/
     try:
         pkg = importlib.import_module(base)
         for _, modname, _ in pkgutil.iter_modules(pkg.__path__):
@@ -30,7 +29,7 @@ async def load_all_cogs(bot):
     except Exception as e:
         print('[cogs_loader] gagal enumerasi cogs:', e)
 
-    # Explicit must-have extensions (safe if already loaded)
+    # Extensions wajib
     extras = (
         PKG_ROOT + '.events.bot_online_announce',
         PKG_ROOT + '.cogs.moderation_test',
