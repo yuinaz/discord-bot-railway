@@ -22,5 +22,14 @@ class BotOnlineAnnounce(commands.Cog):
                 except Exception:
                     pass
 
+    # Command diagnosa untuk cek extension yang aktif
+    @commands.command(name="sbwho")
+    async def sbwho(self, ctx: commands.Context):
+        try:
+            exts = sorted(self.bot.extensions.keys())
+            await ctx.send("Loaded extensions: " + ", ".join(exts))
+        except Exception as e:
+            await ctx.send(f"diag err: {e}")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(BotOnlineAnnounce(bot))
