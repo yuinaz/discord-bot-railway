@@ -20,4 +20,5 @@ def register_basic_events(bot: commands.Bot):
     async def on_message(message: Message):
         if message.author.bot:
             return
-        await bot.process_commands(message)
+        from modules.discord_bot import message_handlers
+        await message_handlers.handle_on_message(bot, message)
