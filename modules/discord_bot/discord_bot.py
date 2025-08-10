@@ -30,7 +30,7 @@ from .background_tasks import run_background_tasks
 from .event_handlers import register_event_handlers
 from .events.advanced_events import register_advanced_events
 from .helpers.error_handler import setup_error_handler
-from .message_handlers import handle_on_message  # single listener only
+from .message_handlers import handle_on_message  # signature: handle_on_message(bot, message)
 
 # --- Bot class & instance ---
 class SatpamBot(commands.Bot):
@@ -70,14 +70,15 @@ async def on_ready():
     except Exception as e:
         logging.exception("setup_error_handler error: %s", e)
 
-    # Listener pesan custom (SATU saja). process_commands dipanggil di akhir handler tsb.
-    try:
-        @bot.listen("on_message")
+# --- Safe on_message relay (no indentation issues) ---
+@bot.listen("on_message")
 async def _relay_on_message(message):
-    from .message_handlers import handle_on_message as _hm
-    await _hm(bot, message)
+    if getattr(message.author, "bot", False):
+        return
+    try:
+        await handle_on_message(bot, message)
     except Exception as e:
-        logging.exception("add_listener on_message error: %s", e)
+        logging.exception("on_message relay error: %s", e)
 
 # --- HTTP routes ---
 @discord_bot_bp.route("/start-bot")
