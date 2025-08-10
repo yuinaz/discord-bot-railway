@@ -1,7 +1,18 @@
 # URL guard (auto)
+async def handle_urls(message, bot):
+    return await _handle_urls_impl(message, bot)
+
+# internal below
 import os, logging
 from urllib.parse import urlparse
 import requests
+
+async def _handle_urls_impl(message, bot):
+    try:
+        pass
+    except Exception:
+        pass
+
 from modules.discord_bot.helpers.url_check import extract_urls, normalize_domain, check_domain_reputation, is_shortener
 from modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelisted_channel  # permissions import
 from modules.discord_bot.helpers.db import log_action
@@ -54,11 +65,21 @@ async def check_message_urls(message, bot):
     levels = [rep for _,_,rep in suspicious]
     level = 'black' if ('black' in levels) else 'sus'
 
-    # Always delete the message
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    if level == 'black' and URL_AUTOBAN_CRITICAL and not message.author.bot:
+        try:
+            await message.guild.ban(message.author, reason='Auto-ban: critical malicious URL', delete_message_days=0)
+            try:
+                await message.delete()
+            except Exception:
+                pass
+        except Exception:
+            pass
+    else:
+        # delete for 'sus' or when not critical
+        try:
+            await message.delete()
+        except Exception:
+            pass
     try:
         log_action(str(getattr(message.author,'id',0)), str(getattr(message.guild,'id',0) if message.guild else 0), 'url_scan', 'message scanned', {'suspicious': True})
     except Exception:
@@ -122,7 +143,14 @@ def _vt_save():
 def vt_check(domain_or_url: str):
     if not (VT_ENABLED and VT_API_KEY):
         return None
-    import requests, json as _json
+    import requests
+
+async def _handle_urls_impl(message, bot):
+    try:
+        pass
+    except Exception:
+        pass
+, json as _json
     # Use domains endpoint for simplicity
     try:
         from urllib.parse import urlparse

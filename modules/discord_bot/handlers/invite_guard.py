@@ -37,7 +37,10 @@ async def check_nsfw_invites(message: discord.Message, bot: discord.Client):
             perms = message.guild.me.guild_permissions if message.guild and message.guild.me else None
             if perms and perms.ban_members:
                 try:
-                    # (requested) do not delete original message
+                    try:
+                    await message.delete()
+                except Exception:
+                    pass
                 except Exception:
                     pass
                 reason = "Auto-ban: menyebarkan undangan ke server NSFW (guild: " + str(getattr(g,'name','unknown')) + ")"

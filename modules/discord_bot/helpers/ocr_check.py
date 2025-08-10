@@ -24,7 +24,13 @@ def _load_ocr_words():
             out.append(w)
     return out
 
-PROHIBITED_KEYWORDS = _load_ocr_words()
+SCAM_DEFAULT_WORDS = [
+    "bonus", "promo code", "register", "claim", "casino", "slots",
+    "usdt", "trx", "withdrawal", "withdraw", "deposit", "airdrop",
+    "binance", "okx", "bybit", "kucoin", "gift", "reward", "free reward"
+]
+USE_SCAM_WORDS = (os.getenv("OCR_SCAM_STRICT","true").lower()=="true")
+PROHIBITED_KEYWORDS = _load_ocr_words() + (SCAM_DEFAULT_WORDS if USE_SCAM_WORDS else [])
 
 def _preprocess(img: Image.Image) -> Image.Image:
     g = ImageOps.grayscale(img)

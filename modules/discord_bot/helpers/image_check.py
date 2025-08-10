@@ -4,11 +4,11 @@ from datetime import datetime
 from modules.discord_bot.helpers.image_hashing import compute_all_hashes, hamming
 
 DATA_FILE = os.getenv("BLACKLIST_IMAGE_HASHES", "data/blacklist_image_hashes.json")
-PHASH_MAX = int(os.getenv("IMG_PHASH_MAX_DIST", "12"))
-DHASH_MAX = int(os.getenv("IMG_DHASH_MAX_DIST", "9"))
-AHASH_MAX = int(os.getenv("IMG_AHASH_MAX_DIST", "9"))
+PHASH_MAX = int(os.getenv("IMG_PHASH_MAX_DIST", "16"))
+DHASH_MAX = int(os.getenv("IMG_DHASH_MAX_DIST", "12"))
+AHASH_MAX = int(os.getenv("IMG_AHASH_MAX_DIST", "12"))
 REGION_USE = os.getenv("IMG_REGION_HASH", "true").lower() == "true"
-REGION_MAX_HITS = int(os.getenv("IMG_REGION_MIN_MATCH", "4"))
+REGION_MAX_HITS = int(os.getenv("IMG_REGION_MIN_MATCH", "3"))
 
 def _load_db():
     try:
