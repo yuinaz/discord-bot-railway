@@ -30,7 +30,7 @@ from .background_tasks import run_background_tasks
 from .event_handlers import register_event_handlers
 from .events.advanced_events import register_advanced_events
 from .helpers.error_handler import setup_error_handler
-from .message_handlers import handle_on_message, _ensure_process_commands
+from .message_handlers import handle_on_message  # single listener only
 
 # --- Bot class & instance ---
 class SatpamBot(commands.Bot):
@@ -70,16 +70,11 @@ async def on_ready():
     except Exception as e:
         logging.exception("setup_error_handler error: %s", e)
 
-    # Listeners
+    # Listener pesan custom (SATU saja). process_commands dipanggil di akhir handler tsb.
     try:
         bot.add_listener(handle_on_message, "on_message")
     except Exception as e:
         logging.exception("add_listener on_message error: %s", e)
-
-    try:
-        bot.add_listener(_ensure_process_commands, "on_message")
-    except Exception as e:
-        logging.exception("add_listener process_commands error: %s", e)
 
 # --- HTTP routes ---
 @discord_bot_bp.route("/start-bot")
