@@ -6,7 +6,7 @@ import io, os
 from typing import Optional
 
 # === Konfigurasi Sticker ===
-FIBILaugh_STICKER_ID = 1402979487750160498  # ID sticker yang kamu berikan
+FIBILaugh_STICKER_ID = 1402979487750160498  # ganti bila ID di server berbeda
 
 MOD_ROLE_NAMES = {"mod", "moderator", "admin", "administrator", "staff"}
 
@@ -26,88 +26,45 @@ def _load_font(pref_list, size):
             continue
     return ImageFont.load_default()
 
-async def _get_fibilaugh_image(ctx):
-    """Ambil gambar FibiLaugh:
-       1) coba fetch by ID,
-       2) fallback cari nama,
-       3) fallback file lokal.
-    """
-    import io as _io
-    from PIL import Image as _Image
-    guild = ctx.guild
-
-    # --- helper fallback lokal ---
-    def _fallback_local():
-        for p in ("assets/fibilaugh.png", "assets/fibilaugh.jpg",
-                  "assets/fibilaugh.webp", "static/fibilaugh.png"):
-            if os.path.exists(p):
-                try:
-                    return Image.open(p).convert("RGBA")
-                except Exception:
-                    pass
+async def _resolve_fibilaugh_sticker(ctx) -> Optional[discord.GuildSticker]:
+    """Balikkan GuildSticker FibiLaugh (prefer ID, lalu nama)."""
+    g = ctx.guild
+    if not g:
         return None
-
-    # --- 1) Langsung via ID ---
-    if guild and FIBILaugh_STICKER_ID:
+    # 1) by ID
+    if FIBILaugh_STICKER_ID:
         try:
-            st = await guild.fetch_sticker(FIBILaugh_STICKER_ID)
-            fmt = getattr(st, "format", None) or getattr(st, "format_type", None)
-            fmt_s = str(fmt).lower()
-            # Jika format animasi (lottie), PIL tidak bisa render → pakai fallback lokal
-            if "lottie" in fmt_s:
-                img = _fallback_local()
-                if img:
-                    return img
-            else:
-                asset = getattr(st, "url", None)
-                if asset:
-                    data = await asset.read()
-                    return _Image.open(_io.BytesIO(data)).convert("RGBA")
+            st = await g.fetch_sticker(FIBILaugh_STICKER_ID)
+            return st
         except Exception:
-            # lanjut ke fallback berikutnya
             pass
-
-    # --- 2) Cari berdasarkan nama (force fetch agar cache tidak kosong) ---
-    candidates = {"fibilaugh", "fibi laugh", "fibi_laugh"}
-    target = None
-    stickers = []
+    # 2) by name (cache + fetch)
     try:
-        stickers = list(getattr(guild, "stickers", [])) if guild else []
-    except Exception:
-        stickers = []
-    try:
-        if guild:
-            fetched = await guild.fetch_stickers()
-            if fetched:
-                seen = {s.id for s in stickers}
-                stickers.extend([s for s in fetched if s.id not in seen])
+        st = discord.utils.get(getattr(g, "stickers", []), name="FibiLaugh")
+        if st:
+            return st
     except Exception:
         pass
+    try:
+        fetched = await g.fetch_stickers()
+        for s in fetched:
+            if (getattr(s, "name", "") or "").lower().replace("-", " ") in {"fibilaugh","fibi laugh","fibi_laugh"}:
+                return s
+    except Exception:
+        pass
+    return None
 
-    for s in stickers:
-        name = (getattr(s, "name", "") or "").lower().replace("-", " ")
-        if name in candidates:
-            target = s
-            break
-
-    if target:
-        try:
-            fmt = getattr(target, "format", None) or getattr(target, "format_type", None)
-            fmt_s = str(fmt).lower()
-            if "lottie" in fmt_s:
-                img = _fallback_local()
-                if img:
-                    return img
-            else:
-                asset = getattr(target, "url", None)
-                if asset:
-                    data = await asset.read()
-                    return _Image.open(_io.BytesIO(data)).convert("RGBA")
-        except Exception:
-            pass
-
-    # --- 3) Fallback file lokal terakhir ---
-    return _fallback_local()
+async def _get_fibilaugh_image(ctx):
+    """Gambar komposit fallback untuk kartu; pakai file lokal bila ada.
+       (Sticker animasi tidak bisa dirender PIL; sticker tetap dikirim native via 'stickers=[...]').
+    """
+    for p in ("assets/fibilaugh.png", "assets/fibilaugh.jpg", "assets/fibilaugh.webp", "static/fibilaugh.png"):
+        if os.path.exists(p):
+            try:
+                return Image.open(p).convert("RGBA")
+            except Exception:
+                pass
+    return None
 
 def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40, 167, 69)):
     # Colors
@@ -147,7 +104,7 @@ def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, 
     y += badge_h + 18
     draw.text((x, y), reason_line, fill=text_warn, font=font_text)
 
-    # Sticker (right)
+    # Sticker (right) — hanya bila ada fallback image
     if sticker_img:
         max_w, max_h = 360, 360
         s = sticker_img.copy()
@@ -206,7 +163,7 @@ class ModerationExtras(commands.Cog):
             "(Pesan ini hanya simulasi untuk pengujian.)",
         ]
         reason_line = f"📝 {reason}"
-        sticker_img = await _get_fibilaugh_image(ctx)
+        sticker_img = await _get_fibilaugh_image(ctx)  # untuk komposit (opsional)
         buf = _compose_card(
             title, desc_lines, "✅ Simulasi testban", reason_line,
             sticker_img=sticker_img, badge_color=(40, 167, 69)
@@ -220,11 +177,17 @@ class ModerationExtras(commands.Cog):
             timestamp=datetime.now(timezone.utc),
         )
         embed.set_image(url="attachment://testban_card.png")
+
+        # --- Kirim sticker native juga (selalu tampil walau animasi) ---
+        sticker_obj = await _resolve_fibilaugh_sticker(ctx)
         try:
-            if member.display_avatar:
-                embed.set_thumbnail(url=member.display_avatar.url)
+            if sticker_obj:
+                await ctx.send(embed=embed, file=file, stickers=[sticker_obj])
+                return
         except Exception:
             pass
+
+        # Fallback: kirim tanpa sticker kalau tidak bisa
         await ctx.send(embed=embed, file=file)
 
     @commands.command(name="ban")
@@ -258,9 +221,12 @@ class ModerationExtras(commands.Cog):
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         embed.add_field(name="Alasan", value=reason, inline=False)
         embed.set_image(url="attachment://ban_card.png")
+
+        sticker_obj = await _resolve_fibilaugh_sticker(ctx)
         try:
-            if member.display_avatar:
-                embed.set_thumbnail(url=member.display_avatar.url)
+            if sticker_obj:
+                await ctx.send(embed=embed, file=file, stickers=[sticker_obj])
+                return
         except Exception:
             pass
         await ctx.send(embed=embed, file=file)
