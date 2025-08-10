@@ -14,7 +14,8 @@ async def load_all_cogs(bot):
         return
     COGS_LOADED = True
 
-    base = 'modules.discord_bot.cogs'
+    base = 'discord_bot.cogs'
+    # Auto-load all cogs under cogs/
     try:
         pkg = __import__(base, fromlist=[''])
         for _, modname, _ in pkgutil.iter_modules(pkg.__path__):
@@ -26,10 +27,10 @@ async def load_all_cogs(bot):
     except Exception as e:
         print('[cogs_loader] gagal enumerasi cogs:', e)
 
-    # explicit important extensions (safe to call even if already loaded)
+    # Explicit must-have extensions (safe if already loaded)
     for ext in (
-        'modules.discord_bot.events.bot_online_announce',
-        'modules.discord_bot.cogs.moderation_test',
+        'discord_bot.events.bot_online_announce',
+        'discord_bot.cogs.moderation_test',
     ):
         try:
             await _maybe_await(bot.load_extension(ext))

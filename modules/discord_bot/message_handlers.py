@@ -36,3 +36,11 @@ async def handle_on_message(message: discord.Message, bot=None):
         await handle_ocr_check(message)
     except Exception:
         pass
+
+
+# === IMPORTANT: forward to command parser ===
+async def _ensure_process_commands(message):
+    try:
+        await message.bot.process_commands(message)
+    except Exception:
+        pass
