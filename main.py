@@ -3,10 +3,15 @@ import eventlet
 eventlet.monkey_patch()
 
 from modules.discord_bot.helpers.env_loader import load_env
-from app import app, socketio
+from app import app, socketio, bootstrap
 
 if __name__ == "__main__":
-    # Honor Render.com assigned port if present, fallback ke 8080 jika kosong
+    # Render kadang memberi PORT kosong -> fallback aman
     raw_port = os.getenv("PORT") or "8080"
     port = int(raw_port)
+
+    # Inisialisasi DB, tema, sampler, dan broadcast loop
+    bootstrap()
+
+    # Jalankan via eventlet (bukan Werkzeug)
     socketio.run(app, host="0.0.0.0", port=port)

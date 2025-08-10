@@ -38,7 +38,7 @@ try:
 except Exception as _stats_err:
     # keep app running even if metrics module missing
     pass
-socketio = SocketIO(app, async_mode='threading')
+socketio = SocketIO(app)
 # (removed duplicate secret assignment)
 
 # Waktu mulai untuk uptime
@@ -342,34 +342,6 @@ def start_broadcast_loop():
     thread = threading.Thread(target=loop)
     thread.daemon = True
     thread.start()
-
-# ===== MAIN =====
-if __name__ == "__main__":
-    init_db()
-    init_stats_db()
-
-    os.makedirs("config", exist_ok=True)
-    theme_file = "config/theme.json"
-    if not os.path.exists(theme_file):
-        with open(theme_file, "w", encoding="utf-8") as f:
-            json.dump({"theme": "default.css"}, f)
-    else:
-        try:
-            with open(theme_file, "r", encoding="utf-8") as f:
-                current = json.load(f).get("theme", "")
-            if not current.endswith(".css"):
-                raise ValueError("Invalid theme format")
-        except:
-            with open(theme_file, "w", encoding="utf-8") as f:
-                json.dump({"theme": "default.css"}, f)
-
-    start_broadcast_loop()
-    
-if __name__ == '__main__':
-    port=int(os.getenv('PORT', 5000))
-    # Start background broadcast loop
-    start_broadcast_loop()
-    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True, debug=os.getenv('FLASK_DEBUG','0')=='1')
 
 # === Dashboard background upload ===
 @app.route("/upload-background", methods=["POST"])
@@ -744,11 +716,26 @@ def restart_service():
     return jsonify({"ok": True})
 
 
-# --- Login guard decorator ---
-def login_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if not session.get("logged_in"):
-            return redirect(url_for("login", next=request.path))
-        return view(*args, **kwargs)
-    return wrapped
+def bootstrap():
+    # Inisialisasi DB dashboards & bot stats
+    init_db()
+    init_stats_db()
+
+    # Pastikan theme config valid
+    os.makedirs("config", exist_ok=True)
+    theme_file = "config/theme.json"
+    if not os.path.exists(theme_file):
+        with open(theme_file, "w", encoding="utf-8") as f:
+            json.dump({"theme": "default.css"}, f)
+    else:
+        try:
+            with open(theme_file, "r", encoding="utf-8") as f:
+                current = json.load(f).get("theme", "")
+            if not current.endswith(".css"):
+                raise ValueError("Invalid theme format")
+        except Exception:
+            with open(theme_file, "w", encoding="utf-8") as f:
+                json.dump({"theme": "default.css"}, f)
+
+    # Mulai loop broadcast realtime 60 detik sekali
+    start_broadcast_loop()
