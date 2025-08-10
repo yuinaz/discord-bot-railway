@@ -1,7 +1,10 @@
 # Enhanced OCR helper (auto 2025-08-09T12:25:01.102837Z)
 import os, io
 from PIL import Image, ImageOps, ImageFilter, ImageEnhance
-import pytesseract
+try:
+    import pytesseract
+except Exception:
+    pytesseract = None
 
 DEFAULT_LANG = os.getenv("OCR_LANG", "eng+ind")
 def _load_ocr_words():
@@ -32,6 +35,8 @@ def _preprocess(img: Image.Image) -> Image.Image:
 
 def extract_text_from_image(image_bytes: bytes, lang: str = None) -> str:
     try:
+        if not pytesseract:
+            return ""
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         prep = _preprocess(img)
         text = pytesseract.image_to_string(prep, lang=(lang or DEFAULT_LANG))
@@ -39,8 +44,16 @@ def extract_text_from_image(image_bytes: bytes, lang: str = None) -> str:
     except Exception:
         return ""
 
+def _normalize_text(s: str) -> str:
+    s = (s or "").lower()
+    s = s.replace("\u200b","").replace("\u200c","").replace("\u200d","")
+    s = " ".join(s.split())
+    for a,b in {"0":"o","1":"i","3":"e","4":"a","5":"s","7":"t","@":"a","$":"s","!":"i"}.items():
+        s = s.replace(a,b)
+    return s
+
 def contains_prohibited_text(text: str) -> bool:
     if not PROHIBITED_KEYWORDS:
         return False
-    low = (text or "").lower()
+    low = _normalize_text(text)
     return any(k in low for k in PROHIBITED_KEYWORDS)

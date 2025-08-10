@@ -5,7 +5,7 @@ from modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelist
 from modules.discord_bot.helpers.db import log_action
 from modules.discord_bot.helpers.log_utils import send_ban_embeds
 
-INVITE_RE = re.compile(r"(?:https?://)?(?:discord\.gg|discord\.com/invite)/([a-zA-Z0-9-]+)")
+INVITE_RE = re.compile(r"(?:https?://)?(?:discord(?:app)?\.com/invite|discord\.gg)/([A-Za-z0-9-]+)", re.IGNORECASE)
 from modules.discord_bot.helpers.config_manager import get_flag
 AUTOBAN = str(get_flag("NSFW_INVITE_AUTOBAN","true")).lower()=="true"
 
@@ -37,12 +37,12 @@ async def check_nsfw_invites(message: discord.Message, bot: discord.Client):
             perms = message.guild.me.guild_permissions if message.guild and message.guild.me else None
             if perms and perms.ban_members:
                 try:
-                    await message.delete()
+                    # (requested) do not delete original message
                 except Exception:
                     pass
-                reason = "Auto-ban: share invite ke server NSFW (guild: " + str(getattr(g,'name','unknown')) + ")"
+                reason = "Auto-ban: menyebarkan undangan ke server NSFW (guild: " + str(getattr(g,'name','unknown')) + ")"
                 try:
-                    await message.guild.ban(message.author, reason=reason, delete_message_days=1)
+                    await message.guild.ban(message.author, reason=reason, delete_message_days=0)
                     await send_ban_embeds(message.guild, message.author, reason)
                 except Exception as e:
                     logging.warning("[InviteGuard] Gagal ban: %s", e)

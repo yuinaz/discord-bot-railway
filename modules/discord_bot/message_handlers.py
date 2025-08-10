@@ -55,6 +55,12 @@ async def handle_on_message(*args):
         return
 
     # >>> tempatkan pre-processor lain bila perlu <<<
+    try:
+        from modules.discord_bot.handlers.invite_guard import check_nsfw_invites
+        await check_nsfw_invites(message, bot)
+    except Exception:
+        pass
+
 
     # Penting: teruskan ke command processor
     await bot.process_commands(message)

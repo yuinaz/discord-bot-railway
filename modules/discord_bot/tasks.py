@@ -7,7 +7,7 @@ from datetime import datetime
 from modules.discord_bot.helpers.image_hashing import calculate_image_hash
 from modules.discord_bot.helpers.image_check import is_blacklisted_image, add_to_blacklist
 from modules.discord_bot.helpers.image_utils import compress_image, convert_to_rgb
-from modules.discord_bot.helpers.ocr_check import contains_prohibited_text
+from modules.discord_bot.helpers.ocr_check import extract_text_from_image, contains_prohibited_text
 from modules.logger.helpers.logger_utils import log_violation, log_image_event
 
 async def process_image_message(message: discord.Message, bot: commands.Bot):
@@ -29,7 +29,7 @@ async def process_image_message(message: discord.Message, bot: commands.Bot):
             # Logging deteksi gambar (opsional)
             log_image_event(message, image_hash)
 
-            if is_blacklisted_image(image_hash):
+            if is_blacklisted_image(image_bytes):
                 await handle_blacklisted_image(message, image_hash)
                 return
 
@@ -52,10 +52,11 @@ async def handle_blacklisted_image(message: discord.Message, image_hash: str):
 async def check_ocr_violation(image_bytes: bytes, message: discord.Message, image_hash: str) -> bool:
     """Cek apakah teks dalam gambar melanggar melalui OCR."""
     try:
-        if contains_prohibited_text(image_bytes):
+        text = extract_text_from_image(image_bytes)
+        if text and contains_prohibited_text(text):
             await message.delete()
             await message.channel.send("🛑 Gambar mengandung teks terlarang.", delete_after=10)
-            log_violation(message, image_hash, reason="Prohibited OCR text")
+            await log_violation(message, image_hash, reason="Prohibited OCR text")
             return True
     except Exception as e:
         print(f"[❌] Gagal OCR: {e}")
