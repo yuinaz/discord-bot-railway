@@ -1,44 +1,54 @@
-import discord
-from typing import Set
-_SB_PROCESSED_IDS: Set[int] = set()
 
-def _should_process(msg: discord.Message) -> bool:
-    try:
-        mid = msg.id
-    except Exception:
+"""
+Safe message handler:
+- Tidak lagi menempelkan atribut ke discord.Message (menghindari AttributeError).
+- Memastikan bot.process_commands(message) dieksekusi sekali per message.
+- Ringan, thread-safe dengan asyncio.Lock + LRU set.
+"""
+import asyncio
+from collections import deque
+
+# LRU guard agar setiap message hanya diproses sekali
+_MSG_GUARD_LOCK = asyncio.Lock()
+_MSG_SEEN_IDS = set()
+_MSG_QUEUE = deque(maxlen=4096)
+
+async def _guard_once(message_id: int) -> bool:
+    """Return True jika message_id belum pernah diproses (lalu tandai), False jika duplikat."""
+    if message_id is None:
+        return True  # kalau tak ada ID, biarkan lewat (jarang terjadi)
+    async with _MSG_GUARD_LOCK:
+        if message_id in _MSG_SEEN_IDS:
+            return False
+        _MSG_SEEN_IDS.add(message_id)
+        _MSG_QUEUE.append(message_id)
+        # Buang ID lama bila melebihi kapasitas (deque sudah otomatis FIFO)
+        if len(_MSG_QUEUE) == _MSG_QUEUE.maxlen:
+            old = _MSG_QUEUE.popleft()
+            _MSG_SEEN_IDS.discard(old)
         return True
-    return mid not in _SB_PROCESSED_IDS
 
-def _mark_processed(msg: discord.Message) -> None:
-    try:
-        _SB_PROCESSED_IDS.add(msg.id)
-    except Exception:
-        pass
-
-async def handle_on_message(message: discord.Message, bot=None):
-    # Abaikan pesan dari bot
-    if getattr(message.author, "bot", False):
+async def handle_on_message(bot, message):
+    """Panggil ini dari event on_message utama kamu.
+    Contoh:
+        @bot.event
+        async def on_message(message):
+            from modules.discord_bot import message_handlers
+            await message_handlers.handle_on_message(bot, message)
+    """
+    # Abaikan DM / bot
+    if getattr(message, "author", None) and getattr(message.author, "bot", False):
+        return
+    if getattr(message, "guild", None) is None:
         return
 
-    content = (message.content or '').strip()
-
-    # Panggil parser command maksimal sekali per message dengan guard
-    # Jika command prefix "!", jangan proses logic custom
-    if content.startswith('!'):
-        if _should_process(message):
-            _mark_processed(message)
-            try:
-                await message.bot.process_commands(message)
-            except Exception:
-                pass
+    # Pastikan hanya sekali per message
+    mid = getattr(message, "id", None)
+    if not await _guard_once(mid):
         return
 
-    # --- TARUH LOGIKA CUSTOM DI SINI (deteksi phishing/ocr/dll) ---
-    # pass
+    # >>> Taruh handler/praproses lain di sini jika perlu <<<
+    # Contoh: anti-spam, anti-phish, dsb. (cog on_message akan tetap dipanggil oleh Discord)
 
-    if _should_process(message):
-        _mark_processed(message)
-        try:
-            await message.bot.process_commands(message)
-        except Exception:
-            pass
+    # Penting: selalu panggil process_commands agar prefix commands (!testban, dst.) tetap jalan
+    await bot.process_commands(message)
