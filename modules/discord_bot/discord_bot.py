@@ -72,7 +72,10 @@ async def on_ready():
 
     # Listener pesan custom (SATU saja). process_commands dipanggil di akhir handler tsb.
     try:
-        bot.add_listener(handle_on_message, "on_message")
+        @bot.listen("on_message")
+async def _relay_on_message(message):
+    from .message_handlers import handle_on_message as _hm
+    await _hm(bot, message)
     except Exception as e:
         logging.exception("add_listener on_message error: %s", e)
 
