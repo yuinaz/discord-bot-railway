@@ -101,3 +101,129 @@ class ModerationTest(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModerationTest(bot))
+
+@commands.command(name="ban")
+@commands.guild_only()
+@commands.has_permissions(ban_members=True)
+async def ban_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Melanggar aturan"):
+    # Ban nyata. Hanya moderator dengan izin ban_members.
+    if member is None:
+        return await ctx.send("Gunakan: `!ban @user [alasan]`")
+    if member == ctx.author:
+        return await ctx.send("Tidak bisa ban diri sendiri.")
+    try:
+        await member.ban(reason=reason, delete_message_days=0)
+    except discord.Forbidden:
+        return await ctx.send("❌ Aku tidak punya izin untuk memban user ini.")
+    except Exception as e:
+        return await ctx.send(f"❌ Gagal memban: {e}")
+
+    embed = discord.Embed(
+        title="🚫 User Dibanned",
+        description=f"{member.mention} telah dibanned.",
+        color=discord.Color.red(),
+        timestamp=datetime.now(timezone.utc)
+    )
+    embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+    embed.add_field(name="Alasan", value=reason, inline=False)
+    try:
+        if member.display_avatar:
+            embed.set_thumbnail(url=member.display_avatar.url)
+    except Exception:
+        pass
+
+    # Sticker FibiLaugh jika tersedia
+    sticker_url = None
+    try:
+        for s in ctx.guild.stickers:
+            if s.name.lower() == "fibilaugh":
+                sticker_url = getattr(s, "url", None)
+                break
+    except Exception:
+        sticker_url = None
+
+    if sticker_url:
+        embed.set_image(url=sticker_url)
+        await ctx.send(embed=embed)
+    else:
+        try:
+            path = "assets/fibilaugh.png"
+            file = discord.File(path, filename="fibilaugh.png")
+            embed.set_image(url="attachment://fibilaugh.png")
+            await ctx.send(embed=embed, file=file)
+        except Exception:
+            await ctx.send(embed=embed)
+
+@commands.command(name="unban")
+@commands.guild_only()
+@commands.has_permissions(ban_members=True)
+async def unban_cmd(self, ctx: commands.Context, *, target: str):
+    # Unban user dengan ID atau username#discriminator.
+    if not target:
+        return await ctx.send("Gunakan: `!unban <user_id | username#1234>`")
+    guild = ctx.guild
+
+    async def find_user_to_unban():
+        # Coba sebagai ID
+        if target.isdigit():
+            try:
+                user = await self.bot.fetch_user(int(target))
+                if user:
+                    return user
+            except Exception:
+                pass
+        # Coba name#discrim
+        if "#" in target:
+            name, discrim = target.rsplit("#", 1)
+            bans = await guild.bans()
+            for entry in bans:
+                u = entry.user
+                if (u.name == name and u.discriminator == discrim) or (f"{u.name}#{u.discriminator}".lower() == target.lower()):
+                    return u
+        # Fallback: cocokkan ID string
+        bans = await guild.bans()
+        for entry in bans:
+            if str(entry.user.id) == target:
+                return entry.user
+        return None
+
+    user = await find_user_to_unban()
+    if not user:
+        return await ctx.send("❌ User tidak ditemukan dalam daftar ban.")
+
+    try:
+        await guild.unban(user, reason=f"Unban by {ctx.author}")
+    except discord.Forbidden:
+        return await ctx.send("❌ Aku tidak punya izin untuk unban.")
+    except Exception as e:
+        return await ctx.send(f"❌ Gagal unban: {e}")
+
+    embed = discord.Embed(
+        title="✅ User Di-unban",
+        description=f"{getattr(user, 'mention', str(user))} telah di-unban.",
+        color=discord.Color.green(),
+        timestamp=datetime.now(timezone.utc)
+    )
+    embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+
+    # Optional: pakai FibiLaugh untuk konsistensi visual
+    sticker_url = None
+    try:
+        for s in ctx.guild.stickers:
+            if s.name.lower() == "fibilaugh":
+                sticker_url = getattr(s, "url", None)
+                break
+    except Exception:
+        sticker_url = None
+
+    if sticker_url:
+        embed.set_image(url=sticker_url)
+        await ctx.send(embed=embed)
+    else:
+        try:
+            path = "assets/fibilaugh.png"
+            file = discord.File(path, filename="fibilaugh.png")
+            embed.set_image(url="attachment://fibilaugh.png")
+            await ctx.send(embed=embed, file=file)
+        except Exception:
+            await ctx.send(embed=embed)
