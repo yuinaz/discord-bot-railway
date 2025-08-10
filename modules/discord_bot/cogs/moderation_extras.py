@@ -5,6 +5,9 @@ from PIL import Image, ImageDraw, ImageFont
 import io, os
 from typing import Optional
 
+# === Konfigurasi Sticker ===
+FIBILaugh_STICKER_ID = 1402979487750160498  # ID sticker yang kamu berikan
+
 MOD_ROLE_NAMES = {"mod", "moderator", "admin", "administrator", "staff"}
 
 def is_moderator(member: discord.Member) -> bool:
@@ -24,52 +27,87 @@ def _load_font(pref_list, size):
     return ImageFont.load_default()
 
 async def _get_fibilaugh_image(ctx):
-    """Cari sticker 'FibiLaugh' (force fetch). Fallback ke file lokal."""
-    # Fallback lokal dulu agar selalu ada gambar
-    for p in ("assets/fibilaugh.png", "assets/fibilaugh.jpg", "assets/fibilaugh.webp", "static/fibilaugh.png"):
-        if os.path.exists(p):
-            try:
-                return Image.open(p).convert("RGBA")
-            except Exception:
-                pass  # coba path berikutnya
-
+    """Ambil gambar FibiLaugh:
+       1) coba fetch by ID,
+       2) fallback cari nama,
+       3) fallback file lokal.
+    """
+    import io as _io
+    from PIL import Image as _Image
     guild = ctx.guild
-    if not guild:
+
+    # --- helper fallback lokal ---
+    def _fallback_local():
+        for p in ("assets/fibilaugh.png", "assets/fibilaugh.jpg",
+                  "assets/fibilaugh.webp", "static/fibilaugh.png"):
+            if os.path.exists(p):
+                try:
+                    return Image.open(p).convert("RGBA")
+                except Exception:
+                    pass
         return None
 
-    # Gabungkan cache + fetch API (cache sticker sering kosong)
+    # --- 1) Langsung via ID ---
+    if guild and FIBILaugh_STICKER_ID:
+        try:
+            st = await guild.fetch_sticker(FIBILaugh_STICKER_ID)
+            fmt = getattr(st, "format", None) or getattr(st, "format_type", None)
+            fmt_s = str(fmt).lower()
+            # Jika format animasi (lottie), PIL tidak bisa render → pakai fallback lokal
+            if "lottie" in fmt_s:
+                img = _fallback_local()
+                if img:
+                    return img
+            else:
+                asset = getattr(st, "url", None)
+                if asset:
+                    data = await asset.read()
+                    return _Image.open(_io.BytesIO(data)).convert("RGBA")
+        except Exception:
+            # lanjut ke fallback berikutnya
+            pass
+
+    # --- 2) Cari berdasarkan nama (force fetch agar cache tidak kosong) ---
+    candidates = {"fibilaugh", "fibi laugh", "fibi_laugh"}
+    target = None
+    stickers = []
     try:
-        stickers = list(getattr(guild, "stickers", []))
+        stickers = list(getattr(guild, "stickers", [])) if guild else []
     except Exception:
         stickers = []
     try:
-        fetched = await guild.fetch_stickers()
-        if fetched:
-            seen = {s.id for s in stickers}
-            stickers.extend([s for s in fetched if s.id not in seen])
+        if guild:
+            fetched = await guild.fetch_stickers()
+            if fetched:
+                seen = {s.id for s in stickers}
+                stickers.extend([s for s in fetched if s.id not in seen])
     except Exception:
         pass
 
-    # Cocokkan nama fleksibel (case-insensitive)
-    candidates = {"fibilaugh", "fibi laugh", "fibi_laugh"}
-    target = None
     for s in stickers:
         name = (getattr(s, "name", "") or "").lower().replace("-", " ")
         if name in candidates:
             target = s
             break
 
-    if not target:
-        return None
+    if target:
+        try:
+            fmt = getattr(target, "format", None) or getattr(target, "format_type", None)
+            fmt_s = str(fmt).lower()
+            if "lottie" in fmt_s:
+                img = _fallback_local()
+                if img:
+                    return img
+            else:
+                asset = getattr(target, "url", None)
+                if asset:
+                    data = await asset.read()
+                    return _Image.open(_io.BytesIO(data)).convert("RGBA")
+        except Exception:
+            pass
 
-    # Unduh gambar sticker
-    try:
-        asset = getattr(target, "url", None)
-        if asset:
-            data = await asset.read()
-            return Image.open(io.BytesIO(data)).convert("RGBA")
-    except Exception:
-        return None
+    # --- 3) Fallback file lokal terakhir ---
+    return _fallback_local()
 
 def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40, 167, 69)):
     # Colors
@@ -232,13 +270,23 @@ class ModerationExtras(commands.Cog):
         """List sticker yang terlihat bot (untuk debug)."""
         try:
             fetched = await ctx.guild.fetch_stickers()
-            names = [getattr(s, "name", f"id:{s.id}") for s in fetched]
+            names = [f"{getattr(s, 'name', f'id:{s.id}')}({s.id})" for s in fetched]
             if names:
                 await ctx.send("Stickers: " + ", ".join(names[:50]))
             else:
                 await ctx.send("Tidak ada sticker ter-fetch (atau izin kurang).")
         except Exception as e:
             await ctx.send(f"Sticker fetch error: {e}")
+
+    @commands.command(name="sbstickerid")
+    async def sbstickerid(self, ctx: commands.Context):
+        """Cek ambil sticker via ID langsung."""
+        try:
+            st = await ctx.guild.fetch_sticker(FIBILaugh_STICKER_ID)
+            fmt = getattr(st, "format", None) or getattr(st, "format_type", None)
+            await ctx.send(f"StickerID OK: {st.name} | id={st.id} | format={fmt}")
+        except Exception as e:
+            await ctx.send(f"Gagal fetch sticker ID: {e}")
 
     @commands.command(name="sbdiag")
     async def sbdiag(self, ctx: commands.Context):
