@@ -155,11 +155,7 @@ class ModerationExtras(commands.Cog):
 
     @commands.command(name="sbfibi_check")
     async def sbfibi_check(self, ctx: commands.Context):
-        base = Path(__file__).resolve().parents[3]
-        p = base / "assets" / "fibilaugh.png"
-        await ctx.send(f"{p} => {'ADA' if p.exists() else 'TIDAK ADA'}")
-
-    @commands.command(name="sbdiag")
+@commands.command(name="sbdiag")
     async def sbdiag(self, ctx: commands.Context):
         try:
             import inspect
