@@ -29,7 +29,6 @@ async def load_all_cogs(bot):
     except Exception as e:
         print('[cogs_loader] gagal enumerasi cogs:', e)
 
-    # Extensions wajib
     extras = (
         PKG_ROOT + '.events.bot_online_announce',
         PKG_ROOT + '.cogs.moderation_test',
