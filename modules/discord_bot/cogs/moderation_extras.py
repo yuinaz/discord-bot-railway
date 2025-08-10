@@ -124,7 +124,7 @@ class ModerationExtras(commands.Cog):
         if g.icon: embed.set_thumbnail(url=g.icon.url)
         await ctx.send(embed=embed)
 
-    @commands.command(name="testban")
+    @commands.command(name="testban", aliases=["tb"])
     @commands.guild_only()
     async def testban_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Simulasi ban untuk pengujian"):
         if not is_moderator(ctx.author):
@@ -190,6 +190,16 @@ if member == ctx.author:
         except Exception:
             pass
         await ctx.send(embed=embed, file=file)
+
+
+    @commands.command(name="sbdiag")
+    async def sbdiag(self, ctx: commands.Context):
+        try:
+            import inspect
+            src = inspect.getsourcefile(self.__class__)
+        except Exception:
+            src = __file__
+        await ctx.send(f"[sbdiag] moderation_extras loaded from: {src}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModerationExtras(bot))
