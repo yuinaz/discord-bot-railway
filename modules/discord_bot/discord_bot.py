@@ -35,8 +35,6 @@ intents.messages = True
 intents.message_content = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix=os.getenv('PREFIX','!'), intents=intents)
-
 # Tentukan mode
 FLASK_ENV = os.getenv("FLASK_ENV", "production").lower()
 
@@ -105,3 +103,28 @@ async def on_ready():
 
     # Tambahkan handler pesan utama
     bot.add_listener(handle_on_message, "on_message")
+
+from discord.ext import commands
+
+class SatpamBot(commands.Bot):
+    async def setup_hook(self):
+        try:
+            from modules.discord_bot.cogs_loader import load_all_cogs
+            await load_all_cogs(self)
+            print('[setup_hook] commands:', [c.qualified_name for c in self.commands])
+        except Exception as e:
+            print('[setup_hook] load cogs error:', e)
+
+def build_bot():
+    return SatpamBot(command_prefix="!", intents=intents, case_insensitive=True)
+
+
+import os
+
+def run_bot():
+    token = os.getenv("DISCORD_BOT_TOKEN") or os.getenv("DISCORD_TOKEN")
+    if not token:
+        print("[run_bot] ❌ Missing DISCORD_BOT_TOKEN (or DISCORD_TOKEN)")
+        return
+    bot = build_bot()
+    bot.run(token)
