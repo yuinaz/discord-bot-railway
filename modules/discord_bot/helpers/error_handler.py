@@ -30,6 +30,7 @@ def setup_error_handler(bot: commands.Bot):
     """Register generic error handlers to the bot."""
     @bot.event
     async def on_command_error(ctx: commands.Context, error: commands.CommandError):
+    # Patched: avoid duplicate usage messages for optional args like testban
         try:
             await handle_error(ctx, error)
         except Exception:

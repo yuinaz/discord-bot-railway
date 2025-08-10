@@ -130,9 +130,8 @@ class ModerationExtras(commands.Cog):
         if not is_moderator(ctx.author):
             return await ctx.send("❌ Hanya moderator yang dapat menggunakan perintah ini.")
         if member is None:
-            return await ctx.send("Gunakan: `!testban @user [alasan]`")
-
-        title = "💀 Simulasi Ban oleh SatpamBot"
+            member = ctx.author
+title = "💀 Simulasi Ban oleh SatpamBot"
         desc_lines = [f"{member.display_name} terdeteksi mengirim pesan mencurigakan.",
                       "(Pesan ini hanya simulasi untuk pengujian.)"]
         reason_line = f"📝 {reason}"
@@ -159,8 +158,8 @@ class ModerationExtras(commands.Cog):
     @commands.has_permissions(ban_members=True)
     async def ban_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Melanggar aturan"):
         if member is None:
-            return await ctx.send("Gunakan: `!ban @user [alasan]`")
-        if member == ctx.author:
+            member = ctx.author
+if member == ctx.author:
             return await ctx.send("Tidak bisa ban diri sendiri.")
         try:
             await member.ban(reason=reason, delete_message_days=0)

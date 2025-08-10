@@ -39,9 +39,9 @@ class ModerationTest(commands.Cog):
         if g.icon: embed.set_thumbnail(url=g.icon.url)
         await ctx.send(embed=embed)
 
-    @commands.command(name="testban")
+    @commands.command(name="testban_legacy")
     @commands.guild_only()
-    async def testban_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Simulasi ban untuk pengujian"):
+    async def testban_legacy_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Simulasi ban untuk pengujian"):
         if not is_moderator(ctx.author):
             return await ctx.send("❌ Hanya moderator yang dapat menggunakan perintah ini.")
         if member is None:
