@@ -1,42 +1,49 @@
 
 """
-Safe message handler:
-- Tidak lagi menempelkan atribut ke discord.Message (menghindari AttributeError).
-- Memastikan bot.process_commands(message) dieksekusi sekali per message.
-- Ringan, thread-safe dengan asyncio.Lock + LRU set.
+Backward-compatible message handler.
+- Menerima dua gaya pemanggilan:
+    1) handle_on_message(bot, message)
+    2) handle_on_message(message)  # lama
+- Guard aman: proses setiap message sekali saja (tanpa mutasi Message).
+- Selalu memanggil bot.process_commands(message).
 """
 import asyncio
 from collections import deque
 
-# LRU guard agar setiap message hanya diproses sekali
 _MSG_GUARD_LOCK = asyncio.Lock()
 _MSG_SEEN_IDS = set()
 _MSG_QUEUE = deque(maxlen=4096)
 
 async def _guard_once(message_id: int) -> bool:
-    """Return True jika message_id belum pernah diproses (lalu tandai), False jika duplikat."""
     if message_id is None:
-        return True  # kalau tak ada ID, biarkan lewat (jarang terjadi)
+        return True
     async with _MSG_GUARD_LOCK:
         if message_id in _MSG_SEEN_IDS:
             return False
         _MSG_SEEN_IDS.add(message_id)
         _MSG_QUEUE.append(message_id)
-        # Buang ID lama bila melebihi kapasitas (deque sudah otomatis FIFO)
         if len(_MSG_QUEUE) == _MSG_QUEUE.maxlen:
             old = _MSG_QUEUE.popleft()
             _MSG_SEEN_IDS.discard(old)
         return True
 
-async def handle_on_message(bot, message):
-    """Panggil ini dari event on_message utama kamu.
-    Contoh:
-        @bot.event
-        async def on_message(message):
-            from modules.discord_bot import message_handlers
-            await message_handlers.handle_on_message(bot, message)
-    """
-    # Abaikan DM / bot
+async def handle_on_message(*args):
+    """Dapat dipanggil sebagai handle_on_message(bot, message) atau handle_on_message(message)."""
+    bot = None
+    message = None
+
+    if len(args) == 1:
+        # Gaya lama: (message)
+        message = args[0]
+        # Ambil bot dari state internal discord.py (aman di runtime)
+        bot = getattr(getattr(message, "_state", None), "_get_client", lambda: None)()
+    elif len(args) >= 2:
+        bot, message = args[0], args[1]
+
+    if message is None or bot is None:
+        return  # tidak bisa proses
+
+    # Skip DM / bot
     if getattr(message, "author", None) and getattr(message.author, "bot", False):
         return
     if getattr(message, "guild", None) is None:
@@ -47,8 +54,7 @@ async def handle_on_message(bot, message):
     if not await _guard_once(mid):
         return
 
-    # >>> Taruh handler/praproses lain di sini jika perlu <<<
-    # Contoh: anti-spam, anti-phish, dsb. (cog on_message akan tetap dipanggil oleh Discord)
+    # >>> tempatkan pre-processor lain bila perlu <<<
 
-    # Penting: selalu panggil process_commands agar prefix commands (!testban, dst.) tetap jalan
+    # Penting: teruskan ke command processor
     await bot.process_commands(message)
