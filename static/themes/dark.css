@@ -1,0 +1,15 @@
+
+body {
+    background-color: #1e1e2f;
+    color: white;
+}
+.sidebar {
+    background-color: #2a2a3c;
+}
+.topbar {
+    background-color: #29293d;
+}
+.card {
+    background-color: #2f2f46;
+    color: white;
+}

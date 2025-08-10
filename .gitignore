@@ -1,0 +1,12 @@
+# .gitignore
+.env
+*.log
+*.zip
+__pycache__/
+.env.*
+# Jangan abaikan superadmin.db
+# *.db
+venv/
+.env
+__pycache__/
+*.pyc
