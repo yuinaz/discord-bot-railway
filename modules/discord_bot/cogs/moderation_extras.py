@@ -1,6 +1,8 @@
 import discord
 from discord.ext import commands
 from datetime import datetime, timezone
+from PIL import Image, ImageDraw, ImageFont
+import io, os
 
 MOD_ROLE_NAMES = {"mod","moderator","admin","administrator","staff"}
 
@@ -10,6 +12,84 @@ def is_moderator(member: discord.Member) -> bool:
         return True
     role_names = {r.name.lower() for r in getattr(member, "roles", [])}
     return any(n in role_names for n in MOD_ROLE_NAMES)
+
+# ---- helpers ----
+def _load_font(pref_list, size):
+    for path in pref_list:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+def _load_sticker_image():
+    # Prefer local asset to avoid remote fetch
+    candidates = [
+        "assets/fibilaugh.png",
+        "assets/fibilaugh.jpg",
+        "assets/fibilaugh.webp",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                return Image.open(p).convert("RGBA")
+            except Exception:
+                continue
+    return None
+
+def build_ban_card(title, desc_lines, reason_line, sticker_img=None, width=900, height=420):
+    # Colors
+    bg = (24, 26, 32)
+    text_primary = (255, 255, 255)
+    text_secondary = (220, 220, 220)
+    text_warn = (255, 230, 170)
+    badge_green = (40, 167, 69)
+
+    img = Image.new("RGB", (width, height), bg)
+    draw = ImageDraw.Draw(img)
+
+    # Fonts (common Windows/Linux/Mac fallbacks)
+    font_title = _load_font([
+        "C:/Windows/Fonts/arialbd.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/System/Library/Fonts/SFNSRounded.ttf"
+    ], 36)
+    font_text = _load_font([
+        "C:/Windows/Fonts/arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/SFNS.ttf"
+    ], 24)
+
+    # Text block (left)
+    x, y = 30, 30
+    draw.text((x, y), title, fill=text_primary, font=font_title)
+    y += 56
+    for line in desc_lines:
+        draw.text((x, y), line, fill=text_secondary, font=font_text)
+        y += 32
+    y += 10
+    # badge
+    badge_w, badge_h = 260, 38
+    draw.rounded_rectangle([x, y, x+badge_w, y+badge_h], radius=9, fill=badge_green)
+    draw.text((x+12, y+7), "✅ Simulasi testban", fill=text_primary, font=font_text)
+    y += badge_h + 18
+    draw.text((x, y), reason_line, fill=text_warn, font=font_text)
+
+    # Sticker (right)
+    if sticker_img:
+        max_w, max_h = 360, 360
+        sticker_img = sticker_img.copy()
+        sticker_img.thumbnail((max_w, max_h))
+        sx = width - sticker_img.width - 30
+        sy = 30
+        try:
+            img.paste(sticker_img, (sx, sy), sticker_img)
+        except Exception:
+            img.paste(sticker_img, (sx, sy))
+
+    # Output buffer
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
 
 class ModerationExtras(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -39,32 +119,28 @@ class ModerationExtras(commands.Cog):
             return await ctx.send("❌ Hanya moderator yang dapat menggunakan perintah ini.")
         if member is None:
             return await ctx.send("Gunakan: `!testban @user [alasan]`")
+
+        title = "💀 Simulasi Ban oleh SatpamBot"
+        desc_lines = [f"{member.display_name} terdeteksi mengirim pesan mencurigakan.",
+                      "(Pesan ini hanya simulasi untuk pengujian.)"]
+        reason_line = f"📝 {reason}"
+        sticker_img = _load_sticker_image()
+        buf = build_ban_card(title, desc_lines, reason_line, sticker_img=sticker_img)
+
+        file = discord.File(buf, filename="testban_card.png")
         embed = discord.Embed(
-            title="💀 Simulasi Ban oleh SatpamBot",
+            title="Simulasi Ban oleh SatpamBot",
             description=f"{member.mention} terdeteksi mengirim pesan mencurigakan.\n*(Simulasi)*",
             color=discord.Color.orange(),
             timestamp=datetime.now(timezone.utc)
         )
-        embed.add_field(name="📝 Alasan", value=reason, inline=False)
+        embed.set_image(url="attachment://testban_card.png")
         try:
-            if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-        except Exception: pass
-        # sticker FibiLaugh
-        sticker_url=None
-        try:
-            for s in ctx.guild.stickers:
-                if s.name.lower()=="fibilaugh":
-                    sticker_url = getattr(s,'url',None); break
-        except Exception: sticker_url=None
-        if sticker_url:
-            embed.set_image(url=sticker_url); await ctx.send(embed=embed)
-        else:
-            try:
-                file = discord.File("assets/fibilaugh.png", filename="fibilaugh.png")
-                embed.set_image(url="attachment://fibilaugh.png")
-                await ctx.send(embed=embed, file=file)
-            except Exception:
-                await ctx.send(embed=embed)
+            if member.display_avatar:
+                embed.set_thumbnail(url=member.display_avatar.url)
+        except Exception:
+            pass
+        await ctx.send(embed=embed, file=file)
 
     @commands.command(name="ban")
     @commands.guild_only()
@@ -80,27 +156,30 @@ class ModerationExtras(commands.Cog):
             return await ctx.send("❌ Aku tidak punya izin untuk memban user ini.")
         except Exception as e:
             return await ctx.send(f"❌ Gagal memban: {e}")
-        embed = discord.Embed(title="🚫 User Dibanned", description=f"{member.mention} telah dibanned.", color=discord.Color.red(), timestamp=datetime.now(timezone.utc))
+
+        # Compose final card (bukan simulasi)
+        title = "🚫 User Dibanned"
+        desc_lines = [f"{member.display_name} telah dibanned.", "Aksi dilakukan oleh moderator."]
+        reason_line = f"📝 {reason}"
+        sticker_img = _load_sticker_image()
+        buf = build_ban_card(title, desc_lines, reason_line, sticker_img=sticker_img)
+
+        file = discord.File(buf, filename="ban_card.png")
+        embed = discord.Embed(
+            title="User Dibanned",
+            description=f"{member.mention} telah dibanned.",
+            color=discord.Color.red(),
+            timestamp=datetime.now(timezone.utc)
+        )
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         embed.add_field(name="Alasan", value=reason, inline=False)
+        embed.set_image(url="attachment://ban_card.png")
         try:
-            if member.display_avatar: embed.set_thumbnail(url=member.display_avatar.url)
-        except Exception: pass
-        sticker_url=None
-        try:
-            for s in ctx.guild.stickers:
-                if s.name.lower()=="fibilaugh":
-                    sticker_url = getattr(s,'url',None); break
-        except Exception: sticker_url=None
-        if sticker_url:
-            embed.set_image(url=sticker_url); await ctx.send(embed=embed)
-        else:
-            try:
-                file = discord.File("assets/fibilaugh.png", filename="fibilaugh.png")
-                embed.set_image(url="attachment://fibilaugh.png")
-                await ctx.send(embed=embed, file=file)
-            except Exception:
-                await ctx.send(embed=embed)
+            if member.display_avatar:
+                embed.set_thumbnail(url=member.display_avatar.url)
+        except Exception:
+            pass
+        await ctx.send(embed=embed, file=file)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModerationExtras(bot))
