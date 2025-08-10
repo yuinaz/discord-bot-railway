@@ -24,33 +24,52 @@ def _load_font(pref_list, size):
     return ImageFont.load_default()
 
 async def _get_fibilaugh_image(ctx):
-    # Try sticker in guild
-    sticker = None
-    try:
-        sticker = discord.utils.find(
-            lambda s: getattr(s, "name", "").lower() == "fibilaugh",
-            getattr(ctx.guild, "stickers", []),
-        )
-    except Exception:
-        sticker = None
-    if sticker:
-        try:
-            asset = getattr(sticker, "url", None)
-            if asset:
-                data = await asset.read()
-                import io as _io
-                from PIL import Image as _Image
-                return _Image.open(_io.BytesIO(data)).convert("RGBA")
-        except Exception:
-            pass
-    # Fallback local asset
+    """Cari sticker 'FibiLaugh' (force fetch). Fallback ke file lokal."""
+    # Fallback lokal dulu agar selalu ada gambar
     for p in ("assets/fibilaugh.png", "assets/fibilaugh.jpg", "assets/fibilaugh.webp", "static/fibilaugh.png"):
         if os.path.exists(p):
             try:
                 return Image.open(p).convert("RGBA")
             except Exception:
-                continue
-    return None
+                pass  # coba path berikutnya
+
+    guild = ctx.guild
+    if not guild:
+        return None
+
+    # Gabungkan cache + fetch API (cache sticker sering kosong)
+    try:
+        stickers = list(getattr(guild, "stickers", []))
+    except Exception:
+        stickers = []
+    try:
+        fetched = await guild.fetch_stickers()
+        if fetched:
+            seen = {s.id for s in stickers}
+            stickers.extend([s for s in fetched if s.id not in seen])
+    except Exception:
+        pass
+
+    # Cocokkan nama fleksibel (case-insensitive)
+    candidates = {"fibilaugh", "fibi laugh", "fibi_laugh"}
+    target = None
+    for s in stickers:
+        name = (getattr(s, "name", "") or "").lower().replace("-", " ")
+        if name in candidates:
+            target = s
+            break
+
+    if not target:
+        return None
+
+    # Unduh gambar sticker
+    try:
+        asset = getattr(target, "url", None)
+        if asset:
+            data = await asset.read()
+            return Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception:
+        return None
 
 def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40, 167, 69)):
     # Colors
@@ -207,6 +226,19 @@ class ModerationExtras(commands.Cog):
         except Exception:
             pass
         await ctx.send(embed=embed, file=file)
+
+    @commands.command(name="sbstickers")
+    async def sbstickers(self, ctx: commands.Context):
+        """List sticker yang terlihat bot (untuk debug)."""
+        try:
+            fetched = await ctx.guild.fetch_stickers()
+            names = [getattr(s, "name", f"id:{s.id}") for s in fetched]
+            if names:
+                await ctx.send("Stickers: " + ", ".join(names[:50]))
+            else:
+                await ctx.send("Tidak ada sticker ter-fetch (atau izin kurang).")
+        except Exception as e:
+            await ctx.send(f"Sticker fetch error: {e}")
 
     @commands.command(name="sbdiag")
     async def sbdiag(self, ctx: commands.Context):
