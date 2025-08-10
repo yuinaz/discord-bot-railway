@@ -1,9 +1,7 @@
 PKG_ROOT = __name__.rsplit('.cogs_loader', 1)[0]
 COGS_LOADED = False
 
-import pkgutil
-import importlib
-import inspect
+import pkgutil, importlib, inspect
 
 async def _maybe_await(x):
     if inspect.iscoroutine(x):
@@ -29,11 +27,11 @@ async def load_all_cogs(bot):
     except Exception as e:
         print('[cogs_loader] gagal enumerasi cogs:', e)
 
-    extras = (
+    # Wajib dimuat, dan aman tanpa konflik
+    for ext in (
         PKG_ROOT + '.events.bot_online_announce',
-        PKG_ROOT + '.cogs.moderation_test',
-    )
-    for ext in extras:
+        PKG_ROOT + '.cogs.moderation_extras',  # hanya serverinfo, testban, ban
+    ):
         try:
             await _maybe_await(bot.load_extension(ext))
             print('[cogs_loader] loaded', ext)

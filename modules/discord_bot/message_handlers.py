@@ -7,16 +7,14 @@ async def handle_on_message(message: discord.Message, bot=None):
 
     content = (message.content or '').strip()
 
-    # Jika ini command prefix "!", jangan diproses di handler custom
+    # Jika command prefix "!", serahkan ke parser command (jangan ditangani di handler custom)
     if content.startswith('!'):
         return
 
     # --- TARUH LOGIKA CUSTOM DI SINI (deteksi phishing/ocr/dll) ---
-    # (Dibiarkan kosong supaya tidak mengganggu command. Tambahkan kembali logic kamu bila perlu.)
-    return
+    # pass
 
-# Pastikan semua pesan akhirnya tetap diteruskan ke parser command
-async def _ensure_process_commands(message: discord.Message):
+    # PENTING: di akhir selalu teruskan ke parser command (sekali saja)
     try:
         await message.bot.process_commands(message)
     except Exception:
