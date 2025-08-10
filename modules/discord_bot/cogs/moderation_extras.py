@@ -3,8 +3,9 @@ from discord.ext import commands
 from datetime import datetime, timezone
 from PIL import Image, ImageDraw, ImageFont
 import io, os
+from typing import Optional
 
-MOD_ROLE_NAMES = {"mod","moderator","admin","administrator","staff"}
+MOD_ROLE_NAMES = {"mod", "moderator", "admin", "administrator", "staff"}
 
 def is_moderator(member: discord.Member) -> bool:
     gp = member.guild_permissions
@@ -26,7 +27,10 @@ async def _get_fibilaugh_image(ctx):
     # Try sticker in guild
     sticker = None
     try:
-        sticker = discord.utils.find(lambda s: getattr(s, "name", "").lower() == "fibilaugh", getattr(ctx.guild, "stickers", []))
+        sticker = discord.utils.find(
+            lambda s: getattr(s, "name", "").lower() == "fibilaugh",
+            getattr(ctx.guild, "stickers", []),
+        )
     except Exception:
         sticker = None
     if sticker:
@@ -40,7 +44,7 @@ async def _get_fibilaugh_image(ctx):
         except Exception:
             pass
     # Fallback local asset
-    for p in ("assets/fibilaugh.png","assets/fibilaugh.jpg","assets/fibilaugh.webp","static/fibilaugh.png"):
+    for p in ("assets/fibilaugh.png", "assets/fibilaugh.jpg", "assets/fibilaugh.webp", "static/fibilaugh.png"):
         if os.path.exists(p):
             try:
                 return Image.open(p).convert("RGBA")
@@ -48,7 +52,7 @@ async def _get_fibilaugh_image(ctx):
                 continue
     return None
 
-def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40,167,69)):
+def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40, 167, 69)):
     # Colors
     bg = (24, 26, 32)
     text_primary = (255, 255, 255)
@@ -62,12 +66,12 @@ def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, 
     font_title = _load_font([
         "C:/Windows/Fonts/arialbd.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/System/Library/Fonts/SFNSRounded.ttf"
+        "/System/Library/Fonts/SFNSRounded.ttf",
     ], 36)
     font_text = _load_font([
         "C:/Windows/Fonts/arial.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/System/Library/Fonts/SFNS.ttf"
+        "/System/Library/Fonts/SFNS.ttf",
     ], 24)
 
     # Text block (left)
@@ -80,9 +84,9 @@ def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, 
     y += 10
     # badge
     badge_w, badge_h = 320, 40
-    draw.rounded_rectangle([x, y, x+badge_w, y+badge_h], radius=10, fill=badge_color)
-    by = y + (badge_h - 28)//2
-    draw.text((x+12, by), badge_text, fill=text_primary, font=font_text)
+    draw.rounded_rectangle([x, y, x + badge_w, y + badge_h], radius=10, fill=badge_color)
+    by = y + (badge_h - 28) // 2
+    draw.text((x + 12, by), badge_text, fill=text_primary, font=font_text)
     y += badge_h + 18
     draw.text((x, y), reason_line, fill=text_warn, font=font_text)
 
@@ -115,35 +119,48 @@ class ModerationExtras(commands.Cog):
         embed = discord.Embed(
             title=f"Server Info — {g.name}",
             color=discord.Color.blurple(),
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
         )
         embed.add_field(name="Server ID", value=str(g.id), inline=True)
-        embed.add_field(name="Owner", value=getattr(g.owner, 'mention', 'Unknown'), inline=True)
+        embed.add_field(name="Owner", value=getattr(g.owner, "mention", "Unknown"), inline=True)
         embed.add_field(name="Members", value=str(g.member_count), inline=True)
         embed.add_field(name="Created", value=g.created_at.strftime("%Y-%m-%d %H:%M UTC"), inline=True)
-        if g.icon: embed.set_thumbnail(url=g.icon.url)
+        if g.icon:
+            embed.set_thumbnail(url=g.icon.url)
         await ctx.send(embed=embed)
 
     @commands.command(name="testban", aliases=["tb"])
     @commands.guild_only()
-    async def testban_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Simulasi ban untuk pengujian"):
+    async def testban_cmd(
+        self,
+        ctx: commands.Context,
+        member: Optional[discord.Member] = None,
+        *,
+        reason: str = "Simulasi ban untuk pengujian",
+    ):
         if not is_moderator(ctx.author):
             return await ctx.send("❌ Hanya moderator yang dapat menggunakan perintah ini.")
         if member is None:
             member = ctx.author
-title = "💀 Simulasi Ban oleh SatpamBot"
-        desc_lines = [f"{member.display_name} terdeteksi mengirim pesan mencurigakan.",
-                      "(Pesan ini hanya simulasi untuk pengujian.)"]
+
+        title = "💀 Simulasi Ban oleh SatpamBot"
+        desc_lines = [
+            f"{member.display_name} terdeteksi mengirim pesan mencurigakan.",
+            "(Pesan ini hanya simulasi untuk pengujian.)",
+        ]
         reason_line = f"📝 {reason}"
         sticker_img = await _get_fibilaugh_image(ctx)
-        buf = _compose_card(title, desc_lines, "✅ Simulasi testban", reason_line, sticker_img=sticker_img, badge_color=(40,167,69))
+        buf = _compose_card(
+            title, desc_lines, "✅ Simulasi testban", reason_line,
+            sticker_img=sticker_img, badge_color=(40, 167, 69)
+        )
 
         file = discord.File(buf, filename="testban_card.png")
         embed = discord.Embed(
             title="Simulasi Ban oleh SatpamBot",
             description=f"{member.mention} terdeteksi mengirim pesan mencurigakan.\n*(Simulasi)*",
             color=discord.Color.orange(),
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
         )
         embed.set_image(url="attachment://testban_card.png")
         try:
@@ -156,10 +173,10 @@ title = "💀 Simulasi Ban oleh SatpamBot"
     @commands.command(name="ban")
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
-    async def ban_cmd(self, ctx: commands.Context, member: discord.Member=None, *, reason: str = "Melanggar aturan"):
+    async def ban_cmd(self, ctx: commands.Context, member: Optional[discord.Member] = None, *, reason: str = "Melanggar aturan"):
         if member is None:
             member = ctx.author
-if member == ctx.author:
+        if member == ctx.author:
             return await ctx.send("Tidak bisa ban diri sendiri.")
         try:
             await member.ban(reason=reason, delete_message_days=0)
@@ -179,7 +196,7 @@ if member == ctx.author:
             title="User Dibanned",
             description=f"{member.mention} telah dibanned.",
             color=discord.Color.red(),
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
         )
         embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         embed.add_field(name="Alasan", value=reason, inline=False)
@@ -190,7 +207,6 @@ if member == ctx.author:
         except Exception:
             pass
         await ctx.send(embed=embed, file=file)
-
 
     @commands.command(name="sbdiag")
     async def sbdiag(self, ctx: commands.Context):
