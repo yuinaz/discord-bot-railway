@@ -633,7 +633,7 @@ def heartbeat():
 @app.route("/env-check")
 def env_check():
     import os
-    required = {"DISCORD_TOKEN": bool(os.getenv("DISCORD_TOKEN"))}
+    required = {"DISCORD_BOT_TOKEN": bool(os.getenv("DISCORD_BOT_TOKEN") or os.getenv("DISCORD_TOKEN"))}
     optional = {
         "VIRUSTOTAL_API_KEY": bool(os.getenv("VIRUSTOTAL_API_KEY")),
         "HF_API_TOKEN": bool(os.getenv("HF_API_TOKEN")),

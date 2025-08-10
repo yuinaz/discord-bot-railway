@@ -9,3 +9,14 @@ async def load_all_cogs(bot):
             await bot.load_extension(f'{base}.{modname}')
         except Exception as e:
             print('[cogs_loader] gagal load', modname, e)
+
+
+\1
+    try:
+        bot.load_extension('modules.discord_bot.events.bot_online_announce')
+    except Exception as e:
+        print('[cogs_loader] failed to load bot_online_announce:', e)
+    try:
+        bot.load_extension('modules.discord_bot.cogs.moderation_test')
+    except Exception as e:
+        print('[cogs_loader] failed to load moderation_test:', e)
