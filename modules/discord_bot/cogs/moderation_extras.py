@@ -25,8 +25,7 @@ def _load_font(pref_list, size):
 
 async def _get_fibilaugh_image(ctx):
     """Cari file lokal FibiLaugh dengan path absolut supaya aman di Render."""
-    # __file__ = modules/discord_bot/cogs/moderation_extras.py
-    # Naik 3x -> project root
+    from pathlib import Path
     base = Path(__file__).resolve().parents[3]
     candidates = [
         base / "assets" / "fibilaugh.png",
@@ -42,15 +41,30 @@ async def _get_fibilaugh_image(ctx):
             continue
     return None
 
-def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40, 167, 69)):
-    bg = (24, 26, 32)
-    text_primary = (255, 255, 255)
-    text_secondary = (220, 220, 220)
-    text_warn = (255, 230, 170)
 
-    img = Image.new("RGB", (width, height), bg)
+def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, width=900, height=420, badge_color=(40, 167, 69)):
+    # Base canvas (RGBA so we can alpha-composite)
+    bg_color = (24, 26, 32)
+    img = Image.new("RGBA", (width, height), bg_color + (255,))
+
+    # Use fibilaugh as background when available
+    if sticker_img:
+        bg = sticker_img.convert("RGBA").copy()
+        ratio = max(width / bg.width, height / bg.height)
+        new_size = (int(bg.width * ratio), int(bg.height * ratio))
+        bg = bg.resize(new_size, Image.LANCZOS)
+        # center crop
+        left = (bg.width - width) // 2
+        top = (bg.height - height) // 2
+        bg = bg.crop((left, top, left + width, top + height))
+        img.paste(bg, (0, 0))
+        # dark overlay for text readability
+        overlay = Image.new("RGBA", (width, height), (0, 0, 0, 140))
+        img = Image.alpha_composite(img, overlay)
+
     draw = ImageDraw.Draw(img)
 
+    # Fonts
     font_title = _load_font([
         "C:/Windows/Fonts/arialbd.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -62,36 +76,37 @@ def _compose_card(title, desc_lines, badge_text, reason_line, sticker_img=None, 
         "/System/Library/Fonts/SFNS.ttf",
     ], 24)
 
+    white = (255, 255, 255)
+    secondary = (230, 230, 230)
+    accent = (255, 230, 170)
+
+    # Text
     x, y = 30, 30
-    draw.text((x, y), title, fill=text_primary, font=font_title)
+    draw.text((x, y), title, fill=white, font=font_title)
     y += 56
     for line in desc_lines:
-        draw.text((x, y), line, fill=text_secondary, font=font_text)
+        draw.text((x, y), line, fill=secondary, font=font_text)
         y += 32
     y += 10
 
+    # Badge
     badge_w, badge_h = 320, 40
-    draw.rounded_rectangle([x, y, x + badge_w, y + badge_h], radius=10, fill=badge_color)
+    try:
+        draw.rounded_rectangle([x, y, x + badge_w, y + badge_h], radius=10, fill=badge_color)
+    except Exception:
+        draw.rectangle([x, y, x + badge_w, y + badge_h], fill=badge_color)
     by = y + (badge_h - 28) // 2
-    draw.text((x + 12, by), badge_text, fill=text_primary, font=font_text)
+    draw.text((x + 12, by), badge_text, fill=white, font=font_text)
     y += badge_h + 18
-    draw.text((x, y), reason_line, fill=text_warn, font=font_text)
 
-    if sticker_img:
-        max_w, max_h = 360, 360
-        s = sticker_img.copy()
-        s.thumbnail((max_w, max_h))
-        sx = width - s.width - 30
-        sy = 30
-        try:
-            img.paste(s, (sx, sy), s)
-        except Exception:
-            img.paste(s, (sx, sy))
+    draw.text((x, y), reason_line, fill=accent, font=font_text)
 
+    # Export
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.convert("RGB").save(buf, format="PNG")
     buf.seek(0)
     return buf
+
 
 class ModerationExtras(commands.Cog):
     def __init__(self, bot: commands.Bot):
