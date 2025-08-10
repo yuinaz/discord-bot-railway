@@ -1,6 +1,8 @@
+PKG_ROOT = __name__.rsplit('.cogs_loader', 1)[0]
 COGS_LOADED = False
 
 import pkgutil
+import importlib
 import inspect
 
 async def _maybe_await(x):
@@ -14,24 +16,26 @@ async def load_all_cogs(bot):
         return
     COGS_LOADED = True
 
-    base = 'discord_bot.cogs'
+    base = PKG_ROOT + '.cogs'
     # Auto-load all cogs under cogs/
     try:
-        pkg = __import__(base, fromlist=[''])
+        pkg = importlib.import_module(base)
         for _, modname, _ in pkgutil.iter_modules(pkg.__path__):
+            ext = f"{base}.{modname}"
             try:
-                await _maybe_await(bot.load_extension(f'{base}.{modname}'))
-                print('[cogs_loader] loaded', f'{base}.{modname}')
+                await _maybe_await(bot.load_extension(ext))
+                print('[cogs_loader] loaded', ext)
             except Exception as e:
                 print('[cogs_loader] gagal load', modname, e)
     except Exception as e:
         print('[cogs_loader] gagal enumerasi cogs:', e)
 
     # Explicit must-have extensions (safe if already loaded)
-    for ext in (
-        'discord_bot.events.bot_online_announce',
-        'discord_bot.cogs.moderation_test',
-    ):
+    extras = (
+        PKG_ROOT + '.events.bot_online_announce',
+        PKG_ROOT + '.cogs.moderation_test',
+    )
+    for ext in extras:
         try:
             await _maybe_await(bot.load_extension(ext))
             print('[cogs_loader] loaded', ext)

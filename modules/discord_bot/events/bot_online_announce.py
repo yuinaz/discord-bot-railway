@@ -15,11 +15,10 @@ class BotOnlineAnnounce(commands.Cog):
             return
         self._announced = True
         for guild in self.bot.guilds:
-            # find text channel by name
             ch = discord.utils.get(guild.text_channels, name=LOG_CHANNEL_NAME)
             if ch and ch.permissions_for(guild.me).send_messages:
                 try:
-                    await ch.send("✅ **SatpamBot online** dan siap berjaga.")
+                    await ch.send("✅ SatpamBot online dan siap berjaga.")
                 except Exception:
                     pass
 

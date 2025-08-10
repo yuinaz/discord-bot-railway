@@ -6,32 +6,37 @@ from flask import Blueprint, jsonify, current_app
 import discord
 from discord.ext import commands
 
+# --- Flask Blueprint ---
 discord_bot_bp = Blueprint("discord_bot", __name__)
 
 FLASK_ENV = os.getenv("FLASK_ENV", "production").lower()
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN_LOCAL") if FLASK_ENV == "development" else os.getenv("DISCORD_BOT_TOKEN")
 
+# --- Intents ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.guilds = True
 
+# --- Optional: keep Flask app handle ---
 _flask_app = None
 def set_flask_app(app):
     global _flask_app
     _flask_app = app
     return _flask_app
 
-from discord_bot.background_tasks import run_background_tasks
-from discord_bot.event_handlers import register_event_handlers
-from discord_bot.events.advanced_events import register_advanced_events
-from discord_bot.helpers.error_handler import setup_error_handler
-from discord_bot.message_handlers import handle_on_message
+# --- Modular imports (package-relative) ---
+from .background_tasks import run_background_tasks
+from .event_handlers import register_event_handlers
+from .events.advanced_events import register_advanced_events
+from .helpers.error_handler import setup_error_handler
+from .message_handlers import handle_on_message, _ensure_process_commands
 
+# --- Bot class & instance ---
 class SatpamBot(commands.Bot):
     async def setup_hook(self):
         try:
-            from discord_bot.cogs_loader import load_all_cogs
+            from .cogs_loader import load_all_cogs
             await load_all_cogs(self)
             print('[setup_hook] extensions:', list(self.extensions.keys()))
             print('[setup_hook] commands:', [c.qualified_name for c in self.commands])
@@ -44,24 +49,36 @@ bot = SatpamBot(command_prefix="!", intents=intents, case_insensitive=True)
 async def on_ready():
     logging.info(f"✅ Bot berhasil login sebagai {bot.user} (ID: {bot.user.id})")
     logging.info(f"🌐 Mode: {FLASK_ENV}")
+
     try: run_background_tasks(bot)
     except Exception as e: logging.exception("run_background_tasks error: %s", e)
+
     try: register_event_handlers(bot)
     except Exception as e: logging.exception("register_event_handlers error: %s", e)
+
     try: register_advanced_events(bot)
     except Exception as e: logging.exception("register_advanced_events error: %s", e)
+
     try: setup_error_handler(bot)
     except Exception as e: logging.exception("setup_error_handler error: %s", e)
+
+    # Listeners
     try: bot.add_listener(handle_on_message, "on_message")
     except Exception as e: logging.exception("add_listener on_message error: %s", e)
 
+    try: bot.add_listener(_ensure_process_commands, "on_message")
+    except Exception as e: logging.exception("add_listener process_commands error: %s", e)
+
+# --- HTTP routes ---
 @discord_bot_bp.route("/start-bot")
 def start_bot():
     if not bot.is_closed():
         return "🤖 Bot sudah berjalan."
+
     token = BOT_TOKEN
     if not token:
         return f"❌ Token bot untuk mode {FLASK_ENV} tidak tersedia.", 500
+
     set_flask_app(current_app)
     loop = asyncio.get_event_loop()
     loop.create_task(bot.start(token))
@@ -72,6 +89,7 @@ def ping():
     current_app.logger.info("💓 Ping dari UptimeRobot diterima.")
     return jsonify({"status": "alive"})
 
+# --- Runner ---
 def run_bot():
     token = os.getenv("DISCORD_BOT_TOKEN") or os.getenv("DISCORD_TOKEN") or BOT_TOKEN
     if not token:
