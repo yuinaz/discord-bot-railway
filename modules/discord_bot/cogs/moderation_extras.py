@@ -6,7 +6,7 @@ import io, os
 from typing import Optional
 
 # === Konfigurasi Sticker ===
-FIBILaugh_STICKER_ID = 1402979487750160498  # ganti bila ID di server berbeda
+FIBILaugh_STICKER_ID = 1373959100496351283  # ganti bila ID di server berbeda
 
 MOD_ROLE_NAMES = {"mod", "moderator", "admin", "administrator", "staff"}
 
