@@ -1,7 +1,10 @@
 import discord
 from discord.ext import commands
 from datetime import datetime, timezone
-from PIL import Image, ImageDraw, ImageFont
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except Exception:
+    Image = ImageDraw = ImageFont = None
 import io, os
 from typing import Optional
 from pathlib import Path
