@@ -1,5 +1,42 @@
 {% extends "base.html" %}
+
+{% block title %}Dashboard - SatpamBot{% endblock %}
+
 {% block content %}
-<h1>Dashboard</h1>
-<p>Selamat datang. Cek <a href="/stats.json">/stats.json</a> untuk metrics.</p>
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h5>🕒 Uptime</h5>
+            <p id="uptime">Loading...</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h5>💾 RAM Usage</h5>
+            <p id="ram">Loading...</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h5>⚙️ CPU Usage</h5>
+            <p id="cpu">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+function fetchStats() {
+    fetch('/api/live_stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('uptime').innerText = data.uptime;
+            document.getElementById('ram').innerText = data.ram + ' MB';
+            document.getElementById('cpu').innerText = data.cpu + '%';
+        })
+        .catch(err => console.error('Gagal fetch live stats:', err));
+}
+
+setInterval(fetchStats, 5000);
+fetchStats();
+</script>
 {% endblock %}
