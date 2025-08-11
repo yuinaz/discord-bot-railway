@@ -1,17 +1,7 @@
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Admin Log</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body { background-color: #111; color: white; padding: 40px; }
-    table { color: white; }
-  </style>
-</head>
-<body>
-  <div class="container">
+{% extends 'base.html' %}
+{% block title %}Admin Log{% endblock %}
+{% block content %}
+<div class="container">
     <h2 class="mb-4">📜 Admin Activity Log</h2>
     <table class="table table-dark table-striped">
       <thead><tr><th>User</th><th>Action</th><th>Timestamp</th></tr></thead>
@@ -23,5 +13,4 @@
     </table>
     <a href="/dashboard" class="btn btn-secondary mt-3">← Kembali ke Dashboard</a>
   </div>
-</body>
-</html>
+{% endblock %}

@@ -1,50 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>SatpamBot Loading</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body {
-      background-color: #1e1e2f;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      flex-direction: column;
-      color: white;
-      font-family: Arial, sans-serif;
-    }
-    .logo {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); opacity: 0.8; }
-      50% { transform: scale(1.1); opacity: 1; }
-      100% { transform: scale(1); opacity: 0.8; }
-    }
-    .title {
-      font-size: 2rem;
-      margin-top: 20px;
-    }
-    .enter-btn {
-      margin-top: 30px;
-      padding: 10px 20px;
-      background-color: #4caf50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <img src="{{ url_for('static', filename=config.get('LOGO_FILENAME', 'bot_avatar.gif')) }}" alt="Bot Logo" class="logo">
+{% extends 'base.html' %}
+{% block title %}SatpamBot Loading{% endblock %}
+{% block content %}
+<img src="{{ url_for('static', filename=config.get('LOGO_FILENAME', 'bot_avatar.gif')) }}" alt="Bot Logo" class="logo">
   <div class="title">Selamat datang di SatpamBot</div>
   <a href="/dashboard"><button class="enter-btn">Masuk Dashboard</button></a>
-</body>
-</html>
+{% endblock %}
