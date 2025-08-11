@@ -115,7 +115,7 @@ class ModerationExtras(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name="testban", aliases=["tb"])
+    @commands.command(name="testban_old", aliases=[])
     @commands.guild_only()
     async def testban_cmd(
         self,

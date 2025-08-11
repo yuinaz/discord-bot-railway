@@ -15,7 +15,7 @@ def run_background_tasks(bot):
         while not bot.is_closed():
             uptime = get_uptime()
             try:
-                await bot.change_presence(activity=discord.Game(name=f"Uptime: {uptime}"))
+                await bot.change_presence(status=discord.Status.online, activity=discord.Game(name="Menjaga Server Dari Scam"))
             except Exception as e:
                 logging.error(f"❌ Gagal update status bot: {e}")
             await asyncio.sleep(60)
