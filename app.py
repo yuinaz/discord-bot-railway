@@ -44,48 +44,6 @@ socketio = SocketIO(app)
 # Waktu mulai untuk uptime
 start_time = time.time()
 
-# ===== Utils (kompatibilitas dashboard.py lama) =====
-def get_uptime():
-    try:
-        secs = int(time.time() - start_time)
-        return str(datetime.timedelta(seconds=secs))
-    except Exception:
-        return "unknown"
-
-def get_ram_usage():
-    try:
-        return round(psutil.virtual_memory().used / (1024 * 1024), 2)
-    except Exception:
-        return 0.0
-
-def get_cpu_usage():
-    try:
-        return psutil.cpu_percent(interval=0.1)
-    except Exception:
-        return 0.0
-
-def get_current_theme():
-    try:
-        with open("config/theme.json","r",encoding="utf-8") as f:
-            theme_file = json.load(f).get("theme","default.css")
-            if not theme_file.endswith(".css"):
-                theme_file += ".css"
-    except Exception:
-        theme_file = "default.css"
-    return f"/static/themes/{theme_file}"
-
-def set_theme(theme_name:str):
-    try:
-        if not theme_name.endswith(".css"):
-            theme_name += ".css"
-        os.makedirs("config", exist_ok=True)
-        with open("config/theme.json","w",encoding="utf-8") as f:
-            json.dump({"theme": theme_name}, f)
-        return f"/static/themes/{theme_name}"
-    except Exception:
-        return get_current_theme()
-
-
 # === TEMA GLOBAL ===
 def _load_background_url():
     try:
@@ -121,7 +79,7 @@ def inject_theme():
         theme_file = "default.css"
     session['live_bg_enabled']=_load_live_flag()
     _p=_load_profile()
-    return {"theme_path": f"/static/themes/{theme_file}", "background_url": _load_background_url(), "profile_avatar_url": _p.get('avatar_url'), "login_background_url": _p.get('login_background_url')}
+    return {"cache_bust": int(time.time()), "theme_path": f"/static/themes/{theme_file}", "background_url": _load_background_url(), "profile_avatar_url": _p.get('avatar_url'), "login_background_url": _p.get('login_background_url')}
 
 # ===== DATABASE SETUP =====
 DB_PATH = "superadmin.db"
@@ -177,26 +135,63 @@ def uptime():
 def home():
     return redirect("/dashboard") if session.get("logged_in") else redirect("/login")
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # If already logged in -> dashboard
     if session.get("logged_in"):
         return redirect(url_for("dashboard"))
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
 
-        env_user = os.getenv("SUPER_ADMIN_USER") or ""
-        env_pass = os.getenv("SUPER_ADMIN_PASS") or ""
-        if env_user and env_pass:
-            if username == env_user and password == env_pass:
-                session.permanent = True if request.form.get("remember") else False
-                session["logged_in"] = True
-                session["username"] = username or "admin"
-                flash("Login sukses", "success")
-                return redirect(request.args.get("next") or url_for("dashboard"))
-            else:
-                flash("Username / password salah", "danger")
-                return render_template("login.html")
+    # Always ensure env admin is present in DB (so change-password works)
+    try:
+        ensure_admin_seed()
+    except Exception:
+        pass
+
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip() or "admin"
+        password = request.form.get("password") or ""
+
+        # 1) Try DB first
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute("SELECT username, password FROM superadmin WHERE username=?", (username,)).fetchone()
+                if row and check_password_hash(row[1], password):
+                    session.permanent = True if request.form.get("remember") else False
+                    session["logged_in"] = True
+                    session["username"] = row[0]
+                    flash("Login sukses (DB)", "success")
+                    return redirect(request.args.get("next") or url_for("dashboard"))
+        except Exception as e:
+            safe_log(f"DB auth error: {e}", level="error")
+
+        # 2) Fallback to ENV user
+        env_user = os.getenv("SUPER_ADMIN_USER") or "admin"
+        env_pass = os.getenv("SUPER_ADMIN_PASS") or os.getenv("ADMIN_PASSWORD") or ""
+        if username == env_user and password == env_pass and env_pass:
+            # Sync DB so change-password becomes effective
+            try:
+                with sqlite3.connect(DB_PATH) as conn:
+                    cur = conn.execute("SELECT id FROM superadmin WHERE username=?", (env_user,))
+                    if cur.fetchone():
+                        conn.execute("UPDATE superadmin SET password=? WHERE username=?",
+                                     (generate_password_hash(env_pass), env_user))
+                    else:
+                        conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)",
+                                     (env_user, generate_password_hash(env_pass)))
+            except Exception as e:
+                safe_log(f"DB sync from ENV failed: {e}", level="error")
+
+            session.permanent = True if request.form.get("remember") else False
+            session["logged_in"] = True
+            session["username"] = env_user
+            flash("Login sukses (ENV)", "success")
+            return redirect(request.args.get("next") or url_for("dashboard"))
+
+        flash("Username / password salah", "danger")
+        return render_template("login.html")
+
+    return render_template("login.html")
 
         expected = os.getenv("ADMIN_PASSWORD", "")
         if expected and password == expected:
@@ -218,15 +213,7 @@ def logout():
 def dashboard():
     if not session.get("logged_in"):
         return redirect("/login")
-    username = session.get("username", "Admin")
-    return render_template(
-        "dashboard.html",
-        uptime=get_uptime(),
-        ram_usage=get_ram_usage(),
-        cpu_usage=get_cpu_usage(),
-        theme_path=get_current_theme(),
-        username=username
-    )
+    return render_template("dashboard.html")
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
@@ -249,21 +236,33 @@ def profil():
         return redirect("/login")
     return render_template("profil.html")
 
+
 @app.route("/change-password", methods=["GET", "POST"])
 def change_password():
     if not session.get("logged_in"):
         return redirect("/login")
+    message = None
     if request.method == "POST":
-        old_pw = request.form["old_password"]
-        new_pw = request.form["new_password"]
-        with sqlite3.connect(DB_PATH) as conn:
-            user = conn.execute("SELECT * FROM superadmin WHERE username=?", (session["username"],)).fetchone()
-            if user and check_password_hash(user[2], old_pw):
-                conn.execute("UPDATE superadmin SET password=? WHERE username=?",
-                             (generate_password_hash(new_pw), session["username"]))
-                return redirect("/change-password?success=1")
-            else:
-                return redirect("/change-password?error=1")
+        old_pw = request.form.get("old_password") or ""
+        new_pw = request.form.get("new_password") or ""
+        if len(new_pw) < 6:
+            flash("Password baru minimal 6 karakter.", "danger")
+            return redirect(url_for("change_password"))
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                user = conn.execute("SELECT username, password FROM superadmin WHERE username=?", (session["username"],)).fetchone()
+                if user and check_password_hash(user[1], old_pw):
+                    conn.execute("UPDATE superadmin SET password=? WHERE username=?",
+                                 (generate_password_hash(new_pw), session["username"]))
+                    flash("Password berhasil diubah.", "success")
+                    return redirect(url_for("change_password"))
+                else:
+                    flash("Password lama salah.", "danger")
+                    return redirect(url_for("change_password"))
+        except Exception as e:
+            safe_log(f"Change password error: {e}", level="error")
+            flash("Terjadi kesalahan saat menyimpan password.", "danger")
+            return redirect(url_for("change_password"))
     return render_template("change-password.html")
 
 @app.route("/api/user-stats")
@@ -792,67 +791,31 @@ def bootstrap():
     # Mulai loop broadcast realtime 60 detik sekali
     start_broadcast_loop()
 
-
-@app.route("/admin-log")
-@login_required
-def admin_log():
-    if not session.get("logged_in"):
-        return redirect("/login")
-    return render_template("admin_log.html", username=session.get("username","Admin"))
-
-
-@app.route("/api/server_stats")
-@login_required
-def api_server_stats():
-    if not session.get("logged_in"):
-        return redirect("/login")
-    try:
-        import sqlite3
-        conn = sqlite3.connect("superadmin.db")
-        cursor = conn.cursor()
-        cursor.execute("""
-        SELECT guild_id, guild_name, COUNT(*) as total_detected
-        FROM phishing_logs
-        GROUP BY guild_id, guild_name
-        """)
-        rows = cursor.fetchall()
-        conn.close()
-        data = [{"guild_id": r[0], "guild_name": r[1], "total_detected": r[2]} for r in rows]
-        return jsonify(data)
-    except Exception:
-        dummy = [
-            {"guild_id": "1", "guild_name": "DummyServer", "total_detected": 10},
-            {"guild_id": "2", "guild_name": "SatpamBot Dev", "total_detected": 3}
-        ]
-        return jsonify(dummy)
-
-
-@app.route("/api/member_monitor")
-@login_required
-def api_member_monitor():
-    if not session.get("logged_in"):
-        return redirect("/login")
-    try:
-        import sqlite3
-        conn = sqlite3.connect("superadmin.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT guild_id, guild_name, member_count FROM guilds")
-        rows = cursor.fetchall()
-        conn.close()
-        data = [{"guild_id": r[0], "guild_name": r[1], "member_count": r[2]} for r in rows]
-        return jsonify(data)
-    except Exception:
-        dummy = [
-            {"guild_id": "1", "guild_name": "DummyServer", "member_count": 300},
-            {"guild_id": "2", "guild_name": "SatpamBot Dev", "member_count": 120}
-        ]
-        return jsonify(dummy)
-
-
-# ===== PING ENDPOINT UNTUK UPTIMEROBOT =====
-@app.route("/ping", methods=["GET", "HEAD"])
+@app.route('/ping')
 def ping():
-    return "pong", 200, {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store"
-    }
+    return 'pong', 200
+
+
+def ensure_admin_seed():
+    """Seed/Sync admin user in SQLite from env (SUPER_ADMIN_USER/PASS or ADMIN_PASSWORD)."""
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    env_user = os.getenv("SUPER_ADMIN_USER") or "admin"
+    env_pass = os.getenv("SUPER_ADMIN_PASS") or os.getenv("ADMIN_PASSWORD")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS superadmin (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE,
+                password TEXT
+            )
+        """)
+        if env_pass:
+            # Upsert
+            cur = conn.execute("SELECT id FROM superadmin WHERE username=?", (env_user,))
+            if cur.fetchone():
+                conn.execute("UPDATE superadmin SET password=? WHERE username=?",
+                             (generate_password_hash(env_pass), env_user))
+            else:
+                conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)",
+                             (env_user, generate_password_hash(env_pass)))
+
