@@ -1,6 +1,7 @@
 from discord.ext import commands
 import discord
-from ..helpers.log_utils import upsert_status_embed, LOG_PHISH_NAME, os
+from ..helpers.log_utils import upsert_status_embed, LOG_PHISH_NAME
+import os
 
 class Health(commands.Cog):
     def __init__(self, bot: commands.Bot):
