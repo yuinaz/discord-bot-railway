@@ -1,31 +1,25 @@
-import os, time, json, discord
+import os, time, discord
 
 LOG_CHANNEL_NAME = os.getenv("LOG_CHANNEL_NAME", "log-botphising")
-# Force channel ID if known (preferred). 0 = disabled
+# Force a default ID (can be overridden by env). 0 disables.
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1400375184048787566"))
 
-_status_msg_cache = {}
-_status_msg_cache_by_channel = {}  # (guild_id, channel_id) -> msg_id
+_status_msg_cache_by_channel = {}  # (guild_id, channel_id) -> message_id
 
 def _find_log_channel(guild: discord.Guild) -> discord.TextChannel | None:
     if not guild:
         return None
-    # Prefer ID
+    # Prefer ID for accuracy
     if LOG_CHANNEL_ID:
         ch = guild.get_channel(LOG_CHANNEL_ID)
         if isinstance(ch, discord.TextChannel):
             return ch
-    # Fallback by name
+    # Fallback by name: accept a few common variants
+    names = {LOG_CHANNEL_NAME, "lot-botphising", "log-botphishing"}
     for ch in guild.text_channels:
-        if ch.name == LOG_CHANNEL_NAME:
+        if ch.name in names:
             return ch
     return None
-
-async def upsert_status_embed(guild: discord.Guild, text: str):
-    ch = _find_log_channel(guild)
-    if not ch:
-        return False
-    return await upsert_status_embed_in_channel(ch, text)
 
 async def upsert_status_embed_in_channel(ch: discord.TextChannel, text: str):
     if not ch:
@@ -55,15 +49,17 @@ async def upsert_status_embed_in_channel(ch: discord.TextChannel, text: str):
         except Exception:
             return False
 
+async def upsert_status_embed(guild: discord.Guild, text: str):
+    ch = _find_log_channel(guild)
+    if not ch:
+        return False
+    return await upsert_status_embed_in_channel(ch, text)
+
 async def announce_bot_online(guild: discord.Guild, bot_tag: str):
-    # Keep legacy helper (some code may still call it); route to upsert
     try:
         await upsert_status_embed(guild, "✅ SatpamBot online dan siap berjaga.")
     except Exception:
-        # Fallback send a plain text message if everything fails
         ch = _find_log_channel(guild)
         if ch:
-            try:
-                await ch.send("✅ SatpamBot online dan siap berjaga.")
-            except Exception:
-                pass
+            try: await ch.send("✅ SatpamBot online dan siap berjaga.")
+            except Exception: pass
