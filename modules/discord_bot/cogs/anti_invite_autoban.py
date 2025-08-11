@@ -1,101 +1,105 @@
 import re
-import discord
 from discord.ext import commands
+import discord
 
-# === CONFIG ===
-INVITE_REGEX = re.compile(
-    r"(?:https?:\/\/)?(?:www\.)?(?:discord(?:\.gg|(?:app)?\.com\/invite)\/)([A-Za-z0-9\-]+)",
-    re.IGNORECASE,
-)
-ALLOW_OWN_SERVER_INVITES = True          # True = izinkan undangan ke server ini (whitelist by guild_id)
-GUILD_ID_WHITELIST = None                # set ke ID server kamu (int) kalau mau whitelist undangan ke server sendiri
-BAN_DELETE_MESSAGE_DAYS = 7              # hapus semua pesan user 7 hari terakhir saat diban (0-7)
+INVITE_RE = re.compile(r"(?:https?://)?(?:discord\.gg/|discord\.com/invite/)([A-Za-z0-9-]+)", re.IGNORECASE)
 
-NOTICE_AFTER_BAN = "🚫 {user} telah dibanned karena mengirim undangan NSFW."
+# Behavior: ONLY act (delete+ban) when invite is NSFW.
+# Non‑NSFW invites are ignored (not deleted, not punished).
+# Optional: allow invites to specific guild IDs even if NSFW (keep default empty).
+GUILD_ID_WHITELIST = set()  # e.g., {123456789012345678}
 
-def _is_nsfw_invite(invite: discord.Invite) -> bool:
-    """True jika undangan mengarah ke kanal/guild NSFW."""
-    # Kanal NSFW?
-    try:
-        if invite.channel and getattr(invite.channel, "nsfw", False):
-            return True
-    except Exception:
-        pass
-    # Level NSFW guild (partial guild biasanya punya nsfw_level)
-    try:
-        nsfw_level = str(getattr(invite.guild, "nsfw_level", "") or "").lower()
-        # nilai umum: 'default', 'explicit', 'safe', 'age_restricted'
-        if nsfw_level in {"explicit", "age_restricted"}:
-            return True
-    except Exception:
-        pass
-    return False
+BAN_DELETE_MESSAGE_DAYS = 1  # 0-7, only applied when banning for NSFW invite
 
-class AntiInvite(commands.Cog):
-    """Autoban pengguna yang mengirim undangan Discord NSFW. Undangan lain dibiarkan."""
-    def __init__(self, bot: commands.Bot, guild_id: int | None = GUILD_ID_WHITELIST):
+class AntiInviteAutoban(commands.Cog):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.guild_id = guild_id
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.guild:
+        # Ignore bot/self messages
+        if not message or message.author.bot:
+            return
+        content = message.content or ""
+        m = INVITE_RE.search(content)
+        if not m:
             return
 
-        # Cari semua kode undangan di pesan
-        codes = [m.group(1) for m in INVITE_REGEX.finditer(message.content or "")]
-        if not codes:
-            return
+        code = m.group(1)
 
-        # Lewatkan moderator/admin
-        perms = message.author.guild_permissions
-        if perms.manage_guild or perms.manage_messages or perms.administrator:
-            return
+        # Try to fetch invite to check NSFW; if cannot fetch, do nothing
+        try:
+            invite = await self.bot.fetch_invite(code, with_counts=False, with_expiration=False)
+        except Exception:
+            return  # fail‑safe: don't punish if unsure
 
-        # Cek setiap kode
-        for code in set(codes):
+        # Determine NSFW
+        is_nsfw = False
+
+        # Some invites link to a channel
+        try:
+            channel = invite.channel
+        except Exception:
+            channel = None
+
+        if channel and hasattr(channel, "nsfw"):
             try:
-                invite = await self.bot.fetch_invite(code, with_counts=False)
+                if channel.nsfw:
+                    is_nsfw = True
             except Exception:
-                continue
+                pass
 
-            # Biarkan undangan ke server sendiri (opsional)
-            if ALLOW_OWN_SERVER_INVITES and self.guild_id:
+        # Guild-level NSFW (explicit) if available
+        guild = getattr(invite, "guild", None)
+        if guild:
+            # Skip action if guild is whitelisted
+            if getattr(guild, "id", None) in GUILD_ID_WHITELIST:
+                return
+            nsfw_level = getattr(guild, "nsfw_level", None)
+            # discord.NSFWLevel.explicit == 2 typically; fall back to str check
+            if nsfw_level is not None:
                 try:
-                    if invite.guild and invite.guild.id == self.guild_id:
-                        continue
+                    # support enum or plain int
+                    val = int(getattr(nsfw_level, "value", nsfw_level))
+                    if val >= 2:
+                        is_nsfw = True
+                except Exception:
+                    # string comparisons as fallback
+                    if str(nsfw_level).lower() in {"explicit", "age_restricted"}:
+                        is_nsfw = True
+
+        # If NOT NSFW -> allow invite (do nothing)
+        if not is_nsfw:
+            return
+
+        # NSFW: delete message (if possible) and ban author
+        # Only act if we have permissions
+        try:
+            if message.guild and message.guild.me and message.guild.me.guild_permissions.manage_messages:
+                try:
+                    await message.delete()
                 except Exception:
                     pass
+        except Exception:
+            pass
 
-            if _is_nsfw_invite(invite):
-                # AUTOBAN user dan hapus pesan beberapa hari terakhir
-                try:
-                    await message.guild.ban(
-                        message.author,
-                        reason="Mengirim undangan Discord NSFW",
-                        delete_message_days=max(0, min(7, int(BAN_DELETE_MESSAGE_DAYS))),
-                    )
-                except TypeError:
-                    # fallback untuk kompatibilitas versi discord.py berbeda
-                    try:
-                        await message.author.ban(
-                            reason="Mengirim undangan Discord NSFW",
-                            delete_message_days=max(0, min(7, int(BAN_DELETE_MESSAGE_DAYS))),
-                        )
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-
-                # Coba kirim notifikasi singkat (abaikan error perms)
-                try:
-                    await message.channel.send(
-                        NOTICE_AFTER_BAN.format(user=str(message.author)), delete_after=10
-                    )
-                except Exception:
-                    pass
-                return  # selesai setelah ban
+        # Ban user for posting NSFW invite
+        try:
+            if message.guild and message.guild.me and message.guild.me.guild_permissions.ban_members:
+                await message.guild.ban(
+                    message.author,
+                    delete_message_days=BAN_DELETE_MESSAGE_DAYS,
+                    reason="Posting NSFW Discord invite"
+                )
+        except Exception:
+            # As a fallback, try timeout if banning not permitted
+            try:
+                if message.guild and message.guild.me and message.guild.me.guild_permissions.moderate_members:
+                    # 1 day timeout as fallback
+                    duration = discord.utils.utcnow() + discord.timedelta(days=1)
+                    await message.author.edit(timeout=duration, reason="Posting NSFW Discord invite")
+            except Exception:
+                pass
 
 async def setup(bot: commands.Bot):
-    # Isi GUILD_ID_WHITELIST di atas bila ingin whitelist undangan ke server sendiri
-    await bot.add_cog(AntiInvite(bot))
+    await bot.add_cog(AntiInviteAutoban(bot))
