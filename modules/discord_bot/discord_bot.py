@@ -6,32 +6,84 @@ import logging
 import discord
 from discord.ext import commands
 
-from .helpers.env import (
-    BOT_PREFIX,
-    BOT_INTENTS,
-    OAUTH2_CLIENT_ID,
-    OAUTH2_CLIENT_SECRET,
-    FLASK_ENV,
-    get_bot_token,
-    get_profile,
-)
-from .cogs_loader import load_cogs
-from .background_tasks import run_background_tasks
-from . import message_handlers
-from .helpers.log_utils import upsert_status_embed, upsert_status_embed_in_channel, LOG_CHANNEL_ID
+# ===== Try to import project helpers, but don't crash editor/runtime if unavailable =====
+try:
+    from .helpers.env import (
+        BOT_PREFIX,
+        BOT_INTENTS,
+        OAUTH2_CLIENT_ID,
+        OAUTH2_CLIENT_SECRET,
+        FLASK_ENV,
+        get_bot_token,
+        get_profile,
+    )
+except Exception:
+    # Reasonable fallbacks for local editing/testing
+    BOT_PREFIX = "!"
+    intents = discord.Intents.default()
+    intents.message_content = True
+    BOT_INTENTS = intents
+    OAUTH2_CLIENT_ID = None
+    OAUTH2_CLIENT_SECRET = None
+    FLASK_ENV = "production"
+    def get_bot_token():
+        import os
+        return os.getenv("BOT_TOKEN") or os.getenv("DISCORD_BOT_TOKEN") or ""
+    def get_profile():
+        return "default"
+
+try:
+    from .cogs_loader import load_cogs
+except Exception:
+    async def load_cogs(_bot):  # fallback: no cogs
+        logging.warning("load_cogs fallback used: cogs_loader not available")
+
+try:
+    from .background_tasks import run_background_tasks
+except Exception:
+    def run_background_tasks(_bot):
+        logging.info("run_background_tasks fallback used")
+
+try:
+    from . import message_handlers
+except Exception:
+    class _MH:
+        async def handle_on_message(bot, message):
+            return
+    message_handlers = _MH()
+
+# Optional log helpers (don't crash if missing)
+try:
+    from .helpers.log_utils import upsert_status_embed, upsert_status_embed_in_channel, LOG_CHANNEL_ID
+except Exception:
+    async def upsert_status_embed(*args, **kwargs): pass
+    async def upsert_status_embed_in_channel(*args, **kwargs): pass
+    LOG_CHANNEL_ID = None
 
 # ===== Bot & intents =====
 intents = BOT_INTENTS
-intents.message_content = True  # jaga-jaga
+intents.message_content = True  # ensure message content intent enabled
 
 bot = commands.Bot(command_prefix=BOT_PREFIX, intents=intents, help_command=None)
 STATUS_TEXT = "✅ SatpamBot online dan siap berjaga."
+
+# Optional Flask app holder for compatibility with main.py that might call set_flask_app()
+_flask_app = None
+def set_flask_app(app):
+    """Store a reference to a Flask app (optional, backward compatible)."""
+    global _flask_app
+    _flask_app = app
+    logging.info("Flask app registered into discord_bot module")
 
 # ===== Events =====
 @bot.event
 async def on_ready():
     logging.info(f"✅ Bot berhasil login sebagai {bot.user} (ID: {bot.user.id})")
-    logging.info(f"🌐 Mode: {get_profile()} ({FLASK_ENV})")
+    try:
+        profile = get_profile()
+    except Exception:
+        profile = "default"
+    logging.info(f"🌐 Mode: {profile} ({FLASK_ENV})")
 
     if not getattr(bot, "_startup_status_done", False):
         setattr(bot, "_startup_status_done", True)
