@@ -514,6 +514,15 @@ def healthcheck():
     return "ok", 200
 
 
+# ===== PING ENDPOINT UNTUK UPTIMEROBOT =====
+@app.route("/ping", methods=["GET", "HEAD"])
+def ping():
+    return "pong", 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store"
+    }
+
+
 # === Discord OAuth Login ===
 from urllib.parse import urlencode
 import requests
