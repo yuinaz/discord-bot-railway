@@ -61,8 +61,12 @@
     </style>
 </head>
 <body>
-    {% include "topbar.html" %}
-    {% include "sidebar.html" %}
+    {% if session.get("logged_in") %}
+{% include "topbar.html" %}
+{% endif %}
+    {% if session.get("logged_in") %}
+{% include "sidebar.html" %}
+{% endif %}
 
     <div class="content">
         {% block content %}{% endblock %}
