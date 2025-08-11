@@ -3,6 +3,9 @@ from threading import Thread
 from flask import Flask
 
 def start_keep_alive():
+    """Start a tiny HTTP server if KEEP_ALIVE=1 (for uptime pings)."""
+    if os.getenv("KEEP_ALIVE") != "1":
+        return
     app = Flask('keep_alive')
 
     @app.route('/')
@@ -10,14 +13,11 @@ def start_keep_alive():
         return "🛡️ SatpamBot Monitor is alive!", 200
 
     def run():
-        if __name__ == "__main__":
-    if os.getenv("KEEP_ALIVE") == "1":
-        app.run(host='0.0.0.0', port=9090)  # ⬅️ Gunakan port berbeda agar tidak bentrok
+        app.run(host='0.0.0.0', port=int(os.getenv("KEEP_ALIVE_PORT","9090")), threaded=True)
 
-    t = Thread(target=run)
-    t.daemon = True
+    t = Thread(target=run, daemon=True)
     t.start()
 
-# Jangan biarkan keep_alive.py dijalankan langsung
+# prevent direct execution
 if __name__ == "__main__":
-    print("⚠️ Jangan jalankan file ini langsung. Jalankan lewat main.py.")
+    print("⚠️ Jangan jalankan file ini langsung. Dipanggil dari main/bot.")

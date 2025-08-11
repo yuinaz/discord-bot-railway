@@ -24,7 +24,8 @@ def _load_ocr_words():
             out.append(w)
     return out
 
-SCAM_DEFAULT_WORDS = [
+\1
+    \"mrbeast\", \"mr beast\", \"$2500\", \"2500\", \"win 2500\", \"usd 2500\", \"nitro free\", \"free nitro\", 
     "bonus", "promo code", "register", "claim", "casino", "slots",
     "usdt", "trx", "withdrawal", "withdraw", "deposit", "airdrop",
     "binance", "okx", "bybit", "kucoin", "gift", "reward", "free reward"
