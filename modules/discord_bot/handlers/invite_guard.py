@@ -3,7 +3,7 @@ from modules.discord_bot.helpers.banlog import record_ban_and_log
 # NSFW invite guard (auto, hardened)
 import os, re, logging, discord
 from modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelisted_channel
-from modules.discord_bot.helpers.log_utils import send_ban_embeds
+from modules.discord_bot.helpers.log_utils import send_ban_embeds, send_error_log
 from modules.discord_bot.helpers.config_manager import get_flag
 
 # Robust pattern for discord.gg / discord.com / discordapp.com invites (with or without scheme)

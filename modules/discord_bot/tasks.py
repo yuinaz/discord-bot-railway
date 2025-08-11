@@ -27,7 +27,7 @@ async def process_image_message(message: discord.Message, bot: commands.Bot):
                 continue  # Tidak bisa hash gambar
 
             # Logging deteksi gambar (opsional)
-            await log_image_event(message, image_hash)
+            await await log_image_event(message, image_hash)
 
             if is_blacklisted_image(image_bytes):
                 await handle_blacklisted_image(message, image_hash)
@@ -45,7 +45,7 @@ async def handle_blacklisted_image(message: discord.Message, image_hash: str):
     try:
         await message.delete()
         await message.channel.send(f"⚠️ Gambar diblokir (blacklist hash).", delete_after=10)
-        log_violation(message, image_hash, reason="Image hash in blacklist")
+        await log_violation(message, image_hash, reason="Image hash in blacklist")
     except Exception as e:
         print(f"[❌] Gagal menghapus pesan blacklist: {e}")
 
@@ -56,7 +56,7 @@ async def check_ocr_violation(image_bytes: bytes, message: discord.Message, imag
         if text and contains_prohibited_text(text):
             await message.delete()
             await message.channel.send("🛑 Gambar mengandung teks terlarang.", delete_after=10)
-            await log_violation(message, image_hash, reason="Prohibited OCR text")
+            await await log_violation(message, image_hash, reason="Prohibited OCR text")
             return True
     except Exception as e:
         print(f"[❌] Gagal OCR: {e}")

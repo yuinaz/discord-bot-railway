@@ -121,3 +121,15 @@ def run_bot():
         print("[run_bot] ❌ Missing DISCORD_BOT_TOKEN (or DISCORD_TOKEN)")
         return
     bot.run(token)
+
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    try:
+        from .helpers.log_utils import send_error_log
+        guild = None
+        for a in list(args)[:3]:
+            guild = getattr(a, "guild", None) or guild
+        await send_error_log(guild, f"Unhandled error in {event}", RuntimeError("on_error"), {"event": event})
+    except Exception:
+        pass

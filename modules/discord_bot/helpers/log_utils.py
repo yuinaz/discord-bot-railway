@@ -104,3 +104,112 @@ async def update_mod_command_ban_log(guild: discord.Guild, user: discord.abc.Use
         await msg.edit(content=BAN_LOG_ANCHOR, embed=emb)
     except Exception:
         await ch.send(BAN_LOG_ANCHOR, embed=emb)
+
+
+# ===== Error log rolling embed (auto-update) =====
+import os as _os, json as _json, time as _time, traceback as _traceback
+from pathlib import Path as _Path
+
+_ERROR_STATE_FILE = _Path("data/errorlog_state.json")
+_MAX_ENTRIES = 10
+_EMBED_TITLE = "❌ Error Log (Auto-Update)"
+
+def _load_state():
+    try:
+        if _ERROR_STATE_FILE.exists():
+            return _json.loads(_ERROR_STATE_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+def _save_state(state):
+    try:
+        _ERROR_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _ERROR_STATE_FILE.write_text(_json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+async def _get_error_channel(guild):
+    if guild is None:
+        return None
+    ch_id = _os.getenv("ERROR_LOG_CHANNEL_ID")
+    ch = None
+    if ch_id and ch_id.isdigit():
+        ch = guild.get_channel(int(ch_id))
+        if ch:
+            return ch
+    for name in ("errorlog-bot", "log-satpam-error", "log-satpam-chat", "mod-command"):
+        ch = discord.utils.get(guild.text_channels, name=name)
+        if ch:
+            return ch
+    return None
+
+async def _get_or_create_error_message(channel):
+    state = _load_state()
+    gkey = str(channel.guild.id)
+    gstate = state.get(gkey, {})
+    msg_id = gstate.get("message_id")
+    if msg_id:
+        try:
+            m = await channel.fetch_message(int(msg_id))
+            return m, state
+        except Exception:
+            pass
+    try:
+        async for m in channel.history(limit=50):
+            if m.author == channel.guild.me and m.embeds:
+                if m.embeds[0].title == _EMBED_TITLE:
+                    gstate["message_id"] = m.id
+                    state[gkey] = gstate
+                    _save_state(state)
+                    return m, state
+    except Exception:
+        pass
+    emb = discord.Embed(title=_EMBED_TITLE, description="(no errors yet)")
+    try:
+        m = await channel.send(embed=emb)
+        gstate["message_id"] = m.id
+        gstate["entries"] = []
+        state[gkey] = gstate
+        _save_state(state)
+        return m, state
+    except Exception:
+        return None, state
+
+def _format_entries(entries):
+    if not entries:
+        return "(no errors yet)"
+    text = "\n".join(entries[-_MAX_ENTRIES:])
+    if len(text) > 3800:
+        text = text[-3800:]
+    return text
+
+async def upsert_errorlog_embed(guild, entry: str):
+    ch = await _get_error_channel(guild)
+    if not ch:
+        return
+    msg, state = await _get_or_create_error_message(ch)
+    if not msg:
+        return
+    gkey = str(guild.id)
+    gstate = state.get(gkey, {"entries": []})
+    entries = gstate.get("entries", [])
+    entries.append(entry)
+    if len(entries) > _MAX_ENTRIES:
+        entries = entries[-_MAX_ENTRIES:]
+    gstate["entries"] = entries
+    state[gkey] = gstate
+    _save_state(state)
+    emb = discord.Embed(title=_EMBED_TITLE, description=_format_entries(entries))
+    try:
+        await msg.edit(embed=emb)
+    except Exception:
+        pass
+
+async def send_error_log(guild, title: str, err: Exception, extra: dict | None = None):
+    ts = _time.strftime("%Y-%m-%d %H:%M:%S")
+    base = f"• **{ts}** — **{title}** — `{type(err).__name__}: {err}`"
+    if extra:
+        kv = " | ".join(f"{k}:{str(v)[:60]}" for k, v in extra.items())
+        base = f"{base} — {kv}"
+    await upsert_errorlog_embed(guild, base)
