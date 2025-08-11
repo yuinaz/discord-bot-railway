@@ -81,6 +81,12 @@ async def on_message(message: discord.Message):
     except Exception as e:
         logging.error(f"process_commands error: {e}")
 
+# Flask compatibility (for main.py)
+_flask_app = None
+def set_flask_app(app):
+    global _flask_app
+    _flask_app = app
+
 async def start_bot():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     await load_cogs(bot)
@@ -89,6 +95,9 @@ async def start_bot():
         raise RuntimeError("BOT_TOKEN is not set")
     await bot.start(token)
 
-if __name__ == "__main__":
+def run_bot():
     import asyncio
     asyncio.run(start_bot())
+
+if __name__ == "__main__":
+    run_bot()

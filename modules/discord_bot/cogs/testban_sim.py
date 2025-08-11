@@ -23,7 +23,7 @@ class TestbanSim(commands.Cog):
         except Exception:
             pass
 
-        # Attach FibiLaugh from common locations (case-insensitive)
+        # Try to attach FibiLaugh from various locations (case-insensitive)
         file = None
         try:
             here = Path(__file__).resolve()

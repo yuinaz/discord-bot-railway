@@ -30,7 +30,7 @@ class Health(commands.Cog):
     @commands.command(name="sbpid")
     async def sbpid(self, ctx: commands.Context):
         host = socket.gethostname()
-        await ctx.send(f"Host={host} | PID={os.getpid()} | Python={platform.python_version()} ")
+        await ctx.send(f"Host={host} | PID={os.getpid()} | Python={platform.python_version()}")
 
     @commands.command(name="sbstatus")
     @commands.has_permissions(manage_guild=True)

@@ -1,21 +1,9 @@
-import re
+\
+import re, os, discord
 from discord.ext import commands
-import discord, os
 
 INVITE_RE = re.compile(r"(?:https?://)?(?:discord(?:app)?\.com/invite/|discord\.gg/|dis\.gd/)([A-Za-z0-9-]+)", re.IGNORECASE)
-
-NSFW_KEYWORDS = {
-    "nsfw","18+","18 ++","18plus","hentai","porn","xxx","sex","lewd","r18","🔞",
-    "🍑","🍆","💦","onlyfans","boobs","nude","nudity","erotic","fetish","bdsm","camgirl","camsex",
-}
-
-def looks_nsfw_text(s: str) -> bool:
-    if not s: return False
-    s = s.lower()
-    for kw in NSFW_KEYWORDS:
-        if kw in s: return True
-    return False
-
+NSFW_WORDS = {"nsfw","18+","hentai","porn","xxx","sex","lewd","r18","🔞","onlyfans","boobs","nude","nudity","erotic"}
 BAN_DELETE_MESSAGE_DAYS = 7
 OWN_GUILD_WHITELIST = {int(x) for x in os.getenv('OWN_GUILD_WHITELIST','').split(',') if x.isdigit()}
 
@@ -25,15 +13,15 @@ class AntiInviteAutoban(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message or message.author.bot: return
-        content = message.content or ""
-        matches = list(INVITE_RE.finditer(content))
-        if not matches: return
-        code = matches[0].group(1)
+        m = INVITE_RE.search(message.content or "")
+        if not m: return
 
+        code = m.group(1)
         invite = None
         try:
             invite = await self.bot.fetch_invite(code, with_counts=False, with_expiration=False)
-        except Exception: pass
+        except Exception:
+            invite = None
 
         is_nsfw = False
         channel = getattr(invite, "channel", None) if invite else None
@@ -51,11 +39,13 @@ class AntiInviteAutoban(commands.Cog):
                 if val >= 2: is_nsfw = True
             elif str(nsfw_level).lower() in {"explicit","age_restricted"}: is_nsfw = True
         except Exception: pass
+
         try:
             texts = []
             if guild: texts += [getattr(guild, "name", "") or "", getattr(guild, "description", "") or ""]
             if channel: texts += [getattr(channel, "name", "") or "", getattr(channel, "topic", "") or ""]
-            if looks_nsfw_text(" ".join(texts)): is_nsfw = True
+            st = " ".join(texts).lower()
+            if any(k in st for k in NSFW_WORDS): is_nsfw = True
         except Exception: pass
 
         if not is_nsfw: return

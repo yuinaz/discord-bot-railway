@@ -1,6 +1,5 @@
 import logging
 from modules.discord_bot import message_handlers
-
 logger = logging.getLogger(__name__)
 
 def setup_bot_events(bot):

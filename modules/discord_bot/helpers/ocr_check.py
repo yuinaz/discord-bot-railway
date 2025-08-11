@@ -1,18 +1,15 @@
-# OCR helper (clean)
 import os, io
 from typing import List
 try:
     from PIL import Image, ImageOps, ImageEnhance
 except Exception:
     Image = None
-
 try:
     import pytesseract
 except Exception:
     pytesseract = None
 
 DEFAULT_LANG = os.getenv("OCR_LANG", "eng+ind")
-
 SCAM_DEFAULT_WORDS: List[str] = [
     "mrbeast", "mr beast", "$2500", "2500", "win 2500", "usd 2500",
     "free nitro", "nitro free", "bonus", "promo code", "register", "claim",
