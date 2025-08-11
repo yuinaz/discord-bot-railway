@@ -10,16 +10,14 @@ NSFW_KEYWORDS = {
 }
 
 def looks_nsfw_text(s: str) -> bool:
-    if not s:
-        return False
+    if not s: return False
     s = s.lower()
     for kw in NSFW_KEYWORDS:
-        if kw in s:
-            return True
+        if kw in s: return True
     return False
 
-BAN_DELETE_MESSAGE_DAYS = 7  # maximum cleanup
-GUILD_ID_WHITELIST = set()   # e.g., {123456789012345678}
+BAN_DELETE_MESSAGE_DAYS = 7
+GUILD_ID_WHITELIST = set()
 
 class AntiInviteAutoban(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -27,16 +25,12 @@ class AntiInviteAutoban(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if not message or message.author.bot:
-            return
+        if not message or message.author.bot: return
         content = message.content or ""
         m = INVITE_RE.search(content)
-        if not m:
-            return
-
+        if not m: return
         code = m.group(1)
 
-        # Try to fetch invite to check NSFW; if cannot fetch, use heuristics later
         invite = None
         try:
             invite = await self.bot.fetch_invite(code, with_counts=False, with_expiration=False)
@@ -50,70 +44,49 @@ class AntiInviteAutoban(commands.Cog):
         if guild and getattr(guild, "id", None) in GUILD_ID_WHITELIST:
             return
 
-        # API-based checks
         try:
             if channel and hasattr(channel, "nsfw") and channel.nsfw:
                 is_nsfw = True
-        except Exception:
-            pass
+        except Exception: pass
 
         try:
             nsfw_level = getattr(guild, "nsfw_level", None)
             if nsfw_level is not None:
                 val = int(getattr(nsfw_level, "value", nsfw_level))
-                if val >= 2:
-                    is_nsfw = True
-            elif str(nsfw_level).lower() in {"explicit", "age_restricted"}:
+                if val >= 2: is_nsfw = True
+            elif str(nsfw_level).lower() in {"explicit","age_restricted"}:
                 is_nsfw = True
-        except Exception:
-            pass
+        except Exception: pass
 
-        # Heuristic fallback
         try:
             texts = []
             if guild:
-                texts.append(getattr(guild, "name", "") or "")
-                texts.append(getattr(guild, "description", "") or "")
+                texts += [getattr(guild, "name", "") or "", getattr(guild, "description", "") or ""]
             if channel:
-                texts.append(getattr(channel, "name", "") or "")
-                texts.append(getattr(channel, "topic", "") or "")
-            combined = " ".join([t for t in texts if t])
-            if looks_nsfw_text(combined):
+                texts += [getattr(channel, "name", "") or "", getattr(channel, "topic", "") or ""]
+            if looks_nsfw_text(" ".join(texts)):
                 is_nsfw = True
-        except Exception:
-            pass
+        except Exception: pass
 
-        if not is_nsfw:
-            return  # allow non-NSFW invites
+        if not is_nsfw: return
 
-        # Act: delete message and ban author (maximum severity)
         try:
             if message.guild and message.guild.me and message.guild.me.guild_permissions.manage_messages:
-                try:
-                    await message.delete()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                try: await message.delete()
+                except Exception: pass
+        except Exception: pass
 
         try:
             if message.guild and message.guild.me and message.guild.me.guild_permissions.ban_members:
-                await message.guild.ban(
-                    message.author,
-                    delete_message_days=BAN_DELETE_MESSAGE_DAYS,
-                    reason="Posting NSFW Discord invite (auto)"
-                )
+                await message.guild.ban(message.author, delete_message_days=BAN_DELETE_MESSAGE_DAYS, reason="Posting NSFW Discord invite (auto)")
                 return
-        except Exception:
-            pass
+        except Exception: pass
 
-        # Fallback: timeout if cannot ban
         try:
             if message.guild and message.guild.me and message.guild.me.guild_permissions.moderate_members:
                 duration = discord.utils.utcnow() + discord.timedelta(days=7)
                 await message.author.edit(timeout=duration, reason="Posting NSFW Discord invite (auto)")
-        except Exception:
-            pass
+        except Exception: pass
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiInviteAutoban(bot))
