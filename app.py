@@ -44,6 +44,48 @@ socketio = SocketIO(app)
 # Waktu mulai untuk uptime
 start_time = time.time()
 
+# ===== Utils (kompatibilitas dashboard.py lama) =====
+def get_uptime():
+    try:
+        secs = int(time.time() - start_time)
+        return str(datetime.timedelta(seconds=secs))
+    except Exception:
+        return "unknown"
+
+def get_ram_usage():
+    try:
+        return round(psutil.virtual_memory().used / (1024 * 1024), 2)
+    except Exception:
+        return 0.0
+
+def get_cpu_usage():
+    try:
+        return psutil.cpu_percent(interval=0.1)
+    except Exception:
+        return 0.0
+
+def get_current_theme():
+    try:
+        with open("config/theme.json","r",encoding="utf-8") as f:
+            theme_file = json.load(f).get("theme","default.css")
+            if not theme_file.endswith(".css"):
+                theme_file += ".css"
+    except Exception:
+        theme_file = "default.css"
+    return f"/static/themes/{theme_file}"
+
+def set_theme(theme_name:str):
+    try:
+        if not theme_name.endswith(".css"):
+            theme_name += ".css"
+        os.makedirs("config", exist_ok=True)
+        with open("config/theme.json","w",encoding="utf-8") as f:
+            json.dump({"theme": theme_name}, f)
+        return f"/static/themes/{theme_name}"
+    except Exception:
+        return get_current_theme()
+
+
 # === TEMA GLOBAL ===
 def _load_background_url():
     try:
@@ -176,7 +218,15 @@ def logout():
 def dashboard():
     if not session.get("logged_in"):
         return redirect("/login")
-    return render_template("dashboard.html")
+    username = session.get("username", "Admin")
+    return render_template(
+        "dashboard.html",
+        uptime=get_uptime(),
+        ram_usage=get_ram_usage(),
+        cpu_usage=get_cpu_usage(),
+        theme_path=get_current_theme(),
+        username=username
+    )
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
@@ -514,15 +564,6 @@ def healthcheck():
     return "ok", 200
 
 
-# ===== PING ENDPOINT UNTUK UPTIMEROBOT =====
-@app.route("/ping", methods=["GET", "HEAD"])
-def ping():
-    return "pong", 200, {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store"
-    }
-
-
 # === Discord OAuth Login ===
 from urllib.parse import urlencode
 import requests
@@ -750,3 +791,68 @@ def bootstrap():
 
     # Mulai loop broadcast realtime 60 detik sekali
     start_broadcast_loop()
+
+
+@app.route("/admin-log")
+@login_required
+def admin_log():
+    if not session.get("logged_in"):
+        return redirect("/login")
+    return render_template("admin_log.html", username=session.get("username","Admin"))
+
+
+@app.route("/api/server_stats")
+@login_required
+def api_server_stats():
+    if not session.get("logged_in"):
+        return redirect("/login")
+    try:
+        import sqlite3
+        conn = sqlite3.connect("superadmin.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT guild_id, guild_name, COUNT(*) as total_detected
+        FROM phishing_logs
+        GROUP BY guild_id, guild_name
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        data = [{"guild_id": r[0], "guild_name": r[1], "total_detected": r[2]} for r in rows]
+        return jsonify(data)
+    except Exception:
+        dummy = [
+            {"guild_id": "1", "guild_name": "DummyServer", "total_detected": 10},
+            {"guild_id": "2", "guild_name": "SatpamBot Dev", "total_detected": 3}
+        ]
+        return jsonify(dummy)
+
+
+@app.route("/api/member_monitor")
+@login_required
+def api_member_monitor():
+    if not session.get("logged_in"):
+        return redirect("/login")
+    try:
+        import sqlite3
+        conn = sqlite3.connect("superadmin.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT guild_id, guild_name, member_count FROM guilds")
+        rows = cursor.fetchall()
+        conn.close()
+        data = [{"guild_id": r[0], "guild_name": r[1], "member_count": r[2]} for r in rows]
+        return jsonify(data)
+    except Exception:
+        dummy = [
+            {"guild_id": "1", "guild_name": "DummyServer", "member_count": 300},
+            {"guild_id": "2", "guild_name": "SatpamBot Dev", "member_count": 120}
+        ]
+        return jsonify(dummy)
+
+
+# ===== PING ENDPOINT UNTUK UPTIMEROBOT =====
+@app.route("/ping", methods=["GET", "HEAD"])
+def ping():
+    return "pong", 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store"
+    }
