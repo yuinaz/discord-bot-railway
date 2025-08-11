@@ -19,12 +19,11 @@ LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "0") or "0")
 _STATUS_CACHE_FILE = os.getenv("STATUS_MSG_CACHE_FILE", "data/status_message_ids.json")
 _MIN_UPDATE_SEC = int(os.getenv("STATUS_MSG_MIN_UPDATE_SEC", "300"))  # 5 menit
 
-# Zona waktu lokal (WIB)
+# Zona waktu lokal (WIB) — bisa dioverride lewat env STATUS_TZ
 TZ = pytz.timezone(os.getenv("STATUS_TZ", "Asia/Jakarta"))
 
 # Memori cache: {(guild_id, channel_id): {"message_id": int, "ts": float}}
 _status_cache: dict[Tuple[int, int], dict] = {}
-
 
 # ========= Util cache =========
 def _load_cache() -> None:
@@ -39,7 +38,6 @@ def _load_cache() -> None:
     except Exception:
         _status_cache = {}
 
-
 def _save_cache() -> None:
     try:
         os.makedirs(os.path.dirname(_STATUS_CACHE_FILE) or ".", exist_ok=True)
@@ -48,7 +46,6 @@ def _save_cache() -> None:
             json.dump(data, f)
     except Exception:
         pass
-
 
 # ========= Channel resolver =========
 def _find_log_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
@@ -69,18 +66,22 @@ def _find_log_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
             continue
     return None
 
+# ========= Waktu WIB =========
+def _now_wib_str() -> str:
+    # Contoh: 2025-08-11 20:44:24 WIB (+07:00)
+    dt = datetime.now(TZ)
+    z = dt.strftime("%z")  # e.g. +0700
+    return f"{dt.strftime('%Y-%m-%d %H:%M:%S')} WIB ({z[:3]}:{z[3:]})"
 
 # ========= Builder embed status (pakai WIB di footer) =========
 def _build_status_embed(text: str) -> discord.Embed:
-    now_wib = datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S WIB")
     emb = discord.Embed(
         title="SatpamBot Status",
         description=text,
         color=discord.Color.green(),
     )
-    emb.set_footer(text=f"Terakhir diperbarui: {now_wib}")
+    emb.set_footer(text=f"Terakhir diperbarui: {_now_wib_str()}")
     return emb
-
 
 # ========= Upsert status (EDIT pesan lama, anti-spam) =========
 async def upsert_status_embed_in_channel(
@@ -155,7 +156,6 @@ async def upsert_status_embed_in_channel(
     except Exception:
         return False
 
-
 async def upsert_status_embed(
     guild: discord.Guild,
     text: str,
@@ -166,7 +166,6 @@ async def upsert_status_embed(
     if not ch:
         return False
     return await upsert_status_embed_in_channel(ch, text, force=force)
-
 
 # ========= Helper untuk event online =========
 async def announce_bot_online(guild: discord.Guild, bot_tag: str):
@@ -180,7 +179,6 @@ async def announce_bot_online(guild: discord.Guild, bot_tag: str):
             except Exception:
                 pass
 
-
 # ========= (Opsional) Utility kirim embed log umum (pakai WIB) =========
 async def send_embed_log(
     channel: discord.TextChannel,
@@ -189,5 +187,5 @@ async def send_embed_log(
     color: discord.Color = discord.Color.blue()
 ):
     emb = discord.Embed(title=title, description=description, color=color)
-    emb.set_footer(text=datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S WIB"))
+    emb.set_footer(text=_now_wib_str())
     await channel.send(embed=emb)
