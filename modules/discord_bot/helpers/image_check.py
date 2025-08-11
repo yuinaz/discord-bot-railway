@@ -1,5 +1,5 @@
 # Blacklist image check with multi-hash (auto 2025-08-09T12:25:01.106184Z)
-import os, json
+import os, json, re
 from datetime import datetime
 from modules.discord_bot.helpers.image_hashing import compute_all_hashes, hamming
 
@@ -9,6 +9,20 @@ DHASH_MAX = int(os.getenv("IMG_DHASH_MAX_DIST", "12"))
 AHASH_MAX = int(os.getenv("IMG_AHASH_MAX_DIST", "12"))
 REGION_USE = os.getenv("IMG_REGION_HASH", "true").lower() == "true"
 REGION_MAX_HITS = int(os.getenv("IMG_REGION_MIN_MATCH", "3"))
+
+TXT_FILE = os.getenv("BLACKLIST_IMAGE_HASHES_TXT", "data/blacklist_image_hashes.txt")
+
+def _load_md5_list():
+    arr = []
+    try:
+        with open(TXT_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                s=line.strip().lower()
+                if s and re.fullmatch(r"[0-9a-f]{32}", s):
+                    arr.append(s)
+    except Exception:
+        pass
+    return arr
 
 def _load_db():
     try:
@@ -43,6 +57,9 @@ def _match_entry(entry, sample):
 
 def is_blacklisted_image(image_bytes: bytes):
     s = compute_all_hashes(image_bytes)
+    md5s = set(_load_md5_list())
+    if md5s and 'md5' in s and (s['md5'] or '').lower() in md5s:
+        return True
     for e in _load_db():
         if _match_entry(e, s): return True
     return False

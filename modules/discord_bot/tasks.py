@@ -27,7 +27,7 @@ async def process_image_message(message: discord.Message, bot: commands.Bot):
                 continue  # Tidak bisa hash gambar
 
             # Logging deteksi gambar (opsional)
-            log_image_event(message, image_hash)
+            await log_image_event(message, image_hash)
 
             if is_blacklisted_image(image_bytes):
                 await handle_blacklisted_image(message, image_hash)

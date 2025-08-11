@@ -47,7 +47,6 @@ bot = SatpamBot(command_prefix="!", intents=intents, case_insensitive=True)
 
 @bot.event
 async def on_ready():
-
     logging.info(f"✅ Bot berhasil login sebagai {bot.user} (ID: {bot.user.id})")
     logging.info(f"🌐 Mode: {FLASK_ENV}")
 
@@ -86,14 +85,12 @@ async def _relay_on_message(message):
 
 @bot.event
 async def on_message(message: discord.Message):
-    # Basic gateway for guards + commands
     try:
         if getattr(message, "author", None) and getattr(message.author, "bot", False):
             return
         from .message_handlers import handle_on_message
         await handle_on_message(bot, message)
     except Exception:
-        # Never let guard failures kill command processing
         try:
             await bot.process_commands(message)
         except Exception:

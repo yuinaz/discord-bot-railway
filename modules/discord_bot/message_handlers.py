@@ -55,26 +55,20 @@ async def handle_on_message(*args):
         return
 
     # >>> tempatkan pre-processor lain bila perlu <<<
-    # 1) NSFW invite autoban
     try:
         from modules.discord_bot.handlers.invite_guard import check_nsfw_invites
         await check_nsfw_invites(message, bot)
-    except Exception:
-        pass
+    except Exception: pass
 
-    # 2) URL reputation guard
     try:
         from modules.discord_bot.handlers.url_guard import handle_urls
         await handle_urls(message, bot)
-    except Exception:
-        pass
+    except Exception: pass
 
-    # 3) Image pipeline (blacklist + OCR)
     try:
         from modules.discord_bot.tasks import process_image_message
         await process_image_message(message, bot)
-    except Exception:
-        pass
+    except Exception: pass
 
     try:
         from modules.discord_bot.handlers.invite_guard import check_nsfw_invites
