@@ -158,7 +158,7 @@ class ModerationExtras(commands.Cog):
 
     @commands.command(name="sbfibi_check")
     async def sbfibi_check(self, ctx: commands.Context):
-@commands.command(name="sbdiag")
+    @commands.command(name="sbdiag")
     async def sbdiag(self, ctx: commands.Context):
         try:
             import inspect
