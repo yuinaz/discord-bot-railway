@@ -1,46 +1,48 @@
-# init_superadmin_db.py
 
-import sqlite3
 import os
+import sqlite3
 from werkzeug.security import generate_password_hash
-from dotenv import load_dotenv
-
-load_dotenv()
 
 DB_PATH = "superadmin.db"
-USERNAME = os.getenv("SUPER_ADMIN_USER", "admin")
-PASSWORD = os.getenv("SUPER_ADMIN_PASS", "Musedash1234")
 
-hashed = generate_password_hash(PASSWORD)
+def init_tables(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS superadmin (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            ts TEXT,
+            action TEXT
+        )
+    """)
 
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
+def main():
+    user = os.getenv("SUPER_ADMIN_USER") or "admin"
+    passwd = os.getenv("SUPER_ADMIN_PASS") or os.getenv("ADMIN_PASSWORD")
+    if not passwd:
+        raise SystemExit("SUPER_ADMIN_PASS/ADMIN_PASSWORD harus di-set di ENV.")
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS superadmin (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
-)
-""")
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        init_tables(conn)
+        cur = conn.execute("SELECT id FROM superadmin WHERE username=?", (user,))
+        if cur.fetchone():
+            conn.execute("UPDATE superadmin SET password=? WHERE username=?", (generate_password_hash(passwd), user))
+            conn.execute("INSERT INTO admin_history(username, ts, action) VALUES (?, datetime('now'), ?)",
+                         (user, "update_password_from_env"))
+            print(f"Updated admin '{user}' from ENV.")
+        else:
+            conn.execute("INSERT INTO superadmin(username, password) VALUES (?, ?)",
+                         (user, generate_password_hash(passwd)))
+            conn.execute("INSERT INTO admin_history(username, ts, action) VALUES (?, datetime('now'), ?)",
+                         (user, "create_from_env"))
+            print(f"Created admin '{user}' from ENV.")
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS admin_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    action TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-)
-""")
-
-# Update jika sudah ada
-cursor.execute("SELECT * FROM superadmin WHERE username = ?", (USERNAME,))
-if cursor.fetchone():
-    cursor.execute("UPDATE superadmin SET password = ? WHERE username = ?", (hashed, USERNAME))
-    print(f"🔄 Password admin '{USERNAME}' diupdate.")
-else:
-    cursor.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)", (USERNAME, hashed))
-    print(f"✅ Admin baru '{USERNAME}' ditambahkan.")
-
-conn.commit()
-conn.close()
+if __name__ == '__main__':
+    main()
