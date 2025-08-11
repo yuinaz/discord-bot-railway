@@ -75,11 +75,6 @@ async def handle_on_message(*args):
         await check_nsfw_invites(message, bot)
     except Exception:
         pass
-
-
-    # Penting: teruskan ke command processor
-    await bot.process_commands(message)
-
 async def handle_on_message(bot, message):
     try:
         from .handlers.invite_guard import check_nsfw_invites
