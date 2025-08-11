@@ -1,5 +1,5 @@
 from discord.ext import commands
-import discord
+import discord, os, platform, socket
 from ..helpers.log_utils import upsert_status_embed_in_channel
 
 class Health(commands.Cog):
@@ -16,7 +16,6 @@ class Health(commands.Cog):
         ptxt = ", ".join([k for k in ['manage_messages','ban_members','moderate_members','administrator'] if getattr(perms,k,False)]) if perms else "-"
         embed.add_field(name="Perms", value=ptxt, inline=False)
         embed.add_field(name="Prefix", value=getattr(self.bot, 'command_prefix', '!'), inline=True)
-        embed.set_footer(text="Gunakan !tb / !testban untuk simulasi, kirim invite NSFW untuk uji otoban.")
         await ctx.send(embed=embed)
 
     @commands.command(name="sbwho")
@@ -28,30 +27,28 @@ class Health(commands.Cog):
         embed.add_field(name="Cogs", value=(", ".join(cogs) or "-"), inline=False)
         await ctx.send(embed=embed)
 
+    @commands.command(name="sbpid")
+    async def sbpid(self, ctx: commands.Context):
+        host = socket.gethostname()
+        await ctx.send(f"Host={host} | PID={os.getpid()} | Python={platform.python_version()} ")
+
     @commands.command(name="sbstatus")
     @commands.has_permissions(manage_guild=True)
     async def sbstatus(self, ctx: commands.Context):
         ok = await upsert_status_embed_in_channel(ctx.channel, "✅ SatpamBot online dan siap berjaga.")
-        if ok:
-            try: await ctx.message.add_reaction("✅")
-            except Exception: pass
-        else:
-            await ctx.send("Gagal menulis embed status di channel ini (cek izin Kirim Pesan + Embed Links).")
+        await ctx.message.add_reaction("✅" if ok else "❌")
 
     @commands.command(name="sbheartbeat")
     @commands.has_permissions(manage_guild=True)
     async def sbheartbeat(self, ctx: commands.Context, toggle: str = "on"):
         g = ctx.guild
         if not g:
-            await ctx.send("Jalankan di dalam server.")
-            return
+            await ctx.send("Jalankan di dalam server."); return
         key = g.id
         if toggle.lower() == "off":
             t = self._hb_tasks.pop(key, None)
-            if t:
-                t.cancel()
-            await ctx.send("Heartbeat dimatikan.")
-            return
+            if t: t.cancel()
+            await ctx.send("Heartbeat dimatikan."); return
         ch = ctx.channel
         async def loop():
             import asyncio
@@ -59,17 +56,14 @@ class Health(commands.Cog):
                 try:
                     await upsert_status_embed_in_channel(ch, "✅ SatpamBot online dan siap berjaga.")
                     await asyncio.sleep(600)
-                except asyncio.CancelledError:
-                    break
-                except Exception:
-                    await asyncio.sleep(600)
-        # cancel existing
+                except asyncio.CancelledError: break
+                except Exception: await asyncio.sleep(600)
         old = self._hb_tasks.get(key)
         if old:
             try: old.cancel()
             except Exception: pass
         self._hb_tasks[key] = self.bot.loop.create_task(loop())
-        await ctx.send("Heartbeat diaktifkan di channel ini (1 embed akan di-update tiap 10 menit).")
+        await ctx.send("Heartbeat diaktifkan di channel ini.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Health(bot))

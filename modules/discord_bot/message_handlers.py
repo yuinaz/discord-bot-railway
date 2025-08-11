@@ -1,5 +1,4 @@
 async def handle_on_message(bot, message):
-    # Pipeline handlers only; do NOT call bot.process_commands here.
     try:
         from .handlers.invite_guard import check_nsfw_invites
         await check_nsfw_invites(message, bot)

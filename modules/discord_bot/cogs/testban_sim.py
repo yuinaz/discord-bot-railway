@@ -1,7 +1,8 @@
 from discord.ext import commands
-import discord
+import discord, os
 from datetime import datetime, timezone
 from pathlib import Path
+from glob import glob
 
 class TestbanSim(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -16,21 +17,30 @@ class TestbanSim(commands.Cog):
             color=discord.Color.orange(),
             timestamp=datetime.now(timezone.utc),
         )
-        # Thumbnail avatar
         try:
             if member.display_avatar:
                 embed.set_thumbnail(url=member.display_avatar.url)
         except Exception:
             pass
 
-        # Coba lampirkan sticker FibiLaugh dari assets (jika ada)
+        # Attach FibiLaugh from common locations (case-insensitive)
         file = None
         try:
-            base = Path(__file__).resolve().parents[2]  # .../modules
-            img = base / "assets" / "FibiLaugh.png"
-            if img.exists():
-                file = discord.File(str(img), filename="fibilaugh.png")
-                embed.set_image(url="attachment://fibilaugh.png")
+            here = Path(__file__).resolve()
+            roots = [here.parents[3], here.parents[2], here.parents[1]]  # project root, modules, discord_bot
+            candidates = []
+            for r in roots:
+                if r and r.exists():
+                    candidates += glob(str(r / "assets" / "*"))
+            chosen = None
+            for c in candidates:
+                n = os.path.basename(c).lower()
+                if n.startswith("fibilaugh") and n.split(".")[-1] in ("png","webp","jpg","jpeg","gif"):
+                    chosen = c; break
+            if chosen:
+                fname = "fibilaugh" + os.path.splitext(chosen)[1]
+                file = discord.File(chosen, filename=fname)
+                embed.set_image(url=f"attachment://{fname}")
         except Exception:
             file = None
 
