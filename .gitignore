@@ -10,3 +10,6 @@ venv/
 .env
 __pycache__/
 *.pyc
+
+# Ignore patch snippets
+*.inject.py
