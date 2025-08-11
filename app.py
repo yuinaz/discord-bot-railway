@@ -105,6 +105,7 @@ def safe_log(msg, level="info"):
 
 # ===== IMPORT MODULES =====
 from modules.discord_bot import run_bot as run_discord_bot
+APP_BOT_THREAD_STARTED = False
 from modules.database import (
     init_stats_db,
     get_last_7_days,
@@ -114,9 +115,10 @@ from modules.database import (
 )
 
 # ===== START DISCORD BOT THREAD =====
-bot_thread = threading.Thread(target=run_discord_bot)
-bot_thread.daemon = True
-bot_thread.start()
+if not os.getenv('DISABLE_APP_AUTOBOT') and not APP_BOT_THREAD_STARTED:
+    bot_thread = threading.Thread(target=run_discord_bot, daemon=True)
+    bot_thread.start()
+    APP_BOT_THREAD_STARTED = True
 
 
 

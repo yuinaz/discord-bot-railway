@@ -1,0 +1,7 @@
+Patch bundle (2025-08-11)
+- Token resolution: DISCORD_BOT_TOKEN_LOCAL (local) / DISCORD_BOT_TOKEN (prod) / BOT_TOKEN fallback.
+- run_local.py now supports --bot-only / --web-only; disables reloader; avoids duplicate bot.
+- app.py guards bot thread with DISABLE_APP_AUTOBOT and ensures single start.
+- cogs_loader avoids duplicate loads and skips moderation_test outside local to prevent 'status' command clash.
+- testban embed sends once; FibiLaugh image fallback ensured.
+- Login status embed should appear in #log-botphising; prefix '!' intact.
