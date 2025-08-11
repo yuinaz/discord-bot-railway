@@ -213,3 +213,56 @@ async def send_error_log(guild, title: str, err: Exception, extra: dict | None =
         kv = " | ".join(f"{k}:{str(v)[:60]}" for k, v in extra.items())
         base = f"{base} — {kv}"
     await upsert_errorlog_embed(guild, base)
+
+
+# ===== Single updatable STATUS embed (online + heartbeat) =====
+import json as _json, os as _os, time as _time
+_STATUS_STATE_FILE = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), "data", "status_embed.json")
+
+def _status_load():
+    try:
+        _os.makedirs(_os.path.dirname(_STATUS_STATE_FILE), exist_ok=True)
+        with open(_STATUS_STATE_FILE, "r", encoding="utf-8") as f:
+            return _json.load(f)
+    except Exception:
+        return {}
+
+def _status_save(state: dict):
+    try:
+        _os.makedirs(_os.path.dirname(_STATUS_STATE_FILE), exist_ok=True)
+        with open(_STATUS_STATE_FILE, "w", encoding="utf-8") as f:
+            _json.dump(state, f)
+    except Exception:
+        pass
+
+async def upsert_status_embed(guild: discord.Guild, text: str, channel_name: str = LOG_PHISH_NAME):
+    """Create or update a single status embed in the given guild's log channel."""
+    if not guild: 
+        return
+    ch = find_text_channel(guild, channel_name)
+    if not ch:
+        return
+    state = _status_load()
+    key = str(guild.id)
+    now = _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime())
+    emb = discord.Embed(title="SatpamBot Status", description=text, color=discord.Color.green())
+    emb.set_footer(text=f"Terakhir diperbarui: {now}")
+    msg_id = state.get(key)
+    msg = None
+    if msg_id:
+        try:
+            msg = await ch.fetch_message(int(msg_id))
+        except Exception:
+            msg = None
+    if msg is None:
+        try:
+            msg = await ch.send(embed=emb)
+            state[key] = str(msg.id)
+            _status_save(state)
+        except Exception:
+            return
+    else:
+        try:
+            await msg.edit(embed=emb)
+        except Exception:
+            pass

@@ -1,6 +1,7 @@
 import os
 import discord
 from discord.ext import commands
+from ..helpers.log_utils import upsert_status_embed
 
 LOG_CHANNEL_NAME = os.getenv("LOG_CHANNEL_NAME", "log-botphising")
 
@@ -18,7 +19,7 @@ class BotOnlineAnnounce(commands.Cog):
             ch = discord.utils.get(guild.text_channels, name=LOG_CHANNEL_NAME)
             if ch and ch.permissions_for(guild.me).send_messages:
                 try:
-                    await ch.send("✅ SatpamBot online dan siap berjaga.")
+                    await upsert_status_embed(guild, "✅ SatpamBot online dan siap berjaga.")
                 except Exception:
                     pass
 
