@@ -2,7 +2,6 @@ from discord.ext import commands
 import discord
 
 class PrefixGuard(commands.Cog):
-    """Failsafe: ensure prefix commands are processed even if other on_message handlers skip it."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 

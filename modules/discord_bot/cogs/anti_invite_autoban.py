@@ -1,6 +1,6 @@
 import re
 from discord.ext import commands
-import discord
+import discord, os
 
 INVITE_RE = re.compile(r"(?:https?://)?(?:discord(?:app)?\.com/invite/|discord\.gg/|dis\.gd/)([A-Za-z0-9-]+)", re.IGNORECASE)
 
@@ -17,13 +17,10 @@ def looks_nsfw_text(s: str) -> bool:
     return False
 
 BAN_DELETE_MESSAGE_DAYS = 7
-import os
 OWN_GUILD_WHITELIST = {int(x) for x in os.getenv('OWN_GUILD_WHITELIST','').split(',') if x.isdigit()}
-GUILD_ID_WHITELIST = set(OWN_GUILD_WHITELIST)
 
 class AntiInviteAutoban(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+    def __init__(self, bot: commands.Bot): self.bot = bot
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -31,46 +28,34 @@ class AntiInviteAutoban(commands.Cog):
         content = message.content or ""
         matches = list(INVITE_RE.finditer(content))
         if not matches: return
-        # handle first match only for performance
-        m = matches[0]
-        if not m: return
-        code = m.group(1)
+        code = matches[0].group(1)
 
         invite = None
         try:
             invite = await self.bot.fetch_invite(code, with_counts=False, with_expiration=False)
-        except Exception:
-            pass
+        except Exception: pass
 
         is_nsfw = False
         channel = getattr(invite, "channel", None) if invite else None
         guild = getattr(invite, "guild", None) if invite else None
 
-        if guild and getattr(guild, "id", None) in GUILD_ID_WHITELIST:
-            return
+        if guild and getattr(guild, "id", None) in OWN_GUILD_WHITELIST: return
 
         try:
-            if channel and hasattr(channel, "nsfw") and channel.nsfw:
-                is_nsfw = True
+            if channel and hasattr(channel, "nsfw") and channel.nsfw: is_nsfw = True
         except Exception: pass
-
         try:
             nsfw_level = getattr(guild, "nsfw_level", None)
             if nsfw_level is not None:
                 val = int(getattr(nsfw_level, "value", nsfw_level))
                 if val >= 2: is_nsfw = True
-            elif str(nsfw_level).lower() in {"explicit","age_restricted"}:
-                is_nsfw = True
+            elif str(nsfw_level).lower() in {"explicit","age_restricted"}: is_nsfw = True
         except Exception: pass
-
         try:
             texts = []
-            if guild:
-                texts += [getattr(guild, "name", "") or "", getattr(guild, "description", "") or ""]
-            if channel:
-                texts += [getattr(channel, "name", "") or "", getattr(channel, "topic", "") or ""]
-            if looks_nsfw_text(" ".join(texts)):
-                is_nsfw = True
+            if guild: texts += [getattr(guild, "name", "") or "", getattr(guild, "description", "") or ""]
+            if channel: texts += [getattr(channel, "name", "") or "", getattr(channel, "topic", "") or ""]
+            if looks_nsfw_text(" ".join(texts)): is_nsfw = True
         except Exception: pass
 
         if not is_nsfw: return

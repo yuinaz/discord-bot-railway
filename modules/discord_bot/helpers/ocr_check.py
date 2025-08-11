@@ -39,7 +39,6 @@ USE_SCAM_WORDS = (os.getenv("OCR_SCAM_STRICT","true").lower()=="true")
 PROHIBITED_KEYWORDS: List[str] = list(dict.fromkeys(_load_ocr_words() + (SCAM_DEFAULT_WORDS if USE_SCAM_WORDS else [])))
 
 def _preprocess(img):
-    # Simple preprocess: grayscale + slight contrast
     try:
         img = ImageOps.grayscale(img)
         img = ImageEnhance.Contrast(img).enhance(1.6)
