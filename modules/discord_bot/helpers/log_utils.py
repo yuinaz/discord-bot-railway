@@ -1,64 +1,62 @@
-import os, time, discord
+import logging
+import discord
+import pytz
+from datetime import datetime
+from discord.ext import commands
 
-LOG_CHANNEL_NAME = os.getenv("LOG_CHANNEL_NAME", "log-botphising")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1400375184048787566"))  # default forced
+# Inisialisasi logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
-_status_msg_cache_by_channel = {}  # (guild_id, channel_id) -> message_id
+# Zona waktu lokal (WIB)
+WIB = pytz.timezone("Asia/Jakarta")
 
-def _find_log_channel(guild: discord.Guild) -> discord.TextChannel | None:
-    if not guild:
-        return None
-    if LOG_CHANNEL_ID:
-        ch = guild.get_channel(LOG_CHANNEL_ID)
-        if isinstance(ch, discord.TextChannel):
-            return ch
-    names = {LOG_CHANNEL_NAME, "lot-botphising", "log-botphishing"}
-    for ch in guild.text_channels:
-        if ch.name in names:
-            return ch
-    return None
+def get_local_time():
+    """Mengembalikan waktu lokal dalam format string."""
+    return datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S")
 
-async def upsert_status_embed_in_channel(ch: discord.TextChannel, text: str):
-    if not ch:
-        return False
-    now = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
-    emb = discord.Embed(title="SatpamBot Status", description=text, color=discord.Color.green())
-    emb.set_footer(text=f"Terakhir diperbarui: {now}")
-    key = (ch.guild.id if ch.guild else 0, ch.id)
-    mid = _status_msg_cache_by_channel.get(key)
-    msg = None
-    if mid:
-        try:
-            msg = await ch.fetch_message(mid)
-        except Exception:
-            msg = None
-    if msg is None:
-        try:
-            msg = await ch.send(embed=emb)
-            _status_msg_cache_by_channel[key] = msg.id
-            return True
-        except Exception:
-            return False
-    else:
-        try:
-            await msg.edit(embed=emb)
-            return True
-        except Exception:
-            return False
+async def send_error_log(channel: discord.TextChannel, title: str, description: str, color=discord.Color.red()):
+    """Mengirimkan log error ke channel Discord dalam bentuk embed."""
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+        timestamp=datetime.now(WIB)  # Gunakan waktu lokal
+    )
+    embed.set_footer(text=f"📅 {get_local_time()} WIB")
+    await channel.send(embed=embed)
 
-async def upsert_status_embed(guild: discord.Guild, text: str):
-    ch = _find_log_channel(guild)
-    if not ch:
-        return False
-    return await upsert_status_embed_in_channel(ch, text)
+async def send_info_log(channel: discord.TextChannel, title: str, description: str, color=discord.Color.blue()):
+    """Mengirimkan log info ke channel Discord dalam bentuk embed."""
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+        timestamp=datetime.now(WIB)  # Gunakan waktu lokal
+    )
+    embed.set_footer(text=f"📅 {get_local_time()} WIB")
+    await channel.send(embed=embed)
 
-async def announce_bot_online(guild: discord.Guild, bot_tag: str):
-    try:
-        await upsert_status_embed(guild, "✅ SatpamBot online dan siap berjaga.")
-    except Exception:
-        ch = _find_log_channel(guild)
-        if ch:
-            try:
-                await ch.send("✅ SatpamBot online dan siap berjaga.")
-            except Exception:
-                pass
+async def send_warning_log(channel: discord.TextChannel, title: str, description: str, color=discord.Color.gold()):
+    """Mengirimkan log warning ke channel Discord dalam bentuk embed."""
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+        timestamp=datetime.now(WIB)  # Gunakan waktu lokal
+    )
+    embed.set_footer(text=f"📅 {get_local_time()} WIB")
+    await channel.send(embed=embed)
+
+def log_error(message: str):
+    logger.error(f"[{get_local_time()} WIB] {message}")
+
+def log_info(message: str):
+    logger.info(f"[{get_local_time()} WIB] {message}")
+
+def log_warning(message: str):
+    logger.warning(f"[{get_local_time()} WIB] {message}")
