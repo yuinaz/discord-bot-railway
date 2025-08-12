@@ -1,8 +1,19 @@
-{% extends 'base.html' %}{% block title %}Servers - SatpamBot{% endblock %}{% block content %}
-<div class="card" style="margin-bottom:12px;"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-<h4 class="m-0">Discord Servers</h4><div style="flex:1"></div><input id="guildSearch" class="form-control" placeholder="Search servers..." style="max-width:320px;">{% if invite_url %}<a class="btn btn-primary" href="{{ invite_url }}" target="_blank">➕ Add to your server</a>{% endif %}
-</div></div><div id="guildList" class="grid cols-3"></div>
+
+{% extends 'base.html' %}
+{% block title %}Servers{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:12px;">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <h4 class="m-0">Discord Servers</h4>
+    <div style="flex:1"></div>
+    <input id="guildSearch" class="form-control" placeholder="Search servers..." style="max-width:320px;">
+    {% if invite_url %}<a class="btn btn-primary" href="{{ invite_url }}" target="_blank">➕ Add to your server</a>{% endif %}
+  </div>
+</div>
+<div id="guildList" class="grid cols-3"></div>
 <script>
-async function loadGuilds(){try{const r=await fetch('/api/guilds');const rows=await r.json();const q=(document.getElementById('guildSearch').value||'').toLowerCase();const list=document.getElementById('guildList');list.innerHTML='';rows.filter(x=>!q||(x.name||'').toLowerCase().includes(q)).forEach(g=>{const card=document.createElement('div');card.className='card';card.innerHTML=`<div style="display:flex; gap:12px; align-items:center;">${g.icon_url?`<img src="${g.icon_url}" style="width:42px;height:42px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,.12)">`:''}<div style="flex:1;"><div style="font-weight:800; letter-spacing:.02em;">${g.name||'Unknown'}</div><div style="opacity:.7;font-size:12px;">ID: ${g.guild_id} · Members: ${g.member_count||0}</div></div></div>`;list.appendChild(card);});}catch(e){console.warn('loadGuilds fail',e);}}
-document.getElementById('guildSearch').oninput=loadGuilds;loadGuilds();
-</script>{% endblock %}
+async function loadGuilds(){try{const r=await fetch('/api/guilds');const rows=await r.json();const q=(document.getElementById('guildSearch').value||'').toLowerCase();const list=document.getElementById('guildList');list.innerHTML='';
+rows.filter(x=>!q||(x.name||'').toLowerCase().includes(q)).forEach(g=>{const card=document.createElement('div');card.className='card';card.innerHTML=`<div style="display:flex; gap:12px; align-items:center;">${g.icon_url?`<img src="${g.icon_url}" style="width:42px;height:42px;border-radius:10px;object-fit:cover;border:1px solid #ffffff12">`:''}<div style="flex:1;"><div style="font-weight:800; letter-spacing:.02em;">${g.name||'Unknown'}</div><div style="opacity:.7;font-size:12px;">ID: ${g.guild_id} · Members: ${g.member_count||0}</div></div></div>`;list.appendChild(card);});}catch(e){console.warn(e);}}
+document.getElementById('guildSearch').oninput=loadGuilds; loadGuilds();
+</script>
+{% endblock %}

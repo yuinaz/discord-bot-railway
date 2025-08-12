@@ -1,17 +1,22 @@
-{% extends 'base.html' %}{% block title %}Pengaturan{% endblock %}{% block content %}
+
+{% extends 'base.html' %}
+{% block title %}Pengaturan{% endblock %}
+{% block content %}
 <div class="card p-3">
   <h4>🎨 Tema & Background — live preview</h4>
   <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
     <select id="selTheme" class="form-select" style="max-width:260px;">
-      {% for t in available_themes %}<option value="{{ t }}" {% if t == current_theme %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      {% for t in (list_themes() if list_themes else []) %}
+        <option value="{{ t }}" {% if t in theme_path %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
     </select>
     <button class="btn btn-primary" onclick="applyTheme()">Apply Theme</button>
-    <span class="text-muted">File diambil dari <code>/static/themes/*.css</code></span>
+    <span class="text-muted">/static/themes/*.css</span>
   </div>
   <hr/>
   <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
     <input id="bgFile" type="file" accept="image/*" class="form-control" style="max-width:320px;">
-    <button class="btn btn-warning" onclick="uploadBg()">Upload & Apply Background</button>
+    <button class="btn btn-primary" onclick="uploadBg()">Upload & Apply</button>
   </div>
 </div>
 <script>
