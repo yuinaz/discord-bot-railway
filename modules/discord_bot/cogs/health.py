@@ -1,5 +1,5 @@
 from discord.ext import commands
-import discord, os, platform, socket
+import discord, os, platform, socket, asyncio
 
 from ..helpers.env import LOG_CHANNEL_ID
 from ..helpers.log_utils import upsert_status_embed_in_channel
@@ -7,7 +7,6 @@ from ..helpers.log_utils import upsert_status_embed_in_channel
 class Health(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # simpan task heartbeat per-guild agar bisa ON/OFF
         self._hb_tasks: dict[int, asyncio.Task] = {}
 
     @commands.command(name="sbhealth")
@@ -22,12 +21,10 @@ class Health(commands.Cog):
                   f"guilds={getattr(intents,'guilds',None)}",
             inline=False,
         )
-        ptxt = ", ".join(
-            [k for k in ["manage_messages","ban_members","moderate_members","administrator"]
-             if getattr(perms, k, False)]
-        ) if perms else "-"
+        ptxt = ", ".join([k for k in ["manage_messages","ban_members","moderate_members","administrator"]
+                          if getattr(perms,k,False)]) if perms else "-"
         embed.add_field(name="Perms", value=ptxt, inline=False)
-        embed.add_field(name="Prefix", value=getattr(self.bot, "command_prefix", "!"), inline=True)
+        embed.add_field(name="Prefix", value=getattr(self.bot, 'command_prefix', '!'), inline=True)
         await ctx.send(embed=embed)
 
     @commands.command(name="sbwho")
@@ -47,16 +44,13 @@ class Health(commands.Cog):
     @commands.command(name="sbstatus")
     @commands.has_permissions(manage_guild=True)
     async def sbstatus(self, ctx: commands.Context):
-        """Update status HANYA di channel LOG_CHANNEL_ID."""
         if not ctx.guild:
             await ctx.send("Jalankan di dalam server."); return
-
         log_ch = ctx.guild.get_channel(LOG_CHANNEL_ID) if LOG_CHANNEL_ID else None
         if not isinstance(log_ch, discord.TextChannel):
             await ctx.message.add_reaction("❌")
             await ctx.send(f"Tidak menemukan channel log <#{LOG_CHANNEL_ID}>.", delete_after=10)
             return
-
         ok = await upsert_status_embed_in_channel(log_ch, "✅ SatpamBot online dan siap berjaga.")
         await ctx.message.add_reaction("✅" if ok else "❌")
         if ctx.channel.id != log_ch.id:
@@ -65,17 +59,14 @@ class Health(commands.Cog):
     @commands.command(name="sbheartbeat")
     @commands.has_permissions(manage_guild=True)
     async def sbheartbeat(self, ctx: commands.Context, toggle: str = "on"):
-        """Heartbeat dikunci ke LOG_CHANNEL_ID, di mana pun perintah diketik."""
         if not ctx.guild:
             await ctx.send("Jalankan di dalam server."); return
-
         log_ch = ctx.guild.get_channel(LOG_CHANNEL_ID) if LOG_CHANNEL_ID else None
         if not isinstance(log_ch, discord.TextChannel):
             await ctx.send(f"Tidak menemukan channel log <#{LOG_CHANNEL_ID}>.", delete_after=10)
             return
 
         key = ctx.guild.id
-
         if toggle.lower() == "off":
             t = self._hb_tasks.pop(key, None)
             if t:
@@ -87,11 +78,10 @@ class Health(commands.Cog):
             return
 
         async def loop():
-            import asyncio
             while True:
                 try:
                     await upsert_status_embed_in_channel(log_ch, "✅ SatpamBot online dan siap berjaga.")
-                    await asyncio.sleep(600)  # setiap 10 menit
+                    await asyncio.sleep(600)  # 10 menit
                 except asyncio.CancelledError:
                     break
                 except Exception:
@@ -108,7 +98,4 @@ class Health(commands.Cog):
             await ctx.send(f"Heartbeat diaktifkan di {log_ch.mention}. (Loop dikunci ke channel log)", delete_after=8)
 
 async def setup(bot: commands.Bot):
-    # import asyncio di sini supaya tidak perlu impor global di atas
-    global asyncio
-    import asyncio
     await bot.add_cog(Health(bot))
