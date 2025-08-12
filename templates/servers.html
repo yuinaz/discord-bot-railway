@@ -1,6 +1,28 @@
 {% extends 'base.html' %}
 {% block title %}Servers{% endblock %}
 {% block content %}
+
+<div class="card" style="margin-bottom:12px;">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <input id="newGuildId" class="form-control" placeholder="ID (opsional)" style="max-width:160px;">
+    <input id="newGuildName" class="form-control" placeholder="Nama server..." style="max-width:260px;">
+    <input id="newGuildIcon" class="form-control" placeholder="Icon URL (opsional)" style="min-width:260px;flex:1;">
+    <button class="btn btn-success" onclick="addGuild()">Tambah</button>
+  </div>
+</div>
+<script>
+async function addGuild(){
+  const id=document.getElementById('newGuildId').value.trim();
+  const name=document.getElementById('newGuildName').value.trim();
+  const icon=document.getElementById('newGuildIcon').value.trim();
+  if(!name) return alert('Nama server wajib diisi');
+  const r=await fetch('/api/guilds/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,name,icon_url:icon})});
+  const j=await r.json(); if(j.status!=='ok') return alert(j.message||'Gagal');
+  document.getElementById('newGuildId').value=''; document.getElementById('newGuildName').value=''; document.getElementById('newGuildIcon').value='';
+  loadGuilds();
+}
+</script>
+
 <div class="card" style="margin-bottom:12px;">
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <h4 class="m-0">Discord Servers</h4>

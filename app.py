@@ -330,6 +330,77 @@ def readyz():
     except Exception as e:
         return jsonify({"status":"error","message":str(e)}), 500
 
+
+@app.route("/change-password", methods=["GET","POST"])
+@login_required
+def change_password():
+    msg = None
+    err = None
+    if request.method == "POST":
+        old = (request.form.get("old_password") or "").strip()
+        new = (request.form.get("new_password") or "").strip()
+        confirm = (request.form.get("confirm_password") or "").strip()
+        if not new or len(new) < 6:
+            err = "Password baru minimal 6 karakter."
+        elif new != confirm:
+            err = "Konfirmasi password tidak cocok."
+        else:
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute("SELECT id, password FROM superadmin WHERE username=?", (session.get("username") or "admin",)).fetchone()
+                if not row or not check_password_hash(row[1], old):
+                    err = "Password lama salah."
+                else:
+                    conn.execute("UPDATE superadmin SET password=? WHERE id=?", (generate_password_hash(new), row[0]))
+                    conn.commit()
+                    msg = "Password berhasil diperbarui."
+    return render_template("change_password.html", message=msg, error=err)
+
+
+@app.route("/admin-log")
+@login_required
+def admin_log():
+    return render_template("admin_log.html")
+
+
+@app.route("/grafik")
+@login_required
+def grafik():
+    return render_template("grafik.html")
+
+
+@app.route("/blacklist-image")
+@login_required
+def blacklist_image():
+    # Use admin_blacklist template as the editor landing
+    return render_template("admin_blacklist.html")
+
+
+@app.route("/api/guilds/add", methods=["POST"])
+@login_required
+def api_add_guild():
+    data = request.get_json(force=True, silent=True) or {}
+    gid = (data.get("id") or "").strip() or str(int(time.time()))
+    name = (data.get("name") or "").strip()
+    icon_url = (data.get("icon_url") or "").strip()
+    if not name:
+        return jsonify({"status":"error","message":"Nama server wajib diisi"}), 400
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bot_guilds(
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                icon_url TEXT
+            )
+        """)
+        # upsert
+        row = conn.execute("SELECT id FROM bot_guilds WHERE id=?", (gid,)).fetchone()
+        if row:
+            conn.execute("UPDATE bot_guilds SET name=?, icon_url=? WHERE id=?", (name, icon_url, gid))
+        else:
+            conn.execute("INSERT INTO bot_guilds (id, name, icon_url) VALUES (?,?,?)", (gid, name, icon_url))
+        conn.commit()
+    return jsonify({"status":"ok","id":gid})
+
 # ---------------- Bootstrap ----------------
 def bootstrap():
     init_db()
