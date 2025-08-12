@@ -72,10 +72,14 @@ async def upsert_status_embed_in_channel(ch: discord.TextChannel, text: str) -> 
     if not isinstance(ch, discord.TextChannel):
         return False
 
+    # 🔒 Guard: hanya izinkan update di channel log yang benar
+    if LOG_CHANNEL_ID and getattr(ch, "id", None) != LOG_CHANNEL_ID:
+        return False
+
     key = (ch.guild.id if ch.guild else 0, ch.id)
     emb = _build_status_embed(text)
 
-    # 0) Coba from cache
+    # 0) Coba dari cache
     mid = _status_msg_cache.get(key)
     if mid:
         try:
