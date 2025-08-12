@@ -1,17 +1,35 @@
+# Monkey-patch must be before any Flask import
 import os
-import eventlet
-eventlet.monkey_patch()
+try:
+    import eventlet
+    eventlet.monkey_patch()
+    ASYNC_MODE = "eventlet"
+except Exception:
+    ASYNC_MODE = "threading"
 
-from modules.discord_bot.helpers.env_loader import load_env
-from app import app, socketio, bootstrap
+from app import app, bootstrap  # import after monkey_patch
+
+# Create SocketIO here (optional)
+socketio = None
+try:
+    from flask_socketio import SocketIO
+    socketio = SocketIO(app, async_mode=ASYNC_MODE)
+except Exception as e:
+    print("[main] Flask-SocketIO not available, fallback plain Flask:", e)
+    socketio = None
 
 if __name__ == "__main__":
-    # Render kadang memberi PORT kosong -> fallback aman
-    raw_port = os.getenv("PORT") or "8080"
-    port = int(raw_port)
+    try:
+        with app.app_context():
+            bootstrap()
+            print("[main] bootstrap() done.")
+    except Exception as e:
+        print("[main] bootstrap() error:", e)
 
-    # Inisialisasi DB, tema, sampler, dan broadcast loop
-    bootstrap()
-
-    # Jalankan via eventlet (bukan Werkzeug)
-    socketio.run(app, host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT") or "10000")
+    host = "0.0.0.0"
+    print(f"[main] starting on {host}:{port} (mode={ASYNC_MODE})")
+    if socketio:
+        socketio.run(app, host=host, port=port)
+    else:
+        app.run(host=host, port=port)

@@ -1,124 +1,47 @@
 {% extends 'base.html' %}
-{% block title %}⚙️ Pengaturan Bot - SatpamBot<div class="card bg-dark text-light mb-4 mt-3">
-  <div class="card-header">🛡️ Blacklist Gambar</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light" href="/blacklist-image">Kelola blacklist gambar</a>
-  </div>
-</div>
-<div class="card bg-dark text-light mb-4 mt-3">
-  <div class="card-header">🛡️ Security</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light" href="/security">Edit whitelist/blacklist & module flags</a>
-  </div>
-
-<div class="card bg-dark text-light mb-4">
-  <div class="card-header">🧠 Image Classifier</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light" href="/image-classifier">Kelola exemplars scam/normal</a>
-  </div>
-</div>
-
-<div class="card bg-dark text-light mb-4">
-  <div class="card-header">🧭 Halaman Lain</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light me-2 mb-2" href="/logs">📜 Logs</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/provision">🛠️ Provision</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/plugin">🔌 Plugin</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/resource">📦 Resource</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/user-locator">🗺️ User Locator</a>
-  </div>
-
-<div class="card bg-dark text-light mb-3">
-  <div class="card-header">Environment</div>
-  <div class="card-body">
-    <div>Active profile: <span class="badge bg-primary">{{ active_profile|upper }}</span></div>
-    <button class="btn btn-outline-light mt-2" onclick="(async()=>{const r=await fetch('/env-check');const j=await r.json();alert(JSON.stringify(j,null,2));})()">Validate Env</button>
-  </div>
-</div>
-
-</div>
-{% endblock %}
-
+{% block title %}Pengaturan{% endblock %}
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
-    <h3>⚙️ Pengaturan Bot</h3>
-    <span class="text-muted">👤 {{ session.username }}</span>
+<div class="card p-3">
+  <h4>🎨 Tema & Background — live preview</h4>
+  <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
+    <select id="selTheme" class="form-select" style="max-width:260px;">
+      {% for t in available_themes %}<option value="{{ t }}" {% if t == current_theme %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary" onclick="applyTheme()">Apply Theme</button>
+    <span class="text-muted">/static/themes/*.css</span>
+  </div>
+  <hr/>
+  <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
+    <input id="bgFile" type="file" accept="image/*" class="form-control" style="max-width:320px;">
+    <button class="btn btn-primary" onclick="uploadBg()">Upload & Apply</button>
   </div>
 
-  <!-- Upload Avatar/Profile -->
-<div class="card bg-dark text-light mb-4"><div class="card-header">👤 Upload Avatar (GIF didukung)</div>
-<div class="card-body">{% if profile_avatar_url %}<div class="mb-2"><img src="{{ profile_avatar_url }}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid #ff2aa1"></div>{% endif %}
-<form action="/upload-avatar" method="post" enctype="multipart/form-data"><div class="mb-3"><label class="form-label">Avatar</label><input type="file" class="form-control" name="avatar" accept="image/*,image/gif" required></div><button class="btn btn-primary">🚀 Upload Avatar</button></form></div></div>
-
-<!-- Upload Background Login -->
-<div class="card bg-dark text-light mb-4"><div class="card-header">🔒 Upload Background Login</div>
-<div class="card-body">{% if login_background_url %}<div class="mb-2"><img src="{{ login_background_url }}" style="max-width:100%;border-radius:12px"></div>{% endif %}
-<form action="/upload-login-background" method="post" enctype="multipart/form-data"><div class="mb-3"><label class="form-label">Gambar</label><input type="file" class="form-control" name="background" accept="image/*" required></div><button class="btn btn-primary">🚀 Upload Background Login</button></form></div></div>
-
-<!-- Upload Background -->
-  <div class="card bg-dark text-light mb-4">
-    <div class="card-header">
-      🖼️ Upload Background Dashboard
-    </div>
-    <div class="card-body">
-      {% if background_url %}
-        <p>🌄 Background saat ini:</p>
-        <div class="mb-3">
-          <img src="{{ background_url }}" alt="Current Background" class="img-fluid rounded shadow" style="max-height: 300px;">
-        </div>
-      {% else %}
-        <p class="text-muted">Belum ada background diatur.</p>
-      {% endif %}
-
-      <form action="/upload-background" method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-          <label for="background" class="form-label">Pilih Gambar:</label>
-          <input type="file" class="form-control" name="background" accept="image/*" required>
-        </div>
-        <button type="submit" class="btn btn-primary">🚀 Upload & Terapkan</button>
-      </form>
-    </div>
+  <hr/>
+  <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
+    <img src="{{ bot_logo_url }}" alt="Logo" style="width:40px;height:40px;border-radius:10px;border:1px solid #ffffff22;object-fit:cover;">
+    <input id="logoFile" type="file" accept="image/*" class="form-control" style="max-width:320px;">
+    <button class="btn btn-primary" onclick="uploadLogo()">Upload Logo</button>
+    <span class="text-muted">Logo akan tampil di login/sidebar</span>
   </div>
 
-</div>
-<div class="card bg-dark text-light mb-4 mt-3">
-  <div class="card-header">🛡️ Blacklist Gambar</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light" href="/blacklist-image">Kelola blacklist gambar</a>
-  </div>
-</div>
-<div class="card bg-dark text-light mb-4 mt-3">
-  <div class="card-header">🛡️ Security</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light" href="/security">Edit whitelist/blacklist & module flags</a>
-  </div>
+<script>
+async function applyTheme(){ const t=document.getElementById('selTheme').value; await fetch('/theme?set='+encodeURIComponent(t)); location.reload(); }
+async function uploadBg(){
+  const f=document.getElementById('bgFile').files[0];
+  if(!f) return alert('Pilih file dulu');
+  const fd=new FormData(); fd.append('file', f);
+  const r=await fetch('/upload/background', {method:'POST', body: fd}); const j=await r.json();
+  if(j.status==='success'){ location.reload(); } else { alert(j.message||'Gagal upload'); }
+}
 
-<div class="card bg-dark text-light mb-4">
-  <div class="card-header">🧠 Image Classifier</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light" href="/image-classifier">Kelola exemplars scam/normal</a>
-  </div>
-</div>
-
-<div class="card bg-dark text-light mb-4">
-  <div class="card-header">🧭 Halaman Lain</div>
-  <div class="card-body">
-    <a class="btn btn-outline-light me-2 mb-2" href="/logs">📜 Logs</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/provision">🛠️ Provision</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/plugin">🔌 Plugin</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/resource">📦 Resource</a>
-    <a class="btn btn-outline-light me-2 mb-2" href="/user-locator">🗺️ User Locator</a>
-  </div>
-
-<div class="card bg-dark text-light mb-3">
-  <div class="card-header">Environment</div>
-  <div class="card-body">
-    <div>Active profile: <span class="badge bg-primary">{{ active_profile|upper }}</span></div>
-    <button class="btn btn-outline-light mt-2" onclick="(async()=>{const r=await fetch('/env-check');const j=await r.json();alert(JSON.stringify(j,null,2));})()">Validate Env</button>
-  </div>
-</div>
-
-</div>
+async function uploadLogo(){
+  const f=document.getElementById('logoFile').files[0];
+  if(!f) return alert('Pilih file logo dulu');
+  const fd=new FormData(); fd.append('file', f);
+  const r=await fetch('/upload/logo', {method:'POST', body: fd});
+  const j=await r.json();
+  if(j.status==='success'){ location.reload(); }
+  else { alert(j.message||'Gagal upload logo'); }
+}
+</script>
 {% endblock %}

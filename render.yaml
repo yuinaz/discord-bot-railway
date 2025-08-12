@@ -1,36 +1,21 @@
-# Render blueprint for SatpamBot
-# Docs: https://render.com/docs/blueprint-spec
 services:
-  - type: web
-    name: satpambot-web
-    env: docker
-    dockerfilePath: ./Dockerfile
-    # If your Dockerfile needs a specific context or build args, add them here
-    # buildCommand: ""
-    # startCommand: "python main.py"  # usually not needed for docker env
+  - type: worker
+    name: satpambot-worker
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
     autoDeploy: true
-    healthCheckPath: /healthcheck
     envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: RENDER
+      - key: DISCORD_TOKEN
+        sync: false   # isi di dashboard
+      - key: BAN_LOG_CHANNEL_ID
+        value: "1400375184048787566"
+      - key: BOT_PREFIX
+        value: "!"
+      - key: GUILD_ID
+        value: "<ID_GUILD_TES_KAMU>"   # penting agar /ping muncul instan
+      - key: OCR_SCAM_STRICT
         value: "true"
-      # PORT is provided by Render automatically. Do NOT hardcode it.
-      # Add your production secrets in the Render dashboard, or mount from .env.prod if using private repo.
-      # Examples (uncomment and set via dashboard):
-      # - key: DISCORD_TOKEN
-      #   sync: false
-      # - key: VIRUSTOTAL_API_KEY
-      #   sync: false
-      # - key: HF_API_TOKEN
-      #   sync: false
-      # - key: DATABASE_URL
-      #   sync: false
-      # - key: DESKTOP_RESTART_TOKEN
-      #   sync: false
-      # - key: DESKTOP_STATUS_SECRET
-      #   sync: false
-    # Optional scaling / plan settings:
-    # plan: free
-    # numInstances: 1
-    # region: oregon
+      - key: OCR_LANG
+        value: "eng+ind"

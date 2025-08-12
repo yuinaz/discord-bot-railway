@@ -1,41 +1,116 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard - SatpamBot{% endblock %}
-
 {% block content %}
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>🕒 Uptime</h5>
-            <p id="uptime">Loading...</p>
-        </div>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.neo-row{ display:grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap:14px; }
+.col-3{ grid-column: span 3 / span 3; } .col-4{ grid-column: span 4 / span 4; }
+.col-5{ grid-column: span 5 / span 5; } .col-6{ grid-column: span 6 / span 6; } .col-7{ grid-column: span 7 / span 7; }
+.col-8{ grid-column: span 8 / span 8; } .col-9{ grid-column: span 9 / span 9; } .col-12{ grid-column: span 12 / span 12; }
+@media(max-width:1200px){ .neo-row{ grid-template-columns: repeat(6,1fr);} .col-7,.col-8,.col-9{grid-column: span 6;} }
+@media(max-width:760px){ .neo-row{ grid-template-columns: repeat(2,1fr);} .col-3,.col-4,.col-5,.col-6{grid-column: span 2;} .col-12{grid-column: span 2;} }
+.kpi-circles{ display:flex; gap:10px; }
+.kpi-circles .gauge { position:relative; width:120px; height:120px; }
+.kpi-circles .gauge .center { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; }
+.mini-strip{ display:grid; grid-template-columns: repeat(3,1fr); gap:10px;}
+.dot-grid{ display:grid; grid-template-columns: repeat(7, 14px); gap:6px; }
+.dot{ width:14px; height:14px; border-radius:3px; background:#2b2d42; border:1px solid #ffffff12; }
+.counter-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.counter{ text-align:center; padding:12px; border:1px solid #ffffff12; border-radius:12px; background:rgba(255,255,255,.03); }
+.counter .n{ font-size:20px; font-weight:800; }
+</style>
+
+<div class="neo-row">
+  <div class="card col-5"><h4>Incident</h4><canvas id="barLeft" class="chart-lg"></canvas></div>
+  <div class="card col-7"><h4>Mini Trends</h4><div class="mini-strip">
+      <canvas id="mini1" class="chart-sm"></canvas>
+      <canvas id="mini2" class="chart-sm"></canvas>
+      <canvas id="mini3" class="chart-sm"></canvas>
+  </div></div>
+
+  <div class="card col-7"><h4>Traffic</h4><canvas id="mainLine" class="chart-lg"></canvas></div>
+  <div class="card col-5"><h4>Incident</h4><div style="position:relative;height:260px;">
+      <canvas id="core" class="chart-lg"></canvas><div id="coreCenter" class="center-label" style="font-size:24px;">0</div></div></div>
+
+  <div class="card col-4">
+    <div class="counter-grid" id="counters"></div><div style="height:10px"></div>
+    <div class="dot-grid" id="heat"></div>
+  </div>
+  <div class="card col-4">
+    <div class="kpi-circles">
+      <div class="gauge"><canvas id="g1"></canvas><div class="center" id="g1txt">0</div></div>
+      <div class="gauge"><canvas id="g2"></canvas><div class="center" id="g2txt">0</div></div>
+      <div class="gauge"><canvas id="g3"></canvas><div class="center" id="g3txt">0</div></div>
+      <div class="gauge"><canvas id="g4"></canvas><div class="center" id="g4txt">0</div></div>
     </div>
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>💾 RAM Usage</h5>
-            <p id="ram">Loading...</p>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>⚙️ CPU Usage</h5>
-            <p id="cpu">Loading...</p>
-        </div>
-    </div>
+  </div>
+  <div class="card col-4">
+    <h4>Top Guilds</h4><table class="table" id="tblGuilds"><thead><tr><th>Guild</th><th>Score</th></tr></thead><tbody></tbody></table>
+    <h4 style="margin-top:8px;">Banned</h4><table class="table" id="tblBans"><thead><tr><th>User</th><th>Guild</th><th>Reason</th></tr></thead><tbody></tbody></table>
+  </div>
 </div>
 
 <script>
-function fetchStats() {
-    fetch('/api/live_stats')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('uptime').innerText = data.uptime;
-            document.getElementById('ram').innerText = data.ram + ' MB';
-            document.getElementById('cpu').innerText = data.cpu + '%';
-        })
-        .catch(err => console.error('Gagal fetch live stats:', err));
-}
+const P='#9b6bff',Y='#ffd166',T='#39d0ff',M='rgba(255,255,255,.25)';
+let charts=[];
+function grad(ctx, c1, c2){ const g=ctx.createLinearGradient(0,0,0,220); g.addColorStop(0,c1); g.addColorStop(1,c2); return g;}
 
-setInterval(fetchStats, 5000);
-fetchStats();
+async function boot(){
+  const r = await fetch('/api/dashboard_plus'); const d = await r.json();
+  const base = d.base || {};
+
+  const ctxBL = document.getElementById('barLeft').getContext('2d');
+  charts.push(new Chart(ctxBL, {type:'bar', data:{labels:d.barLeft.labels, datasets:[{data:d.barLeft.values, backgroundColor: grad(ctxBL, 'rgba(57,208,255,.65)', 'rgba(155,107,255,.25)'), borderColor:'#ffffff22', borderWidth:1}]}, options:{plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{grid:{color:'#ffffff12'}}}}));
+
+  const minis=[{id:'mini1',c:P},{id:'mini2',c:T},{id:'mini3',c:Y}];
+  d.mini.forEach((m,i)=>{
+    const ctx = document.getElementById(minis[i].id).getContext('2d');
+    charts.push(new Chart(ctx,{type:'line',data:{labels:m.labels,datasets:[{data:m.values,borderColor:minis[i].c,backgroundColor:minis[i].c.replace('1)','.15)'),fill:true,tension:.35}]},options:{plugins:{legend:{display:false}},elements:{point:{radius:0}},scales:{x:{display:false},y:{display:false}}}));
+  });
+
+  const ctxMain = document.getElementById('mainLine').getContext('2d');
+  charts.push(new Chart(ctxMain,{type:'line',data:{labels:base.series.labels,datasets:[{data:base.series.values,borderColor:P,backgroundColor:'rgba(155,107,255,.12)',fill:true,tension:.3}]},options:{plugins:{legend:{display:false}},elements:{point:{radius:0}}}}));
+
+  const ctxCore = document.getElementById('core').getContext('2d');
+  charts.push(new Chart(ctxCore,{type:'doughnut',data:{labels:['Total','Rem'],datasets:[{data:[d.core_total, Math.max(1, Math.round(d.core_total*0.12))],backgroundColor:[grad(ctxCore,'rgba(155,107,255,.8)','rgba(57,208,255,.5)'),M],borderColor:'#ffffff22',borderWidth:2}]},options:{cutout:'70%',plugins:{legend:{display:false}}}}));
+  document.getElementById('coreCenter').textContent = (d.core_total).toLocaleString();
+
+  const cg = document.getElementById('counters'); const c=d.counters;
+  Object.entries(c).forEach(([k,v])=>{ const div=document.createElement('div'); div.className='counter'; div.innerHTML=`<div class="n">${v}</div><div style="opacity:.7">${k}</div>`; cg.appendChild(div); });
+
+  const heat = document.getElementById('heat');
+  d.heat.forEach(row => row.forEach(val => { const dot=document.createElement('div'); dot.className='dot'; dot.style.background = `rgba(155,107,255,${0.08 + 0.15*val})`; dot.style.borderColor='rgba(255,255,255,.1)'; heat.appendChild(dot);}));
+
+  const vals = d.gauges || [98,65,83,37];
+  const ids = ['g1','g2','g3','g4']; const cols=[P,T,Y,'#ff5c91'];
+  ids.forEach((id,ix)=>{
+    const v = vals[ix]||0; document.getElementById(id+'txt').textContent = v;
+    const ctx = document.getElementById(id).getContext('2d');
+    charts.push(new Chart(ctx,{type:'doughnut',data:{labels:['V','R'],datasets:[{data:[v,100-v],backgroundColor:[cols[ix],M],borderColor:'#ffffff22',borderWidth:2}]},options:{cutout:'75%',plugins:{legend:{display:false}}}}));
+  });
+
+  const tbG=document.querySelector('#tblGuilds tbody'); tbG.innerHTML='';
+  (base.guilds||[]).slice(0,5).forEach(g=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${g.name||'-'}</td><td>${g.detections||0}</td>`;tbG.appendChild(tr);});
+  const tbB=document.querySelector('#tblBans tbody'); tbB.innerHTML='';
+  (base.bans||[]).forEach(b=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${b.username||b.user_id}</td><td>${b.guild_id||'-'}</td><td>${b.reason||'-'}</td>`;tbB.appendChild(tr);});
+}
+boot();
+
+setInterval(async ()=>{
+  try{
+    const r = await fetch('/api/dashboard_plus'); const d = await r.json();
+    // Update center total
+    const c=document.getElementById('coreCenter'); if(c && typeof d.core_total!=='undefined'){ c.textContent = (d.core_total).toLocaleString(); }
+    // Update gauges
+    const vals = d.gauges || [];
+    for(let i=0;i<4;i++){
+      const chart = charts[6+i]; if(chart && vals[i]!=null){ chart.data.datasets[0].data = [vals[i], 100-vals[i]]; chart.update('none'); document.getElementById('g'+(i+1)+'txt').textContent = vals[i]; }
+    }
+    // Update bar left
+    if (charts[0] && d.barLeft){ charts[0].data.labels = d.barLeft.labels; charts[0].data.datasets[0].data = d.barLeft.values; charts[0].update('none'); }
+  }catch(e){ console.warn('live refresh fail', e); }
+}, 10000);
+
 </script>
 {% endblock %}
