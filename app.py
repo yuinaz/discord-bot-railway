@@ -85,11 +85,11 @@ def _save_profile(data:dict):
 def inject_theme():
     try:
         with open("config/theme.json", "r", encoding="utf-8") as f:
-            theme_file = json.load(f).get("theme", "dark.css")
+            theme_file = json.load(f).get("theme", "default.css")
             if not theme_file.endswith(".css"):
                 theme_file += ".css"
     except Exception:
-        theme_file = "dark.css"
+        theme_file = "default.css"
     session['live_bg_enabled']=_load_live_flag()
     _p=_load_profile()
     # cache_bust to beat CDN/browser caching for theme/background assets
@@ -98,7 +98,7 @@ def inject_theme():
         "background_url": _load_background_url(),
         "profile_avatar_url": _p.get('avatar_url'),
         "login_background_url": _p.get('login_background_url'),
-        "cache_bust": int(time.time()), "invite_url": _invite_url()
+        "cache_bust": int(time.time())
     }
 
 # ===== DATABASE SETUP =====
@@ -251,7 +251,6 @@ def dashboard():
         return redirect("/login")
     return render_template("dashboard.html")
 
-
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     if not session.get("logged_in"):
@@ -259,14 +258,7 @@ def settings():
     if request.method == "POST":
         print("Disimpan:", request.form)
         return redirect("/settings")
-    try:
-        current_theme = json.load(open("config/theme.json","r",encoding="utf-8")).get("theme")
-    except Exception:
-        current_theme = "dark.css"
-    return render_template("settings.html",
-                           available_themes=list_themes(),
-                           current_theme=current_theme,
-                           background_current=_load_background_url())
+    return render_template("settings.html")
 
 @app.route("/grafik")
 def grafik():
@@ -390,36 +382,23 @@ def themes():
     )
 
 # ===== GANTI TEMA (AJAX) =====
-
 @app.route("/theme", methods=["GET","POST"])
 def change_theme():
     try:
-        if request.method == "POST":
-            data = request.get_json(silent=True) or {}
-            theme_name = (data.get("theme") or "").strip()
-        else:
-            theme_name = (request.args.get("set") or request.args.get("theme") or "").strip()
-        if theme_name and not theme_name.endswith(".css"):
-            theme_name += ".css"
-        theme_path = os.path.join("static","themes", theme_name) if theme_name else None
-        if theme_name and os.path.exists(theme_path):
-            os.makedirs("config", exist_ok=True)
-            with open("config/theme.json","w",encoding="utf-8") as f:
-                json.dump({"theme": theme_name}, f, ensure_ascii=False, indent=2)
-            safe_log(f"🎨 Tema diubah: {theme_name}")
-            return jsonify({"status":"success","theme": theme_name})
-        # If no name given, return current
-        if not theme_name:
-            try:
-                current = json.load(open("config/theme.json","r",encoding="utf-8")).get("theme")
-            except Exception:
-                current = "dark.css"
-            return jsonify({"status":"ok","theme": current})
-        return jsonify({"status":"error","message":"File tema tidak ditemukan"}), 400
-    except Exception as e:
-        safe_log(f"❌ Gagal ubah tema: {e}", level="error")
-        return jsonify({"status":"error","message": str(e)}), 500
+        data = request.get_json()
+        theme_name = data.get("theme", "")
+        theme_path = os.path.join("static/themes", theme_name)
 
+        if os.path.exists(theme_path) and theme_name.endswith(".css"):
+            os.makedirs("config", exist_ok=True)
+            with open("config/theme.json", "w", encoding="utf-8") as f:
+                json.dump({"theme": theme_name}, f)
+            safe_log(f"🎨 Tema diubah via AJAX: {theme_name}")
+            return jsonify({"status": "success", "theme": theme_name})
+        return jsonify({"status": "error", "message": "File tema tidak ditemukan atau format salah"}), 400
+    except Exception as e:
+        safe_log(f"❌ Gagal ubah tema via AJAX: {e}", level="error")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ===== SOCKETIO EVENTS =====
 @socketio.on('connect')
@@ -972,36 +951,109 @@ def ensure_admin_seed():
             conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)", (username, pwd_hash))
         conn.commit()
 
-
 def list_themes():
     theme_folder = os.path.join("static","themes")
     try:
-        files = [f for f in os.listdir(theme_folder) if f.endswith(".css") and not f.startswith("_")]
+        files = [f for f in os.listdir(theme_folder) if f.endswith(".css")]
         files.sort()
         return files
     except Exception:
         return []
 
-
-def _invite_url():
-    cid = os.getenv("DISCORD_CLIENT_ID") or os.getenv("BOT_CLIENT_ID")
-    perms = os.getenv("DISCORD_INVITE_PERMS", "8")
-    scope = "bot%20applications.commands"
-    if not cid: 
-        return None
-    return f"https://discord.com/api/oauth2/authorize?client_id={cid}&permissions={perms}&scope={scope}"
-
-
-@app.route("/api/guilds")
+@app.route("/upload/background", methods=["POST"])
 @login_required
-def api_guilds():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT * FROM bot_guilds ORDER BY LOWER(name)").fetchall()
-        return jsonify([dict(r) for r in rows])
+def upload_background_api():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"status":"error","message":"no file"}), 400
+    ext = "." + f.filename.rsplit(".",1)[-1].lower()
+    if ext not in {".jpg",".jpeg",".png",".webp",".gif"}:
+        return jsonify({"status":"error","message":"bad extension"}), 400
+    updir = os.path.join("static","uploads")
+    os.makedirs(updir, exist_ok=True)
+    tsname = str(int(time.time())) + "_" + secure_filename(f.filename)
+    path = os.path.join(updir, tsname)
+    try:
+        img = Image.open(f.stream)
+        try: img = ImageOps.exif_transpose(img)
+        except Exception: pass
+        img.thumbnail((1920,1080), Image.LANCZOS)
+        fmt = "PNG" if ext==".png" else "JPEG"
+        params = {"optimize": True}
+        if fmt=="JPEG": 
+            if img.mode in ("RGBA","LA"):
+                bg = Image.new("RGB", img.size, "#0b0b16"); bg.paste(img, mask=img.split()[-1]); img = bg
+            elif img.mode!="RGB": img = img.convert("RGB")
+            params.update({"quality": 84, "progressive": True})
+        img.save(path, fmt, **params)
+    except Exception:
+        f.stream.seek(0); f.save(path)
 
+    url = "/" + path.replace("\\","/")
+    os.makedirs("config", exist_ok=True)
+    cfg = {}
+    try: cfg = json.load(open("config/theme.json","r",encoding="utf-8"))
+    except Exception: pass
+    cfg["background_image"] = url
+    json.dump(cfg, open("config/theme.json","w",encoding="utf-8"), ensure_ascii=False, indent=2)
+    return jsonify({"status":"success","url":url})
 
-@app.route("/servers")
+@app.route("/api/dashboard")
 @login_required
-def servers_page():
-    return render_template("servers.html")
+def api_dashboard():
+    # KPIs
+    try:
+        import psutil, datetime
+        cpu = round(psutil.cpu_percent(interval=0.1), 1)
+        mem = psutil.virtual_memory()
+        ram_mb = int(mem.used / 1024 / 1024)
+        uptime = int(time.time() - psutil.boot_time())
+        up_str = f"{uptime//3600:02d}:{(uptime%3600)//60:02d}:{uptime%60:02d}"
+    except Exception:
+        cpu, ram_mb, up_str = 0.0, 0, "00:00:00"
+
+    # Simple series 7 days (dummy if not present)
+    labels = []
+    values = []
+    try:
+        for i in range(7):
+            labels.append(f"D-{6-i}")
+            values.append(max(0, int(50 + 20*i - i*i)))
+    except Exception:
+        labels = ["D-6","D-5","D-4","D-3","D-2","D-1","D-0"]
+        values = [10,20,30,25,40,45,50]
+
+    # guilds summary (top 6) from bot_guilds if exists
+    guilds = []
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT name, member_count AS detections FROM bot_guilds ORDER BY detections DESC LIMIT 6").fetchall()
+            guilds = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    # bans mini
+    bans = []
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT user_id, username, guild_id, reason FROM banned_users WHERE active=1 ORDER BY banned_at DESC LIMIT 6").fetchall()
+            bans = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    return jsonify({
+        "kpi": {"cpu": cpu, "ram": ram_mb, "uptime": up_str},
+        "series": {"labels": labels, "values": values},
+        "guilds": guilds,
+        "bans": bans
+    })
+
+@app.context_processor
+def inject_globals():
+    return {
+        "theme_path": get_theme_path(),
+        "background_url": _load_background_url(),
+        "cache_bust": int(time.time())
+    }

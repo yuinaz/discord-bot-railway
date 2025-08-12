@@ -1,29 +1,47 @@
 {% extends 'base.html' %}{% block title %}Dashboard - SatpamBot{% endblock %}{% block content %}
-<div class="grid cols-4">
-  <div class="card"><h4>Uptime</h4><div class="kpi"><span>⏱️</span><span class="val" id="kpi-uptime">--:--</span></div></div>
-  <div class="card"><h4>RAM</h4><div class="kpi"><span>💾</span><span class="val"><span id="kpi-ram">0</span> MB</span></div><canvas id="ramSpark" class="chart-xs"></canvas></div>
-  <div class="card"><h4>CPU</h4><div class="kpi"><span>⚙️</span><span class="val"><span id="kpi-cpu">0</span>%</span></div><div style="position:relative;"><canvas id="cpuDoughnut" class="chart-sm"></canvas><div class="center-label" id="cpuCenter">0%</div></div></div>
-  <div class="card"><h4>Komposisi</h4><canvas id="pieComposition" class="chart-sm"></canvas></div>
-  <div class="card" style="grid-column: span 2;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><h4>Aktivitas</h4><span class="badge">7 hari</span></div><canvas id="lineActivity" class="chart-lg"></canvas></div>
-  <div class="card"><h4>Top Guilds</h4><table class="table" id="tblGuilds"><thead><tr><th>Guild</th><th>Deteksi</th><th>Aktivitas</th></tr></thead><tbody></tbody></table></div>
-  <div class="card"><h4>Join / Leave</h4><canvas id="barJoinLeave" class="chart-md"></canvas></div>
-</div>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<div class="grid cols-4">
+  <div class="card"><h4>CPU</h4><div style="position:relative;"><canvas id="cpu" class="chart-sm"></canvas><div class="center-label" id="cpuVal">0%</div></div></div>
+  <div class="card"><h4>RAM</h4><div class="kpi"><span>💾</span><span class="val"><span id="ramVal">0</span> MB</span></div><canvas id="ramSpark" class="chart-xs"></canvas></div>
+  <div class="card"><h4>Deteksi 7 Hari</h4><canvas id="line7" class="chart-sm"></canvas></div>
+  <div class="card"><h4>Komposisi</h4><canvas id="comp" class="chart-sm"></canvas></div>
+
+  <div class="card" style="grid-column: span 2;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h4>Aktivitas</h4><span class="badge">7 hari</span></div><canvas id="act" class="chart-lg"></canvas></div>
+  <div class="card"><h4>Top Guilds</h4><table class="table" id="tblGuilds"><thead><tr><th>Guild</th><th>Score</th></tr></thead><tbody></tbody></table></div>
+  <div class="card"><h4>Banned Top</h4><table class="table" id="tblBans"><thead><tr><th>User</th><th>Guild</th><th>Reason</th></tr></thead><tbody></tbody></table></div>
+</div>
+
 <script>
-const C_PURPLE='#9b6bff', C_YELLOW='#ffd166', C_MUTED='rgba(255,255,255,.25)';
-let cpuChart,ramChart,lineChart,pieChart,barChart; const sparkData=[];
-function pushSpark(a,v,m=40){a.push(v);if(a.length>m)a.shift();return a;}
-async function loadLive(){const r=await fetch('/api/live_stats');const j=await r.json();
-document.getElementById('kpi-uptime').textContent=j.uptime??'--';document.getElementById('kpi-ram').textContent=j.ram??0;document.getElementById('kpi-cpu').textContent=j.cpu??0;
-const ctxR=document.getElementById('ramSpark');pushSpark(sparkData,j.ram||0);
-if(!ramChart){ramChart=new Chart(ctxR,{type:'line',data:{labels:sparkData.map((_,i)=>i+1),datasets:[{data:sparkData,fill:true,tension:.35,borderColor:C_PURPLE,backgroundColor:'rgba(155,107,255,.15)'}]},options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}},elements:{point:{radius:0}}})}else{ramChart.data.datasets[0].data=sparkData.slice();ramChart.update();}
-const used=j.cpu||0;const free=Math.max(0,100-used);document.getElementById('cpuCenter').textContent=used+'%';const ctxC=document.getElementById('cpuDoughnut');
-if(!cpuChart){cpuChart=new Chart(ctxC,{type:'doughnut',data:{labels:['Used','Free'],datasets:[{data:[used,free],borderWidth:2,borderColor:'#ffffff22',backgroundColor:[C_PURPLE,C_MUTED]}]},options:{cutout:'70%',plugins:{legend:{display:false}}}})}else{cpuChart.data.datasets[0].data=[used,free];cpuChart.update();}}
-async function loadSummary(){const r=await fetch('/api/servers/summary');const arr=await r.json();const labels=arr.map(x=>x.name||x.guild||'Guild');const values=arr.map(x=>x.count||x.detections||x.value||0);
-const ctxL=document.getElementById('lineActivity');lineChart=new Chart(ctxL,{type:'line',data:{labels,datasets:[{label:'Deteksi',data:values,borderColor:C_YELLOW,backgroundColor:'rgba(255,209,102,.15)',fill:true,tension:.35}]},options:{plugins:{legend:{display:false}},elements:{point:{radius:0}}}});
-const total=values.reduce((a,b)=>a+b,0);const ctxP=document.getElementById('pieComposition');pieChart=new Chart(ctxP,{type:'doughnut',data:{labels:['Phishing','NSFW','Spam'],datasets:[{data:[Math.round(total*.5),Math.round(total*.3),Math.round(total*.2)],backgroundColor:[C_PURPLE,C_YELLOW,'#ff5c91'],borderWidth:2,borderColor:'#ffffff22'}]},options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{color:'#cfcfe0'}}}});
-const tb=document.querySelector('#tblGuilds tbody');tb.innerHTML='';for(let i=0;i<Math.min(arr.length,6);i++){const g=arr[i];const tr=document.createElement('tr');tr.innerHTML=`<td>${g.name||g.guild||'-'}</td><td>${g.count||g.detections||0}</td><td>${g.activity||'-'}</td>`;tb.appendChild(tr);}}
-async function loadJoinLeave(){try{const r=await fetch('/api/member_monitor');const j=await r.json();const ctx=document.getElementById('barJoinLeave');barChart=new Chart(ctx,{type:'bar',data:{labels:j.labels,datasets:[{label:'Aktif',data:j.active,backgroundColor:C_PURPLE}]},options:{plugins:{legend:{display:false}}}});}catch(e){console.warn('join/leave not available',e);}}
-loadLive();setInterval(loadLive,5000);loadSummary();loadJoinLeave();
+const P='#9b6bff',Y='#ffd166',M='rgba(255,255,255,.25)';
+let cpuD, ramL, line7, comp, act; const ramSeries=[];
+
+async function loadDashboard(){
+  const r = await fetch('/api/dashboard'); const d = await r.json();
+  // KPI
+  document.getElementById('cpuVal').textContent = (d.kpi.cpu||0) + '%';
+  document.getElementById('ramVal').textContent = d.kpi.ram||0;
+  // CPU donut
+  const used=d.kpi.cpu||0, free=Math.max(0,100-used);
+  cpuD = new Chart(document.getElementById('cpu'), {type:'doughnut', data:{labels:['Used','Free'], datasets:[{data:[used,free], backgroundColor:[P,M], borderColor:'#ffffff22', borderWidth:2}]}, options:{cutout:'70%', plugins:{legend:{display:false}}}});
+  // RAM spark
+  ramSeries.push(d.kpi.ram||0); if(ramSeries.length>40)ramSeries.shift();
+  ramL = new Chart(document.getElementById('ramSpark'), {type:'line', data:{labels:ramSeries.map((_,i)=>i+1), datasets:[{data:ramSeries, fill:true, tension:.35, borderColor:P, backgroundColor:'rgba(155,107,255,.15)'}]}, options:{plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}}, elements:{point:{radius:0}}}});
+  // Line 7
+  line7 = new Chart(document.getElementById('line7'), {type:'line', data:{labels:d.series.labels, datasets:[{data:d.series.values, borderColor:Y, backgroundColor:'rgba(255,209,102,.15)', fill:true, tension:.35}]}, options:{plugins:{legend:{display:false}}, elements:{point:{radius:0}}}});
+  // Comp
+  comp = new Chart(document.getElementById('comp'), {type:'doughnut', data:{labels:['Phishing','NSFW','Spam'], datasets:[{data:[40,35,25], backgroundColor:[P,Y,'#ff5c91'], borderColor:'#ffffff22', borderWidth:2}]}, options:{cutout:'62%', plugins:{legend:{position:'bottom'}}}});
+  // Activity stacked area (reuse series)
+  act = new Chart(document.getElementById('act'), {type:'line', data:{labels:d.series.labels, datasets:[
+    {label:'Deteksi', data:d.series.values, borderColor:P, backgroundColor:'rgba(155,107,255,.12)', fill:true, tension:.3}
+  ]}, options:{plugins:{legend:{display:false}}, elements:{point:{radius:0}}}});
+  // Tables
+  const tbG=document.querySelector('#tblGuilds tbody'); tbG.innerHTML='';
+  (d.guilds||[]).slice(0,6).forEach(g=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${g.name||'-'}</td><td>${g.detections||0}</td>`;tbG.appendChild(tr);});
+  const tbB=document.querySelector('#tblBans tbody'); tbB.innerHTML='';
+  (d.bans||[]).forEach(b=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${b.username||b.user_id}</td><td>${b.guild_id||'-'}</td><td>${b.reason||'-'}</td>`;tbB.appendChild(tr);});
+}
+loadDashboard();
 </script>
 {% endblock %}

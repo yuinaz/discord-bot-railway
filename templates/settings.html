@@ -1,154 +1,27 @@
-{% extends 'base.html' %}
-{% block title %}⚙️ Pengaturan - SatpamBot{% endblock %}
-{% block content %}
-<div class="container-fluid" style="max-width: 1200px;">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
-    <h3 class="m-0">⚙️ Pengaturan</h3>
-    <span class="text-muted">👤 {{ session.username or 'Guest' }}</span>
+{% extends 'base.html' %}{% block title %}Pengaturan{% endblock %}{% block content %}
+<div class="card p-3">
+  <h4>🎨 Tema & Background — live preview</h4>
+  <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
+    <select id="selTheme" class="form-select" style="max-width:260px;">
+      {% for t in available_themes %}<option value="{{ t }}" {% if t == current_theme %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary" onclick="applyTheme()">Apply Theme</button>
+    <span class="text-muted">File diambil dari <code>/static/themes/*.css</code></span>
   </div>
-
-  <div class="row g-3">
-    <!-- Card: Tema & Background -->
-    <div class="col-12">
-      <div class="card p-3 position-relative" style="background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.08); border-radius:14px;">
-        <h5 class="mb-3">🎨 Tema & Background <small class="text-muted">— live preview</small></h5>
-
-        <div class="row g-2 align-items-end">
-          <div class="col-md-4">
-            <label class="form-label">Pilih theme</label>
-            <select id="selTheme" class="form-select">
-              {% for t in available_themes %}
-                <option value="{{ t }}" {% if t == current_theme %}selected{% endif %}>{{ t }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-4">
-            <button class="btn btn-primary w-100" onclick="applyTheme()">Apply Theme</button>
-          </div>
-          <div class="col-md-4 text-end">
-            <small class="text-muted">File diambil dari <code>/static/themes/*.css</code></small>
-          </div>
-        </div>
-
-        <hr class="my-3" />
-
-        <div class="row g-2 align-items-end">
-          <div class="col-md-5">
-            <label class="form-label">Background image URL</label>
-            <input id="bgUrl" type="text" class="form-control" placeholder="https://..." value="{{ background_current or '' }}">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Upload background</label>
-            <input id="bgFile" type="file" accept="image/*" class="form-control" />
-          </div>
-          <div class="col-md-2 d-grid">
-            <button class="btn btn-outline-info" onclick="previewBg()">Preview</button>
-          </div>
-          <div class="col-md-2 d-grid">
-            <button class="btn btn-warning" onclick="uploadBg()">Upload</button>
-          </div>
-          <div class="col-md-3 d-grid">
-            <button class="btn btn-success" onclick="saveBg()">Save Background</button>
-          </div>
-        </div>
-
-        <!-- Floating preview -->
-        <div id="bgPreview" class="floating-preview shadow-lg">
-          <div class="fp-header">Preview</div>
-          <div class="fp-content">
-            <div class="fp-card"></div>
-            <div class="fp-card wide"></div>
-            <div class="fp-row">
-              <div class="fp-chip"></div>
-              <div class="fp-chip"></div>
-              <div class="fp-chip"></div>
-            </div>
-          </div>
-          <button class="btn btn-sm btn-dark fp-close" onclick="hidePreview()">×</button>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Seksi lain yang sudah ada -->
-    <div class="col-12">
-      <div class="card p-3">
-        <h5 class="mb-2">🛡️ Security</h5>
-        <a class="btn btn-outline-light me-2 mb-2" href="/security">Edit whitelist/blacklist & module flags</a>
-      </div>
-    </div>
-
-    <div class="col-12">
-      <div class="card p-3">
-        <h5 class="mb-2">🧠 Image Classifier</h5>
-        <a class="btn btn-outline-light" href="/blacklist-image">Kelola blacklist gambar</a>
-      </div>
-    </div>
-
-    <div class="col-12">
-      <div class="card p-3">
-        <h5 class="mb-2">🧰 Halaman Lain</h5>
-        <a class="btn btn-outline-light me-2 mb-2" href="/admin-log">📜 Logs</a>
-        <a class="btn btn-outline-light me-2 mb-2" href="/provision">🧩 Provision</a>
-        <a class="btn btn-outline-light me-2 mb-2" href="/plugin">🧿 Plugin</a>
-        <a class="btn btn-outline-light me-2 mb-2" href="/resource">📦 Resource</a>
-        <a class="btn btn-outline-light me-2 mb-2" href="/user-locator">🗺️ User Locator</a>
-      </div>
-    </div>
+  <hr/>
+  <div class="row g-2 align-items-end" style="display:flex; gap:10px; flex-wrap:wrap;">
+    <input id="bgFile" type="file" accept="image/*" class="form-control" style="max-width:320px;">
+    <button class="btn btn-warning" onclick="uploadBg()">Upload & Apply Background</button>
   </div>
 </div>
-
-<style>
-.floating-preview{
-  position: fixed;
-  right: 24px; bottom: 24px;
-  width: 420px; height: 260px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.15);
-  background: #0b0b16 center/cover no-repeat;
-  display: none;
-  overflow: hidden;
-}
-.floating-preview.show{ display: block; }
-.fp-header{
-  height: 36px; display:flex; align-items:center; padding:0 12px;
-  background: rgba(0,0,0,.45); color:#eee; font-weight:700; font-size: 13px;
-  border-bottom: 1px solid rgba(255,255,255,.12);
-}
-.fp-close{ position:absolute; right:6px; top:6px; line-height: 1; padding: 0 8px; }
-.fp-content{ padding: 12px; position: relative; }
-.fp-card{ height: 42px; border-radius: 12px; background: rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.15); margin-bottom: 10px; }
-.fp-card.wide{ height: 86px; }
-.fp-row{ display:flex; gap:8px; margin-top: 8px; }
-.fp-chip{ height: 14px; width: 60px; border-radius: 999px; background: rgba(255,255,255,.25); }
-</style>
-
 <script>
-async function applyTheme(){
-  const t = document.getElementById('selTheme').value;
-  await fetch('/theme?set=' + encodeURIComponent(t));
-  location.reload();
-}
-function previewBg(){
-  const url = document.getElementById('bgUrl').value.trim();
-  const el = document.getElementById('bgPreview');
-  if(!url){ return alert('Masukkan URL background dulu.'); }
-  el.style.backgroundImage = `url('${url}')`;
-  el.classList.add('show');
-}
-function hidePreview(){
-  document.getElementById('bgPreview').classList.remove('show');
-}
-async function saveBg(){
-  const url = document.getElementById('bgUrl').value.trim();
-  if(!url){ return alert('Masukkan URL background dulu.'); }
-  await fetch('/theme', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ background_image: url })
-  });
-  alert('Background disimpan.');
+async function applyTheme(){ const t=document.getElementById('selTheme').value; await fetch('/theme?set='+encodeURIComponent(t)); location.reload(); }
+async function uploadBg(){
+  const f=document.getElementById('bgFile').files[0];
+  if(!f) return alert('Pilih file dulu');
+  const fd=new FormData(); fd.append('file', f);
+  const r=await fetch('/upload/background', {method:'POST', body: fd}); const j=await r.json();
+  if(j.status==='success'){ location.reload(); } else { alert(j.message||'Gagal upload'); }
 }
 </script>
 {% endblock %}
