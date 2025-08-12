@@ -333,7 +333,7 @@ def api_servers_summary():
         return jsonify(stats)
     except Exception as e:
         safe_log(f"❌ Gagal ambil summary stats: {e}", level="error")
-        return jsonify({"error": "Gagal mengambil data"}), 500
+        return jsonify([])
 
 # ===== API: Live System Stats =====
 @app.route("/api/live_stats")
@@ -848,3 +848,13 @@ def bootstrap():
 
     # Mulai loop broadcast realtime 60 detik sekali
     start_broadcast_loop()
+
+# ===== API: Member Monitor (dummy minimal agar UI tidak error) =====
+@app.route("/api/member_monitor")
+def api_member_monitor():
+    if not session.get("logged_in"):
+        return jsonify({"error":"Unauthorized"}), 401
+    return jsonify({
+        "labels": [f"{h:02d}:00" for h in range(24)],
+        "active": [0]*24
+    })

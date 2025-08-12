@@ -1,26 +1,32 @@
 {% extends 'base.html' %}
 {% block title %}Login - SatpamBot{% endblock %}
 {% block content %}
-<div class="login-box">
-        <h2 class="text-center mb-4">🔐 Login Admin</h2>
-        {% if error %}
-        <div class="alert alert-danger" role="alert">
-            {{ error }}
-        </div>
-        {% endif %}
-        {% if profile_avatar_url %}<div class="text-center mb-2"><img src="{{ profile_avatar_url }}" style="width:86px;height:86px;border-radius:50%;border:2px solid #ff2aa1;object-fit:cover;box-shadow:0 0 18px rgba(255,42,161,.35)"></div>{% endif %}
-<form method="POST">
-            <div class="mb-3">
-                <label for="username" class="form-label">👤 Username</label>
-                <input type="text" class="form-control" name="username" required placeholder="admin">
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">🔑 Password</label>
-                <input type="password" class="form-control" name="password" required placeholder="admin">
-            </div>
-            <div class="d-grid">
-                <button type="submit" class="btn btn-primary">Masuk</button>
-            </div>
-        </form>
+<div class="d-flex justify-content-center align-items-start" style="min-height: calc(100vh - 80px); padding-top: 80px;">
+  <div class="login-box card p-4" style="min-width:320px; max-width:420px; background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.1); border-radius:12px;">
+    <div class="text-center mb-3">
+      {% if profile_avatar_url %}
+        <img src="{{ profile_avatar_url }}?v={{ cache_bust }}" alt="Bot Avatar" style="width:84px;height:84px;border-radius:50%;object-fit:cover;box-shadow:0 0 18px rgba(255,42,161,.35);border:2px solid rgba(255,255,255,.35)">
+      {% else %}
+        <div style="width:84px;height:84px;border-radius:50%;background:#444;display:inline-flex;align-items:center;justify-content:center;font-size:28px">🤖</div>
+      {% endif %}
     </div>
+    <h2 class="text-center mb-4">🔐 Login Admin</h2>
+    {% if error %}
+      <div class="alert alert-danger" role="alert">{{ error }}</div>
+    {% endif %}
+    <form method="POST">
+      <div class="mb-3">
+        <label for="username" class="form-label">👤 Username</label>
+        <input type="text" class="form-control" name="username" required placeholder="admin">
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">🔑 Password</label>
+        <input type="password" class="form-control" name="password" required placeholder="admin">
+      </div>
+      <div class="d-grid">
+        <button type="submit" class="btn btn-primary">Masuk</button>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
