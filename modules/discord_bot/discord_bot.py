@@ -38,10 +38,14 @@ def _resolve_log_channel() -> discord.TextChannel | None:
             f"resolved_to=#{ch.name} (id={ch.id}) in guild='{ch.guild.name}' (id={ch.guild.id})"
         )
         return ch
-    logging.warning(
-        f"[status] LOG_CHANNEL_ID={LOG_CHANNEL_ID} not found/visible. "
-        f"Pastikan bot punya izin melihat & menulis di channel itu."
-    )
+    # Saat warm-up (belum ready), jangan bikin warning supaya log bersih
+    if bot.is_ready():
+        logging.warning(
+            f"[status] LOG_CHANNEL_ID={LOG_CHANNEL_ID} not found/visible. "
+            f"Pastikan bot punya izin melihat & menulis di channel itu."
+        )
+    else:
+        logging.info("[status] warm-up: channel belum tersedia (bot belum ready)")
     return None
 
 # ---------- Heartbeat 10 menit (HANYA ke LOG_CHANNEL_ID) ----------
@@ -50,6 +54,12 @@ async def status_heartbeat():
     ch = _resolve_log_channel()
     if ch:
         await upsert_status_embed_in_channel(ch, STATUS_TEXT)
+
+# Pastikan loop baru jalan setelah bot benar-benar ready
+@status_heartbeat.before_loop
+async def _hb_before_loop():
+    await bot.wait_until_ready()
+    await asyncio.sleep(2)  # beri jeda kecil agar cache channel terisi
 
 @bot.event
 async def setup_hook():
