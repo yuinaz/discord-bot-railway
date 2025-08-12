@@ -103,6 +103,7 @@ def inject_theme():
 
 # ===== DATABASE SETUP =====
 DB_PATH = "superadmin.db"
+
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
@@ -124,12 +125,39 @@ def init_db():
                 unbanned_at TEXT
             )
         """)
-        if cur.fetchone():
-            conn.execute("UPDATE superadmin SET password=? WHERE username=?",
-                         (generate_password_hash(env_pass), env_user))
+        conn.commit()
+
+def ensure_admin_seed():
+    """Seed / sinkron user admin dari ENV ke tabel superadmin.
+
+    ENV yang dibaca (urut prioritas):
+    - SUPER_ADMIN_USER atau ADMIN_USERNAME (default: "admin")
+    - SUPER_ADMIN_PASSWORD atau SUPER_ADMIN_PASS atau ADMIN_PASSWORD (default: "admin")
+    """
+    username = (
+        os.getenv("SUPER_ADMIN_USER")
+        or os.getenv("ADMIN_USERNAME")
+        or "admin"
+    )
+    raw_pwd = (
+        os.getenv("SUPER_ADMIN_PASSWORD")
+        or os.getenv("SUPER_ADMIN_PASS")
+        or os.getenv("ADMIN_PASSWORD")
+        or "admin"
+    )
+    pwd_hash = generate_password_hash(raw_pwd)
+
+    # Pastikan tabel ada
+    init_db()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute("SELECT id FROM superadmin WHERE username = ?", (username,))
+        row = cur.fetchone()
+        if row:
+            conn.execute("UPDATE superadmin SET password=? WHERE id=?", (pwd_hash, row[0]))
         else:
-            conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)",
-                         (env_user, generate_password_hash(env_pass)))
+            conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)", (username, pwd_hash))
+        conn.commit()
 
 # ===== SAFE LOG =====
 def safe_log(msg, level="info"):
