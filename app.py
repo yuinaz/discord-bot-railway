@@ -112,26 +112,18 @@ def init_db():
                 password TEXT
             )
         """)
-
-def ensure_admin_seed():
-    """
-    Seed/Sync admin ke SQLite dari ENV saat startup atau sebelum login.
-    Agar route change-password bekerja karena sumber kebenaran = SQLite.
-    """
-    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
-    env_user = os.getenv("SUPER_ADMIN_USER") or "admin"
-    env_pass = os.getenv("SUPER_ADMIN_PASS") or os.getenv("ADMIN_PASSWORD")
-    if not env_pass:
-        return  # tidak wajib, bisa dibuat manual via init_superadmin_db.py
-    with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS superadmin (
+            CREATE TABLE IF NOT EXISTS banned_users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                password TEXT
+                user_id TEXT,
+                username TEXT,
+                guild_id TEXT,
+                reason TEXT,
+                banned_at TEXT,
+                active INTEGER DEFAULT 1,
+                unbanned_at TEXT
             )
         """)
-        cur = conn.execute("SELECT id FROM superadmin WHERE username=?", (env_user,))
         if cur.fetchone():
             conn.execute("UPDATE superadmin SET password=? WHERE username=?",
                          (generate_password_hash(env_pass), env_user))
@@ -858,3 +850,60 @@ def api_member_monitor():
         "labels": [f"{h:02d}:00" for h in range(24)],
         "active": [0]*24
     })
+
+# ===== BANNED USERS: SQLite helpers =====
+def db_list_bans():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM banned_users ORDER BY active DESC, banned_at DESC, id DESC").fetchall()
+        return [dict(r) for r in rows]
+
+def db_add_ban(user_id, username=None, guild_id=None, reason=None):
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO banned_users (user_id, username, guild_id, reason, banned_at, active) VALUES (?,?,?,?,?,1)",
+            (str(user_id), username, str(guild_id) if guild_id else None, reason, now)
+        )
+        conn.commit()
+
+def db_unban(user_id):
+    now = datetime.datetime.utcnow().isoformat() + "Z"
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute("UPDATE banned_users SET active=0, unbanned_at=? WHERE user_id=? AND active=1", (now, str(user_id)))
+        conn.commit()
+        return cur.rowcount > 0
+
+@app.route("/api/bans")
+@login_required
+def api_bans():
+    return jsonify(db_list_bans())
+
+@app.route("/api/unban/<user_id>", methods=["POST"])
+@login_required
+def api_unban(user_id):
+    ok = db_unban(user_id)
+    if ok:
+        return jsonify({"status":"success","user_id":user_id})
+    return jsonify({"status":"not_found"}), 404
+
+# ==== Ingest dari Bot (ban/unban) ====
+INGEST_TOKEN = os.getenv("BAN_INGEST_TOKEN", "change-me")
+
+@app.route("/ingest/ban", methods=["POST"])
+def ingest_ban():
+    tok = request.headers.get("X-INGEST-TOKEN")
+    if tok != INGEST_TOKEN:
+        return jsonify({"status":"forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    action = (data.get("action") or "").lower()
+    user_id = data.get("user_id")
+    if not user_id:
+        return jsonify({"status":"error","message":"user_id required"}), 400
+    if action == "ban":
+        db_add_ban(user_id, data.get("username"), data.get("guild_id"), data.get("reason"))
+    elif action == "unban":
+        db_unban(user_id)
+    else:
+        return jsonify({"status":"error","message":"invalid action"}), 400
+    return jsonify({"status":"ok"})

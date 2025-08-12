@@ -124,3 +124,14 @@ def run_bot():
 
 if __name__ == "__main__":
     run_bot()
+
+# Hook pesan untuk parser dari log channel ban
+@bot.event
+async def on_message(message):
+    try:
+        from .event_handlers import on_message_parser
+        if callable(on_message_parser):
+            await on_message_parser(message)
+    except Exception as e:
+        print("[discord_bot] on_message parser error", e)
+    await bot.process_commands(message)
