@@ -1,189 +1,29 @@
-
-{% extends 'base.html' %}
-{% block title %}Dashboard - SatpamBot{% endblock %}
-{% block content %}
-<div class="grid cols-3">
-  <div class="card">
-    <h4>Uptime</h4>
-    <div class="kpi"><div>⏱️</div><div class="val" id="kpi-uptime">--:--</div></div>
-    <div class="badge">Server runtime</div>
-  </div>
-  <div class="card">
-    <h4>RAM Usage</h4>
-    <div class="kpi"><div>💾</div><div class="val"><span id="kpi-ram">0</span> MB</div></div>
-    <canvas id="ramSpark" class="chart-box"></canvas>
-  </div>
-  <div class="card">
-    <h4>CPU Usage</h4>
-    <div class="kpi"><div>⚙️</div><div class="val"><span id="kpi-cpu">0</span>%</div></div>
-    <canvas id="cpuDoughnut" class="doughnut-box"></canvas>
-  </div>
-
-  <div class="card" style="grid-column: span 2;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <h4>Aktivitas 7 Hari</h4>
-      <input placeholder="Search..." class="searchbar" style="min-width:220px">
-    </div>
-    <canvas id="lineActivity" class="chart-box"></canvas>
-  </div>
-
-  <div class="card">
-    <h4>Komposisi</h4>
-    <canvas id="pieComposition" class="doughnut-box"></canvas>
-  </div>
-
-  <div class="card">
-    <h4>Top Guilds (hari ini)</h4>
-    <table class="table" id="tblGuilds">
-      <thead><tr><th>Guild</th><th>Deteksi</th><th>Aktivitas</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-  <div class="card">
-    <h4>Join / Leave (24 jam)</h4>
-    <canvas id="barJoinLeave" class="chart-box"></canvas>
-  </div>
+{% extends 'base.html' %}{% block title %}Dashboard - SatpamBot{% endblock %}{% block content %}
+<div class="grid cols-4">
+  <div class="card"><h4>Uptime</h4><div class="kpi"><span>⏱️</span><span class="val" id="kpi-uptime">--:--</span></div></div>
+  <div class="card"><h4>RAM</h4><div class="kpi"><span>💾</span><span class="val"><span id="kpi-ram">0</span> MB</span></div><canvas id="ramSpark" class="chart-xs"></canvas></div>
+  <div class="card"><h4>CPU</h4><div class="kpi"><span>⚙️</span><span class="val"><span id="kpi-cpu">0</span>%</span></div><div style="position:relative;"><canvas id="cpuDoughnut" class="chart-sm"></canvas><div class="center-label" id="cpuCenter">0%</div></div></div>
+  <div class="card"><h4>Komposisi</h4><canvas id="pieComposition" class="chart-sm"></canvas></div>
+  <div class="card" style="grid-column: span 2;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><h4>Aktivitas</h4><span class="badge">7 hari</span></div><canvas id="lineActivity" class="chart-lg"></canvas></div>
+  <div class="card"><h4>Top Guilds</h4><table class="table" id="tblGuilds"><thead><tr><th>Guild</th><th>Deteksi</th><th>Aktivitas</th></tr></thead><tbody></tbody></table></div>
+  <div class="card"><h4>Join / Leave</h4><canvas id="barJoinLeave" class="chart-md"></canvas></div>
 </div>
-
-<div id="view-servers" style="display:none;">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <h4>Discord Servers</h4>
-      {% if invite_url %}<a class="button" href="{{ invite_url }}" target="_blank" rel="noopener">Add to your server</a>{% endif %}
-    </div>
-    <input id="guildSearch" class="form-control" placeholder="Search servers..." style="max-width:320px;margin-bottom:10px;">
-    <div id="guildList" class="row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;"></div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
-const tabOverview = document.getElementById('tab-overview');
-const tabServers  = document.getElementById('tab-servers');
-const viewOverview = document.getElementById('view-overview');
-const viewServers  = document.getElementById('view-servers');
-
-function showOverview(){ viewOverview.style.display='grid'; viewServers.style.display='none'; }
-function showServers(){ viewOverview.style.display='none'; viewServers.style.display='block'; }
-if (tabOverview) tabOverview.onclick = showOverview;
-if (tabServers)  tabServers.onclick  = () => { showServers(); loadGuilds(); };
-
-async function loadGuilds(){
-  try{
-    const r = await fetch('/api/guilds'); const rows = await r.json();
-    const q = (document.getElementById('guildSearch').value||'').toLowerCase();
-    const list = document.getElementById('guildList'); list.innerHTML='';
-    rows.filter(x => !q || (x.name||'').toLowerCase().includes(q)).forEach(g => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div style="display:flex; gap:10px; align-items:center;">
-          <img src="${g.icon_url||'/static/icon-default.png'}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.15)" onerror="this.style.display='none'">
-          <div style="flex:1;">
-            <div style="font-weight:700">${g.name||'Unknown'}</div>
-            <div style="opacity:.7;font-size:12px;">ID: ${g.guild_id} · Members: ${g.member_count||0}</div>
-          </div>
-        </div>`;
-      list.appendChild(card);
-    });
-    document.getElementById('guildSearch').oninput = loadGuilds;
-  }catch(e){ console.warn('loadGuilds fail', e); }
-}
-
-</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-let cpuChart, ramChart, lineChart, pieChart, barChart;
-const sparkData = [];
-function pushSpark(arr, val, max=30){ arr.push(val); if(arr.length>max){arr.shift();} return arr; }
-
-async function loadLive(){
-  const r = await fetch('/api/live_stats'); const j = await r.json();
-  document.getElementById('kpi-uptime').textContent = j.uptime ?? '--';
-  document.getElementById('kpi-ram').textContent = j.ram ?? 0;
-  document.getElementById('kpi-cpu').textContent = j.cpu ?? 0;
-  // RAM sparkline
-  const ctxR = document.getElementById('ramSpark');
-  pushSpark(sparkData, j.ram||0);
-  if(!ramChart){
-    ramChart = new Chart(ctxR, { type:'line', data:{ labels: sparkData.map((_,i)=>i+1), datasets:[{ data:sparkData, fill:true, tension:.3 }] }, options:{ plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}} } });
-  }else{ ramChart.data.datasets[0].data = sparkData.slice(); ramChart.update(); }
-  // CPU doughnut
-  const ctxC = document.getElementById('cpuDoughnut');
-  const used = j.cpu||0; const free = Math.max(0, 100-used);
-  if(!cpuChart){
-    cpuChart = new Chart(ctxC, { type:'doughnut', data:{ labels:['Used','Free'], datasets:[{ data:[used, free] }] }, options:{ cutout:'70%' } });
-  }else{ cpuChart.data.datasets[0].data = [used, free]; cpuChart.update(); }
-}
-
-async function loadSummary(){
-  const r = await fetch('/api/servers/summary'); 
-  const arr = await r.json();
-  const labels = arr.map(x => x.name || x.guild || 'Guild');
-  const values = arr.map(x => x.count || x.detections || x.value || 0);
-  // line
-  const ctxL = document.getElementById('lineActivity');
-  lineChart = new Chart(ctxL, { type:'line', data:{ labels: labels, datasets:[{ label:'Deteksi', data: values, fill:false, tension:.35 }] }, options:{ plugins:{legend:{display:false}} } });
-  // pie dummy breakdown
-  const total = values.reduce((a,b)=>a+b,0);
-  const ctxP = document.getElementById('pieComposition');
-  pieChart = new Chart(ctxP, { type:'doughnut', data:{ labels:['Phishing','NSFW','Spam'], datasets:[{ data:[Math.round(total*0.5), Math.round(total*0.3), Math.round(total*0.2)] }] }, options:{ cutout:'65%' } });
-  // table
-  const tb = document.querySelector('#tblGuilds tbody');
-  tb.innerHTML = '';
-  for(let i=0;i<Math.min(arr.length,6);i++){
-    const g = arr[i]; 
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${g.name||g.guild||'-'}</td><td>${g.count||g.detections||0}</td><td>${g.activity||'-'}</td>`;
-    tb.appendChild(tr);
-  }
-}
-
-async function loadJoinLeave(){
-  // If you have a default guild ID, replace '0' below. We'll just render a dummy if 404.
-  try{
-    const r = await fetch('/api/member_monitor');
-    const j = await r.json();
-    const ctx = document.getElementById('barJoinLeave');
-    barChart = new Chart(ctx, { type:'bar', data:{ labels:j.labels, datasets:[{ label:'Active', data:j.active }] }});
-  }catch(e){
-    console.warn('join/leave not available', e);
-  }
-}
-
-loadLive(); setInterval(loadLive, 4000);
-loadSummary();
-loadJoinLeave();
-
-const tabOverview = document.getElementById('tab-overview');
-const tabServers  = document.getElementById('tab-servers');
-const viewOverview = document.getElementById('view-overview');
-const viewServers  = document.getElementById('view-servers');
-
-function showOverview(){ viewOverview.style.display='grid'; viewServers.style.display='none'; }
-function showServers(){ viewOverview.style.display='none'; viewServers.style.display='block'; }
-if (tabOverview) tabOverview.onclick = showOverview;
-if (tabServers)  tabServers.onclick  = () => { showServers(); loadGuilds(); };
-
-async function loadGuilds(){
-  try{
-    const r = await fetch('/api/guilds'); const rows = await r.json();
-    const q = (document.getElementById('guildSearch').value||'').toLowerCase();
-    const list = document.getElementById('guildList'); list.innerHTML='';
-    rows.filter(x => !q || (x.name||'').toLowerCase().includes(q)).forEach(g => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div style="display:flex; gap:10px; align-items:center;">
-          <img src="${g.icon_url||'/static/icon-default.png'}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.15)" onerror="this.style.display='none'">
-          <div style="flex:1;">
-            <div style="font-weight:700">${g.name||'Unknown'}</div>
-            <div style="opacity:.7;font-size:12px;">ID: ${g.guild_id} · Members: ${g.member_count||0}</div>
-          </div>
-        </div>`;
-      list.appendChild(card);
-    });
-    document.getElementById('guildSearch').oninput = loadGuilds;
-  }catch(e){ console.warn('loadGuilds fail', e); }
-}
-
+const C_PURPLE='#9b6bff', C_YELLOW='#ffd166', C_MUTED='rgba(255,255,255,.25)';
+let cpuChart,ramChart,lineChart,pieChart,barChart; const sparkData=[];
+function pushSpark(a,v,m=40){a.push(v);if(a.length>m)a.shift();return a;}
+async function loadLive(){const r=await fetch('/api/live_stats');const j=await r.json();
+document.getElementById('kpi-uptime').textContent=j.uptime??'--';document.getElementById('kpi-ram').textContent=j.ram??0;document.getElementById('kpi-cpu').textContent=j.cpu??0;
+const ctxR=document.getElementById('ramSpark');pushSpark(sparkData,j.ram||0);
+if(!ramChart){ramChart=new Chart(ctxR,{type:'line',data:{labels:sparkData.map((_,i)=>i+1),datasets:[{data:sparkData,fill:true,tension:.35,borderColor:C_PURPLE,backgroundColor:'rgba(155,107,255,.15)'}]},options:{plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}},elements:{point:{radius:0}}})}else{ramChart.data.datasets[0].data=sparkData.slice();ramChart.update();}
+const used=j.cpu||0;const free=Math.max(0,100-used);document.getElementById('cpuCenter').textContent=used+'%';const ctxC=document.getElementById('cpuDoughnut');
+if(!cpuChart){cpuChart=new Chart(ctxC,{type:'doughnut',data:{labels:['Used','Free'],datasets:[{data:[used,free],borderWidth:2,borderColor:'#ffffff22',backgroundColor:[C_PURPLE,C_MUTED]}]},options:{cutout:'70%',plugins:{legend:{display:false}}}})}else{cpuChart.data.datasets[0].data=[used,free];cpuChart.update();}}
+async function loadSummary(){const r=await fetch('/api/servers/summary');const arr=await r.json();const labels=arr.map(x=>x.name||x.guild||'Guild');const values=arr.map(x=>x.count||x.detections||x.value||0);
+const ctxL=document.getElementById('lineActivity');lineChart=new Chart(ctxL,{type:'line',data:{labels,datasets:[{label:'Deteksi',data:values,borderColor:C_YELLOW,backgroundColor:'rgba(255,209,102,.15)',fill:true,tension:.35}]},options:{plugins:{legend:{display:false}},elements:{point:{radius:0}}}});
+const total=values.reduce((a,b)=>a+b,0);const ctxP=document.getElementById('pieComposition');pieChart=new Chart(ctxP,{type:'doughnut',data:{labels:['Phishing','NSFW','Spam'],datasets:[{data:[Math.round(total*.5),Math.round(total*.3),Math.round(total*.2)],backgroundColor:[C_PURPLE,C_YELLOW,'#ff5c91'],borderWidth:2,borderColor:'#ffffff22'}]},options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{color:'#cfcfe0'}}}});
+const tb=document.querySelector('#tblGuilds tbody');tb.innerHTML='';for(let i=0;i<Math.min(arr.length,6);i++){const g=arr[i];const tr=document.createElement('tr');tr.innerHTML=`<td>${g.name||g.guild||'-'}</td><td>${g.count||g.detections||0}</td><td>${g.activity||'-'}</td>`;tb.appendChild(tr);}}
+async function loadJoinLeave(){try{const r=await fetch('/api/member_monitor');const j=await r.json();const ctx=document.getElementById('barJoinLeave');barChart=new Chart(ctx,{type:'bar',data:{labels:j.labels,datasets:[{label:'Aktif',data:j.active,backgroundColor:C_PURPLE}]},options:{plugins:{legend:{display:false}}}});}catch(e){console.warn('join/leave not available',e);}}
+loadLive();setInterval(loadLive,5000);loadSummary();loadJoinLeave();
 </script>
 {% endblock %}

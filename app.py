@@ -85,11 +85,11 @@ def _save_profile(data:dict):
 def inject_theme():
     try:
         with open("config/theme.json", "r", encoding="utf-8") as f:
-            theme_file = json.load(f).get("theme", "default.css")
+            theme_file = json.load(f).get("theme", "dark.css")
             if not theme_file.endswith(".css"):
                 theme_file += ".css"
     except Exception:
-        theme_file = "default.css"
+        theme_file = "dark.css"
     session['live_bg_enabled']=_load_live_flag()
     _p=_load_profile()
     # cache_bust to beat CDN/browser caching for theme/background assets
@@ -98,7 +98,7 @@ def inject_theme():
         "background_url": _load_background_url(),
         "profile_avatar_url": _p.get('avatar_url'),
         "login_background_url": _p.get('login_background_url'),
-        "cache_bust": int(time.time())
+        "cache_bust": int(time.time()), "invite_url": _invite_url()
     }
 
 # ===== DATABASE SETUP =====
@@ -251,6 +251,7 @@ def dashboard():
         return redirect("/login")
     return render_template("dashboard.html")
 
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     if not session.get("logged_in"):
@@ -258,7 +259,14 @@ def settings():
     if request.method == "POST":
         print("Disimpan:", request.form)
         return redirect("/settings")
-    return render_template("settings.html")
+    try:
+        current_theme = json.load(open("config/theme.json","r",encoding="utf-8")).get("theme")
+    except Exception:
+        current_theme = "dark.css"
+    return render_template("settings.html",
+                           available_themes=list_themes(),
+                           current_theme=current_theme,
+                           background_current=_load_background_url())
 
 @app.route("/grafik")
 def grafik():
@@ -382,23 +390,36 @@ def themes():
     )
 
 # ===== GANTI TEMA (AJAX) =====
-@app.route("/theme", methods=["POST"])
+
+@app.route("/theme", methods=["GET","POST"])
 def change_theme():
     try:
-        data = request.get_json()
-        theme_name = data.get("theme", "")
-        theme_path = os.path.join("static/themes", theme_name)
-
-        if os.path.exists(theme_path) and theme_name.endswith(".css"):
+        if request.method == "POST":
+            data = request.get_json(silent=True) or {}
+            theme_name = (data.get("theme") or "").strip()
+        else:
+            theme_name = (request.args.get("set") or request.args.get("theme") or "").strip()
+        if theme_name and not theme_name.endswith(".css"):
+            theme_name += ".css"
+        theme_path = os.path.join("static","themes", theme_name) if theme_name else None
+        if theme_name and os.path.exists(theme_path):
             os.makedirs("config", exist_ok=True)
-            with open("config/theme.json", "w", encoding="utf-8") as f:
-                json.dump({"theme": theme_name}, f)
-            safe_log(f"🎨 Tema diubah via AJAX: {theme_name}")
-            return jsonify({"status": "success", "theme": theme_name})
-        return jsonify({"status": "error", "message": "File tema tidak ditemukan atau format salah"}), 400
+            with open("config/theme.json","w",encoding="utf-8") as f:
+                json.dump({"theme": theme_name}, f, ensure_ascii=False, indent=2)
+            safe_log(f"🎨 Tema diubah: {theme_name}")
+            return jsonify({"status":"success","theme": theme_name})
+        # If no name given, return current
+        if not theme_name:
+            try:
+                current = json.load(open("config/theme.json","r",encoding="utf-8")).get("theme")
+            except Exception:
+                current = "dark.css"
+            return jsonify({"status":"ok","theme": current})
+        return jsonify({"status":"error","message":"File tema tidak ditemukan"}), 400
     except Exception as e:
-        safe_log(f"❌ Gagal ubah tema via AJAX: {e}", level="error")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        safe_log(f"❌ Gagal ubah tema: {e}", level="error")
+        return jsonify({"status":"error","message": str(e)}), 500
+
 
 # ===== SOCKETIO EVENTS =====
 @socketio.on('connect')
@@ -950,3 +971,37 @@ def ensure_admin_seed():
         else:
             conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)", (username, pwd_hash))
         conn.commit()
+
+
+def list_themes():
+    theme_folder = os.path.join("static","themes")
+    try:
+        files = [f for f in os.listdir(theme_folder) if f.endswith(".css") and not f.startswith("_")]
+        files.sort()
+        return files
+    except Exception:
+        return []
+
+
+def _invite_url():
+    cid = os.getenv("DISCORD_CLIENT_ID") or os.getenv("BOT_CLIENT_ID")
+    perms = os.getenv("DISCORD_INVITE_PERMS", "8")
+    scope = "bot%20applications.commands"
+    if not cid: 
+        return None
+    return f"https://discord.com/api/oauth2/authorize?client_id={cid}&permissions={perms}&scope={scope}"
+
+
+@app.route("/api/guilds")
+@login_required
+def api_guilds():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM bot_guilds ORDER BY LOWER(name)").fetchall()
+        return jsonify([dict(r) for r in rows])
+
+
+@app.route("/servers")
+@login_required
+def servers_page():
+    return render_template("servers.html")
