@@ -1,41 +1,112 @@
+
 {% extends 'base.html' %}
 {% block title %}Dashboard - SatpamBot{% endblock %}
-
 {% block content %}
-<div class="row g-4">
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>🕒 Uptime</h5>
-            <p id="uptime">Loading...</p>
-        </div>
+<div class="grid cols-3">
+  <div class="card">
+    <h4>Uptime</h4>
+    <div class="kpi"><div>⏱️</div><div class="val" id="kpi-uptime">--:--</div></div>
+    <div class="badge">Server runtime</div>
+  </div>
+  <div class="card">
+    <h4>RAM Usage</h4>
+    <div class="kpi"><div>💾</div><div class="val"><span id="kpi-ram">0</span> MB</div></div>
+    <canvas id="ramSpark" class="chart-box"></canvas>
+  </div>
+  <div class="card">
+    <h4>CPU Usage</h4>
+    <div class="kpi"><div>⚙️</div><div class="val"><span id="kpi-cpu">0</span>%</div></div>
+    <canvas id="cpuDoughnut" class="doughnut-box"></canvas>
+  </div>
+
+  <div class="card" style="grid-column: span 2;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h4>Aktivitas 7 Hari</h4>
+      <input placeholder="Search..." class="searchbar" style="min-width:220px">
     </div>
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>💾 RAM Usage</h5>
-            <p id="ram">Loading...</p>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card p-3">
-            <h5>⚙️ CPU Usage</h5>
-            <p id="cpu">Loading...</p>
-        </div>
-    </div>
+    <canvas id="lineActivity" class="chart-box"></canvas>
+  </div>
+
+  <div class="card">
+    <h4>Komposisi</h4>
+    <canvas id="pieComposition" class="doughnut-box"></canvas>
+  </div>
+
+  <div class="card">
+    <h4>Top Guilds (hari ini)</h4>
+    <table class="table" id="tblGuilds">
+      <thead><tr><th>Guild</th><th>Deteksi</th><th>Aktivitas</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h4>Join / Leave (24 jam)</h4>
+    <canvas id="barJoinLeave" class="chart-box"></canvas>
+  </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-function fetchStats() {
-    fetch('/api/live_stats')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('uptime').innerText = data.uptime;
-            document.getElementById('ram').innerText = data.ram + ' MB';
-            document.getElementById('cpu').innerText = data.cpu + '%';
-        })
-        .catch(err => console.error('Gagal fetch live stats:', err));
+let cpuChart, ramChart, lineChart, pieChart, barChart;
+const sparkData = [];
+function pushSpark(arr, val, max=30){ arr.push(val); if(arr.length>max){arr.shift();} return arr; }
+
+async function loadLive(){
+  const r = await fetch('/api/live_stats'); const j = await r.json();
+  document.getElementById('kpi-uptime').textContent = j.uptime ?? '--';
+  document.getElementById('kpi-ram').textContent = j.ram ?? 0;
+  document.getElementById('kpi-cpu').textContent = j.cpu ?? 0;
+  // RAM sparkline
+  const ctxR = document.getElementById('ramSpark');
+  pushSpark(sparkData, j.ram||0);
+  if(!ramChart){
+    ramChart = new Chart(ctxR, { type:'line', data:{ labels: sparkData.map((_,i)=>i+1), datasets:[{ data:sparkData, fill:true, tension:.3 }] }, options:{ plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}} } });
+  }else{ ramChart.data.datasets[0].data = sparkData.slice(); ramChart.update(); }
+  // CPU doughnut
+  const ctxC = document.getElementById('cpuDoughnut');
+  const used = j.cpu||0; const free = Math.max(0, 100-used);
+  if(!cpuChart){
+    cpuChart = new Chart(ctxC, { type:'doughnut', data:{ labels:['Used','Free'], datasets:[{ data:[used, free] }] }, options:{ cutout:'70%' } });
+  }else{ cpuChart.data.datasets[0].data = [used, free]; cpuChart.update(); }
 }
 
-setInterval(fetchStats, 5000);
-fetchStats();
+async function loadSummary(){
+  const r = await fetch('/api/servers/summary'); 
+  const arr = await r.json();
+  const labels = arr.map(x => x.name || x.guild || 'Guild');
+  const values = arr.map(x => x.count || x.detections || x.value || 0);
+  // line
+  const ctxL = document.getElementById('lineActivity');
+  lineChart = new Chart(ctxL, { type:'line', data:{ labels: labels, datasets:[{ label:'Deteksi', data: values, fill:false, tension:.35 }] }, options:{ plugins:{legend:{display:false}} } });
+  // pie dummy breakdown
+  const total = values.reduce((a,b)=>a+b,0);
+  const ctxP = document.getElementById('pieComposition');
+  pieChart = new Chart(ctxP, { type:'doughnut', data:{ labels:['Phishing','NSFW','Spam'], datasets:[{ data:[Math.round(total*0.5), Math.round(total*0.3), Math.round(total*0.2)] }] }, options:{ cutout:'65%' } });
+  // table
+  const tb = document.querySelector('#tblGuilds tbody');
+  tb.innerHTML = '';
+  for(let i=0;i<Math.min(arr.length,6);i++){
+    const g = arr[i]; 
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${g.name||g.guild||'-'}</td><td>${g.count||g.detections||0}</td><td>${g.activity||'-'}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+async function loadJoinLeave(){
+  // If you have a default guild ID, replace '0' below. We'll just render a dummy if 404.
+  try{
+    const r = await fetch('/api/member_monitor');
+    const j = await r.json();
+    const ctx = document.getElementById('barJoinLeave');
+    barChart = new Chart(ctx, { type:'bar', data:{ labels:j.labels, datasets:[{ label:'Active', data:j.active }] }});
+  }catch(e){
+    console.warn('join/leave not available', e);
+  }
+}
+
+loadLive(); setInterval(loadLive, 4000);
+loadSummary();
+loadJoinLeave();
 </script>
 {% endblock %}
