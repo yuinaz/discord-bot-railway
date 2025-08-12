@@ -29,14 +29,27 @@ bot = commands.Bot(
 
 STATUS_TEXT = "✅ SatpamBot online dan siap berjaga."
 
+def _resolve_log_channel() -> discord.TextChannel | None:
+    """Ambil channel dari LOG_CHANNEL_ID + LOG ke console supaya gampang cek di Render."""
+    ch = bot.get_channel(LOG_CHANNEL_ID) if LOG_CHANNEL_ID else None
+    if isinstance(ch, discord.TextChannel):
+        logging.info(
+            f"[status] using LOG_CHANNEL_ID={LOG_CHANNEL_ID} "
+            f"resolved_to=#{ch.name} (id={ch.id}) in guild='{ch.guild.name}' (id={ch.guild.id})"
+        )
+        return ch
+    logging.warning(
+        f"[status] LOG_CHANNEL_ID={LOG_CHANNEL_ID} not found/visible. "
+        f"Pastikan bot punya izin melihat & menulis di channel itu."
+    )
+    return None
+
 # ---------- Heartbeat 10 menit (HANYA ke LOG_CHANNEL_ID) ----------
 @tasks.loop(minutes=10)
 async def status_heartbeat():
-    ch = bot.get_channel(LOG_CHANNEL_ID) if LOG_CHANNEL_ID else None
-    if isinstance(ch, discord.TextChannel):
+    ch = _resolve_log_channel()
+    if ch:
         await upsert_status_embed_in_channel(ch, STATUS_TEXT)
-    else:
-        logging.warning("Heartbeat skipped: LOG_CHANNEL_ID not found/visible.")
 
 @bot.event
 async def setup_hook():
@@ -52,16 +65,15 @@ async def setup_hook():
 async def on_ready():
     logging.info(f"✅ Bot berhasil login sebagai {bot.user} (ID: {bot.user.id})")
     logging.info(f"🌐 Mode: {FLASK_ENV}")
+    logging.info(f"[status] ENV LOG_CHANNEL_ID={LOG_CHANNEL_ID}")
 
     # Upsert status sekali saat ready (HANYA ke LOG_CHANNEL_ID)
-    ch = bot.get_channel(LOG_CHANNEL_ID) if LOG_CHANNEL_ID else None
-    if isinstance(ch, discord.TextChannel):
+    ch = _resolve_log_channel()
+    if ch:
         try:
             await upsert_status_embed_in_channel(ch, STATUS_TEXT)
         except Exception as e:
-            logging.warning(f"status upsert failed: {e}")
-    else:
-        logging.warning("on_ready: LOG_CHANNEL_ID not found/visible; status skipped.")
+            logging.warning(f"[status] upsert failed: {e}")
 
     # Presence loop (“Menjaga Server Dari Scam”)
     try:

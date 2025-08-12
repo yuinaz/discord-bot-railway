@@ -41,6 +41,16 @@ class Health(commands.Cog):
         host = socket.gethostname()
         await ctx.send(f"Host={host} | PID={os.getpid()} | Python={platform.python_version()}")
 
+    # 🔎 NEW: cek channel target yang dipakai
+    @commands.command(name="sblogtarget", aliases=["sblog"])
+    @commands.has_permissions(manage_guild=True)
+    async def sblogtarget(self, ctx: commands.Context):
+        ch = ctx.guild.get_channel(LOG_CHANNEL_ID) if ctx.guild else None
+        if isinstance(ch, discord.TextChannel):
+            await ctx.send(f"LOG_CHANNEL_ID → {ch.mention} (name='{ch.name}', id={ch.id})")
+        else:
+            await ctx.send(f"Tidak dapat melihat channel dengan ID {LOG_CHANNEL_ID}. Cek izin & ENV.", delete_after=10)
+
     @commands.command(name="sbstatus")
     @commands.has_permissions(manage_guild=True)
     async def sbstatus(self, ctx: commands.Context):
