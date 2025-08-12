@@ -329,6 +329,23 @@ def api_dashboard_plus():
     })
 
 
+
+# --- Health endpoints (no auth) ---
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status":"ok","ts": int(time.time())}), 200
+
+@app.route("/readyz")
+def readyz():
+    try:
+        init_db()
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("SELECT 1")
+        return jsonify({"status":"ready"}), 200
+    except Exception as e:
+        return jsonify({"status":"error","message":str(e)}), 500
+
+
 def bootstrap():
     init_db()
 
