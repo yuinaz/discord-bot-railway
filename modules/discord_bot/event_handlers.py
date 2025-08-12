@@ -1,3 +1,51 @@
+
+import sqlite3, os
+DB_PATH = os.getenv("DB_PATH", "superadmin.db")
+
+def _db_upsert_guild(guild):
+    try:
+        gid = str(guild.id)
+        name = guild.name
+        icon_url = str(guild.icon.url) if getattr(guild, "icon", None) else None
+        mc = getattr(guild, "member_count", None) or 0
+        ja = None
+        try:
+            me = guild.me
+            if getattr(me, "joined_at", None):
+                ja = me.joined_at.isoformat()
+        except Exception:
+            pass
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS bot_guilds (
+                    guild_id TEXT PRIMARY KEY,
+                    name TEXT,
+                    member_count INTEGER,
+                    icon_url TEXT,
+                    joined_at TEXT
+                )
+            """)
+            conn.execute("""
+                INSERT INTO bot_guilds (guild_id, name, member_count, icon_url, joined_at)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    name=excluded.name,
+                    member_count=excluded.member_count,
+                    icon_url=excluded.icon_url,
+                    joined_at=COALESCE(bot_guilds.joined_at, excluded.joined_at)
+            """, (gid, name, mc, icon_url, ja))
+            conn.commit()
+    except Exception as e:
+        print("[guilds] upsert fail", e)
+
+def _db_remove_guild(guild_id: str):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM bot_guilds WHERE guild_id=?", (str(guild_id),))
+            conn.commit()
+    except Exception as e:
+        print("[guilds] remove fail", e)
+
 from .helpers.once import once
 # modules/discord_bot/events/event_handler.py
 import discord
@@ -172,3 +220,11 @@ async def on_message_parser(msg):
     elif is_unban:
         await _post_ingest({"action":"unban","user_id": uid, "guild_id": str(getattr(getattr(msg,'guild',None),'id',0))})
 
+
+@bot.event
+async def on_guild_join(guild):
+    _db_upsert_guild(guild)
+
+@bot.event
+async def on_guild_remove(guild):
+    _db_remove_guild(guild.id)

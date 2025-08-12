@@ -45,7 +45,51 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<div id="view-servers" style="display:none;">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h4>Discord Servers</h4>
+      {% if invite_url %}<a class="button" href="{{ invite_url }}" target="_blank" rel="noopener">Add to your server</a>{% endif %}
+    </div>
+    <input id="guildSearch" class="form-control" placeholder="Search servers..." style="max-width:320px;margin-bottom:10px;">
+    <div id="guildList" class="row" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+const tabOverview = document.getElementById('tab-overview');
+const tabServers  = document.getElementById('tab-servers');
+const viewOverview = document.getElementById('view-overview');
+const viewServers  = document.getElementById('view-servers');
+
+function showOverview(){ viewOverview.style.display='grid'; viewServers.style.display='none'; }
+function showServers(){ viewOverview.style.display='none'; viewServers.style.display='block'; }
+if (tabOverview) tabOverview.onclick = showOverview;
+if (tabServers)  tabServers.onclick  = () => { showServers(); loadGuilds(); };
+
+async function loadGuilds(){
+  try{
+    const r = await fetch('/api/guilds'); const rows = await r.json();
+    const q = (document.getElementById('guildSearch').value||'').toLowerCase();
+    const list = document.getElementById('guildList'); list.innerHTML='';
+    rows.filter(x => !q || (x.name||'').toLowerCase().includes(q)).forEach(g => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div style="display:flex; gap:10px; align-items:center;">
+          <img src="${g.icon_url||'/static/icon-default.png'}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.15)" onerror="this.style.display='none'">
+          <div style="flex:1;">
+            <div style="font-weight:700">${g.name||'Unknown'}</div>
+            <div style="opacity:.7;font-size:12px;">ID: ${g.guild_id} · Members: ${g.member_count||0}</div>
+          </div>
+        </div>`;
+      list.appendChild(card);
+    });
+    document.getElementById('guildSearch').oninput = loadGuilds;
+  }catch(e){ console.warn('loadGuilds fail', e); }
+}
+
+</script>
 <script>
 let cpuChart, ramChart, lineChart, pieChart, barChart;
 const sparkData = [];
@@ -108,5 +152,38 @@ async function loadJoinLeave(){
 loadLive(); setInterval(loadLive, 4000);
 loadSummary();
 loadJoinLeave();
+
+const tabOverview = document.getElementById('tab-overview');
+const tabServers  = document.getElementById('tab-servers');
+const viewOverview = document.getElementById('view-overview');
+const viewServers  = document.getElementById('view-servers');
+
+function showOverview(){ viewOverview.style.display='grid'; viewServers.style.display='none'; }
+function showServers(){ viewOverview.style.display='none'; viewServers.style.display='block'; }
+if (tabOverview) tabOverview.onclick = showOverview;
+if (tabServers)  tabServers.onclick  = () => { showServers(); loadGuilds(); };
+
+async function loadGuilds(){
+  try{
+    const r = await fetch('/api/guilds'); const rows = await r.json();
+    const q = (document.getElementById('guildSearch').value||'').toLowerCase();
+    const list = document.getElementById('guildList'); list.innerHTML='';
+    rows.filter(x => !q || (x.name||'').toLowerCase().includes(q)).forEach(g => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div style="display:flex; gap:10px; align-items:center;">
+          <img src="${g.icon_url||'/static/icon-default.png'}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;border:1px solid rgba(255,255,255,.15)" onerror="this.style.display='none'">
+          <div style="flex:1;">
+            <div style="font-weight:700">${g.name||'Unknown'}</div>
+            <div style="opacity:.7;font-size:12px;">ID: ${g.guild_id} · Members: ${g.member_count||0}</div>
+          </div>
+        </div>`;
+      list.appendChild(card);
+    });
+    document.getElementById('guildSearch').oninput = loadGuilds;
+  }catch(e){ console.warn('loadGuilds fail', e); }
+}
+
 </script>
 {% endblock %}

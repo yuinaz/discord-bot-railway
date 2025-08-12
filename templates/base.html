@@ -18,7 +18,7 @@
           {% else %}
             none
           {% endif %};
-        --app-bg-opacity: 1;
+        --app-bg-opacity: {{ background_opacity or 1 }};
       }
       html, body { background: transparent !important; }
       body::before{
