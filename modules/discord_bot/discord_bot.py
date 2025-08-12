@@ -1,4 +1,3 @@
-cat > modules/discord_bot/discord_bot.py << 'EOF'
 import os
 import logging
 import asyncio
@@ -8,7 +7,7 @@ from discord.ext import commands, tasks
 from .helpers.env import (
     BOT_PREFIX, BOT_INTENTS, FLASK_ENV, BOT_TOKEN, LOG_CHANNEL_ID,
 )
-# GUILD_IDS mungkin belum ada di env.py kamu; fallback ke [] biar aman
+# GUILD_IDS opsional (untuk sync slash per-guild). Kalau belum ada di env.py, fallback ke [].
 try:
     from .helpers.env import GUILD_IDS
 except Exception:
@@ -52,16 +51,15 @@ async def status_heartbeat():
     except Exception:
         pass
 
-# ---------- Setup hook: mulai heartbeat & sync slash ----------
+# ---------- Setup hook: mulai heartbeat & (opsional) sync slash ----------
 @bot.event
 async def setup_hook():
     # Mulai heartbeat (auto-start, akan berhenti otomatis saat disconnect)
     if not status_heartbeat.is_running():
         status_heartbeat.start()
 
-    # Sync slash commands: guild-scope (instan) lalu global (opsional)
+    # (Opsional) Sync slash commands kalau kamu punya cogs/slash_basic.py
     try:
-        # Pastikan cog slash ter-load jika autoloader belum sempat
         try:
             await bot.load_extension("modules.discord_bot.cogs.slash_basic")
         except Exception:
@@ -136,4 +134,3 @@ def run_bot():
 
 if __name__ == "__main__":
     run_bot()
-EOF
