@@ -1,32 +1,36 @@
 {% extends 'base.html' %}
 {% block title %}Login - SatpamBot{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-center align-items-start" style="min-height: calc(100vh - 80px); padding-top: 80px;">
-  <div class="login-box card p-4" style="min-width:320px; max-width:420px; background: rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.1); border-radius:12px;">
-    <div class="text-center mb-3">
-      {% if profile_avatar_url %}
-        <img src="{{ profile_avatar_url }}?v={{ cache_bust }}" alt="Bot Avatar" style="width:84px;height:84px;border-radius:50%;object-fit:cover;box-shadow:0 0 18px rgba(255,42,161,.35);border:2px solid rgba(255,255,255,.35)">
-      {% else %}
-        <div style="width:84px;height:84px;border-radius:50%;background:#444;display:inline-flex;align-items:center;justify-content:center;font-size:28px">🤖</div>
-      {% endif %}
+<style>
+.login-wrap{min-height: calc(100vh - 80px); display:flex; align-items:center; justify-content:center;}
+.login-card{ width: 380px; padding: 22px; border-radius: 18px; border:1px solid #ffffff18; background: rgba(16,18,32,.86); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.login-card .brand{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.login-card .brand img{ width:42px; height:42px; border-radius:12px; border:1px solid #ffffff22; object-fit:cover; }
+.login-card h3{ margin:0; font-size:18px; }
+.login-card .muted{ opacity:.8; font-size:12px; margin-bottom:12px; }
+.form-control{ width:100%; background:#0f1220; color:#e6e6f0; padding:10px 12px; border-radius:12px; border:1px solid #ffffff1a; }
+.btn{ width:100%; margin-top:10px; padding:10px 12px; border-radius:12px; border:none; font-weight:800;
+ background: linear-gradient(90deg,#9b6bff,#39d0ff); color:#0b0b16; cursor:pointer; }
+.note{ font-size:12px; opacity:.8; margin-top:10px; }
+</style>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand">
+      <img src="{{ bot_avatar or '/static/icon-default.png' }}" onerror="this.style.display='none'">
+      <div>
+        <h3>Dashboard SatpamBot</h3>
+        <div class="muted">Masuk menggunakan akun admin</div>
+      </div>
     </div>
-    <h2 class="text-center mb-4">🔐 Login Admin</h2>
-    {% if error %}
-      <div class="alert alert-danger" role="alert">{{ error }}</div>
-    {% endif %}
-    <form method="POST">
-      <div class="mb-3">
-        <label for="username" class="form-label">👤 Username</label>
-        <input type="text" class="form-control" name="username" required placeholder="admin">
-      </div>
-      <div class="mb-3">
-        <label for="password" class="form-label">🔑 Password</label>
-        <input type="password" class="form-control" name="password" required placeholder="admin">
-      </div>
-      <div class="d-grid">
-        <button type="submit" class="btn btn-primary">Masuk</button>
-      </div>
+    {% if error %}<div class="muted" style="color:#ff8da1">{{ error }}</div>{% endif %}
+    <form method="post">
+      <input class="form-control" type="text" name="username" placeholder="Username" required autofocus>
+      <div style="height:8px"></div>
+      <input class="form-control" type="password" name="password" placeholder="Password" required>
+      <button class="btn" type="submit">Login</button>
     </form>
+    <div class="note">Gunakan kredensial <code>SUPER_ADMIN_USER</code>/<code>SUPER_ADMIN_PASSWORD</code> yang diset di Render.</div>
   </div>
 </div>
 {% endblock %}
