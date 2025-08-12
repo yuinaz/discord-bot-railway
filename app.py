@@ -474,7 +474,7 @@ def _validate_upload(file):
 
 # === Dashboard background upload ===
 @app.route("/upload-background", methods=["POST"])
-def upload_background():
+def upload_background_form():
     if not session.get("logged_in"): return redirect(url_for("login"))
     file = request.files.get("background")
     ok, reason = _validate_upload(file)
@@ -1022,9 +1022,9 @@ def allowed_image(filename: str) -> bool:
         return False
     return ext in ALLOWED_IMAGE_EXT
 
-@app.route("/upload/background", methods=["POST"])
+@app.route("/upload/background", methods=["POST"], endpoint="upload_background_api")
 @login_required
-def upload_background():
+def upload_background_api():
     # Limit a bit (e.g., 15MB)
     max_len = 15 * 1024 * 1024
     if request.content_length and request.content_length > max_len:
