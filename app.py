@@ -103,7 +103,10 @@ def inject_theme():
 
 # ===== DATABASE SETUP =====
 DB_PATH = "superadmin.db"
+
 def init_db():
+    # Create required tables only; no selects or env access here.
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS superadmin (
@@ -124,12 +127,16 @@ def init_db():
                 unbanned_at TEXT
             )
         """)
-        if cur.fetchone():
-            conn.execute("UPDATE superadmin SET password=? WHERE username=?",
-                         (generate_password_hash(env_pass), env_user))
-        else:
-            conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)",
-                         (env_user, generate_password_hash(env_pass)))
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bot_guilds (
+                guild_id TEXT PRIMARY KEY,
+                name TEXT,
+                member_count INTEGER,
+                icon_url TEXT,
+                joined_at TEXT
+            )
+        """)
+        conn.commit()
 
 # ===== SAFE LOG =====
 def safe_log(msg, level="info"):
