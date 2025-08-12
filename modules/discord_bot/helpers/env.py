@@ -1,61 +1,61 @@
-# modules/discord_bot/helpers/env.py
-from __future__ import annotations
 import os
 import discord
 
-def _truthy(x: str | None) -> bool:
-    return str(x or "").strip().lower() in ("1", "true", "yes", "on")
+def _bool(x: str) -> bool:
+    return str(x).strip().lower() in ("1","true","yes","on")
 
-# --- PROFILE DETECTOR ---
-# Urutan:
-# 1) ENV_PROFILE (jika ada) → pakai itu (mis. "local", "render", "production")
-# 2) Terdeteksi Render (RENDER / RENDER_SERVICE_ID / RENDER_EXTERNAL_URL) → "render"
-# 3) Default ke "local" (lebih enak buat dev di mesin sendiri)
-_PROFILE = os.getenv("ENV_PROFILE")
-if not _PROFILE:
-    if any(os.getenv(k) for k in ("RENDER", "RENDER_SERVICE_ID", "RENDER_EXTERNAL_URL")):
-        _PROFILE = "render"
-    else:
-        _PROFILE = "local"
+# Mode (opsional)
+APP_MODE = os.getenv("APP_MODE", "prod").lower()
 
-# simpan untuk diagnosa
-os.environ["ENV_PROFILE_ACTIVE"] = _PROFILE
+# --- Token resolution: DISCORD_TOKEN (prod) -> BOT_TOKEN -> DISCORD_BOT_TOKEN_LOCAL (local)
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN") or DISCORD_TOKEN or os.getenv("DISCORD_BOT_TOKEN_LOCAL")
+if not BOT_TOKEN:
+    BOT_TOKEN = None  # biar errornya jelas saat start kalau lupa set token
 
-# --- PREFIX ---
+# Prefix & Intents
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
+FLASK_ENV = os.getenv("FLASK_ENV", "production")
 
-# --- INTENTS ---
-def _build_intents() -> discord.Intents:
+def build_intents() -> discord.Intents:
     intents = discord.Intents.default()
-    intents.guilds = True
+    intents.message_content = True
     intents.members = True
-    intents.messages = True
-    intents.bans = True
-    intents.invites = True
-    intents.message_content = True  # penting untuk prefix "!"
+    intents.guilds = True
     return intents
 
-BOT_INTENTS = _build_intents()
+BOT_INTENTS = build_intents()
 
-# --- MODE/LOGGING LABEL ---
-FLASK_ENV = "development" if _PROFILE in ("local", "dev") else "production"
+# OAuth (opsional)
+OAUTH2_CLIENT_ID = os.getenv("CLIENT_ID", os.getenv("OAUTH2_CLIENT_ID", ""))
+OAUTH2_CLIENT_SECRET = os.getenv("CLIENT_SECRET", os.getenv("OAUTH2_CLIENT_SECRET", ""))
 
-# --- OAUTH (opsional) ---
-OAUTH2_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID") or os.getenv("OAUTH2_CLIENT_ID")
-OAUTH2_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET") or os.getenv("OAUTH2_CLIENT_SECRET")
+# Toggles dari .env
+NSFW_INVITE_AUTOBAN   = _bool(os.getenv("NSFW_INVITE_AUTOBAN", "true"))
+URL_AUTOBAN_CRITICAL  = _bool(os.getenv("URL_AUTOBAN_CRITICAL", "true"))
+URL_RESOLVE_ENABLED   = _bool(os.getenv("URL_RESOLVE_ENABLED", "true"))
 
-# --- TOKEN RESOLVER ---
-# - LOCAL/DEV  : pakai DISCORD_BOT_TOKEN_LOCAL dulu, fallback ke DISCORD_BOT_TOKEN/BOT_TOKEN
-# - RENDER/PROD: pakai DISCORD_BOT_TOKEN atau BOT_TOKEN
-def get_bot_token() -> str | None:
-    if _PROFILE in ("local", "dev"):
-        return (
-            os.getenv("DISCORD_BOT_TOKEN_LOCAL")
-            or os.getenv("DISCORD_BOT_TOKEN")
-            or os.getenv("BOT_TOKEN")
-        )
-    # render/production
-    return os.getenv("DISCORD_BOT_TOKEN") or os.getenv("BOT_TOKEN")
+# OCR
+OCR_SCAM_STRICT = _bool(os.getenv("OCR_SCAM_STRICT", "true"))
+OCR_LANG        = os.getenv("OCR_LANG", "eng+ind")
 
-def get_profile() -> str:
-    return _PROFILE
+# Channel log status: pakai LOG_CHANNEL_ID, fallback BAN_LOG_CHANNEL_ID
+def _to_int(x: str | None, default: int = 0) -> int:
+    try:
+        return int(str(x).strip())
+    except Exception:
+        return default
+
+LOG_CHANNEL_ID   = _to_int(os.getenv("LOG_CHANNEL_ID", "") or os.getenv("BAN_LOG_CHANNEL_ID", "1400375184048787566"))
+LOG_CHANNEL_NAME = os.getenv("LOG_CHANNEL_NAME", "log-botphising")
+
+# Slash commands: daftar guild untuk sync cepat (comma-separated)
+def _to_ints_csv(x: str | None):
+    arr = []
+    for part in (x or "").split(","):
+        part = part.strip()
+        if part.isdigit():
+            arr.append(int(part))
+    return arr
+
+GUILD_IDS = _to_ints_csv(os.getenv("GUILD_ID", os.getenv("GUILD_IDS", "")))  # contoh: "123,456"
