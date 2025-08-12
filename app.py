@@ -70,31 +70,6 @@ def _load_live_flag():
             return bool(json.load(f).get('live_enabled'))
     except Exception:
         return False
-
-def _load_background_opacity():
-    try:
-        with open('config/background.json','r',encoding='utf-8') as f:
-            v = (json.load(f).get('opacity') or 1)
-            try:
-                return float(v)
-            except Exception:
-                return 1
-    except Exception:
-        return 1
-
-def _save_background(url=None, live_enabled=None, opacity=None):
-    os.makedirs('config', exist_ok=True)
-    try:
-        cur = json.load(open('config/background.json','r',encoding='utf-8'))
-    except Exception:
-        cur = {}
-    if url is not None: cur['background_url'] = url
-    if live_enabled is not None: cur['live_enabled'] = bool(live_enabled)
-    if opacity is not None:
-        try: cur['opacity'] = float(opacity)
-        except Exception: pass
-    json.dump(cur, open('config/background.json','w',encoding='utf-8'), ensure_ascii=False, indent=2)
-
 def _load_profile():
     try:
         with open('config/profile.json','r',encoding='utf-8') as f:
@@ -123,9 +98,7 @@ def inject_theme():
         "background_url": _load_background_url(),
         "profile_avatar_url": _p.get('avatar_url'),
         "login_background_url": _p.get('login_background_url'),
-        "cache_bust": int(time.time()),
-        "invite_url": _invite_url(),
-        "background_opacity": _load_background_opacity()
+        "cache_bust": int(time.time())
     }
 
 # ===== DATABASE SETUP =====
@@ -278,7 +251,7 @@ def settings():
     if request.method == "POST":
         print("Disimpan:", request.form)
         return redirect("/settings")
-    return render_template("settings.html", available_themes=list_themes(), current_theme=(json.load(open("config/theme.json","r",encoding="utf-8")).get("theme") if os.path.exists("config/theme.json") else None))
+    return render_template("settings.html")
 
 @app.route("/grafik")
 def grafik():
@@ -405,38 +378,22 @@ def themes():
 @app.route("/theme", methods=["POST"])
 def change_theme():
     try:
-        if request.method == "POST":
-            data = request.get_json(silent=True) or {}
-            theme_name = (data.get("theme") or "").strip()
-            bg = (data.get("background_image") or "").strip()
-        else:
-            theme_name = (request.args.get("set") or request.args.get("theme") or "").strip()
-            bg = (request.args.get("background_image") or "").strip()
+        data = request.get_json()
+        theme_name = data.get("theme", "")
+        theme_path = os.path.join("static/themes", theme_name)
 
-        if theme_name and not theme_name.endswith(".css"):
-            theme_name += ".css"
-        themes_dir = os.path.join("static","themes")
-        available = {f for f in os.listdir(themes_dir) if f.endswith(".css")}
-
-        if theme_name and theme_name not in available:
-            return jsonify({"status":"error","message":"File tema tidak ditemukan"}), 400
-
-        os.makedirs("config", exist_ok=True)
-        conf_path = os.path.join("config","theme.json")
-        try:
-            conf = json.load(open(conf_path,"r",encoding="utf-8"))
-        except Exception:
-            conf = {}
-        if theme_name: conf["theme"] = theme_name
-        if bg: conf["background_image"] = bg
-        json.dump(conf, open(conf_path,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
-        return jsonify({"status":"success","config":conf})
+        if os.path.exists(theme_path) and theme_name.endswith(".css"):
+            os.makedirs("config", exist_ok=True)
+            with open("config/theme.json", "w", encoding="utf-8") as f:
+                json.dump({"theme": theme_name}, f)
+            safe_log(f"🎨 Tema diubah via AJAX: {theme_name}")
+            return jsonify({"status": "success", "theme": theme_name})
+        return jsonify({"status": "error", "message": "File tema tidak ditemukan atau format salah"}), 400
     except Exception as e:
-        safe_log(f"❌ Gagal ubah tema: {e}", level="error")
-        return jsonify({"status":"error","message":str(e)}), 500
+        safe_log(f"❌ Gagal ubah tema via AJAX: {e}", level="error")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ===== SOCKETIO EVENTS =====
-
 @socketio.on('connect')
 def handle_connect():
     print("📡 Client terhubung ke SocketIO")
@@ -474,7 +431,7 @@ def _validate_upload(file):
 
 # === Dashboard background upload ===
 @app.route("/upload-background", methods=["POST"])
-def upload_background_form():
+def upload_background():
     if not session.get("logged_in"): return redirect(url_for("login"))
     file = request.files.get("background")
     ok, reason = _validate_upload(file)
@@ -894,15 +851,6 @@ def api_member_monitor():
         "active": [0]*24
     })
 
-
-def _invite_url():
-    cid = os.getenv("DISCORD_CLIENT_ID") or os.getenv("BOT_CLIENT_ID")
-    perms = os.getenv("DISCORD_INVITE_PERMS", "8")
-    scope = "bot%20applications.commands"
-    if not cid: 
-        return None
-    return f"https://discord.com/api/oauth2/authorize?client_id={cid}&permissions={perms}&scope={scope}"
-
 # ===== BANNED USERS: SQLite helpers =====
 def db_list_bans():
     with sqlite3.connect(DB_PATH) as conn:
@@ -960,115 +908,38 @@ def ingest_ban():
         return jsonify({"status":"error","message":"invalid action"}), 400
     return jsonify({"status":"ok"})
 
-@app.route("/bans")
-@login_required
-def bans_page():
-    return render_template("bans.html")
 
-def list_themes():
-    themes_dir = os.path.join("static","themes")
-    try:
-        return sorted([f for f in os.listdir(themes_dir) if f.endswith(".css")])
-    except Exception:
-        return []
+# --- admin seeding helper (added) ---
+from werkzeug.security import generate_password_hash
 
-@app.route("/settings/theme", methods=["GET","POST"])
-@login_required
-def settings_theme():
-    if request.method == "POST":
-        theme = (request.form.get("theme") or "").strip()
-        if theme and not theme.endswith(".css"):
-            theme += ".css"
-        available = set(list_themes())
-        if theme in available:
-            os.makedirs("config", exist_ok=True)
-            path = os.path.join("config","theme.json")
-            try:
-                conf = json.load(open(path,"r",encoding="utf-8"))
-            except Exception:
-                conf = {}
-            conf["theme"] = theme
-            json.dump(conf, open(path,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
-            flash("Tema disimpan.", "success")
-        else:
-            flash("Tema tidak ditemukan.", "danger")
-        return redirect("/settings/theme")
-    # current
-    try:
-        cur = json.load(open("config/theme.json","r",encoding="utf-8")).get("theme")
-    except Exception:
-        cur = None
-    return render_template("settings_theme.html", available_themes=list_themes(), current_theme=cur)
+def ensure_admin_seed():
+    """Seed/sync admin dashboard dari ENV ke SQLite.
 
-@app.route("/save-background", methods=["POST"])
-def save_background():
-    if not session.get("logged_in"): return redirect(url_for("login"))
-    url = request.form.get("background_url") or request.json.get("background_url") if request.is_json else None
-    opacity = request.form.get("opacity") or request.json.get("opacity") if request.is_json else None
-    live_enabled = (request.form.get("live_enabled") or request.json.get("live_enabled") if request.is_json else None)
-    _save_background(url=url, live_enabled=live_enabled, opacity=opacity)
-    flash("Background disimpan.", "success")
-    return redirect(url_for("settings"))
+    ENV prioritas:
+    - SUPER_ADMIN_USER atau ADMIN_USERNAME (default: "admin")
+    - SUPER_ADMIN_PASSWORD atau SUPER_ADMIN_PASS atau ADMIN_PASSWORD (default: "admin")
+    """
+    username = (
+        os.getenv("SUPER_ADMIN_USER")
+        or os.getenv("ADMIN_USERNAME")
+        or "admin"
+    )
+    raw_pwd = (
+        os.getenv("SUPER_ADMIN_PASSWORD")
+        or os.getenv("SUPER_ADMIN_PASS")
+        or os.getenv("ADMIN_PASSWORD")
+        or "admin"
+    )
+    pwd_hash = generate_password_hash(raw_pwd)
 
-from werkzeug.utils import secure_filename
-from PIL import Image, ImageOps
+    # pastikan tabel ada
+    init_db()
 
-ALLOWED_IMAGE_EXT = {".png",".jpg",".jpeg",".webp",".gif"}
-
-def allowed_image(filename: str) -> bool:
-    try:
-        ext = "." + filename.rsplit(".",1)[1].lower()
-    except Exception:
-        return False
-    return ext in ALLOWED_IMAGE_EXT
-
-@app.route("/upload/background", methods=["POST"], endpoint="upload_background_api")
-@login_required
-def upload_background_api():
-    # Limit a bit (e.g., 15MB)
-    max_len = 15 * 1024 * 1024
-    if request.content_length and request.content_length > max_len:
-        return jsonify({"status":"error","message":"File terlalu besar (>15MB)"}), 413
-
-    f = request.files.get("file")
-    if not f or not f.filename:
-        return jsonify({"status":"error","message":"Tidak ada file"}), 400
-    if not allowed_image(f.filename):
-        return jsonify({"status":"error","message":"Ekstensi tidak diizinkan"}), 400
-
-    ts = int(time.time())
-    base = secure_filename(f.filename)
-    name = f"{ts}_{base}"
-    updir = os.path.join("static","uploads")
-    os.makedirs(updir, exist_ok=True)
-    path = os.path.join(updir, name)
-    f.save(path)
-
-    # Build URL and persist to theme.json as background_image
-    url = f"/static/uploads/{name}"
-    try:
-        conf_path = os.path.join("config","theme.json")
-        os.makedirs("config", exist_ok=True)
-        try:
-            conf = json.load(open(conf_path,"r",encoding="utf-8"))
-        except Exception:
-            conf = {}
-        conf["background_image"] = url
-        json.dump(conf, open(conf_path,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
-    except Exception as e:
-        pass
-
-    return jsonify({"status":"success","url": url})
-
-@app.route("/api/guilds")
-@login_required
-def api_guilds():
     with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute("SELECT * FROM bot_guilds ORDER BY LOWER(name)").fetchall()
-        return jsonify([dict(r) for r in rows])
-
-@app.route("/servers")
-@login_required
-def servers_page():
-    return render_template("servers.html")
+        cur = conn.execute("SELECT id FROM superadmin WHERE username=?", (username,))
+        row = cur.fetchone()
+        if row:
+            conn.execute("UPDATE superadmin SET password=? WHERE id=?", (pwd_hash, row[0]))
+        else:
+            conn.execute("INSERT INTO superadmin (username, password) VALUES (?, ?)", (username, pwd_hash))
+        conn.commit()
