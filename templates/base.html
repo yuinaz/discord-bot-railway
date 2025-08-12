@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -13,19 +12,33 @@
       background: #0b0b16 url('{{ background_url or "" }}') center/cover no-repeat fixed;
       opacity: 1;
     }
-    .container{ max-width: 1240px; margin: 0 auto; padding: 18px; }
-    .topbar{ height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 14px; }
-    .sidebar{ position:fixed; left:0; top:0; bottom:0; width: 220px; padding: 14px 12px; }
+    .container{ max-width: 1280px; margin: 0 auto; padding: 18px; }
+    .topbar{ height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 14px; background:rgba(16,18,32,.86); border-bottom:1px solid #ffffff12;}
+    .sidebar{ position:fixed; left:0; top:0; bottom:0; width: 220px; padding: 14px 12px; background:rgba(16,18,32,.82); border-right:1px solid #ffffff12;}
     .content{ margin-left: 232px; }
-    .btn, .button{ cursor:pointer; padding:10px 12px; border-radius:12px; border:1px solid #ffffff15; background:#1b1c28; color:#e8eaf6; text-decoration:none; }
+    .btn{ cursor:pointer; padding:10px 12px; border-radius:12px; border:1px solid #ffffff15; background:#1b1c28; color:#e8eaf6; text-decoration:none; }
     .btn-primary{ background: linear-gradient(90deg, #9b6bff, #39d0ff); color:#0b0b16; border:none; font-weight:800; }
-    .card{ padding: 12px; }
+    .card{ background:rgba(19,19,35,.85); border:1px solid #ffffff12; border-radius:18px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+    .grid{ display:grid; gap:14px; } .grid.cols-3{grid-template-columns:repeat(3,1fr);} .grid.cols-4{grid-template-columns:repeat(4,1fr);}
+    .chart-xs{height:110px}.chart-sm{height:160px}.chart-md{height:210px}.chart-lg{height:260px}
+    .center-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800}
   </style>
 </head>
 <body>
-  <div class="sidebar topbar">SatpamBot</div>
+  <div class="sidebar">
+    <div style="font-weight:800; margin-bottom:10px;">SatpamBot</div>
+    <nav style="display:flex; flex-direction:column; gap:8px;">
+      <a class="btn" href="/dashboard">Dashboard</a>
+      <a class="btn" href="/servers">Servers</a>
+      <a class="btn" href="/settings">Pengaturan</a>
+      <a class="btn" href="/logout">Logout</a>
+    </nav>
+  </div>
   <div class="content">
-    <div class="topbar"></div>
+    <div class="topbar">
+      <div>{{ self.title() }}</div>
+      <div>{{ session.username or 'Guest' }}</div>
+    </div>
     <div class="container">
       {% block content %}{% endblock %}
     </div>
