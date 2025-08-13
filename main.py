@@ -8,13 +8,11 @@ import asyncio
 import random
 import importlib
 
-# (opsional) batasi koneksi HTTP discord.py biar "kalem" di free tier
 try:
     import aiohttp  # type: ignore
 except Exception:
     aiohttp = None  # type: ignore
 
-# ---------------- Logging ----------------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -22,7 +20,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("startup")
 
-# ---- filter agar /healthz & /ping tidak spam di log werkzeug ----
 class _NoHealthz(logging.Filter):
     def filter(self, record):
         try:
@@ -34,7 +31,6 @@ class _NoHealthz(logging.Filter):
                 return False
         return True
 
-# ---------------- Helpers ----------------
 CF_HINTS = (
     "Error 1015",
     "Access denied | discord.com",
@@ -44,7 +40,7 @@ CF_HINTS = (
 )
 
 class PreflightError(Exception):
-    """Soft failure: gateway check not healthy."""
+    pass
 
 def _get_token() -> str:
     token = (
@@ -59,12 +55,8 @@ def _get_token() -> str:
     return token
 
 def _new_bot():
-    """
-    Buat instance Bot baru setiap percobaan.
-    Kita reload module supaya tidak reuse session lama.
-    """
     import modules.discord_bot.discord_bot as dmod  # type: ignore
-    dmod = importlib.reload(dmod)                   # bot global dibuat ulang
+    dmod = importlib.reload(dmod)
     return dmod.bot
 
 async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
@@ -78,7 +70,6 @@ async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
         return True
 
 async def _force_close_http_session(bot):
-    """Pastikan session aiohttp milik discord.py benar-benar tertutup."""
     try:
         await bot.close()
     except Exception:
@@ -90,68 +81,43 @@ async def _force_close_http_session(bot):
             await sess.close()
     except Exception:
         pass
-    # beri kesempatan GC mengoleksi sisa objek agar tidak muncul warning
     await asyncio.sleep(0)
     gc.collect()
 
-# ---------------- Web (Flask) ----------------
 def run_web() -> None:
-    from app import app, bootstrap  # lokal project
-
+    from app import app, bootstrap
     try:
-        bootstrap()
-        log.info("bootstrap: OK")
+        bootstrap(); log.info("bootstrap: OK")
     except Exception as e:
         log.warning("bootstrap error: %s", e)
-
-    # Route ping untuk UptimeRobot
     try:
         from flask import Response
         @app.route("/ping")
-        def _ping():
-            return Response("pong", mimetype="text/plain")
+        def _ping(): return Response("pong", mimetype="text/plain")
     except Exception:
         pass
-
     logging.getLogger("werkzeug").addFilter(_NoHealthz())
-
     port = int(os.getenv("PORT", "10000"))
     log.info("Starting web on :%s", port)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
 
-# ---------------- Mini Web (untuk MODE=botmini) ----------------
 def run_mini_web() -> None:
-    """
-    Mini HTTP server super ringan agar service bot bisa jadi Web Service
-    di Render Free. Hanya /, /ping & /healthz.
-    """
     try:
         from flask import Flask, Response
         app = Flask("mini")
-
         @app.route("/")
-        def _root():  # type: ignore
-            return Response("ok", mimetype="text/plain")
-
+        def _root(): return Response("ok", mimetype="text/plain")
         @app.route("/healthz")
-        def _hz():  # type: ignore
-            return Response("ok", mimetype="text/plain")
-
+        def _hz(): return Response("ok", mimetype="text/plain")
         @app.route("/ping")
-        def _ping():  # type: ignore
-            return Response("pong", mimetype="text/plain")
-
+        def _ping(): return Response("pong", mimetype="text/plain")
         logging.getLogger("werkzeug").addFilter(_NoHealthz())
-
         port = int(os.getenv("PORT", "10000"))
         log.info("Starting mini web on :%s", port)
         app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
         return
-
     except Exception:
-        # Fallback tanpa Flask
         import http.server, socketserver
-
         class Handler(http.server.SimpleHTTPRequestHandler):
             def do_GET(self):
                 if self.path in ("/", "/ping", "/healthz"):
@@ -161,42 +127,32 @@ def run_mini_web() -> None:
                     self.wfile.write(b"pong" if self.path == "/ping" else b"ok")
                 else:
                     self.send_error(404)
-
-            def log_message(self, *args, **kwargs):
-                pass  # jangan spam log
-
+            def log_message(self, *args, **kwargs): pass
         port = int(os.getenv("PORT", "10000"))
         with socketserver.TCPServer(("", port), Handler) as httpd:
             log.info("Starting mini web on :%s", port)
             httpd.serve_forever()
 
-# ---------------- Discord Bot ----------------
 async def _start_bot_async(bot) -> None:
     token = _get_token()
-
     if aiohttp is not None:
         try:
-            # koneksi lebih kalem
             bot.http.connector = aiohttp.TCPConnector(
-                limit=4, limit_per_host=2, ttl_dns_cache=300
+                limit=1,          # << super kalem (dari 4 -> 1)
+                limit_per_host=1, # <<
+                ttl_dns_cache=600
             )
         except Exception:
             pass
-
-    # Preflight opsional: matikan dengan DISABLE_PREFLIGHT=1
     if os.getenv("DISABLE_PREFLIGHT") != "1":
         ok = await _preflight_gateway_ok()
         if not ok:
             raise PreflightError("Gateway preflight failed")
-
     await bot.start(token)
 
 async def bot_runner() -> None:
     from discord.errors import HTTPException
-
     tries = 0
-
-    # Initial delay (kontrol via ENV). Default: jitter 5–20s.
     try:
         start_delay = int(os.getenv("BOT_START_DELAY", "").strip() or "0")
     except Exception:
@@ -205,19 +161,19 @@ async def bot_runner() -> None:
         log.info("Delaying first login for %ss (BOT_START_DELAY).", start_delay)
         await asyncio.sleep(start_delay)
     else:
-        await asyncio.sleep(random.randint(5, 20))
+        await asyncio.sleep(random.randint(5, 15))  # jitter kecil
 
     while True:
         bot = _new_bot()
         try:
             await _start_bot_async(bot)
-            break  # keluar normal jika berhasil start & stop
+            break
         except PreflightError as e:
             await _force_close_http_session(bot)
             tries += 1
-            base = 60 * (2 ** min(tries - 1, 4))             # 60..960s
-            sleep_s = min(900, base + random.randint(0, 30)) # cap 15m
-            log.warning("[status] %s. Backoff %ss (try %s).", e, sleep_s, tries)
+            base = 60 * (2 ** min(tries - 1, 4))
+            sleep_s = min(900, base + random.randint(0, 30))
+            logging.warning("[status] %s. Backoff %ss (try %s).", e, sleep_s, tries)
             await asyncio.sleep(sleep_s)
             continue
         except HTTPException as e:
@@ -226,48 +182,40 @@ async def bot_runner() -> None:
             await _force_close_http_session(bot)
             if is_cf:
                 tries += 1
-                base = 60 * (2 ** min(tries - 1, 4))             # cap ~16m
-                sleep_s = min(900, base + random.randint(0, 30)) # cap 15m
-                log.warning("[status] 429/Cloudflare. Backoff %ss (try %s).", sleep_s, tries)
+                base = 60 * (2 ** min(tries - 1, 4))
+                sleep_s = min(900, base + random.randint(0, 30))
+                logging.warning("[status] 429/Cloudflare. Backoff %ss (try %s).", sleep_s, tries)
                 await asyncio.sleep(sleep_s)
                 continue
-            log.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
+            logging.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
             await asyncio.sleep(30)
         except Exception:
             await _force_close_http_session(bot)
-            log.exception("[status] Bot crashed; retry 30s")
+            logging.exception("[status] Bot crashed; retry 30s")
             await asyncio.sleep(30)
         finally:
-            # lepas referensi biar GC tidak mengeluh "Unclosed client session"
             del bot
             gc.collect()
 
-# ---------------- Orchestrator ----------------
 def main() -> None:
     mode = os.getenv("MODE", "bot").lower()
     log.info("Mode: %s", mode)
-
     if mode == "web":
         run_web(); return
-
     if mode == "bot":
         asyncio.run(bot_runner()); return
-
     if mode == "both":
         async def orchestrate():
             web_task = asyncio.create_task(asyncio.to_thread(run_web))
             bot_task = asyncio.create_task(bot_runner())
             await asyncio.gather(web_task, bot_task)
         asyncio.run(orchestrate()); return
-
-    # mode: jalankan BOT + mini HTTP (tanpa dashboard)
     if mode == "botmini":
         async def orchestrate_mini():
             web_task = asyncio.create_task(asyncio.to_thread(run_mini_web))
             bot_task = asyncio.create_task(bot_runner())
             await asyncio.gather(web_task, bot_task)
         asyncio.run(orchestrate_mini()); return
-
     log.warning("MODE tidak dikenal: %s. Default ke 'bot'.", mode)
     asyncio.run(bot_runner())
 
