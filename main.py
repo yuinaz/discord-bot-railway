@@ -57,12 +57,10 @@ def _get_token() -> str:
     return token
 
 def _get_bot():
-    # satu-satunya sumber bot (module-level object)
     from modules.discord_bot.discord_bot import bot  # type: ignore
     return bot
 
 async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
-    """Cek cepat gateway Discord; kalau tidak 200, tunda start agar tidak memicu 1015."""
     if aiohttp is None:
         return True
     try:
@@ -70,11 +68,9 @@ async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
             async with s.get("https://discord.com/api/v10/gateway", timeout=timeout) as r:
                 return r.status == 200
     except Exception:
-        # kalau ada error jaringan, biarkan bot.start() yang handle
         return True
 
 async def _safe_close_bot():
-    """Tutup session aiohttp milik discord.py agar tidak ada 'Unclosed client session'."""
     try:
         bot = _get_bot()
         await bot.close()
@@ -83,14 +79,10 @@ async def _safe_close_bot():
 
 # ---------------- Web (Flask) ----------------
 def run_web() -> None:
-    """
-    Jalankan web server. Panggil bootstrap() lebih dulu agar DB/config siap.
-    Nonaktifkan log /healthz & /ping agar tidak spam di Render.
-    """
     from app import app, bootstrap  # lokal project
 
     try:
-        bootstrap()  # init DB + config.json (idempotent)
+        bootstrap()
         log.info("bootstrap: OK")
     except Exception as e:
         log.warning("bootstrap error: %s", e)
@@ -104,7 +96,6 @@ def run_web() -> None:
     except Exception:
         pass
 
-    # Pasang filter anti-spam untuk akses /healthz & /ping
     logging.getLogger("werkzeug").addFilter(_NoHealthz())
 
     port = int(os.getenv("PORT", "10000"))
@@ -116,16 +107,15 @@ async def _start_bot_async() -> None:
     bot = _get_bot()
     token = _get_token()
 
-    # Tweak konektor HTTP biar "kalem" (cocok free tier)
     if aiohttp is not None:
         try:
             bot.http.connector = aiohttp.TCPConnector(
-                limit=8, limit_per_host=4, ttl_dns_cache=300
+                limit=4, limit_per_host=2, ttl_dns_cache=300
             )
         except Exception:
             pass
 
-    # Preflight ringan (bisa dimatikan via ENV untuk 24/7 single guild)
+    # Preflight opsional: matikan dengan DISABLE_PREFLIGHT=1
     if os.getenv("DISABLE_PREFLIGHT") != "1":
         ok = await _preflight_gateway_ok()
         if not ok:
@@ -134,38 +124,38 @@ async def _start_bot_async() -> None:
     await bot.start(token)
 
 async def bot_runner() -> None:
-    from discord.errors import HTTPException  # import saat runtime
+    from discord.errors import HTTPException
 
     tries = 0
+    # Initial jitter sekali di awal (hindari tabrakan IP shared)
+    await asyncio.sleep(random.randint(5, 20))
+
     while True:
         try:
             await _start_bot_async()
-            break  # keluar normal
+            break
         except PreflightError as e:
-            # preflight gagal -> backoff lembut + jitter (maks 15 menit)
             await _safe_close_bot()
             tries += 1
-            base = 60 * (2 ** min(tries - 1, 4))       # 60,120,240,480,960 (≈16m)
-            sleep_s = min(900, base + random.randint(0, 30))  # cap 900s (15m)
+            base = 60 * (2 ** min(tries - 1, 4))             # 60..960s
+            sleep_s = min(900, base + random.randint(0, 30)) # cap 15m
             log.warning("[status] %s. Backoff %ss (try %s).", e, sleep_s, tries)
             await asyncio.sleep(sleep_s)
             continue
         except HTTPException as e:
             body = getattr(e, "text", "") or ""
             is_cf = (getattr(e, "status", None) == 429) and any(h in body for h in CF_HINTS)
-            # pastikan session lama ditutup agar tidak ada 'Unclosed client session'
             await _safe_close_bot()
             if is_cf:
                 tries += 1
-                base = 60 * (2 ** min(tries - 1, 4))       # cap ≈16m
-                sleep_s = min(900, base + random.randint(0, 30))  # cap 15m
+                base = 60 * (2 ** min(tries - 1, 4))             # cap ~16m
+                sleep_s = min(900, base + random.randint(0, 30)) # cap 15m
                 log.warning("[status] 429/Cloudflare. Backoff %ss (try %s).", sleep_s, tries)
                 await asyncio.sleep(sleep_s)
                 continue
             log.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
             await asyncio.sleep(30)
         except Exception:
-            # tutup session pada error umum juga
             await _safe_close_bot()
             log.exception("[status] Bot crashed; retry 30s")
             await asyncio.sleep(30)
