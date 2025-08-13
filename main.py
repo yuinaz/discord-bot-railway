@@ -41,6 +41,9 @@ CF_HINTS = (
     "You are being rate limited",
 )
 
+class PreflightError(Exception):
+    """Soft failure: gateway check not healthy."""
+
 def _get_token() -> str:
     token = (
         os.getenv("DISCORD_TOKEN")
@@ -122,10 +125,11 @@ async def _start_bot_async() -> None:
         except Exception:
             pass
 
-    # Preflight ringan untuk menghindari start saat gateway lagi tidak bisa
-    ok = await _preflight_gateway_ok()
-    if not ok:
-        raise RuntimeError("Gateway preflight failed")
+    # Preflight ringan (bisa dimatikan via ENV untuk 24/7 single guild)
+    if os.getenv("DISABLE_PREFLIGHT") != "1":
+        ok = await _preflight_gateway_ok()
+        if not ok:
+            raise PreflightError("Gateway preflight failed")
 
     await bot.start(token)
 
@@ -137,6 +141,15 @@ async def bot_runner() -> None:
         try:
             await _start_bot_async()
             break  # keluar normal
+        except PreflightError as e:
+            # preflight gagal -> backoff lembut + jitter (maks 15 menit)
+            await _safe_close_bot()
+            tries += 1
+            base = 60 * (2 ** min(tries - 1, 4))       # 60,120,240,480,960 (≈16m)
+            sleep_s = min(900, base + random.randint(0, 30))  # cap 900s (15m)
+            log.warning("[status] %s. Backoff %ss (try %s).", e, sleep_s, tries)
+            await asyncio.sleep(sleep_s)
+            continue
         except HTTPException as e:
             body = getattr(e, "text", "") or ""
             is_cf = (getattr(e, "status", None) == 429) and any(h in body for h in CF_HINTS)
@@ -144,10 +157,9 @@ async def bot_runner() -> None:
             await _safe_close_bot()
             if is_cf:
                 tries += 1
-                # Exponential backoff: 60s,120s,240s,480s,960s,1920s (cap 3600) + jitter 0–30s
-                base = 60 * (2 ** min(tries - 1, 5))
-                sleep_s = min(3600, base + random.randint(0, 30))
-                log.error("[status] Cloudflare 1015/429 terdeteksi. Backoff %ss (try %s).", sleep_s, tries)
+                base = 60 * (2 ** min(tries - 1, 4))       # cap ≈16m
+                sleep_s = min(900, base + random.randint(0, 30))  # cap 15m
+                log.warning("[status] 429/Cloudflare. Backoff %ss (try %s).", sleep_s, tries)
                 await asyncio.sleep(sleep_s)
                 continue
             log.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
