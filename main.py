@@ -5,7 +5,7 @@ import os
 import logging
 import asyncio
 
-# aiohttp hanya dipakai untuk batasi koneksi HTTP (optional)
+# (opsional) batasi koneksi HTTP discord.py biar "kalem" di free tier
 try:
     import aiohttp  # type: ignore
 except Exception:
@@ -18,6 +18,19 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
 )
 log = logging.getLogger("startup")
+
+# ---- filter agar /healthz tidak spam di log werkzeug ----
+class _NoHealthz(logging.Filter):
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        return (
+            "/healthz" not in msg
+            and '"GET /healthz ' not in msg
+            and '"HEAD /healthz ' not in msg
+        )
 
 # ---------------- Helpers ----------------
 CF_HINTS = (
@@ -43,34 +56,36 @@ def _get_token() -> str:
 # ---------------- Web (Flask) ----------------
 def run_web() -> None:
     """
-    Jalankan web server. Di sini kita PANGGIL bootstrap() lebih dulu
-    agar DB/config siap ketika service naik.
+    Jalankan web server. Panggil bootstrap() lebih dulu agar DB/config siap.
+    Nonaktifkan log /healthz agar tidak spam di Render.
     """
-    from app import app, bootstrap  # lokal ke project
+    from app import app, bootstrap  # lokal project
 
     try:
-        bootstrap()  # init DB + config.json, aman jika dipanggil berulang
+        bootstrap()  # init DB + config.json (idempotent)
         log.info("bootstrap: OK")
     except Exception as e:
         log.warning("bootstrap error: %s", e)
 
+    # Pasang filter anti-spam untuk akses /healthz
+    logging.getLogger("werkzeug").addFilter(_NoHealthz())
+
     port = int(os.getenv("PORT", "10000"))
     log.info("Starting web on :%s", port)
-    # Matikan reloader agar tidak spawn proses dobel
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
 
 # ---------------- Discord Bot ----------------
 async def _start_bot_async() -> None:
-    from modules.discord_bot.discord_bot import bot  # lokal ke project
+    from modules.discord_bot.discord_bot import bot  # lokal project
 
     token = _get_token()
-    # Tweak konektor HTTP biar "kalem" (cocok free tier)
     if aiohttp is not None:
         try:
-            bot.http.connector = aiohttp.TCPConnector(limit=8, limit_per_host=4, ttl_dns_cache=300)
+            bot.http.connector = aiohttp.TCPConnector(
+                limit=8, limit_per_host=4, ttl_dns_cache=300
+            )
         except Exception:
             pass
-
     await bot.start(token)
 
 async def bot_runner() -> None:
@@ -112,7 +127,6 @@ def main() -> None:
 
     if mode == "both":
         async def orchestrate():
-            # Jalankan web di thread terpisah supaya bot tetap di event loop utama
             web_task = asyncio.create_task(asyncio.to_thread(run_web))
             bot_task = asyncio.create_task(bot_runner())
             await asyncio.gather(web_task, bot_task)
@@ -120,7 +134,6 @@ def main() -> None:
         asyncio.run(orchestrate())
         return
 
-    # fallback jika MODE tidak dikenal
     log.warning("MODE tidak dikenal: %s. Default ke 'bot'.", mode)
     asyncio.run(bot_runner())
 
