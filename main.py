@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import os
+import gc
 import logging
 import asyncio
 import random
+import importlib
 
 # (opsional) batasi koneksi HTTP discord.py biar "kalem" di free tier
 try:
@@ -56,9 +58,14 @@ def _get_token() -> str:
         raise RuntimeError("DISCORD_TOKEN / BOT_TOKEN / DISCORD_BOT_TOKEN tidak diset")
     return token
 
-def _get_bot():
-    from modules.discord_bot.discord_bot import bot  # type: ignore
-    return bot
+def _new_bot():
+    """
+    Buat instance Bot baru setiap percobaan.
+    Kita reload module supaya tidak reuse session lama.
+    """
+    import modules.discord_bot.discord_bot as dmod  # type: ignore
+    dmod = importlib.reload(dmod)                   # bot global dibuat ulang
+    return dmod.bot
 
 async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
     if aiohttp is None:
@@ -70,12 +77,22 @@ async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
     except Exception:
         return True
 
-async def _safe_close_bot():
+async def _force_close_http_session(bot):
+    """Pastikan session aiohttp milik discord.py benar-benar tertutup."""
     try:
-        bot = _get_bot()
         await bot.close()
     except Exception:
         pass
+    try:
+        http = getattr(bot, "http", None)
+        sess = getattr(http, "_HTTPClient__session", None)
+        if sess and hasattr(sess, "closed") and not sess.closed:
+            await sess.close()
+    except Exception:
+        pass
+    # beri kesempatan GC mengoleksi sisa objek agar tidak muncul warning
+    await asyncio.sleep(0)
+    gc.collect()
 
 # ---------------- Web (Flask) ----------------
 def run_web() -> None:
@@ -106,11 +123,15 @@ def run_web() -> None:
 def run_mini_web() -> None:
     """
     Mini HTTP server super ringan agar service bot bisa jadi Web Service
-    di Render Free. Hanya /ping & /healthz.
+    di Render Free. Hanya /, /ping & /healthz.
     """
     try:
         from flask import Flask, Response
         app = Flask("mini")
+
+        @app.route("/")
+        def _root():  # type: ignore
+            return Response("ok", mimetype="text/plain")
 
         @app.route("/healthz")
         def _hz():  # type: ignore
@@ -150,12 +171,12 @@ def run_mini_web() -> None:
             httpd.serve_forever()
 
 # ---------------- Discord Bot ----------------
-async def _start_bot_async() -> None:
-    bot = _get_bot()
+async def _start_bot_async(bot) -> None:
     token = _get_token()
 
     if aiohttp is not None:
         try:
+            # koneksi lebih kalem
             bot.http.connector = aiohttp.TCPConnector(
                 limit=4, limit_per_host=2, ttl_dns_cache=300
             )
@@ -187,11 +208,12 @@ async def bot_runner() -> None:
         await asyncio.sleep(random.randint(5, 20))
 
     while True:
+        bot = _new_bot()
         try:
-            await _start_bot_async()
-            break
+            await _start_bot_async(bot)
+            break  # keluar normal jika berhasil start & stop
         except PreflightError as e:
-            await _safe_close_bot()
+            await _force_close_http_session(bot)
             tries += 1
             base = 60 * (2 ** min(tries - 1, 4))             # 60..960s
             sleep_s = min(900, base + random.randint(0, 30)) # cap 15m
@@ -201,7 +223,7 @@ async def bot_runner() -> None:
         except HTTPException as e:
             body = getattr(e, "text", "") or ""
             is_cf = (getattr(e, "status", None) == 429) and any(h in body for h in CF_HINTS)
-            await _safe_close_bot()
+            await _force_close_http_session(bot)
             if is_cf:
                 tries += 1
                 base = 60 * (2 ** min(tries - 1, 4))             # cap ~16m
@@ -212,9 +234,13 @@ async def bot_runner() -> None:
             log.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
             await asyncio.sleep(30)
         except Exception:
-            await _safe_close_bot()
+            await _force_close_http_session(bot)
             log.exception("[status] Bot crashed; retry 30s")
             await asyncio.sleep(30)
+        finally:
+            # lepas referensi biar GC tidak mengeluh "Unclosed client session"
+            del bot
+            gc.collect()
 
 # ---------------- Orchestrator ----------------
 def main() -> None:
@@ -234,7 +260,7 @@ def main() -> None:
             await asyncio.gather(web_task, bot_task)
         asyncio.run(orchestrate()); return
 
-    # >>> mode baru: jalankan BOT + mini HTTP (tanpa dashboard)
+    # mode: jalankan BOT + mini HTTP (tanpa dashboard)
     if mode == "botmini":
         async def orchestrate_mini():
             web_task = asyncio.create_task(asyncio.to_thread(run_mini_web))
