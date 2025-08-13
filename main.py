@@ -102,6 +102,53 @@ def run_web() -> None:
     log.info("Starting web on :%s", port)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
 
+# ---------------- Mini Web (untuk MODE=botmini) ----------------
+def run_mini_web() -> None:
+    """
+    Mini HTTP server super ringan agar service bot bisa jadi Web Service
+    di Render Free. Hanya /ping & /healthz.
+    """
+    try:
+        from flask import Flask, Response
+        app = Flask("mini")
+
+        @app.route("/healthz")
+        def _hz():  # type: ignore
+            return Response("ok", mimetype="text/plain")
+
+        @app.route("/ping")
+        def _ping():  # type: ignore
+            return Response("pong", mimetype="text/plain")
+
+        logging.getLogger("werkzeug").addFilter(_NoHealthz())
+
+        port = int(os.getenv("PORT", "10000"))
+        log.info("Starting mini web on :%s", port)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
+        return
+
+    except Exception:
+        # Fallback tanpa Flask
+        import http.server, socketserver
+
+        class Handler(http.server.SimpleHTTPRequestHandler):
+            def do_GET(self):
+                if self.path in ("/", "/ping", "/healthz"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain")
+                    self.end_headers()
+                    self.wfile.write(b"pong" if self.path == "/ping" else b"ok")
+                else:
+                    self.send_error(404)
+
+            def log_message(self, *args, **kwargs):
+                pass  # jangan spam log
+
+        port = int(os.getenv("PORT", "10000"))
+        with socketserver.TCPServer(("", port), Handler) as httpd:
+            log.info("Starting mini web on :%s", port)
+            httpd.serve_forever()
+
 # ---------------- Discord Bot ----------------
 async def _start_bot_async() -> None:
     bot = _get_bot()
@@ -127,8 +174,17 @@ async def bot_runner() -> None:
     from discord.errors import HTTPException
 
     tries = 0
-    # Initial jitter sekali di awal (hindari tabrakan IP shared)
-    await asyncio.sleep(random.randint(5, 20))
+
+    # Initial delay (kontrol via ENV). Default: jitter 5–20s.
+    try:
+        start_delay = int(os.getenv("BOT_START_DELAY", "").strip() or "0")
+    except Exception:
+        start_delay = 0
+    if start_delay > 0:
+        log.info("Delaying first login for %ss (BOT_START_DELAY).", start_delay)
+        await asyncio.sleep(start_delay)
+    else:
+        await asyncio.sleep(random.randint(5, 20))
 
     while True:
         try:
@@ -166,21 +222,25 @@ def main() -> None:
     log.info("Mode: %s", mode)
 
     if mode == "web":
-        run_web()
-        return
+        run_web(); return
 
     if mode == "bot":
-        asyncio.run(bot_runner())
-        return
+        asyncio.run(bot_runner()); return
 
     if mode == "both":
         async def orchestrate():
             web_task = asyncio.create_task(asyncio.to_thread(run_web))
             bot_task = asyncio.create_task(bot_runner())
             await asyncio.gather(web_task, bot_task)
+        asyncio.run(orchestrate()); return
 
-        asyncio.run(orchestrate())
-        return
+    # >>> mode baru: jalankan BOT + mini HTTP (tanpa dashboard)
+    if mode == "botmini":
+        async def orchestrate_mini():
+            web_task = asyncio.create_task(asyncio.to_thread(run_mini_web))
+            bot_task = asyncio.create_task(bot_runner())
+            await asyncio.gather(web_task, bot_task)
+        asyncio.run(orchestrate_mini()); return
 
     log.warning("MODE tidak dikenal: %s. Default ke 'bot'.", mode)
     asyncio.run(bot_runner())
