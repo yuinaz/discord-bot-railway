@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import logging
 import asyncio
+import random
 
 # (opsional) batasi koneksi HTTP discord.py biar "kalem" di free tier
 try:
@@ -19,18 +20,17 @@ logging.basicConfig(
 )
 log = logging.getLogger("startup")
 
-# ---- filter agar /healthz tidak spam di log werkzeug ----
+# ---- filter agar /healthz & /ping tidak spam di log werkzeug ----
 class _NoHealthz(logging.Filter):
     def filter(self, record):
         try:
             msg = record.getMessage()
         except Exception:
             return True
-        return (
-            "/healthz" not in msg
-            and '"GET /healthz ' not in msg
-            and '"HEAD /healthz ' not in msg
-        )
+        for path in ("/healthz", "/ping"):
+            if (f'"GET {path} ' in msg) or (f'"HEAD {path} ' in msg) or (path in msg):
+                return False
+        return True
 
 # ---------------- Helpers ----------------
 CF_HINTS = (
@@ -53,11 +53,36 @@ def _get_token() -> str:
         raise RuntimeError("DISCORD_TOKEN / BOT_TOKEN / DISCORD_BOT_TOKEN tidak diset")
     return token
 
+def _get_bot():
+    # satu-satunya sumber bot (module-level object)
+    from modules.discord_bot.discord_bot import bot  # type: ignore
+    return bot
+
+async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
+    """Cek cepat gateway Discord; kalau tidak 200, tunda start agar tidak memicu 1015."""
+    if aiohttp is None:
+        return True
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get("https://discord.com/api/v10/gateway", timeout=timeout) as r:
+                return r.status == 200
+    except Exception:
+        # kalau ada error jaringan, biarkan bot.start() yang handle
+        return True
+
+async def _safe_close_bot():
+    """Tutup session aiohttp milik discord.py agar tidak ada 'Unclosed client session'."""
+    try:
+        bot = _get_bot()
+        await bot.close()
+    except Exception:
+        pass
+
 # ---------------- Web (Flask) ----------------
 def run_web() -> None:
     """
     Jalankan web server. Panggil bootstrap() lebih dulu agar DB/config siap.
-    Nonaktifkan log /healthz agar tidak spam di Render.
+    Nonaktifkan log /healthz & /ping agar tidak spam di Render.
     """
     from app import app, bootstrap  # lokal project
 
@@ -67,7 +92,16 @@ def run_web() -> None:
     except Exception as e:
         log.warning("bootstrap error: %s", e)
 
-    # Pasang filter anti-spam untuk akses /healthz
+    # Route ping untuk UptimeRobot
+    try:
+        from flask import Response
+        @app.route("/ping")
+        def _ping():
+            return Response("pong", mimetype="text/plain")
+    except Exception:
+        pass
+
+    # Pasang filter anti-spam untuk akses /healthz & /ping
     logging.getLogger("werkzeug").addFilter(_NoHealthz())
 
     port = int(os.getenv("PORT", "10000"))
@@ -76,9 +110,10 @@ def run_web() -> None:
 
 # ---------------- Discord Bot ----------------
 async def _start_bot_async() -> None:
-    from modules.discord_bot.discord_bot import bot  # lokal project
-
+    bot = _get_bot()
     token = _get_token()
+
+    # Tweak konektor HTTP biar "kalem" (cocok free tier)
     if aiohttp is not None:
         try:
             bot.http.connector = aiohttp.TCPConnector(
@@ -86,6 +121,12 @@ async def _start_bot_async() -> None:
             )
         except Exception:
             pass
+
+    # Preflight ringan untuk menghindari start saat gateway lagi tidak bisa
+    ok = await _preflight_gateway_ok()
+    if not ok:
+        raise RuntimeError("Gateway preflight failed")
+
     await bot.start(token)
 
 async def bot_runner() -> None:
@@ -99,16 +140,21 @@ async def bot_runner() -> None:
         except HTTPException as e:
             body = getattr(e, "text", "") or ""
             is_cf = (getattr(e, "status", None) == 429) and any(h in body for h in CF_HINTS)
+            # pastikan session lama ditutup agar tidak ada 'Unclosed client session'
+            await _safe_close_bot()
             if is_cf:
                 tries += 1
-                # Exponential backoff: 1m → 2m → 4m → 8m → 16m → 32m (maks 60m)
-                sleep_s = min(3600, 60 * (2 ** min(tries, 5)))
+                # Exponential backoff: 60s,120s,240s,480s,960s,1920s (cap 3600) + jitter 0–30s
+                base = 60 * (2 ** min(tries - 1, 5))
+                sleep_s = min(3600, base + random.randint(0, 30))
                 log.error("[status] Cloudflare 1015/429 terdeteksi. Backoff %ss (try %s).", sleep_s, tries)
                 await asyncio.sleep(sleep_s)
                 continue
             log.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
             await asyncio.sleep(30)
         except Exception:
+            # tutup session pada error umum juga
+            await _safe_close_bot()
             log.exception("[status] Bot crashed; retry 30s")
             await asyncio.sleep(30)
 
