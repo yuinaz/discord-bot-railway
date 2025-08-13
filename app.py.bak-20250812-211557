@@ -1,0 +1,697 @@
+
+import os, json, time, sqlite3
+from functools import wraps
+from flask import Flask, render_template, request, redirect, session, jsonify, send_file
+from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash, generate_password_hash
+
+# Optional deps
+try:
+    import psutil
+except Exception:
+    psutil = None
+
+try:
+    from PIL import Image, ImageOps
+except Exception:
+    Image = ImageOps = None
+
+app = Flask(__name__)
+REQUEST_COUNTER = 0
+START_TS = int(time.time())
+app.secret_key = os.getenv("SECRET_KEY", "changeme")
+
+DB_PATH = os.getenv("DB_PATH", "superadmin.db")
+
+# ---------------- Auth helper ----------------
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect("/login")
+        return view(*args, **kwargs)
+    return wrapped
+
+# ---------------- DB bootstrap ----------------
+def init_db():
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS superadmin(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE,
+                password TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS banned_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT,
+                username TEXT,
+                guild_id TEXT,
+                reason TEXT,
+                banned_at TEXT,
+                active INTEGER DEFAULT 1,
+                unbanned_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bot_guilds(
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                icon_url TEXT
+            )""")
+        conn.commit()
+
+def ensure_admin_seed():
+    username = os.getenv("SUPER_ADMIN_USER") or os.getenv("ADMIN_USERNAME") or "admin"
+    raw_pwd = (
+        os.getenv("SUPER_ADMIN_PASSWORD")
+        or os.getenv("SUPER_ADMIN_PASS")
+        or os.getenv("ADMIN_PASSWORD")
+        or "admin"
+    )
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT id, password FROM superadmin WHERE username=?", (username,)).fetchone()
+        pwd_hash = generate_password_hash(raw_pwd)
+        if row:
+            try:
+                if not row[1] or len(row[1]) < 25:
+                    conn.execute("UPDATE superadmin SET password=? WHERE id=?", (pwd_hash, row[0]))
+            except Exception:
+                conn.execute("UPDATE superadmin SET password=? WHERE id=?", (pwd_hash, row[0]))
+        else:
+            conn.execute("INSERT INTO superadmin (username, password) VALUES (?,?)", (username, pwd_hash))
+        conn.commit()
+
+# ---------------- Theme helpers ----------------
+def _load_theme_config():
+    try:
+        return json.load(open(os.path.join("config","theme.json"), "r", encoding="utf-8"))
+    except Exception:
+        return {}
+
+def list_themes():
+    d = os.path.join("static","themes")
+    try:
+        return sorted([f for f in os.listdir(d) if f.endswith(".css") and not f.startswith("_")])
+    except Exception:
+        return []
+
+
+def get_theme_path():
+    fn = _current_theme_name()
+    return f"/static/themes/{fn}"
+
+
+
+def _load_background_url():
+    # 1) from config
+    url = (_load_theme_config().get("background_image") or "").strip()
+    if url:
+        if not url.startswith(("http://", "https://", "/")):
+            url = "/" + url.lstrip()
+        return url
+    # 2) from SQLite assets table
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS assets(key TEXT PRIMARY KEY, mime TEXT, data BLOB, updated_at TEXT)")
+            row = conn.execute("SELECT 1 FROM assets WHERE key='background'").fetchone()
+            if row:
+                return "/assets/background"
+    except Exception:
+        pass
+    return ""
+
+
+def _invite_url():
+    cid = os.getenv("DISCORD_CLIENT_ID") or os.getenv("BOT_CLIENT_ID")
+    perms = os.getenv("DISCORD_INVITE_PERMS", "8")
+    scope = "bot%20applications.commands"
+    return (f"https://discord.com/api/oauth2/authorize?client_id={cid}&permissions={perms}&scope={scope}") if cid else None
+
+
+
+def _load_bot_logo_url():
+    try:
+        url = (_load_theme_config().get("bot_logo") or os.getenv("BOT_AVATAR_URL") or "/static/icon-default.png").strip()
+    except Exception:
+        url = os.getenv("BOT_AVATAR_URL") or "/static/icon-default.png"
+    if url and not url.startswith(("http://","https://","/")):
+        url = "/" + url.lstrip()
+    return url
+
+@app.context_processor
+def inject_globals():
+    theme = _current_theme_name()
+    return {
+        "current_theme": theme,
+        "available_themes": _available_themes(),
+        "theme_path": get_theme_path(),
+        "cache_bust": int(time.time()),
+        "background_url": _load_background_url(),
+        "bot_logo_url": os.getenv("BOT_AVATAR_URL", "/static/icon-default.png"),
+    }
+# --- Migration: ensure bot_guilds has 'id' column and unique index
+
+
+def ensure_bot_guilds_pk():
+    with sqlite3.connect(DB_PATH) as conn:
+        try:
+            conn.row_factory = sqlite3.Row
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(bot_guilds)")}
+            if 'id' not in cols:
+                # create table or add id column
+                if 'guild_id' in cols:
+                    conn.execute("ALTER TABLE bot_guilds ADD COLUMN id TEXT")
+                    conn.execute("UPDATE bot_guilds SET id = guild_id WHERE id IS NULL")
+                else:
+                    conn.execute("CREATE TABLE IF NOT EXISTS bot_guilds(id TEXT PRIMARY KEY, name TEXT, icon_url TEXT, member_count INTEGER DEFAULT 0)")
+            if 'member_count' not in cols:
+                conn.execute("ALTER TABLE bot_guilds ADD COLUMN member_count INTEGER DEFAULT 0")
+            if 'icon_url' not in cols:
+                conn.execute("ALTER TABLE bot_guilds ADD COLUMN icon_url TEXT")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_guilds_id ON bot_guilds(id)")
+            conn.commit()
+        except Exception as e:
+            # If table doesn't exist yet, create it
+            conn.execute("CREATE TABLE IF NOT EXISTS bot_guilds(id TEXT PRIMARY KEY, name TEXT, icon_url TEXT, member_count INTEGER DEFAULT 0)")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_bot_guilds_id ON bot_guilds(id)")
+            conn.commit()
+
+
+# ---------------- Routes: Auth ----------------
+@app.route("/login", methods=["GET","POST"])
+def login():
+    try:
+        ensure_admin_seed()
+    except Exception as e:
+        print("[login] seed error:", e)
+    error = None
+    if request.method == "POST":
+        u = (request.form.get("username") or "").strip()
+        p = (request.form.get("password") or "").strip()
+        if not u or not p:
+            error = "Lengkapi username & password."
+        else:
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute("SELECT password FROM superadmin WHERE username=?", (u,)).fetchone()
+            if row and check_password_hash(row[0], p):
+                session["logged_in"] = True
+                session["username"] = u
+                return redirect(request.args.get("next") or "/dashboard")
+            else:
+                error = "Username atau password salah."
+    return render_template("login.html", error=error, bot_avatar=os.getenv("BOT_AVATAR_URL"))
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+# ---------------- Routes: Pages ----------------
+@app.route("/")
+@login_required
+def home():
+    return redirect("/dashboard")
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return render_template("dashboard.html")
+
+@app.route("/servers")
+@login_required
+def servers_page():
+    return render_template("servers.html")
+
+@app.route("/settings")
+@login_required
+def settings_page():
+    current_theme = get_theme_path().split("/")[-1]
+    return render_template("settings.html",
+                           available_themes=list_themes(),
+                           current_theme=current_theme,
+                           background_current=_load_background_url())
+
+# ---------------- API: Theme & Background ----------------
+@app.route("/theme", methods=["GET","POST"])
+def change_theme():
+    try:
+        if request.method == "POST":
+            data = request.get_json(silent=True) or {}
+            theme = (data.get("theme") or "").strip()
+        else:
+            theme = (request.args.get("set") or request.args.get("theme") or "").strip()
+
+        if theme and not theme.endswith(".css"):
+            theme += ".css"
+        if theme:
+            path = os.path.join("static","themes", theme)
+            if not os.path.exists(path):
+                return jsonify({"status":"error","message":"Theme not found"}), 400
+            os.makedirs("config", exist_ok=True)
+            cfg = _load_theme_config()
+            cfg["theme"] = theme
+            json.dump(cfg, open(os.path.join("config","theme.json"),"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+            return jsonify({"status":"success","theme": theme})
+        return jsonify({"status":"ok","theme": get_theme_path().rsplit("/",1)[-1]})
+    except Exception as e:
+        return jsonify({"status":"error","message": str(e)}), 500
+
+@app.route("/upload/logo", methods=["POST"])
+@login_required
+def upload_logo():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"status":"error","message":"No file"}), 400
+    ext = "." + f.filename.rsplit(".",1)[-1].lower()
+    if ext not in {".jpg",".jpeg",".png",".webp",".gif"}:
+        return jsonify({"status":"error","message":"Unsupported type"}), 400
+    updir = os.path.join("static","uploads")
+    os.makedirs(updir, exist_ok=True)
+    name = f"logo_{int(time.time())}_" + secure_filename(f.filename)
+    path = os.path.join(updir, name)
+    try:
+        if Image is not None:
+            img = Image.open(f.stream)
+            try: img = ImageOps.exif_transpose(img)
+            except Exception: pass
+            img.thumbnail((512,512))
+            img.save(path)
+        else:
+            f.save(path)
+    except Exception:
+        f.stream.seek(0); f.save(path)
+    url = "/" + path.replace("\\","/")
+    cfg = _load_theme_config(); cfg["bot_logo"] = url
+    os.makedirs("config", exist_ok=True)
+    json.dump(cfg, open(os.path.join("config","theme.json"),"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+    
+    # Persist via Discord webhook if available, else keep local
+    try:
+        with open(path, 'rb') as _f:
+            raw = _f.read()
+        remote = _upload_to_webhook(raw, "logo_" + os.path.basename(path), "image/png" if path.lower().endswith(".png") else "image/jpeg")
+        if remote:
+            url = remote
+    except Exception as _e:
+        pass
+    # Also store a copy in SQLite BLOB (survive restart)
+    try:
+        _ensure_assets_table()
+        with sqlite3.connect(DB_PATH) as _c:
+            _c.execute("REPLACE INTO assets(key,mime,data,updated_at) VALUES (?,?,?,datetime('now'))", ("logo", ("image/png" if path.lower().endswith(".png") else "image/jpeg"), open(path,'rb').read()))
+            _c.commit()
+    except Exception as _e:
+        pass
+    return jsonify({"status":"success","url": url})
+
+@app.route("/upload/background", methods=["POST"])
+@login_required
+def upload_background():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"status":"error","message":"No file"}), 400
+    ext = "." + f.filename.rsplit(".",1)[-1].lower()
+    if ext not in {".jpg",".jpeg",".png",".webp",".gif"}:
+        return jsonify({"status":"error","message":"Unsupported type"}), 400
+
+    updir = os.path.join("static","uploads")
+    os.makedirs(updir, exist_ok=True)
+    name = f"{int(time.time())}_{secure_filename(f.filename)}"
+    path = os.path.join(updir, name)
+
+    try:
+        if Image is not None:
+            img = Image.open(f.stream)
+            try: img = ImageOps.exif_transpose(img)
+            except Exception: pass
+            img.thumbnail((1920,1080), Image.LANCZOS)
+            fmt = "PNG" if ext == ".png" else "JPEG"
+            params = {"optimize": True}
+            if fmt == "JPEG":
+                if img.mode in ("RGBA","LA"):
+                    bg = Image.new("RGB", img.size, "#0b0b16")
+                    bg.paste(img, mask=img.split()[-1])
+                    img = bg
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+                params.update({"quality": 84, "progressive": True})
+            img.save(path, fmt, **params)
+        else:
+            f.save(path)
+    except Exception:
+        f.stream.seek(0); f.save(path)
+
+    url = "/" + path.replace("\\","/")
+    cfg = _load_theme_config()
+    cfg["background_image"] = url
+    os.makedirs("config", exist_ok=True)
+    json.dump(cfg, open(os.path.join("config","theme.json"),"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+
+    # Upload to webhook if available
+    try:
+        with open(path, 'rb') as _f:
+            raw = _f.read()
+        remote = _upload_to_webhook(raw, "background_" + os.path.basename(path), "image/png" if path.lower().endswith(".png") else "image/jpeg")
+        if remote:
+            url = remote
+    except Exception:
+        pass
+
+    # Store copy in SQLite (BLOB)
+    try:
+        _ensure_assets_table()
+        with sqlite3.connect(DB_PATH) as _c:
+            _c.execute("REPLACE INTO assets(key,mime,data,updated_at) VALUES (?,?,?,datetime('now'))",
+                       ("background", ("image/png" if path.lower().endswith(".png") else "image/jpeg"), open(path,'rb').read()))
+            _c.commit()
+    except Exception:
+        pass
+
+    return jsonify({"status":"success","url":url})
+
+
+# ---------------- API: Dashboard data ----------------
+@app.route("/api/dashboard")
+@login_required
+def api_dashboard():
+    cpu = round(psutil.cpu_percent(interval=0.1),1) if psutil else 0.0
+    ram_mb = int(psutil.virtual_memory().used/1024/1024) if psutil else 0
+    up_str = "00:00:00"
+    if psutil:
+        uptime = int(time.time() - psutil.boot_time())
+        up_str = f"{uptime//3600:02d}:{(uptime%3600)//60:02d}:{uptime%60:02d}"
+
+    labels = [f"D-{i}" for i in range(6,-1,-1)]
+    values = [18,26,33,29,41,45,52]
+
+    guilds = []; bans = []
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT name, member_count AS detections FROM bot_guilds ORDER BY detections DESC LIMIT 6").fetchall()
+            guilds = [dict(r) for r in rows]
+            rows = conn.execute("SELECT user_id, username, guild_id, reason FROM banned_users WHERE active=1 ORDER BY banned_at DESC LIMIT 6").fetchall()
+            bans = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    return jsonify({
+        "kpi": {"cpu": cpu, "ram": ram_mb, "uptime": up_str},
+        "series": {"labels": labels, "values": values},
+        "guilds": guilds,
+        "bans": bans
+    })
+
+
+
+@app.route("/api/dashboard_plus")
+@login_required
+def api_dashboard_plus():
+    # base data from DB
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        total_bans = conn.execute("SELECT COUNT(1) FROM banned_users").fetchone()[0]
+        # last 7 days bans per day
+        days = []; vals = []
+        for i in range(6, -1, -1):
+            d0 = int(time.time()) - i*86400
+            d1s = time.strftime('%Y-%m-%d 00:00:00', time.localtime(d0))
+            d2s = time.strftime('%Y-%m-%d 23:59:59', time.localtime(d0))
+            c = conn.execute("SELECT COUNT(1) FROM banned_users WHERE banned_at BETWEEN ? AND ?", (d1s, d2s)).fetchone()[0]
+            days.append(time.strftime('%a', time.localtime(d0)))
+            vals.append(c)
+        guilds = conn.execute("""
+            SELECT g.id, g.name, g.icon_url, COALESCE(COUNT(b.id),0) AS detections
+            FROM bot_guilds g
+            LEFT JOIN banned_users b ON b.guild_id = g.id
+            GROUP BY g.id, g.name, g.icon_url
+            ORDER BY detections DESC, LOWER(g.name) ASC
+            LIMIT 5
+        """).fetchall()
+        bans = conn.execute("SELECT username, user_id, guild_id, reason, banned_at FROM banned_users ORDER BY banned_at DESC LIMIT 8").fetchall()
+
+    mini = [
+        {"labels": days, "values": vals},
+        {"labels": days, "values": [max(0, v-1) for v in vals]},
+        {"labels": days, "values": [0 for _ in vals]},
+    ]
+    gauges = [min(100, (total_bans % 100)), 65, 83, 37]
+    heat = [[(i*j) % 6 for i in range(7)] for j in range(7)]
+    counters = {"BANS": total_bans, "GUILDS": len(guilds)}
+    base = {"guilds": [dict(x) for x in guilds], "bans": [dict(x) for x in bans], "series": {"labels": days, "values": vals}}
+    return jsonify({"base": base, "mini": mini, "gauges": gauges, "barLeft": {"labels": days, "values": vals}, "heat": heat, "counters": counters, "core_total": total_bans})
+
+@app.route("/api/guilds")
+@login_required
+def api_guilds():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM bot_guilds ORDER BY LOWER(name)").fetchall()
+        return jsonify([dict(r) for r in rows])
+
+# ---------------- Health ----------------
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status":"ok","ts": int(time.time())}), 200
+
+@app.route("/readyz")
+def readyz():
+    try:
+        init_db()
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("SELECT 1")
+        return jsonify({"status":"ready"}), 200
+    except Exception as e:
+        return jsonify({"status":"error","message":str(e)}), 500
+
+
+@app.route("/change-password", methods=["GET","POST"])
+@login_required
+def change_password():
+    msg = None
+    err = None
+    if request.method == "POST":
+        old = (request.form.get("old_password") or "").strip()
+        new = (request.form.get("new_password") or "").strip()
+        confirm = (request.form.get("confirm_password") or "").strip()
+        if not new or len(new) < 6:
+            err = "Password baru minimal 6 karakter."
+        elif new != confirm:
+            err = "Konfirmasi password tidak cocok."
+        else:
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute("SELECT id, password FROM superadmin WHERE username=?", (session.get("username") or "admin",)).fetchone()
+                if not row or not check_password_hash(row[1], old):
+                    err = "Password lama salah."
+                else:
+                    conn.execute("UPDATE superadmin SET password=? WHERE id=?", (generate_password_hash(new), row[0]))
+                    conn.commit()
+                    msg = "Password berhasil diperbarui."
+    return render_template("change_password.html", message=msg, error=err)
+
+
+@app.route("/admin-log")
+@login_required
+def admin_log():
+    return render_template("admin_log.html")
+
+
+@app.route("/grafik")
+@login_required
+def grafik():
+    return render_template("grafik.html")
+
+
+@app.route("/blacklist-image")
+@login_required
+def blacklist_image():
+    # Use admin_blacklist template as the editor landing
+    return render_template("admin_blacklist.html")
+
+
+@app.route("/api/guilds/add", methods=["POST"])
+@login_required
+def api_add_guild():
+    data = request.get_json(force=True, silent=True) or {}
+    gid = (data.get("id") or "").strip() or str(int(time.time()))
+    name = (data.get("name") or "").strip()
+    icon_url = (data.get("icon_url") or "").strip()
+    if not name:
+        return jsonify({"status":"error","message":"Nama server wajib diisi"}), 400
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS bot_guilds(
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                icon_url TEXT
+            )
+        """)
+        # upsert
+        row = conn.execute("SELECT id FROM bot_guilds WHERE id=?", (gid,)).fetchone()
+        if row:
+            conn.execute("UPDATE bot_guilds SET name=?, icon_url=? WHERE id=?", (name, icon_url, gid))
+        else:
+            conn.execute("INSERT INTO bot_guilds (id, name, icon_url) VALUES (?,?,?)", (gid, name, icon_url))
+        conn.commit()
+    return jsonify({"status":"ok","id":gid})
+
+# ---------------- Bootstrap ----------------
+def bootstrap():
+    init_db()
+    ensure_bot_guilds_pk()
+    ensure_admin_seed()
+
+
+@app.before_request
+def _count_requests():
+    global REQUEST_COUNTER
+    REQUEST_COUNTER += 1
+
+
+
+@app.get("/api/live")
+@login_required
+def api_live():
+    """Small live metrics for dashboard: cpu/mem/request counter + recent incidents."""
+    cpu = mem = None
+    try:
+        if psutil:
+            cpu = psutil.cpu_percent(interval=None)
+            mem = psutil.virtual_memory().percent
+    except Exception:
+        pass
+    now = int(time.time())
+    # incidents in last hour grouped in 5-min buckets
+    series = [0]*12
+    with sqlite3.connect(DB_PATH) as conn:
+        try:
+            rows = conn.execute("SELECT banned_at FROM banned_users WHERE banned_at >= datetime('now','-60 minutes')").fetchall()
+            for (ts_str,) in rows:
+                # assume banned_at stored as text
+                try:
+                    # try parse common formats
+                    # fallback: treat as now
+                    ts = int(time.mktime(time.strptime(ts_str.split('.')[0], "%Y-%m-%d %H:%M:%S")))
+                except Exception:
+                    ts = now
+                delta = now - ts
+                idx = 11 - min(11, max(0, delta // 300))  # bucket 5 min
+                series[idx] += 1
+        except Exception:
+            pass
+    return jsonify({"ts": now, "cpu": cpu, "mem": mem, "requests": REQUEST_COUNTER, "incidents_series": series})
+
+
+
+
+@app.get("/api/guilds/stats")
+@login_required
+def api_guilds_stats():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT g.id, g.name, g.icon_url,
+                   COALESCE(COUNT(b.id),0) AS bans_total,
+                   COALESCE(SUM(CASE WHEN b.active=1 THEN 1 ELSE 0 END),0) AS bans_active,
+                   MAX(b.banned_at) AS last_banned_at
+            FROM bot_guilds g
+            LEFT JOIN banned_users b ON b.guild_id = g.id
+            GROUP BY g.id, g.name, g.icon_url
+            ORDER BY bans_total DESC, LOWER(g.name) ASC
+        """).fetchall()
+        return jsonify([dict(r) for r in rows])
+
+
+
+def _ensure_assets_table():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS assets(
+            key TEXT PRIMARY KEY,
+            mime TEXT,
+            data BLOB,
+            updated_at TEXT DEFAULT (datetime('now'))
+        )""" )
+        conn.commit()
+
+@app.get("/assets/<key>")
+def assets_get(key):
+    _ensure_assets_table()
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT mime, data FROM assets WHERE key=?", (key,)).fetchone()
+        if not row: return ('Not Found',404)
+        mime, data = row
+    from io import BytesIO
+    return send_file(BytesIO(data), mimetype=mime)
+
+
+def _upload_to_webhook(file_bytes: bytes, filename: str, mime: str):
+    url = os.getenv("ASSET_WEBHOOK_URL","").strip()
+    if not url:
+        return None
+    try:
+        import requests
+        files = {'file': (filename, file_bytes, mime)}
+        r = requests.post(url, files=files, data={'content':'asset upload'}, timeout=15)
+        try:
+            j = r.json()
+        except Exception:
+            j = {}
+        if r.status_code//100 == 2 and isinstance(j, dict):
+            atts = j.get('attachments') or []
+            if atts:
+                return atts[0].get('url')
+    except Exception as e:
+        print("[assets] webhook upload failed:", e)
+    return None
+
+
+@app.get('/theme_info')
+@login_required
+def theme_set():
+    name = (request.args.get('set') or '').strip()
+    if not name:
+        return jsonify({'ok':True, 'current': _current_theme_name(), 'available': list_themes()})
+    if not _theme_exists(name):
+        return jsonify({'ok':False, 'error':'theme not found'}), 400
+    cfg = _load_theme_config()
+    cfg['theme'] = name
+    os.makedirs('config', exist_ok=True)
+    json.dump(cfg, open(os.path.join('config','theme.json'),'w',encoding='utf-8'), ensure_ascii=False, indent=2)
+    return jsonify({'ok':True,'current':name})
+
+
+@app.get('/api/dashboard_init')
+@login_required
+def api_dashboard_init():
+    gid = request.args.get('guild_id') or request.args.get('gid') or None
+    try:
+        if gid: gid = str(int(gid))
+    except Exception:
+        gid = None
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        if gid:
+            total_bans = conn.execute('SELECT COUNT(1) FROM banned_users WHERE guild_id=?', (gid,)).fetchone()[0]
+        else:
+            total_bans = conn.execute('SELECT COUNT(1) FROM banned_users').fetchone()[0]
+        days=[]; vals=[]
+        now = int(time.time())
+        for i in range(6,-1,-1):
+            d0 = now - i*86400
+            d1s = time.strftime('%Y-%m-%d 00:00:00', time.localtime(d0))
+            d2s = time.strftime('%Y-%m-%d 23:59:59', time.localtime(d0))
+            if gid:
+                c = conn.execute('SELECT COUNT(1) FROM banned_users WHERE guild_id=? AND banned_at BETWEEN ? AND ?', (gid, d1s, d2s)).fetchone()[0]
+            else:
+                c = conn.execute('SELECT COUNT(1) FROM banned_users WHERE banned_at BETWEEN ? AND ?', (d1s, d2s)).fetchone()[0]
+            days.append(time.strftime('%a', time.localtime(d0))); vals.append(c)
+        guilds = conn.execute("""SELECT g.id, g.name, g.icon_url, COALESCE(COUNT(b.id),0) AS detections
+                                  FROM bot_guilds g LEFT JOIN banned_users b ON b.guild_id=g.id
+                                  GROUP BY g.id, g.name, g.icon_url
+                                  ORDER BY detections DESC, LOWER(g.name) ASC LIMIT 5""").fetchall()
+        bans = conn.execute('SELECT username, user_id, guild_id, reason, banned_at FROM banned_users ORDER BY banned_at DESC LIMIT 8').fetchall()
+    return jsonify({'core_total': total_bans, 'barLeft': {'labels': days, 'values': vals}, 'topGuilds': [dict(x) for x in guilds], 'bans':[dict(x) for x in bans]})

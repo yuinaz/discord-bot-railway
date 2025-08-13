@@ -1,0 +1,21 @@
+services:
+  - type: worker
+    name: satpambot-worker
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    autoDeploy: true
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false   # isi di dashboard
+      - key: BAN_LOG_CHANNEL_ID
+        value: "1400375184048787566"
+      - key: BOT_PREFIX
+        value: "!"
+      - key: GUILD_ID
+        value: "<ID_GUILD_TES_KAMU>"   # penting agar /ping muncul instan
+      - key: OCR_SCAM_STRICT
+        value: "true"
+      - key: OCR_LANG
+        value: "eng+ind"
