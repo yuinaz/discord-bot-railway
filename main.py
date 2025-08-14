@@ -128,7 +128,6 @@ def _add_common_routes(app):
     @app.route("/callback")
     def _callback():
         # Callback sederhana untuk OAuth/Invite – cukup return 200
-        # (kalau mau, bisa redirect ke halaman dashboard)
         return Response("ok", mimetype="text/plain")
 
 # ---------------- Full web (dashboard) ----------------
@@ -204,11 +203,24 @@ async def _start_bot_async(bot) -> None:
     token = _get_token()
     if aiohttp is not None:
         try:
-            # super kalem supaya tidak bikin 429 gampang
-            bot.http.connector = aiohttp.TCPConnector(
-                limit=1,
-                limit_per_host=1,
+            # Sedikit lebih longgar agar request /interactions tidak timeout,
+            # tetap sopan untuk menghindari 429.
+            connector = aiohttp.TCPConnector(
+                limit=3,          # dari 1 -> 3
+                limit_per_host=2, # dari 1 -> 2
                 ttl_dns_cache=600
+            )
+            timeout = aiohttp.ClientTimeout(
+                total=20, connect=10, sock_connect=10, sock_read=15
+            )
+            bot.http.connector = connector
+            # pastikan session HTTPClient pakai connector & timeout ini
+            http = getattr(bot, "http", None)
+            sess = getattr(http, "_HTTPClient__session", None)
+            if sess and not sess.closed:
+                await sess.close()
+            http._HTTPClient__session = aiohttp.ClientSession(  # type: ignore
+                connector=connector, timeout=timeout
             )
         except Exception:
             pass
