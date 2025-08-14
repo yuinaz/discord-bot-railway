@@ -8,7 +8,11 @@ import asyncio
 import random
 import importlib
 import time
+import warnings
 from typing import Optional
+
+# Silence noisy ResourceWarning when aiohttp session is swapped/closed during startup
+warnings.filterwarnings("ignore", message="Unclosed client session", category=ResourceWarning)
 
 try:
     import aiohttp  # type: ignore
