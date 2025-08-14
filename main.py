@@ -7,6 +7,7 @@ import logging
 import asyncio
 import random
 import importlib
+from typing import Optional
 
 try:
     import aiohttp  # type: ignore
@@ -19,6 +20,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
 )
 log = logging.getLogger("startup")
+
+# ===== state untuk /bot_ready =====
+ACTIVE_BOT: Optional[object] = None
 
 class _NoHealthz(logging.Filter):
     def filter(self, record):
@@ -84,47 +88,92 @@ async def _force_close_http_session(bot):
     await asyncio.sleep(0)
     gc.collect()
 
+# ---------------- Web routes helper ----------------
+def _add_common_routes(app):
+    from flask import Response, jsonify
+
+    @app.route("/")
+    def _root():
+        return Response("ok", mimetype="text/plain")
+
+    @app.route("/healthz")
+    def _hz():
+        return Response("ok", mimetype="text/plain")
+
+    @app.route("/ping")
+    def _ping():
+        return Response("pong", mimetype="text/plain")
+
+    @app.route("/bot_ready")
+    def _bot_ready():
+        try:
+            ready = bool(ACTIVE_BOT and getattr(ACTIVE_BOT, "is_ready")())
+        except Exception:
+            ready = False
+        status = 200 if ready else 503
+        return jsonify({"bot_ready": ready}), status
+
+    @app.route("/callback")
+    def _callback():
+        # Callback sederhana untuk OAuth/Invite – cukup return 200
+        # (kalau mau, bisa redirect ke halaman dashboard)
+        return Response("ok", mimetype="text/plain")
+
+# ---------------- Full web (dashboard) ----------------
 def run_web() -> None:
     from app import app, bootstrap
     try:
         bootstrap(); log.info("bootstrap: OK")
     except Exception as e:
         log.warning("bootstrap error: %s", e)
+
     try:
-        from flask import Response
-        @app.route("/ping")
-        def _ping(): return Response("pong", mimetype="text/plain")
+        _add_common_routes(app)
     except Exception:
         pass
+
     logging.getLogger("werkzeug").addFilter(_NoHealthz())
     port = int(os.getenv("PORT", "10000"))
     log.info("Starting web on :%s", port)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
 
+# ---------------- Mini web (untuk MODE=botmini) ----------------
 def run_mini_web() -> None:
+    """
+    Mini HTTP server agar service bot dianggap Web Service di Render Free.
+    Punya route: /, /ping, /healthz, /bot_ready, /callback
+    """
     try:
-        from flask import Flask, Response
+        from flask import Flask
         app = Flask("mini")
-        @app.route("/")
-        def _root(): return Response("ok", mimetype="text/plain")
-        @app.route("/healthz")
-        def _hz(): return Response("ok", mimetype="text/plain")
-        @app.route("/ping")
-        def _ping(): return Response("pong", mimetype="text/plain")
+        _add_common_routes(app)
         logging.getLogger("werkzeug").addFilter(_NoHealthz())
         port = int(os.getenv("PORT", "10000"))
         log.info("Starting mini web on :%s", port)
         app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
         return
     except Exception:
-        import http.server, socketserver
+        # fallback tanpa Flask
+        import http.server, socketserver, json
         class Handler(http.server.SimpleHTTPRequestHandler):
             def do_GET(self):
-                if self.path in ("/", "/ping", "/healthz"):
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/plain")
+                global ACTIVE_BOT
+                if self.path in ("/", "/healthz", "/ping", "/bot_ready", "/callback"):
+                    if self.path == "/ping":
+                        body, status, ctype = b"pong", 200, "text/plain"
+                    elif self.path == "/bot_ready":
+                        try:
+                            ready = bool(ACTIVE_BOT and getattr(ACTIVE_BOT, "is_ready")())
+                        except Exception:
+                            ready = False
+                        body = json.dumps({"bot_ready": ready}).encode("utf-8")
+                        status, ctype = (200 if ready else 503), "application/json"
+                    else:
+                        body, status, ctype = b"ok", 200, "text/plain"
+                    self.send_response(status)
+                    self.send_header("Content-Type", ctype)
                     self.end_headers()
-                    self.wfile.write(b"pong" if self.path == "/ping" else b"ok")
+                    self.wfile.write(body)
                 else:
                     self.send_error(404)
             def log_message(self, *args, **kwargs): pass
@@ -133,13 +182,15 @@ def run_mini_web() -> None:
             log.info("Starting mini web on :%s", port)
             httpd.serve_forever()
 
+# ---------------- Discord Bot ----------------
 async def _start_bot_async(bot) -> None:
     token = _get_token()
     if aiohttp is not None:
         try:
+            # super kalem supaya tidak bikin 429 gampang
             bot.http.connector = aiohttp.TCPConnector(
-                limit=1,          # << super kalem (dari 4 -> 1)
-                limit_per_host=1, # <<
+                limit=1,
+                limit_per_host=1,
                 ttl_dns_cache=600
             )
         except Exception:
@@ -152,7 +203,10 @@ async def _start_bot_async(bot) -> None:
 
 async def bot_runner() -> None:
     from discord.errors import HTTPException
+    global ACTIVE_BOT
+
     tries = 0
+    # Delay awal (ENV) atau jitter kecil
     try:
         start_delay = int(os.getenv("BOT_START_DELAY", "").strip() or "0")
     except Exception:
@@ -161,18 +215,19 @@ async def bot_runner() -> None:
         log.info("Delaying first login for %ss (BOT_START_DELAY).", start_delay)
         await asyncio.sleep(start_delay)
     else:
-        await asyncio.sleep(random.randint(5, 15))  # jitter kecil
+        await asyncio.sleep(random.randint(5, 15))
 
     while True:
         bot = _new_bot()
+        ACTIVE_BOT = bot  # simpan untuk /bot_ready
         try:
             await _start_bot_async(bot)
-            break
+            break  # keluar normal jika bot.stop() dipanggil
         except PreflightError as e:
             await _force_close_http_session(bot)
             tries += 1
             base = 60 * (2 ** min(tries - 1, 4))
-            sleep_s = min(900, base + random.randint(0, 30))
+            sleep_s = min(900, base + random.randint(0, 30))  # max 15m
             logging.warning("[status] %s. Backoff %ss (try %s).", e, sleep_s, tries)
             await asyncio.sleep(sleep_s)
             continue
@@ -194,9 +249,16 @@ async def bot_runner() -> None:
             logging.exception("[status] Bot crashed; retry 30s")
             await asyncio.sleep(30)
         finally:
-            del bot
-            gc.collect()
+            # kalau belum ready, jangan pegang referensi supaya GC bersih
+            try:
+                ACTIVE_BOT = bot if getattr(bot, "is_ready")() else None
+            except Exception:
+                ACTIVE_BOT = None
+            if ACTIVE_BOT is None:
+                del bot
+                gc.collect()
 
+# ---------------- Orchestrator ----------------
 def main() -> None:
     mode = os.getenv("MODE", "bot").lower()
     log.info("Mode: %s", mode)
