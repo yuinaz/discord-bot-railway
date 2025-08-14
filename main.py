@@ -7,6 +7,7 @@ import logging
 import asyncio
 import random
 import importlib
+import time
 from typing import Optional
 
 try:
@@ -20,6 +21,11 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
 )
 log = logging.getLogger("startup")
+
+# ===== throttle log /ping (default 30 menit) =====
+LOG_PING = os.getenv("LOG_PING", "0") == "1"
+PING_LOG_INTERVAL = int(os.getenv("PING_LOG_INTERVAL", "1800"))  # detik; 1800 = 30 menit
+_last_ping_log_ts = 0.0
 
 # ===== state untuk /bot_ready =====
 ACTIVE_BOT: Optional[object] = None
@@ -102,6 +108,12 @@ def _add_common_routes(app):
 
     @app.route("/ping")
     def _ping():
+        global _last_ping_log_ts
+        if LOG_PING:
+            now = time.monotonic()
+            if now - _last_ping_log_ts >= PING_LOG_INTERVAL:
+                logging.getLogger("startup").info("[keepalive] /ping received")
+                _last_ping_log_ts = now
         return Response("pong", mimetype="text/plain")
 
     @app.route("/bot_ready")
@@ -157,9 +169,14 @@ def run_mini_web() -> None:
         import http.server, socketserver, json
         class Handler(http.server.SimpleHTTPRequestHandler):
             def do_GET(self):
-                global ACTIVE_BOT
+                global ACTIVE_BOT, _last_ping_log_ts
                 if self.path in ("/", "/healthz", "/ping", "/bot_ready", "/callback"):
                     if self.path == "/ping":
+                        if LOG_PING:
+                            now = time.monotonic()
+                            if now - _last_ping_log_ts >= PING_LOG_INTERVAL:
+                                logging.getLogger("startup").info("[keepalive] /ping received")
+                                _last_ping_log_ts = now
                         body, status, ctype = b"pong", 200, "text/plain"
                     elif self.path == "/bot_ready":
                         try:
