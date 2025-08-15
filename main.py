@@ -1,43 +1,77 @@
-import os, sys, threading
+import os, sys, threading, importlib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Tambahkan /satpambot ke sys.path agar bisa import "dashboard" dan "satpambot.bot"
+# support monorepo: import dari /satpambot kalau ada
 sys.path.append(os.path.join(BASE_DIR, "satpambot"))
 
-def start_bot():
-    """Jalankan Discord bot di thread terpisah (opsional)."""
-    try:
-        # Coba beberapa entrypoint yang umum
-        import importlib
-        for mod_name in ("satpambot.bot.main", "satpambot.bot.__main__"):
+def try_start_bot():
+    # Coba beberapa entrypoint umum
+    candidates = [
+        "satpambot.bot.main",
+        "satpambot.bot.__main__",
+        "modules.discord_bot.discord_bot",   # legacy
+        "bot.main",
+        "modules.discord_bot.__main__",
+    ]
+    for mod_name in candidates:
+        try:
+            mod = importlib.import_module(mod_name)
+            for fn in ("main", "run_bot", "run", "start"):
+                if hasattr(mod, fn):
+                    try:
+                        getattr(mod, fn)()
+                        return
+                    except Exception as e:
+                        print(f"[WARN] bot {mod_name}.{fn} gagal:", e)
+                        # lanjut cari kandidat lain
+            # fallback: import side-effect
+            return
+        except Exception:
+            continue
+    print("[INFO] Bot entrypoint tidak ditemukan; lewati start bot.")
+
+def serve_dashboard():
+    # Coba dengan SocketIO dulu, lalu fallback ke Flask biasa
+    candidates = [
+        ("dashboard.app", "socketio", "app"),
+        ("satpambot.dashboard.app", "socketio", "app"),
+        ("app", None, "app"),  # legacy root app.py
+    ]
+    for mod_name, sock_attr, app_attr in candidates:
+        try:
+            mod = importlib.import_module(mod_name)
+            app = getattr(mod, app_attr)
+            port = int(os.getenv("PORT", "10000"))
+            if sock_attr and hasattr(mod, sock_attr):
+                sock = getattr(mod, sock_attr)
+                try:
+                    sock.run(app, host="0.0.0.0", port=port)
+                    return
+                except Exception:
+                    pass
+            # Fallback: Flask biasa + /ping healthcheck
             try:
-                mod = importlib.import_module(mod_name)
-                if hasattr(mod, "main"):
-                    mod.main()
-                    return
-                if hasattr(mod, "run_bot"):
-                    mod.run_bot()
-                    return
+                app.add_url_rule("/ping", "ping", lambda: ("ok", 200))
             except Exception:
-                continue
-        # Fallback: import side-effect
-        __import__("satpambot.bot.main")
+                pass
+            app.run(host="0.0.0.0", port=port)
+            return
+        except Exception as e:
+            continue
+    # Ultimate fallback: minimal Flask supaya Render/UptimeRobot sehat
+    try:
+        from flask import Flask
+        app = Flask(__name__)
+        @app.get("/ping")
+        def ping(): return "ok", 200
+        port = int(os.getenv("PORT", "10000"))
+        app.run(host="0.0.0.0", port=port)
     except Exception as e:
-        print("[WARN] Bot tidak start:", e)
+        print("[FATAL] tidak ada app yang bisa dijalankan:", e)
+        raise
 
 if os.getenv("RUN_BOT", "1") != "0":
-    threading.Thread(target=start_bot, daemon=True).start()
+    threading.Thread(target=try_start_bot, daemon=True).start()
 
-try:
-    # Utama: dashboard Flask (dengan/atau tanpa SocketIO)
-    from dashboard.app import app, socketio  # type: ignore
-    port = int(os.getenv("PORT", "10000"))
-    try:
-        socketio.run(app, host="0.0.0.0", port=port)  # type: ignore
-    except Exception:
-        app.run(host="0.0.0.0", port=port)
-except ImportError:
-    # Jika tidak ada socketio
-    from dashboard.app import app  # type: ignore
-    port = int(os.getenv("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port)
+if __name__ == "__main__":
+    serve_dashboard()
