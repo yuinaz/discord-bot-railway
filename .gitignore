@@ -50,3 +50,8 @@ pnpm-debug.log*
 *.iml
 .DS_Store
 Thumbs.db
+
+# Ignore archives
+*.zip
+*.7z
+*.rar
