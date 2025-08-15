@@ -1,5 +1,6 @@
 import re, os, discord, asyncio, pathlib
 from discord.ext import commands
+from modules.discord_bot.utils.actions import delete_message_safe
 
 from ..helpers.env import (
     NSFW_INVITE_AUTOBAN, LOG_CHANNEL_ID,
@@ -124,8 +125,8 @@ class AntiInviteAutoban(commands.Cog):
         action_done = "moderation"
         try:
             if message.guild and message.guild.me and message.guild.me.guild_permissions.manage_messages:
-                try: await message.delete()
-                except Exception: pass
+                await delete_message_safe(message, actor='anti_invite_autoban')
+except Exception: pass
         except Exception: pass
 
         try:

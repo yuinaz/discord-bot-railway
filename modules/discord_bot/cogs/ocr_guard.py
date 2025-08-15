@@ -6,6 +6,7 @@ from typing import List, Optional
 
 import discord
 from discord.ext import commands
+from modules.discord_bot.utils.actions import delete_message_safe
 from PIL import Image
 
 try:
@@ -158,8 +159,8 @@ class OCRGuard(commands.Cog):
             return
 
         if action == "delete":
-            try: await message.delete()
-            except Exception: pass
+            await delete_message_safe(message, actor='ocr_guard')
+except Exception: pass
             if ch_log:
                 await ch_log.send(
                     f"🧹 Pesan {message.author.mention} dihapus (OCR). Alasan:\n• " + "\n• ".join(reasons)
