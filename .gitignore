@@ -1,10 +1,23 @@
+# === Env & local config ===
 .env
 .env.*
 .env.local
 .env.prod
+
+# === Arsip & sumber lama ===
+archive/
+original_src/
+
+# === Upload/media ===
 **/static/uploads/
+satpambot/dashboard/static/uploads/
+
+# === Data runtime bot ===
+satpambot/bot/data/
 *.sqlite3
 *.db
+
+# === Python caches/build ===
 **/__pycache__/
 *.py[cod]
 .mypy_cache/
@@ -16,6 +29,8 @@ build/
 dist/
 .eggs/
 *.egg-info/
+
+# === Node/FE artefacts ===
 node_modules/
 dist/
 build/
@@ -28,6 +43,8 @@ yarn-debug.log*
 pnpm-debug.log*
 .pnp
 .pnp.js
+
+# === IDE/OS ===
 .vscode/
 .idea/
 *.iml
