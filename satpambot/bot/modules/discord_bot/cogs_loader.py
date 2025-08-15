@@ -1,12 +1,9 @@
 from __future__ import annotations
-
-import logging
-import pkgutil
-import importlib
+import logging, pkgutil, importlib, os
 
 logger = logging.getLogger(__name__)
-
 DEFAULT_SKIP = {'commands_probe'}
+DISABLED_COGS = set((os.getenv('DISABLED_COGS') or 'image_poster').split(','))
 
 def _iter_cogs_package(package_name: str):
     try:
@@ -26,7 +23,7 @@ async def load_all(bot):
     loaded = set()
     for name in _iter_all_candidates():
         base = name.split(".")[-1]
-        if base in loaded or base in DEFAULT_SKIP:
+        if base in loaded or base in DEFAULT_SKIP or base in DISABLED_COGS:
             continue
         try:
             await bot.load_extension(name)

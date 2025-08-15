@@ -1,51 +1,44 @@
 import os
-from flask import Blueprint, request, session, redirect, render_template_string, jsonify
+from flask import Blueprint, request, session, redirect, render_template, jsonify
 
-admin_fallback_bp = Blueprint('admin_fallback', __name__)
+admin_fallback_bp = Blueprint("admin_fallback", __name__)
+
+# integrate theme helpers without modifying app.py
+@admin_fallback_bp.record_once
+def _init_theme(setup_state):
+    try:
+        from satpambot.app_theme_context_patch import attach_theme_context, register_theme_routes
+        app = setup_state.app
+        attach_theme_context(app)
+        register_theme_routes(app)
+    except Exception:
+        pass
 
 def _creds():
-    u = os.getenv('ADMIN_USERNAME') or os.getenv('SUPER_ADMIN_USER')
-    p = os.getenv('ADMIN_PASSWORD') or os.getenv('SUPER_ADMIN_PASS')
-    return (u or '').strip(), (p or '').strip()
+    u = os.getenv("ADMIN_USERNAME") or os.getenv("SUPER_ADMIN_USER")
+    p = os.getenv("ADMIN_PASSWORD") or os.getenv("SUPER_ADMIN_PASS")
+    return (u or "").strip(), (p or "").strip()
 
-@admin_fallback_bp.route('/admin/login', methods=['GET','POST'])
+@admin_fallback_bp.route("/admin/login", methods=["GET","POST"])
 def admin_login():
     USER, PASS = _creds()
-    err = None
     if not USER or not PASS:
-        return render_template_string('<p>Set ADMIN_USERNAME/ADMIN_PASSWORD atau SUPER_ADMIN_USER/SUPER_ADMIN_PASS di Render.</p>')
-    if request.method == 'POST':
-        u = (request.form.get('username') or '').strip()
-        p = (request.form.get('password') or '').strip()
+        return render_template("login.html", err="Set ADMIN_USERNAME/ADMIN_PASSWORD atau SUPER_ADMIN_USER/SUPER_ADMIN_PASS di Render.")
+    err=None
+    if request.method == "POST":
+        u = (request.form.get("username") or "").strip()
+        p = (request.form.get("password") or "").strip()
         if u == USER and p == PASS:
-            session['is_admin'] = True
-            session['admin_user'] = u
-            return redirect('/')
-        err = 'Username / password salah'
-    return render_template_string('''<!doctype html>
-<meta name=viewport content="width=device-width, initial-scale=1">
-<style>
-body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;background:#0b0e14;color:#e6e6e6;display:grid;place-items:center;height:100vh;margin:0}
-.card{background:#141923;border:1px solid #222b3b;border-radius:16px;padding:24px;min-width:320px;box-shadow:0 8px 32px rgba(0,0,0,.35)}
-input,button{width:100%;padding:10px 12px;border-radius:10px}
-input{border:1px solid #334;background:#0f1320;color:#e6e6e6;margin-top:8px}
-button{margin-top:12px;border:none;background:#5865F2;color:#fff;font-weight:600;cursor:pointer}
-.err{color:#ff6b6b;margin:8px 0 0 0;font-size:.9rem}
-</style>
-<div class=card>
-  <h2>Login Admin</h2>
-  {% if err %}<div class=err>{{err}}</div>{% endif %}
-  <form method=POST>
-    <label>Username</label><input name=username autocomplete=username>
-    <label>Password</label><input name=password type=password autocomplete=current-password>
-    <button type=submit>Masuk</button>
-  </form>
-</div>''', err=err)
+            session["is_admin"] = True
+            session["admin_user"] = u
+            return redirect("/")
+        err = "Username / password salah"
+    return render_template("login.html", err=err)
 
-@admin_fallback_bp.route('/logout')
+@admin_fallback_bp.route("/logout")
 def admin_logout():
-    session.clear(); return redirect('/')
+    session.clear(); return redirect("/")
 
-@admin_fallback_bp.route('/api/me')
+@admin_fallback_bp.route("/api/me")
 def me():
-    return jsonify({'admin': bool(session.get('is_admin')), 'user': session.get('admin_user')})
+    return jsonify({"admin": bool(session.get("is_admin")), "user": session.get("admin_user")})
