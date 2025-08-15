@@ -7,6 +7,7 @@ import signal
 import logging
 import asyncio
 import importlib
+from modules.discord_bot.helpers.notify_hooks import notify_webhook
 from typing import Optional, Any
 
 # ---------- logging ----------
@@ -25,28 +26,7 @@ def setup_logging() -> logging.Logger:
     logging.getLogger().addFilter(_DropWarnings())
 
     # ---- SENYAPKAN /healthz & HEAD / dari werkzeug ----
-    class _SilenceHealthz(logging.Filter):
-        pass
-
-    class _SilenceSpam(logging.Filter):
-        def filter(self, record: logging.LogRecord) -> bool:
-            msg = record.getMessage()
-            if 'We are being rate limited' in msg:
-                return False
-            if '[cogs_loader] skip' in msg:
-                return False
-            return True
-        def filter(self, record: logging.LogRecord) -> bool:
-            msg = record.getMessage()
-            # Render health check /healthz
-            if '"/healthz' in msg:
-                return False
-            # HEAD / dari health probe internal
-            if '"HEAD / ' in msg:
-                return False
-            return True
-
-    wz = logging.getLogger("werkzeug")
+            wz = logging.getLogger("werkzeug")
     quiet = os.getenv("QUIET_HEALTHZ", "1").strip().lower() in {"1", "true", "yes", "y", "on"}
     if quiet:
         wz.addFilter(_SilenceHealthz())
@@ -228,6 +208,10 @@ def main():
         mode = "botmini"
 
     log.info("🌐 Mode: %s", mode)
+    try:
+        notify_webhook('startup')
+    except Exception:
+        pass
     host = os.getenv("HOST", "0.0.0.0")
     port = get_port()
 
@@ -236,6 +220,10 @@ def main():
 
     def on_signal(*_):
         log.info("Signal diterima, shutdown...")
+        try:
+            notify_webhook('shutdown')
+        except Exception:
+            pass
         # biarkan tugas dibatalkan di finally
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
