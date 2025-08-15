@@ -1,2 +1,9 @@
+# Root aggregator
+-r archive/2025-08-15_original_src/original_src/requirements-windows.txt
+-r archive/2025-08-15_original_src/original_src/requirements.txt
 -r satpambot/bot/requirements.txt
 -r satpambot/dashboard/requirements.txt
+flask
+flask-socketio
+eventlet
+requests

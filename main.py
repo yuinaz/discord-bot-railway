@@ -1,15 +1,26 @@
-import os, sys, threading, importlib
+import os, sys, threading, importlib, asyncio, inspect
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # support monorepo: import dari /satpambot kalau ada
 sys.path.append(os.path.join(BASE_DIR, "satpambot"))
 
 def try_start_bot():
-    # Coba beberapa entrypoint umum
+    # 1) Hormati RUN_BOT
+    if os.getenv("RUN_BOT", "1") == "0":
+        print("[INFO] RUN_BOT=0 → skip start bot")
+        return
+
+    # 2) Wajib ada token
+    token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
+    if not token:
+        print("[INFO] Skip start bot: BOT_TOKEN/DISCORD_TOKEN tidak diset")
+        return
+
+    # 3) Cari entrypoint umum
     candidates = [
         "satpambot.bot.main",
         "satpambot.bot.__main__",
-        "modules.discord_bot.discord_bot",   # legacy
+        "modules.discord_bot.discord_bot",  # legacy
         "bot.main",
         "modules.discord_bot.__main__",
     ]
@@ -18,26 +29,38 @@ def try_start_bot():
             mod = importlib.import_module(mod_name)
             for fn in ("main", "run_bot", "run", "start"):
                 if hasattr(mod, fn):
+                    func = getattr(mod, fn)
                     try:
-                        getattr(mod, fn)()
+                        # dukung async & sync
+                        if inspect.iscoroutinefunction(func):
+                            asyncio.run(func())
+                        else:
+                            res = func()
+                            if inspect.iscoroutine(res):
+                                asyncio.run(res)
+                        print(f"[INFO] Bot started via {mod_name}.{fn}")
                         return
                     except Exception as e:
-                        print(f"[WARN] bot {mod_name}.{fn} gagal:", e)
-                        # lanjut cari kandidat lain
+                        print(f"[WARN] {mod_name}.{fn} gagal: {e}")
+                        continue
             # fallback: import side-effect
-            return
+            try:
+                importlib.import_module(mod_name)
+                print(f"[INFO] Bot imported (side-effect): {mod_name}")
+                return
+            except Exception:
+                pass
         except Exception:
             continue
-    print("[INFO] Bot entrypoint tidak ditemukan; lewati start bot.")
+    print("[INFO] Tidak menemukan entrypoint bot yang cocok; skip.")
 
 def serve_dashboard():
-    # Coba dengan SocketIO dulu, lalu fallback ke Flask biasa
-    candidates = [
+    # Coba dashboard dengan SocketIO dulu
+    for mod_name, sock_attr, app_attr in [
         ("dashboard.app", "socketio", "app"),
         ("satpambot.dashboard.app", "socketio", "app"),
-        ("app", None, "app"),  # legacy root app.py
-    ]
-    for mod_name, sock_attr, app_attr in candidates:
+        ("app", None, "app"),  # legacy root
+    ]:
         try:
             mod = importlib.import_module(mod_name)
             app = getattr(mod, app_attr)
@@ -49,16 +72,17 @@ def serve_dashboard():
                     return
                 except Exception:
                     pass
-            # Fallback: Flask biasa + /ping healthcheck
+            # Fallback: Flask biasa + /ping
             try:
                 app.add_url_rule("/ping", "ping", lambda: ("ok", 200))
             except Exception:
                 pass
             app.run(host="0.0.0.0", port=port)
             return
-        except Exception as e:
+        except Exception:
             continue
-    # Ultimate fallback: minimal Flask supaya Render/UptimeRobot sehat
+
+    # Fallback terakhir: mini Flask supaya sehat di Render/UptimeRobot
     try:
         from flask import Flask
         app = Flask(__name__)
@@ -70,8 +94,7 @@ def serve_dashboard():
         print("[FATAL] tidak ada app yang bisa dijalankan:", e)
         raise
 
-if os.getenv("RUN_BOT", "1") != "0":
-    threading.Thread(target=try_start_bot, daemon=True).start()
-
 if __name__ == "__main__":
+    # Start bot di thread terpisah (kalau diizinkan & token ada)
+    threading.Thread(target=try_start_bot, daemon=True).start()
     serve_dashboard()
