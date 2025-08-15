@@ -158,3 +158,21 @@ try:
 except Exception:
     pass
 
+
+# --- API fallback saat bot OFF (dipasang hanya kalau route belum ada) ---
+try:
+    import os
+    from flask import jsonify
+    # /api/live
+    if not any(getattr(r, "rule", None) == "/api/live" for r in app.url_map.iter_rules()):
+        @app.get("/api/live")
+        def __api_live_fallback():
+            return jsonify(ok=True, live=True, bot="off", env=os.getenv("ENV","local")), 200
+    # /api/ping
+    if not any(getattr(r, "rule", None) == "/api/ping" for r in app.url_map.iter_rules()):
+        @app.get("/api/ping")
+        def __api_ping_fallback():
+            return jsonify(ok=True, pong=True), 200
+except Exception:
+    pass
+
