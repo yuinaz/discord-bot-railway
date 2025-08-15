@@ -76,6 +76,15 @@ class TestbanHybrid(commands.Cog):
     # Slash alias eksplisit: /tb
     @app_commands.command(name="tb", description="Alias dari /testban")
     async def testban_slash_alias(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+    # dedupe guard untuk !tb
+    try:
+        from ..helpers.once import once as _once
+        if ctx and hasattr(ctx, 'message'):
+            _key = f"tb:{ctx.guild.id}:{ctx.channel.id}:{ctx.message.id}"
+            if not await _once(_key, ttl=8):
+                return
+    except Exception:
+        pass
         ctx = await commands.Context.from_interaction(interaction)
         await self._simulate(ctx, member)
 

@@ -1,4 +1,21 @@
 from __future__ import annotations
+# === BAN_DEDUP_PATCH: cegah ban ganda (TTL=10s) ===
+try:
+    import discord, os as _os
+    from .helpers.once import once_sync as _once_sync
+    _real_ban = discord.Guild.ban
+    async def _ban_once(self, user, *args, **kwargs):
+        _ttl = int(_os.getenv("BAN_DEDUP_TTL","10"))
+        _uid = getattr(user, "id", user)
+        _key = f"ban:{self.id}:{_uid}"
+        if not _once_sync(_key, ttl=_ttl):
+            return  # duplicate, skip
+        return await _real_ban(self, user, *args, **kwargs)
+    discord.Guild.ban = _ban_once
+except Exception as _e:
+    print("[WARN] ban dedupe patch gagal:", _e)
+# === END BAN_DEDUP_PATCH ===
+
 import os
 import logging
 import asyncio
