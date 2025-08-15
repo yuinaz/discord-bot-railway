@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Resilient Discord bot bootstrapper (async-friendly + legacy shim)
+Discord bot bootstrapper (async-friendly + legacy shim + quiet logs)
 - Hardcoded primary path: satpambot.bot.modules.discord_bot.discord_bot
-- Installs 'modules' shim so legacy imports work
+- Installs 'modules' shim for legacy imports
 - Handles entrypoints that call asyncio.run() by offloading to a thread
 - Supervisor via BOT_SUPERVISE=1 (default 1)
+- Reduces 429 noise from discord/http logs
 """
 
-import os, sys, asyncio, importlib, inspect, traceback, threading
+import os, sys, asyncio, importlib, inspect, traceback, threading, logging
+
+# Quiet noisy loggers (reduce 429 spam)
+logging.getLogger('discord').setLevel(logging.INFO)
+logging.getLogger('discord.http').setLevel(logging.ERROR)
+logging.getLogger('aiohttp.client').setLevel(logging.ERROR)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SATPAMBOT_DIR = os.path.dirname(BASE_DIR)          # .../satpambot

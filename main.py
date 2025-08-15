@@ -1,7 +1,22 @@
-import os, sys, threading, importlib, asyncio, inspect
+import os, sys, threading, importlib, asyncio, inspect, logging
+from werkzeug.serving import WSGIRequestHandler
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, "satpambot"))
+
+# --- Reduce Flask/Werkzeug log noise (especially /ping) ---
+class NoPingWSGIRequestHandler(WSGIRequestHandler):
+    def log_request(self, code='-', size='-'):
+        try:
+            # Avoid logging health checks
+            if getattr(self, 'path', '').startswith('/ping'):
+                return
+        except Exception:
+            pass
+        super().log_request(code, size)
+
+# Lower werkzeug verbosity (still shows startup lines)
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 def ensure_dirs():
     for rel in ("satpambot/dashboard/static/uploads", "satpambot/bot/data"):
@@ -22,7 +37,6 @@ def try_start_bot():
 
     def _run():
         try:
-            # First choice: our monorepo bootstrapper
             candidates = [
                 "satpambot.bot.main",
                 "satpambot.bot.__main__",
@@ -33,7 +47,6 @@ def try_start_bot():
             for mod_name in candidates:
                 try:
                     mod = importlib.import_module(mod_name)
-                    # pick function
                     for fn in ("main", "run_bot", "run", "start"):
                         if hasattr(mod, fn):
                             func = getattr(mod, fn)
@@ -65,7 +78,6 @@ def try_start_bot():
         threading.Thread(target=_run, daemon=True).start()
 
 def serve_dashboard():
-    # Try SocketIO first, then Flask
     for mod_name, sock_attr, app_attr in [
         ("app", "socketio", "app"),
         ("dashboard.app", "socketio", "app"),
@@ -81,7 +93,7 @@ def serve_dashboard():
             if sock_attr and hasattr(mod, sock_attr):
                 sock = getattr(mod, sock_attr)
                 try:
-                    sock.run(app, host="0.0.0.0", port=port)
+                    sock.run(app, host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler)
                     return
                 except Exception:
                     pass
@@ -89,17 +101,17 @@ def serve_dashboard():
                 app.add_url_rule("/ping", "ping", lambda: ("ok", 200))
             except Exception:
                 pass
-            app.run(host="0.0.0.0", port=port)
+            app.run(host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler)
             return
         except Exception:
             continue
-    # Last resort mini web
+    # Minimal fallback
     from flask import Flask
     mini = Flask("mini-web")
     @mini.get("/ping")
     def ping(): return "ok", 200
     port = int(os.getenv("PORT", "10000"))
-    mini.run(host="0.0.0.0", port=port)
+    mini.run(host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler)
 
 if __name__ == "__main__":
     ensure_dirs()
