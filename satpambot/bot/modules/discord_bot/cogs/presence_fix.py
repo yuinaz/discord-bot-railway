@@ -1,8 +1,13 @@
 
 from __future__ import annotations
 import os
+from ..helpers.sticky import upsert_sticky
 import discord
 from discord.ext import commands
+
+import time
+_PRESENCE_LAST_TS = {}
+_PRESENCE_MIN_SEC = int(os.getenv('PRESENCE_COOLDOWN','300'))
 
 class PresenceFix(commands.Cog):
     """Paksa presence ONLINE + activity default, dan sediakan !alive."""
@@ -11,6 +16,15 @@ class PresenceFix(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        try:
+            g = getattr(getattr(ctx,'guild',None) or getattr(message,'guild',None) or getattr(self.bot,'guild',None), 'id', None)
+        except Exception:
+            g = None
+        if g is not None:
+            now = time.time()
+            if (_PRESENCE_LAST_TS.get(g) and now - _PRESENCE_LAST_TS[g] < _PRESENCE_MIN_SEC):
+                return
+            _PRESENCE_LAST_TS[g] = now
         mode = os.getenv("BOT_PRESENCE", "online").lower()
         mapping = {
             "online": discord.Status.online,
