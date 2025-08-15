@@ -196,3 +196,32 @@ _ASSETS_DIR=_os.path.join(_os.path.dirname(__file__),'static','assets')
 @app.route('/assets/<path:filename>')
 def _assets(filename):
     return _sfd(_ASSETS_DIR, filename)
+
+
+# --- admin fallback integration ---
+import os
+try:
+    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-key')
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = bool(os.getenv('SESSION_COOKIE_SECURE','1')!='0')
+except Exception:
+    pass
+try:
+    from .admin_fallback import admin_fallback_bp
+except Exception:
+    from admin_fallback import admin_fallback_bp
+try:
+    app.register_blueprint(admin_fallback_bp)
+except Exception:
+    pass
+
+# Aliases so these URLs always work
+from flask import redirect
+@app.route('/login')
+def _login_alias():
+    return redirect('/admin/login', 302)
+
+@app.route('/discord/login')
+def _discord_login_alias():
+    return redirect('/admin/login', 302)
+
