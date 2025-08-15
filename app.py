@@ -1,5 +1,4 @@
-# Root app shim so imports of `app` work.
-# It simply forwards to your dashboard module if present.
+# Root app shim (for imports of `app`)
 try:
     from dashboard.app import app, socketio  # type: ignore
 except Exception:

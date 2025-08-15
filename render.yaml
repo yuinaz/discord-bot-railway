@@ -1,1 +1,23 @@
-# (paste isi YAML di atas)
+services:
+  - type: web
+    name: SatpamBot
+    env: python
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /ping
+    autoDeploy: true
+    envVars:
+      - key: MODE
+        value: both
+      - key: TZ
+        value: Asia/Jakarta
+      - key: BOT_TOKEN
+        sync: false
+      - key: LOG_CHANNEL_ID
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: FLASK_SECRET_KEY
+        generateValue: true

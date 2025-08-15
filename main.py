@@ -1,11 +1,16 @@
 import os, sys, threading, importlib, asyncio, inspect
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Support monorepo layout: allow importing from /satpambot
 sys.path.append(os.path.join(BASE_DIR, "satpambot"))
 
+def ensure_dirs():
+    for rel in ("satpambot/dashboard/static/uploads", "satpambot/bot/data"):
+        try:
+            os.makedirs(os.path.join(BASE_DIR, rel), exist_ok=True)
+        except Exception:
+            pass
+
 def try_start_bot():
-    # Only start if MODE allows and token exists
     mode = os.getenv("MODE", "both").lower()
     if mode not in ("both", "bot", "botmini"):
         print(f"[INFO] MODE={mode} -> bot disabled")
@@ -17,34 +22,27 @@ def try_start_bot():
 
     def _run():
         try:
-            # Try multiple known entrypoints
+            # First choice: our monorepo bootstrapper
             candidates = [
-                os.getenv("BOT_ENTRY"),  # explicit override
                 "satpambot.bot.main",
                 "satpambot.bot.__main__",
                 "modules.discord_bot.discord_bot",  # legacy
                 "bot.main",
                 "modules.discord_bot.__main__",
             ]
-            candidates = [c for c in candidates if c]
-            if not candidates:
-                candidates = ["satpambot.bot.main", "modules.discord_bot.discord_bot", "bot.main"]
             for mod_name in candidates:
                 try:
                     mod = importlib.import_module(mod_name)
-                    # choose function
-                    fn_name = os.getenv("BOT_FUNC", "").strip() or None
-                    fns = [fn_name] if fn_name else ["main", "run_bot", "run", "start"]
-                    for fn in fns:
-                        if not fn or not hasattr(mod, fn):
-                            continue
-                        func = getattr(mod, fn)
-                        if inspect.iscoroutinefunction(func):
-                            return asyncio.run(func())
-                        res = func()
-                        if inspect.iscoroutine(res):
-                            return asyncio.run(res)
-                        return
+                    # pick function
+                    for fn in ("main", "run_bot", "run", "start"):
+                        if hasattr(mod, fn):
+                            func = getattr(mod, fn)
+                            if inspect.iscoroutinefunction(func):
+                                return asyncio.run(func())
+                            res = func()
+                            if inspect.iscoroutine(res):
+                                return asyncio.run(res)
+                            return
                 except Exception as e:
                     print(f"[WARN] bot entry {mod_name} failed: {e}")
             print("[INFO] No bot entrypoint matched; skip.")
@@ -67,13 +65,12 @@ def try_start_bot():
         threading.Thread(target=_run, daemon=True).start()
 
 def serve_dashboard():
-    mode = os.getenv("MODE", "both").lower()
-    # Try SocketIO app first
+    # Try SocketIO first, then Flask
     for mod_name, sock_attr, app_attr in [
-        ("app", "socketio", "app"),  # root shim (we ship this)
+        ("app", "socketio", "app"),
         ("dashboard.app", "socketio", "app"),
         ("satpambot.dashboard.app", "socketio", "app"),
-        ("app", None, "app"),        # plain Flask fallback
+        ("app", None, "app"),
         ("dashboard.app", None, "app"),
         ("satpambot.dashboard.app", None, "app"),
     ]:
@@ -94,10 +91,9 @@ def serve_dashboard():
                 pass
             app.run(host="0.0.0.0", port=port)
             return
-        except Exception as e:
+        except Exception:
             continue
-
-    # Last resort: tiny Flask so /ping works
+    # Last resort mini web
     from flask import Flask
     mini = Flask("mini-web")
     @mini.get("/ping")
@@ -106,5 +102,6 @@ def serve_dashboard():
     mini.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
+    ensure_dirs()
     try_start_bot()
     serve_dashboard()

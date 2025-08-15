@@ -1,29 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Resilient Discord bot bootstrapper (permanent + legacy shim)
-- Prioritizes: satpambot.bot.modules.discord_bot.discord_bot
-- Installs a 'modules' shim at runtime for legacy absolute imports
-- Supports async/sync entrypoints (main/run_bot/run/start)
-- Optional supervisor (auto-restart) via BOT_SUPERVISE=1 (default 1)
+Resilient Discord bot bootstrapper (async-friendly + legacy shim)
+- Hardcoded primary path: satpambot.bot.modules.discord_bot.discord_bot
+- Installs 'modules' shim so legacy imports work
+- Handles entrypoints that call asyncio.run() by offloading to a thread
+- Supervisor via BOT_SUPERVISE=1 (default 1)
 """
 
-import os, sys, asyncio, importlib, inspect, traceback
+import os, sys, asyncio, importlib, inspect, traceback, threading
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SATPAMBOT_DIR = os.path.dirname(BASE_DIR)          # .../satpambot
 REPO_ROOT = os.path.dirname(SATPAMBOT_DIR)         # repo root
 
-# Ensure search paths
 for p in (REPO_ROOT, SATPAMBOT_DIR):
     if p and p not in sys.path:
         sys.path.insert(0, p)
 
-# ---- Install legacy 'modules' alias so imports like 'modules.discord_bot.*' work ----
+# Legacy 'modules' alias
 try:
     if 'modules' not in sys.modules:
         sys.modules['modules'] = importlib.import_module('satpambot.bot.modules')
 except Exception as _e:
-    # Non-fatal; bootstrap will still try monorepo paths
     print('[WARN] legacy modules shim unavailable:', _e)
 
 def _env(k, default=None):
@@ -31,9 +29,7 @@ def _env(k, default=None):
     return v if v not in (None, "") else default
 
 def candidates():
-    # Permanent correct path for your repo
     yield "satpambot.bot.modules.discord_bot.discord_bot"
-    # Other guesses (legacy/alternative)
     for name in (
         "modules.discord_bot.discord_bot",
         "satpambot.modules.discord_bot.discord_bot",
@@ -52,6 +48,27 @@ def find_entry(mod):
             return getattr(mod, name)
     return None
 
+async def _awaitable_call(entry):
+    if inspect.iscoroutinefunction(entry):
+        return await entry()  # type: ignore
+    res = entry()
+    if inspect.iscoroutine(res):
+        return await res
+    return res
+
+def _call_in_thread(fn):
+    exc = {}
+    def target():
+        try:
+            fn()
+        except Exception as e:
+            exc['e'] = e
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join()
+    if 'e' in exc:
+        raise exc['e']
+
 async def run_once():
     token = _env("DISCORD_TOKEN") or _env("BOT_TOKEN")
     if not token:
@@ -65,12 +82,14 @@ async def run_once():
             if not entry:
                 tried.append(f"{name} (no entry)")
                 continue
-            res = entry()
-            if inspect.iscoroutine(res):
-                await res
-            elif inspect.iscoroutinefunction(entry):
-                await entry()  # type: ignore
-            return
+            try:
+                return await _awaitable_call(entry)
+            except RuntimeError as re:
+                msg = str(re)
+                if 'asyncio.run() cannot be called from a running event loop' in msg or 'This event loop is already running' in msg:
+                    _call_in_thread(entry)
+                    return
+                raise
         except Exception as e:
             last = e
             tried.append(f"{name} ({e})")
