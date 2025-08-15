@@ -1,88 +1,26 @@
-# ---- Python ----
+# Python
 __pycache__/
-<<<<<<< HEAD
-*.pyc
-.venv/
-node_modules/
-.DS_Store
-Thumbs.db
-*.zip
-# DB lokal dan cache (jangan track di git)
-*.db
-*.jsonl
-bot/data/vt_cache.json
-# Kecualikan jika memang ingin dilacak:
-!dashboard/superadmin.db
-original_src/
-__pycache__/
-*.pyc
-original_src/
-__pycache__/
-*.pyc
-.venv/
-*.zip
-*.log
-*.db
-*.jsonl
-=======
 *.py[cod]
-*.pyd
-.Python
-env/
-venv/
-.venv/
-ENV/
-build/
-dist/
-.eggs/
-*.egg-info/
-.mypy_cache/
-.pytest_cache/
-.coverage
-coverage/
-coverage.xml
-htmlcov/
-.cache/
-.ipynb_checkpoints
-.pyre/
-.pytype/
-instance/
-*.sqlite3
-*.log
+env/ venv/ .venv/
+build/ dist/ .eggs/ *.egg-info/
+.mypy_cache/ .pytest_cache/ .coverage coverage/ htmlcov/ .cache/
+instance/ *.sqlite3 *.log
 
 # Flask/Render
 uploads/
 .env
 .env.*
 !.env.example
-# penting: jangan ignore ini
-# !requirements.txt
-# !render.yaml
-# !Procfile
+!requirements.txt
+!render.yaml
+!Procfile
 
-# ---- Node/JS (frontend/dashboard) ----
+# Node / Frontend
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.pnp
-.pnp.js
-.pnpm-debug.log*
-.nyc_output/
-coverage/
-dist/
-build/
-.next/
-out/
-.vite/
-storybook-static/
-.cache/
+dist/ build/ .next/ out/ .vite/ storybook-static/
+npm-debug.log* yarn-debug.log* pnpm-debug.log* .pnp .pnp.js
 
-# ---- IDE / OS ----
-.vscode/
-.idea/
-*.iml
+# IDE / OS
+.vscode/ .idea/ *.iml
 .DS_Store
 Thumbs.db
->>>>>>> origin/main
