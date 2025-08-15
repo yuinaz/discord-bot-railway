@@ -40,6 +40,16 @@ logging.basicConfig(
 )
 log = logging.getLogger("entry")
 
+def _configure_quiet_access_log():
+    # QUIET_ACCESS_LOG=1 (default) menyembunyikan access log dari werkzeug/urllib3
+    if (os.getenv('QUIET_ACCESS_LOG','1') != '0'):
+        try:
+            logging.getLogger('werkzeug').setLevel(logging.ERROR)
+            logging.getLogger('urllib3').setLevel(logging.ERROR)
+        except Exception:
+            pass
+
+
 
 def get_flask_app():
     """Import dashboard Flask app; fallback to a tiny web if import fails."""
@@ -98,7 +108,9 @@ def main():
 
     app = get_flask_app()
 
-    if should_run_bot():
+    
+    _configure_quiet_access_log()
+if should_run_bot():
         threading.Thread(target=_run_supervisor, name="bot-supervisor", daemon=True).start()
         log.info("🤖 Bot supervisor started in background")
 
