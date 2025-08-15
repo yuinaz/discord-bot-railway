@@ -6,6 +6,10 @@ from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
+import time
+import hmac
+import hashlib
+import requests
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
@@ -19,6 +23,34 @@ DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "app.db"
 CFG_PATH = DATA_DIR / "config.json"
+
+# === Discord OAuth & Remote Bot Bridge (added) ===
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", "").strip()
+DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "").strip()
+OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "").strip()  # e.g. https://satpambot-dashboard.onrender.com/callback
+BOT_BASE_URL = os.getenv("BOT_BASE_URL", "").rstrip("/")          # e.g. https://satpambot-n0c2.onrender.com
+SHARED_DASH_TOKEN = os.getenv("SHARED_DASH_TOKEN", "")            # MUST match bot service
+
+DISCORD_API = "https://discord.com/api/v10"
+
+def _hmac_headers(method: str, path: str, body: str = ""):
+    ts = str(int(time.time()))
+    raw = (method + "\n" + path + "\n" + body + "\n" + ts).encode("utf-8")
+    sig = hmac.new(SHARED_DASH_TOKEN.encode("utf-8"), raw, hashlib.sha256).hexdigest() if SHARED_DASH_TOKEN else ""
+    h = {"Content-Type": "application/json"}
+    if SHARED_DASH_TOKEN:
+        h.update({"X-Auth": f"Bearer {SHARED_DASH_TOKEN}", "X-Sign": sig, "X-Ts": ts})
+    return h
+
+def _bot_get(path: str):
+    url = BOT_BASE_URL + path
+    return requests.get(url, headers=_hmac_headers("GET", path, ""), timeout=10)
+
+def _bot_post(path: str, payload: dict):
+    import json as _json
+    body = _json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    url = BOT_BASE_URL + path
+    return requests.post(url, headers=_hmac_headers("POST", path, body), data=body.encode("utf-8"), timeout=10)
 
 def init_db():
     with sqlite3.connect(DB_PATH) as c:
@@ -158,6 +190,84 @@ def upload_logo():
     final = _save_asset("logo", local_path, url)
     return jsonify({"ok": True, "url": final})
 
+
+# === OAuth routes (added) ===
+@app.get("/discord/login")
+def discord_login():
+    if not (DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET and OAUTH_REDIRECT_URI):
+        return "Discord OAuth belum dikonfigurasi (set DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET/OAUTH_REDIRECT_URI).", 500
+    params = {
+        "client_id": DISCORD_CLIENT_ID,
+        "redirect_uri": OAUTH_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "identify guilds",
+        "prompt": "none",
+    }
+    qs = "&".join(f"{k}={requests.utils.quote(str(v))}" for k, v in params.items())
+    return redirect(f"https://discord.com/api/oauth2/authorize?{qs}")
+
+@app.get("/callback")
+def discord_callback():
+    code = request.args.get("code")
+    if not code:
+        return "Missing code", 400
+    data = {
+        "client_id": DISCORD_CLIENT_ID,
+        "client_secret": DISCORD_CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": OAUTH_REDIRECT_URI,
+    }
+    r = requests.post(f"{DISCORD_API}/oauth2/token", data=data, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=10)
+    if r.status_code != 200:
+        return f"Token exchange failed: {r.status_code} {r.text}", 400
+    tok = r.json()
+    session["oauth"] = tok
+    # fetch user + guilds
+    h = {"Authorization": f"Bearer {tok['access_token']}"}
+    u = requests.get(f"{DISCORD_API}/users/@me", headers=h, timeout=10).json()
+    g = requests.get(f"{DISCORD_API}/users/@me/guilds", headers=h, timeout=10).json()
+    session["discord_user"] = u
+    session["discord_guilds"] = g
+    return redirect(url_for("servers"))
+
+# === Remote bot APIs (added) ===
+@app.get("/api/guilds")
+def api_guilds():
+    # requires Discord login to know manageable guilds; fallback to admin session
+    guilds = session.get("discord_guilds", [])
+    try:
+        bot_ids = set(_bot_get("/internal/api/guilds").json())
+    except Exception:
+        bot_ids = set()
+    out = []
+    for g in guilds:
+        gid = str(g.get("id"))
+        # MANAGE_GUILD (0x20) or ADMIN (0x8)
+        try:
+            perms = int(g.get("permissions", "0"))
+        except Exception:
+            perms = 0
+        manageable = (perms & 0x20) != 0 or (perms & 0x8) != 0
+        out.append({
+            "id": gid,
+            "name": g.get("name"),
+            "system_channel_id": g.get("system_channel_id"),
+            "manageable": manageable,
+            "bot_present": gid in bot_ids,
+        })
+    return jsonify({"ok": True, "data": out})
+
+@app.get("/api/guilds/<gid>/status")
+def api_guild_status(gid: str):
+    r = _bot_get(f"/internal/api/guilds/{gid}/status")
+    return (r.text, r.status_code, {"Content-Type":"application/json"})
+
+@app.post("/api/guilds/<gid>/say")
+def api_guild_say(gid: str):
+    payload = request.get_json(silent=True) or {}
+    r = _bot_post(f"/internal/api/guilds/{gid}/say", payload)
+    return (r.text, r.status_code, {"Content-Type":"application/json"})
 
 @app.get('/healthz')
 def healthz():

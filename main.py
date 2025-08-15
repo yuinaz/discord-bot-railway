@@ -127,6 +127,15 @@ def build_mini_app():
     def callback():
         return "ok", 200
 
+
+    # Register internal API if available (secure link from dashboard)
+    try:
+        from modules.discord_bot.web_api import make_api_blueprint
+        token = os.getenv("SHARED_DASH_TOKEN", "")
+        app.register_blueprint(make_api_blueprint(token), url_prefix="/internal/api")
+    except Exception as e:
+        log.warning("Internal API not mounted: %s", e)
+
     return app, state
 
 def run_web(app, socketio=None, host="0.0.0.0", port: int = 10000):
