@@ -1,29 +1,22 @@
-# permissions helper (auto)
-import os, json
+from __future__ import annotations
+import os
+import discord
 
-CFG_FILE = os.getenv("MODULES_CONFIG_FILE","config/modules.json")
+# Optional: can be set via ENV later
+MOD_ROLE_IDS = {
+    int(x) for x in os.getenv("MOD_ROLE_IDS", "").replace(" ", "").split(",") if x.isdigit()
+}
+MOD_ROLE_NAMES = [s.strip().lower() for s in os.getenv(
+    "MOD_ROLE_NAMES", "moderator,admin,mod"
+).split(",") if s.strip()]
 
-def _load_cfg():
-    try:
-        with open(CFG_FILE,'r',encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def exempt_roles():
-    cfg = _load_cfg()
-    return set((cfg.get("EXEMPT_ROLES") or []))
-
-def whitelisted_channels():
-    cfg = _load_cfg()
-    return set((cfg.get("WHITELIST_CHANNELS") or []))
-
-def is_exempt_user(member) -> bool:
-    if not member: return False
-    names = { (r.name if hasattr(r,'name') else str(r)).lower() for r in getattr(member,'roles',[]) }
-    return any(er.lower() in names for er in exempt_roles())
-
-def is_whitelisted_channel(channel) -> bool:
-    if not channel: return False
-    wl = {c.lstrip('#').lower() for c in whitelisted_channels()}
-    return (getattr(channel,'name','').lower() in wl)
+def is_mod_or_admin(m: discord.Member) -> bool:
+    if not isinstance(m, discord.Member):
+        return False
+    gp = m.guild_permissions
+    if gp.administrator or gp.ban_members or gp.manage_guild or gp.manage_messages:
+        return True
+    if MOD_ROLE_IDS and any(r.id in MOD_ROLE_IDS for r in m.roles):
+        return True
+    names = [r.name.lower() for r in m.roles]
+    return any(any(tok in n for tok in MOD_ROLE_NAMES) for n in names)
