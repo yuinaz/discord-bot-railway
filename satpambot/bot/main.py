@@ -1,13 +1,19 @@
-# Resilient Discord bot bootstrapper for monorepo
-# - Auto-discovers module
-# - Supports async/sync entrypoints
-# - Supervisor via BOT_SUPERVISE=1 (default)
+# -*- coding: utf-8 -*-
+"""
+Resilient Discord bot bootstrapper (permanent path)
+- Prioritizes: satpambot.bot.modules.discord_bot.discord_bot  (your repo's actual path)
+- Supports async/sync entrypoints (main/run_bot/run/start)
+- Optional supervisor (auto-restart) via BOT_SUPERVISE=1 (default 1)
+- Still allows overrides via BOT_ENTRY / BOT_FUNC if you ever need them, but NOT required.
+"""
+
 import os, sys, asyncio, importlib, inspect, traceback
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SATPAMBOT_DIR = os.path.dirname(BASE_DIR)          # .../satpambot
 REPO_ROOT = os.path.dirname(SATPAMBOT_DIR)         # repo root
 
+# Ensure repo root and /satpambot are importable
 for p in (REPO_ROOT, SATPAMBOT_DIR):
     if p and p not in sys.path:
         sys.path.insert(0, p)
@@ -17,10 +23,13 @@ def _env(k, default=None):
     return v if v not in (None, "") else default
 
 def candidates():
-    # explicit override
+    # 1) Permanent correct path for your repo (no env needed)
+    yield "satpambot.bot.modules.discord_bot.discord_bot"
+    # 2) Optional explicit override via env (if ever needed)
     e = _env("BOT_ENTRY")
-    if e: yield e
-    # guesses
+    if e:
+        yield e
+    # 3) Other guesses (legacy/alternative layouts)
     for name in (
         "modules.discord_bot.discord_bot",
         "satpambot.modules.discord_bot.discord_bot",
