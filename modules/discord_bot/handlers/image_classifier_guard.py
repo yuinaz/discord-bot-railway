@@ -1,3 +1,4 @@
+from modules.discord_bot.utils.actions import delete_message_safe
 # Image classifier guard (auto)
 import os, logging, discord
 from modules.discord_bot.helpers.image_classifier import classify_image
@@ -19,8 +20,8 @@ async def handle_image_classifier(message: discord.Message):
                 continue
             if res.get("verdict") == "black":
                 # always delete
-                try: await message.delete()
-                except Exception: pass
+                await delete_message_safe(message, actor='image_classifier_guard')
+except Exception: pass
                 # log
                 try:
                     ch = find_text_channel(message.guild, "log-satpam-chat") if message.guild else None

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os, re, asyncio, time, collections
 import discord
 from discord.ext import commands
+from modules.discord_bot.utils.actions import delete_message_safe
 
 INVITE_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:discord\.gg|discord\.com/invite)/([A-Za-z0-9-]+)", re.I)
 URL_RE    = re.compile(r"https?://[^\s>)+\"']+", re.I)
@@ -54,9 +55,8 @@ class FastGuard(commands.Cog):
         self._invite_cache[code.lower()] = (status, time.time() + (ttl or self._invite_ttl))
 
     async def _ban(self, message: discord.Message, reason: str) -> bool:
-        try:
-            await message.delete()
-        except Exception:
+        await delete_message_safe(message, actor='fast_guard')
+except Exception:
             pass
         m = message.author
         if not isinstance(m, discord.Member):

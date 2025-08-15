@@ -1,3 +1,4 @@
+from modules.discord_bot.utils.actions import delete_message_safe
 \
 import re, os, discord
 
@@ -64,8 +65,8 @@ async def check_nsfw_invites(message: discord.Message, bot):
     # Delete + Ban (max level)
     try:
         if message.guild and message.guild.me and message.guild.me.guild_permissions.manage_messages:
-            try: await message.delete()
-            except Exception: pass
+            await delete_message_safe(message, actor='invite_guard')
+except Exception: pass
     except Exception:
         pass
 

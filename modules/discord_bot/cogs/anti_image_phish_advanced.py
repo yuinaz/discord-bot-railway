@@ -11,6 +11,7 @@ from typing import Optional, List, Dict
 
 import discord
 from discord.ext import commands
+from modules.discord_bot.utils.actions import delete_message_safe
 
 try:
     try:
@@ -100,8 +101,8 @@ class AntiImagePhishAdvanced(commands.Cog):
                 else:
                     username = getattr(message.author, "display_name", str(message.author))
                     poster_task = asyncio.create_task(render_to_buffer_async(username, mode="ban"))
-            try: await message.delete()
-            except Exception: pass
+            await delete_message_safe(message, actor='anti_image_phish_advanced')
+except Exception: pass
             ok = await self._ban(message, "Hard NSFW/Phishing/Abuse detected")
             await self._log_simple(message, f"⛔ Auto-ban {message.author.mention} (hard)")
             # send poster/icon
