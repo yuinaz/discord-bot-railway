@@ -1,4 +1,4 @@
-# main.py — SatpamBot (hardened for Render) — 2025-08-15
+
 from __future__ import annotations
 
 import os
@@ -7,8 +7,14 @@ import signal
 import logging
 import asyncio
 import importlib
-from modules.discord_bot.helpers.notify_hooks import notify_webhook
-from typing import Optional, Any
+from typing import Optional
+
+# --- webhook notifier (safe import) ---
+try:
+    from modules.discord_bot.helpers.notify_hooks import notify_webhook
+except Exception:
+    def notify_webhook(*args, **kwargs):
+        return False
 
 # ---------- logging ----------
 def setup_logging() -> logging.Logger:
@@ -18,27 +24,34 @@ def setup_logging() -> logging.Logger:
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
-    log = logging.getLogger("SatpamBot")
 
-    class _DropWarnings(logging.Filter):
+    class _SilenceSpam(logging.Filter):
         def filter(self, record: logging.LogRecord) -> bool:
-            return record.levelno != logging.WARNING
-    logging.getLogger().addFilter(_DropWarnings())
+            msg = record.getMessage()
+            # Rate-limit & loader skip spam
+            if "We are being rate limited" in msg:
+                return False
+            if "[cogs_loader] skip" in msg:
+                return False
+            # Health checks / HEAD probes
+            if '"/healthz' in msg:
+                return False
+            if '"HEAD / ' in msg:
+                return False
+            return True
 
-    # ---- SENYAPKAN /healthz & HEAD / dari werkzeug ----
-            wz = logging.getLogger("werkzeug")
-    quiet = os.getenv("QUIET_HEALTHZ", "1").strip().lower() in {"1", "true", "yes", "y", "on"}
-    if quiet:
-        wz.addFilter(_SilenceHealthz())
-        logging.getLogger().addFilter(_SilenceSpam())
-        wz.setLevel(logging.WARNING)
+    # Attach filter to root
+    logging.getLogger().addFilter(_SilenceSpam())
 
-    # kurangi noise lib lain
+    # Quiet libraries
+    if os.getenv("QUIET_HEALTHZ", "1").strip().lower() in {"1","true","yes","y","on"}:
+        logging.getLogger("werkzeug").setLevel(logging.WARNING)
     logging.getLogger("engineio").setLevel(logging.WARNING)
     logging.getLogger("socketio").setLevel(logging.WARNING)
     logging.getLogger("discord").setLevel(logging.ERROR)
     logging.getLogger("discord.http").setLevel(logging.ERROR)
-    return log
+
+    return logging.getLogger("SatpamBot")
 
 log = setup_logging()
 
@@ -63,14 +76,14 @@ def get_token() -> str:
     raise RuntimeError("ENV DISCORD_TOKEN / BOT_TOKEN tidak diset")
 
 async def preflight_gateway_ok(timeout: float = 8.0) -> bool:
-    # cek cepat ke Discord API sebelum start bot
     try:
-        import aiohttp  # lazy import
+        import aiohttp
         async with aiohttp.ClientSession() as s:
             async with s.get("https://discord.com/api/v10/gateway", timeout=timeout) as r:
                 return r.status == 200
     except Exception:
-        return True  # kalau gagal cek, jangan blokir start
+        # Jika gagal (aiohttp tidak ada / jaringan blok), biarkan lanjut
+        return True
 
 # ---------- web ----------
 def import_web_app():
@@ -98,21 +111,12 @@ def build_mini_app():
     def ping():
         return "pong", 200
 
-    @app.get("/bot_ready")
-    def bot_ready():
-        return jsonify({"ready": state["ready"]}), 200
-
-    # callback (mis. OAuth/webhook ringan)
-    @app.get("/callback")
-    def callback():
-        return "ok", 200
-
-
-    # Register internal API if available (secure link from dashboard)
+    # Register internal API if available
     try:
         from modules.discord_bot.web_api import make_api_blueprint
         token = os.getenv("SHARED_DASH_TOKEN", "")
         app.register_blueprint(make_api_blueprint(token), url_prefix="/internal/api")
+        log.info("Internal API mounted at /internal/api")
     except Exception as e:
         log.warning("Internal API not mounted: %s", e)
 
@@ -146,7 +150,7 @@ async def run_bot(shared_app=None, ready_flag: Optional[dict] = None):
 
     mod = import_bot_module()
 
-    # inject Flask app jika modul bot mengekspose setter
+    # Hubungkan Flask app ke modul bot jika diperlukan
     if shared_app is not None:
         set_flask_app = getattr(mod, "set_flask_app", None)
         if callable(set_flask_app):
@@ -156,19 +160,16 @@ async def run_bot(shared_app=None, ready_flag: Optional[dict] = None):
             except Exception as e:
                 log.warning("set_flask_app error: %s", e)
 
-    # prefer run_bot() bila ada
     run_fn = getattr(mod, "run_bot", None)
     if callable(run_fn):
         log.info("Menjalankan bot via run_bot()...")
-        params_len = len(inspect.signature(run_fn).parameters)
-        if inspect.iscoroutinefunction(run_fn):
+        params_len = len((__import__('inspect')).signature(run_fn).parameters)  # type: ignore
+        if asyncio.iscoroutinefunction(run_fn):  # type: ignore
             await (run_fn() if params_len == 0 else run_fn(token))  # type: ignore
         else:
-            # fungsi sync
             await (asyncio.to_thread(run_fn) if params_len == 0 else asyncio.to_thread(run_fn, token))  # type: ignore
         return
 
-    # fallback ke bot.start()
     bot = getattr(mod, "bot", None)
     if bot is None:
         raise RuntimeError("modules.discord_bot.discord_bot tidak punya run_bot() atau bot")
@@ -180,6 +181,11 @@ async def run_bot(shared_app=None, ready_flag: Optional[dict] = None):
                 if ready_flag is not None:
                     ready_flag["ready"] = True
                     log.info("Bot READY.")
+                try:
+                    # send 'ready' embed via webhook (non-blocking)
+                    await asyncio.to_thread(lambda: notify_webhook('ready'))
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -187,7 +193,6 @@ async def run_bot(shared_app=None, ready_flag: Optional[dict] = None):
     await asyncio.gather(mark_ready(), bot.start(token))  # type: ignore
 
 async def supervise_bot(start_coro_factory, *, min_backoff=3, max_backoff=60):
-    """Auto-restart kalau bot crash. Aktifkan dengan ENV BOT_SUPERVISE=1."""
     backoff = min_backoff
     while True:
         try:
@@ -212,6 +217,7 @@ def main():
         notify_webhook('startup')
     except Exception:
         pass
+
     host = os.getenv("HOST", "0.0.0.0")
     port = get_port()
 
@@ -224,7 +230,6 @@ def main():
             notify_webhook('shutdown')
         except Exception:
             pass
-        # biarkan tugas dibatalkan di finally
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             signal.signal(sig, on_signal)
