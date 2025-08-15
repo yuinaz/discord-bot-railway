@@ -1,21 +1,20 @@
 # satpambot/scripts/smoke_test_message_flow.py
-import os, sys
+import os, sys, types, asyncio
+
+# pastikan bisa jalan dari mana saja
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-import asyncio
-import types
-import discord
-from discord.ext import commands
+try:
+    from satpambot.bot.modules.discord_bot.message_handlers import handle_on_message  # type: ignore
+except Exception as e:
+    print(f"❌ cannot import handle_on_message: {type(e).__name__}: {e}")
+    raise
 
-# handler message dari repo mono
-from satpambot.bot.modules.discord_bot.message_handlers import handle_on_message  # type: ignore
-
-def make_test_bot():
-    intents = discord.Intents.none()
-    intents.guilds = True
-    intents.messages = True
-    intents.message_content = True
-    return commands.Bot(command_prefix="!", intents=intents)
+class DummyBot:
+    def __init__(self):
+        self._calls = 0
+    async def process_commands(self, message):
+        self._calls += 1
 
 class DummyChannel:
     def __init__(self):
@@ -41,15 +40,25 @@ class DummyMessage:
         self.id = 999
 
 async def main():
-    bot = make_test_bot()
+    bot = DummyBot()
+
     # pesan biasa
-    msg = DummyMessage("hello world", is_bot=False)
-    await handle_on_message(msg)  # harus tidak error
-    print("OK: handle_on_message executed (normal message)")
+    try:
+        await handle_on_message(bot, DummyMessage("hello", is_bot=False))
+        print("OK: handle_on_message(normal) no error")
+    except Exception as e:
+        print(f"FAIL: normal message -> {type(e).__name__}: {e}")
+        raise
+
     # pesan dari bot (should be ignored)
-    botmsg = DummyMessage("from bot", is_bot=True)
-    await handle_on_message(botmsg)
-    print("OK: handle_on_message ignored bot message")
+    try:
+        await handle_on_message(bot, DummyMessage("from bot", is_bot=True))
+        print("OK: handle_on_message(bot message) no error")
+    except Exception as e:
+        print(f"FAIL: bot message -> {type(e).__name__}: {e}")
+        raise
+
+    print(f"process_commands calls (informational): {bot._calls}")
 
 if __name__ == "__main__":
     asyncio.run(main())
