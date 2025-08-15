@@ -14,3 +14,11 @@ bot/data/vt_cache.json
 original_src/
 __pycache__/
 *.pyc
+original_src/
+__pycache__/
+*.pyc
+.venv/
+*.zip
+*.log
+*.db
+*.jsonl
