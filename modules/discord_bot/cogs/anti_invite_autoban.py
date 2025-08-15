@@ -126,6 +126,8 @@ class AntiInviteAutoban(commands.Cog):
         try:
             if message.guild and message.guild.me and message.guild.me.guild_permissions.manage_messages:
                 await delete_message_safe(message, actor='anti_invite_autoban')
+        except Exception as e:
+            pass
 except Exception: pass
         except Exception: pass
 

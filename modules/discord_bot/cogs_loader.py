@@ -1,4 +1,11 @@
 
+# Exclude cogs that cause duplicate commands or are intentionally disabled
+COGS_EXCLUDE = {
+    'modules.discord_bot.cogs.moderation_test',
+    'modules.discord_bot.cogs.slash_basic',
+}
+
+
 from __future__ import annotations
 import logging, pkgutil, os
 from typing import List
