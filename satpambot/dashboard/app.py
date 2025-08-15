@@ -231,3 +231,30 @@ try:
 except Exception:
     pass
 
+
+# --- force alias to /login (safe; runs before routes) ---
+try:
+    from flask import request, redirect
+    @app.before_request
+    def _force_login_alias():
+        if request.path in ("/", "/discord/login"):
+            return redirect("/login", code=302)
+except Exception:
+    pass
+
+
+# --- hard override: force /login to use admin_fallback, plus aliases ---
+try:
+    from flask import request, redirect
+    from .admin_fallback import admin_login  # form user/pass (ENV)
+    @app.before_request
+    def _login_overrides():
+        # Aliases menuju /login
+        if request.path in ("/", "/discord/login"):
+            return redirect("/login", code=302)
+        # Paksa /login selalu pakai admin_fallback (hindari handler lama "Invalid request!")
+        if request.path == "/login" and request.method in ("GET","POST"):
+            return admin_login()
+except Exception:
+    pass
+
