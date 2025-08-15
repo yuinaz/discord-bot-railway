@@ -1,13 +1,10 @@
-# Safe shim runner for SatpamBot (no top-level run)
 import os, asyncio, logging
 import discord
 from discord.ext import commands
 
 try:
-    # Prefer local cogs loader in this repo
     from .cogs_loader import load_cogs
 except Exception:
-    # Fallback import path if relative fails
     from satpambot.bot.modules.discord_bot.cogs_loader import load_cogs  # type: ignore
 
 log = logging.getLogger(__name__)

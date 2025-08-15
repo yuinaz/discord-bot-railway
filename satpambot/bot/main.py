@@ -1,16 +1,25 @@
-# Supervisor for Discord bot with env override + robust awaiting
 from __future__ import annotations
 import os, importlib, asyncio, logging, inspect
 
 log = logging.getLogger(__name__)
 
+def _should_run_bot() -> bool:
+    v = (os.getenv("RUN_BOT") or "").strip().lower()
+    if v in ("0","false","no","off"):  # explicit off
+        return False
+    if v in ("1","true","yes","on"):   # explicit on
+        return True
+    # AUTO: kalau ada token, jalan; kalau tidak, skip (biar web hidup)
+    return bool(os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN"))
+
 def import_bot_module():
-    # Candidate order: ENV override first, then common paths
     names = []
     envmod = os.getenv("DISCORD_BOT_MODULE")
     if envmod:
         names.append(envmod)
+    # default aman duluan: shim_runner
     names += [
+        "satpambot.bot.modules.discord_bot.shim_runner",
         "satpambot.bot.modules.discord_bot.discord_bot",
         "modules.discord_bot.discord_bot",
         "satpambot.bot.discord_bot",
@@ -25,35 +34,31 @@ def import_bot_module():
             return mod, name
         except Exception as e:
             last = e
-    raise ImportError("Tidak bisa import modul bot") from last
+    raise ImportError("Tidak bisa import modul bot dari kandidat-kandidat") from last
 
 async def run_once():
     mod, name = import_bot_module()
-    # Find a start callable
-    for attr in ("start_bot", "run_bot", "main", "start"):
+    # Cari entrypoint yang bisa di-run
+    for attr in ("start_bot","run_bot","main","start"):
         fn = getattr(mod, attr, None)
         if fn:
             if inspect.iscoroutinefunction(fn):
                 return await fn()
-            try:
-                res = fn()
-                if inspect.iscoroutine(res):
-                    return await res
-                return res
-            except TypeError:
-                # If requires args (unlikely), try calling without
-                return await asyncio.to_thread(fn)
-    # If module exposes a 'bot' with .start()
+            res = fn()
+            if inspect.iscoroutine(res):
+                return await res
+            return res
+    # Fallback: kalau modul punya .bot dengan .start(token)
     bot = getattr(mod, "bot", None)
     token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
     if bot and token:
         start = getattr(bot, "start", None)
         if inspect.iscoroutinefunction(start):
             return await start(token)
-    raise ImportError("Modul bot tidak punya start callable yang dikenali")
+    raise ImportError("Modul bot tidak punya entrypoint yang dikenali (start_bot/run_bot/main/start)")
 
 async def supervise():
-    # retry loop instead of crashing the whole process
+    # Loop retry 10 dtk supaya proses tidak mati cepat
     while True:
         try:
             await run_once()
@@ -63,8 +68,7 @@ async def supervise():
             await asyncio.sleep(10)
 
 def run_supervisor():
-    # Default to RUN_BOT=0 so web stays up unless explicitly enabled
-    if os.getenv("RUN_BOT", "0") == "0":
-        log.info("[bot.main] RUN_BOT=0 -> skip bot supervisor (web-only mode)")
+    if not _should_run_bot():
+        log.info("[bot.main] AUTO: token tidak ada atau RUN_BOT=0 -> skip supervisor (web-only)")
         return
     asyncio.run(supervise())
