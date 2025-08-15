@@ -3,6 +3,7 @@ from typing import Optional
 
 import discord
 from discord import app_commands
+from ..helpers.ban_embed import build_ban_embed
 from discord.ext import commands
 
 from modules.discord_bot.helpers.permissions import is_mod_or_admin
@@ -76,6 +77,14 @@ class TestbanHybrid(commands.Cog):
     # Slash alias eksplisit: /tb
     @app_commands.command(name="tb", description="Alias dari /testban")
     async def testban_slash_alias(self, interaction: discord.Interaction, member: Optional[discord.Member] = None):
+        # gunakan embed layout seragam
+        try:
+            _target = (member if 'member' in locals() else ctx.author)
+            _emb = build_ban_embed(_target, simulated=True)
+            await ctx.send(embed=_emb)
+            return
+        except Exception:
+            pass
     # dedupe guard untuk !tb
     try:
         from ..helpers.once import once as _once

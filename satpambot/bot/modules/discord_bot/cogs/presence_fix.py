@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 import os
+from ..helpers.sticky import upsert_sticky_embed
 from ..helpers.sticky import upsert_sticky
 import discord
 from discord.ext import commands

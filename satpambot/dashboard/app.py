@@ -181,3 +181,18 @@ def healthz():
 @app.route("/ping", methods=["GET","HEAD"])
 def ping():
     return "pong", 200
+
+from flask import redirect
+@app.route('/discord/login')
+def discord_login_alias():
+    rules={r.rule for r in app.url_map.iter_rules()}
+    for cand in ('/login','/admin/login','/auth/login','/dashboard/login'):
+        if cand in rules: return redirect(cand,302)
+    return redirect('/',302)
+
+import os as _os
+from flask import send_from_directory as _sfd
+_ASSETS_DIR=_os.path.join(_os.path.dirname(__file__),'static','assets')
+@app.route('/assets/<path:filename>')
+def _assets(filename):
+    return _sfd(_ASSETS_DIR, filename)

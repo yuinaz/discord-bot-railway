@@ -1,40 +1,24 @@
-import os, json, asyncio
+import os, json
 from pathlib import Path
-
 def _state_path():
-    # .../satpambot/bot/modules/discord_bot/helpers -> /satpambot/bot/data
     here = Path(__file__).resolve()
     data_dir = here.parents[3] / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir / "sticky_state.json"
-
 def _load():
-    p = _state_path()
+    p=_state_path()
     if p.exists():
-        try:
-            return json.loads(p.read_text())
-        except Exception:
-            return {}
+        try: return json.loads(p.read_text())
+        except Exception: return {}
     return {}
-
-def _save(state):
-    _state_path().write_text(json.dumps(state, indent=2))
-
-async def upsert_sticky(channel, content, key="presence"):
-    """Edit satu pesan (sticky) per key di channel itu; kalau belum ada → kirim baru."""
-    state = _load()
-    chan_map = state.setdefault(str(channel.id), {})
-    msg_id = chan_map.get(key)
+def _save(s): _state_path().write_text(json.dumps(s, indent=2))
+async def upsert_sticky_embed(channel, embed, key='presence'):
+    s=_load(); m=s.setdefault(str(channel.id),{}).get(key)
     try:
-        if msg_id:
-            msg = await channel.fetch_message(int(msg_id))
-            if msg and (msg.content != content):
-                await msg.edit(content=content)
+        if m:
+            msg=await channel.fetch_message(int(m))
+            if msg: await msg.edit(embed=embed, content=None)
             return msg
-    except Exception:
-        pass
-    # buat baru
-    msg = await channel.send(content)
-    chan_map[key] = str(msg.id)
-    _save(state)
-    return msg
+    except Exception: pass
+    msg=await channel.send(embed=embed)
+    s[str(channel.id)][key]=str(msg.id); _save(s); return msg
