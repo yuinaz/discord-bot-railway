@@ -1,7 +1,58 @@
-{% extends "base.html" %}{% block content %}
-<div class='card'><h2>Discord Servers</h2><div id='discord-servers' style='display:flex;flex-direction:column;gap:.5rem;'></div></div>
+
+<!doctype html>
+<meta charset="utf-8"/>
+<title>SatpamBot — Servers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="stylesheet" href="/static/dashboard.css"/>
+<div class="container" style="max-width:900px">
+  <h1>Servers</h1>
+  <div id="root"></div>
+</div>
 <script>
-async function loadDiscordServers(){const box=document.getElementById('discord-servers');box.innerHTML='Loading…';try{const r=await fetch('/api/discord/guilds');const j=await r.json();if(!j.ok) throw 0;box.innerHTML='';j.data.forEach(g=>{const el=document.createElement('div');el.className='server-item';el.style='display:flex;align-items:center;gap:.75rem;padding:.5rem;border-radius:.75rem;background:#0e0f14;';el.innerHTML=`
-<img src="${g.icon_url || '/static/icon-default.png'}" class="w-10 h-10 rounded-lg" alt=""><div class="grow"><div class="name" style="font-weight:600">${g.name}</div><div class="muted" style="opacity:.7">ID: ${g.id}${g.members?' • Members: '+g.members:''}</div></div><button class="btn" onclick="openGuildStats('${g.id}')">Stats</button>`;box.appendChild(el);});}catch(e){box.innerHTML='Gagal memuat daftar server.';}}
-async function openGuildStats(gid){const r=await fetch(`/api/guilds/${gid}/stats`);const j=await r.json();alert(JSON.stringify(j,null,2));}window.addEventListener('load', loadDiscordServers);
-</script>{% endblock %}
+async function fetchGuilds(){
+  const res = await fetch('/api/guilds');
+  const root = document.querySelector('#root');
+  if(!res.ok){ root.innerHTML = "<div class='card'>Gagal memuat. <a class='btn primary' href='/discord/login'>Login Discord</a></div>"; return; }
+  const js = await res.json();
+  const list = (js && js.data) || [];
+  if(!list.length){
+    root.innerHTML = "<div class='card'><h2>Belum login</h2><a class='btn primary' href='/discord/login'>Login Discord</a></div>"; return;
+  }
+  root.innerHTML = '';
+  for(const g of list){
+    const div = document.createElement('div');
+    div.className='card';
+    div.innerHTML = `
+      <div class="row">
+        <div><b>${g.name}</b> <small>(id: <code>${g.id}</code>)</small></div>
+        <div class="pill">${g.manageable ? 'Manageable' : 'Readonly'}</div>
+        <div class="pill">Bot: ${g.bot_present ? 'Hadir' : 'Tidak'}</div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        ${g.manageable && g.bot_present ? `
+          <button class="btn primary" data-act="status" data-id="${g.id}">Status</button>
+          <button class="btn" data-act="say" data-id="${g.id}" data-ch="${g.system_channel_id||''}">Say halo</button>
+        ` : `<a class="btn" href="/discord/login">Login Discord</a>`}
+      </div>
+      <pre id="out-${g.id}" style="white-space:pre-wrap;"></pre>
+    `;
+    root.appendChild(div);
+  }
+  root.addEventListener('click', async (e)=>{
+    const b = e.target.closest('button');
+    if(!b) return;
+    const gid = b.getAttribute('data-id');
+    const act = b.getAttribute('data-act');
+    const out = document.querySelector('#out-'+gid);
+    if(act==='status'){
+      const r = await fetch(`/api/guilds/${gid}/status`);
+      out.textContent = await r.text();
+    } else if(act==='say'){
+      const ch = b.getAttribute('data-ch') || '';
+      const r = await fetch(`/api/guilds/${gid}/say`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({channel_id: ch, content: 'Halo dari Dashboard!'})});
+      out.textContent = await r.text();
+    }
+  });
+}
+fetchGuilds();
+</script>
