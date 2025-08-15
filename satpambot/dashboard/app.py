@@ -225,3 +225,33 @@ def _login_alias():
 def _discord_login_alias():
     return redirect('/admin/login', 302)
 
+
+
+# === ADMIN FALLBACK START ===
+import os
+try:
+    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY') or os.getenv('SECRET_KEY') or 'dev-key'
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = bool(os.getenv('SESSION_COOKIE_SECURE','1')!='0')
+except Exception:
+    pass
+
+try:
+    from .admin_fallback import admin_fallback_bp
+except Exception:
+    from admin_fallback import admin_fallback_bp
+try:
+    app.register_blueprint(admin_fallback_bp)
+except Exception:
+    pass
+
+from flask import redirect
+@app.route('/login')
+def _login_alias():
+    return redirect('/admin/login', 302)
+
+@app.route('/discord/login')
+def _discord_login_alias():
+    return redirect('/admin/login', 302)
+# === ADMIN FALLBACK END ===
+
