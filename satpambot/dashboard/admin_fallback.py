@@ -3,7 +3,7 @@ from flask import Blueprint, request, session, redirect, render_template, jsonif
 
 admin_fallback_bp = Blueprint("admin_fallback", __name__)
 
-# integrate theme helpers without modifying app.py
+# Attach theme helpers if available
 @admin_fallback_bp.record_once
 def _init_theme(setup_state):
     try:
@@ -19,13 +19,13 @@ def _creds():
     p = os.getenv("ADMIN_PASSWORD") or os.getenv("SUPER_ADMIN_PASS")
     return (u or "").strip(), (p or "").strip()
 
-@admin_fallback_bp.route("/admin/login", methods=["GET","POST"])
+@admin_fallback_bp.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     USER, PASS = _creds()
     if not USER or not PASS:
         return render_template("login.html", err="Set ADMIN_USERNAME/ADMIN_PASSWORD atau SUPER_ADMIN_USER/SUPER_ADMIN_PASS di Render.")
-    err=None
-    if request.method == "POST":
+    err = None
+    if request.method == "POST"):
         u = (request.form.get("username") or "").strip()
         p = (request.form.get("password") or "").strip()
         if u == USER and p == PASS:
@@ -37,7 +37,8 @@ def admin_login():
 
 @admin_fallback_bp.route("/logout")
 def admin_logout():
-    session.clear(); return redirect("/")
+    session.clear()
+    return redirect("/")
 
 @admin_fallback_bp.route("/api/me")
 def me():

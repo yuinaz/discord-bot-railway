@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging, pkgutil, importlib, os
-
 logger = logging.getLogger(__name__)
 DEFAULT_SKIP = {'commands_probe'}
 DISABLED_COGS = set((os.getenv('DISABLED_COGS') or 'image_poster').split(','))
@@ -14,15 +13,15 @@ def _iter_cogs_package(package_name: str):
         yield m.name
 
 def _iter_all_candidates():
-    names = list(_iter_cogs_package("modules.discord_bot.cogs"))
+    names = list(_iter_cogs_package('modules.discord_bot.cogs'))
     if not names:
-        names = list(_iter_cogs_package("discord_bot.cogs"))
+        names = list(_iter_cogs_package('discord_bot.cogs'))
     return names
 
 async def load_all(bot):
     loaded = set()
     for name in _iter_all_candidates():
-        base = name.split(".")[-1]
+        base = name.split('.')[-1]
         if base in loaded or base in DEFAULT_SKIP or base in DISABLED_COGS:
             continue
         try:
