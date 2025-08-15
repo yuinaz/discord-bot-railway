@@ -4,7 +4,7 @@ services:
     env: python
     rootDirectory: bot
     buildCommand: pip install -r requirements.txt
-    startCommand: MODE=botmini python main.py
+    startCommand: python main.py
     autoDeploy: false
 
   - type: web
@@ -12,5 +12,5 @@ services:
     env: python
     rootDirectory: dashboard
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn "app:app" --bind 0.0.0.0:$PORT --workers 2 --threads 4
+    startCommand: python main.py
     autoDeploy: false
