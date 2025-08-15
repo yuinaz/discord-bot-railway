@@ -1,7 +1,0 @@
-{% extends "base.html" %}{% block content %}
-<div class='card'><h2>Discord Servers</h2><div id='discord-servers' style='display:flex;flex-direction:column;gap:.5rem;'></div></div>
-<script>
-async function loadDiscordServers(){const box=document.getElementById('discord-servers');box.innerHTML='Loading…';try{const r=await fetch('/api/discord/guilds');const j=await r.json();if(!j.ok) throw 0;box.innerHTML='';j.data.forEach(g=>{const el=document.createElement('div');el.className='server-item';el.style='display:flex;align-items:center;gap:.75rem;padding:.5rem;border-radius:.75rem;background:#0e0f14;';el.innerHTML=`
-<img src="${g.icon_url || '/static/icon-default.png'}" class="w-10 h-10 rounded-lg" alt=""><div class="grow"><div class="name" style="font-weight:600">${g.name}</div><div class="muted" style="opacity:.7">ID: ${g.id}${g.members?' • Members: '+g.members:''}</div></div><button class="btn" onclick="openGuildStats('${g.id}')">Stats</button>`;box.appendChild(el);});}catch(e){box.innerHTML='Gagal memuat daftar server.';}}
-async function openGuildStats(gid){const r=await fetch(`/api/guilds/${gid}/stats`);const j=await r.json();alert(JSON.stringify(j,null,2));}window.addEventListener('load', loadDiscordServers);
-</script>{% endblock %}

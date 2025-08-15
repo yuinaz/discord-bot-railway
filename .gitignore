@@ -1,20 +1,13 @@
 __pycache__/
-*.py[cod]
-*.egg-info/
+*.pyc
 .venv/
-venv/
-env/
-ENV/
-.env
-.env.*
-!.env.example
-.pytest_cache/
-.mypy_cache/
-.cache/
+node_modules/
 .DS_Store
 Thumbs.db
-.vscode/
-.idea/
-modules/*.zip
-
-modules/*.zip
+*.zip
+# DB lokal dan cache (jangan track di git)
+*.db
+*.jsonl
+bot/data/vt_cache.json
+# Kecualikan jika memang ingin dilacak:
+!dashboard/superadmin.db
