@@ -22,3 +22,11 @@ __pycache__/
 *.log
 *.db
 *.jsonl
+original_src/
+__pycache__/
+*.pyc
+.venv/
+*.zip
+*.log
+*.jsonl
+*.db
