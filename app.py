@@ -1,3 +1,18 @@
+import os as _os
+
+from functools import wraps
+from flask import session, redirect, url_for, request
+
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not (session.get("admin") or session.get("oauth") or session.get("discord_user")):
+            return redirect(url_for("login", next=request.url))
+        return fn(*args, **kwargs)
+    return wrapper
+if _os.getenv("USE_EVENTLET", "0").lower() in ("1","true","yes","y","on"):
+    import eventlet
+    eventlet.monkey_patch()
 
 import os
 import json
@@ -14,9 +29,11 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, s
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
 
+app.config["SECRET_KEY"] = os.getenv("SESSION_SECRET", os.getenv("SECRET_KEY", "satpambot-dev"))
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "satpambot-dev")
-socketio = SocketIO(app, cors_allowed_origins="*")
+USE_EVENTLET = os.getenv("USE_EVENTLET", "0").lower() in ("1","true","yes","y","on")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=("eventlet" if USE_EVENTLET else "threading"))
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
@@ -103,7 +120,9 @@ def login():
     if request.method == "POST":
         user = request.form.get("user", "")
         pw = request.form.get("pass", "")
-        if user == os.getenv("SUPER_ADMIN_USER", "admin") and pw == os.getenv("SUPER_ADMIN_PASSWORD", "admin"):
+        user_env = os.getenv("SUPER_ADMIN_USER", "admin")
+        pass_env = os.getenv("SUPER_ADMIN_PASS", os.getenv("SUPER_ADMIN_PASSWORD", "admin"))
+        if user == user_env and pw == pass_env:
             session["admin"] = user
             return redirect(request.args.get("next") or url_for("dashboard"))
         return render_template("login.html", error="Kredensial salah.")
@@ -116,8 +135,9 @@ def logout():
 
 @app.get("/")
 def index():
+    if session.get("oauth") or session.get("discord_user"):
+        return redirect(url_for("servers"))
     return redirect(url_for("dashboard") if session.get("admin") else url_for("login"))
-
 @app.get("/dashboard")
 @login_required
 def dashboard():
