@@ -1,16 +1,1 @@
-services:
-  - type: web
-    name: satpambot-bot
-    env: python
-    rootDirectory: bot
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    autoDeploy: false
-
-  - type: web
-    name: satpambot-dashboard
-    env: python
-    rootDirectory: dashboard
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    autoDeploy: false
+# (paste isi YAML di atas)
