@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
-    from modules.discord_bot.message_handlers import handle_on_message  # type: ignore
+    from satpambot.bot.modules.discord_bot.message_handlers import handle_on_message  # type: ignore
 except Exception as e:
     print("❌ Import failed:", e)
     print("Hint: ensure this file is inside <project>/scripts/ and run: python scripts/smoke_test_message_flow.py")

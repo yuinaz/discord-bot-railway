@@ -1,7 +1,7 @@
 # Blacklist image check with multi-hash (auto 2025-08-09T12:25:01.106184Z)
 import os, json, re
 from datetime import datetime
-from modules.discord_bot.helpers.image_hashing import compute_all_hashes, hamming
+from satpambot.bot.modules.discord_bot.helpers.image_hashing import compute_all_hashes, hamming
 
 DATA_FILE = os.getenv("BLACKLIST_IMAGE_HASHES", "data/blacklist_image_hashes.json")
 PHASH_MAX = int(os.getenv("IMG_PHASH_MAX_DIST", "16"))

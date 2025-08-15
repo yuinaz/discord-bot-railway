@@ -1,6 +1,6 @@
 import logging
-from modules.discord_bot.helpers import env
-from modules.discord_bot.helpers.log_once import log_once
+from satpambot.bot.modules.discord_bot.helpers import env
+from satpambot.bot.modules.discord_bot.helpers.log_once import log_once
 
 def log_env_summary_once():
     log_once("env_log_summary", lambda: logging.info("[status] %s", env.env_log_summary()))

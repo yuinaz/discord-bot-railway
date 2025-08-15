@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging, discord
-from modules.discord_bot.utils.actions import delete_message_safe
+from satpambot.bot.modules.discord_bot.utils.actions import delete_message_safe
 
 logger = logging.getLogger(__name__)
 

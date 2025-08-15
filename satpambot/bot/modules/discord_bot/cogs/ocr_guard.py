@@ -2,8 +2,8 @@ from __future__ import annotations
 import logging, io
 import discord
 from discord.ext import commands
-from modules.discord_bot.utils.actions import delete_message_safe
-from modules.discord_bot.helpers.log_utils import find_text_channel
+from satpambot.bot.modules.discord_bot.utils.actions import delete_message_safe
+from satpambot.bot.modules.discord_bot.helpers.log_utils import find_text_channel
 
 log = logging.getLogger(__name__)
 

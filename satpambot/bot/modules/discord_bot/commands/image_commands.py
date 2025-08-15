@@ -2,7 +2,7 @@ from discord.ext import commands
 from PIL import Image
 import io
 import discord
-from modules.discord_bot.helpers.image_utils import compress_image
+from satpambot.bot.modules.discord_bot.helpers.image_utils import compress_image
 
 def register_image_commands(bot: commands.Bot):
     @bot.command(name="checkimage")

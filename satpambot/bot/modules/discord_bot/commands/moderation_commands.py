@@ -1,5 +1,5 @@
 from discord.ext import commands
-from modules.discord_bot.helpers.image_check import add_to_blacklist, remove_from_blacklist, list_blacklist
+from satpambot.bot.modules.discord_bot.helpers.image_check import add_to_blacklist, remove_from_blacklist, list_blacklist
 
 def register_moderation_commands(bot: commands.Bot):
     @bot.command(name="blacklist")

@@ -1,16 +1,16 @@
 import discord
 from discord.ext import commands
-from modules.discord_bot.helpers.metrics_agg import inc
+from satpambot.bot.modules.discord_bot.helpers.metrics_agg import inc
 
 # Realtime dashboard + DB helpers (safe fallbacks if not present)
 try:
-    from modules.discord_bot.helpers.ws import emit
+    from satpambot.bot.modules.discord_bot.helpers.ws import emit
 except Exception:  # pragma: no cover
     def emit(*args, **kwargs):
         pass
 
 try:
-    from modules.discord_bot.helpers.flaskdb import insert_ban, mark_unban, compute_stats
+    from satpambot.bot.modules.discord_bot.helpers.flaskdb import insert_ban, mark_unban, compute_stats
 except Exception:  # pragma: no cover
     def insert_ban(*args, **kwargs):
         pass

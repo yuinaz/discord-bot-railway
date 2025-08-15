@@ -1,9 +1,9 @@
 from __future__ import annotations
 import logging, discord
-from modules.discord_bot.utils.actions import delete_message_safe
-from modules.discord_bot.helpers.image_classifier import classify_image
-from modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelisted_channel
-from modules.discord_bot.helpers.log_utils import find_text_channel
+from satpambot.bot.modules.discord_bot.utils.actions import delete_message_safe
+from satpambot.bot.modules.discord_bot.helpers.image_classifier import classify_image
+from satpambot.bot.modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelisted_channel
+from satpambot.bot.modules.discord_bot.helpers.log_utils import find_text_channel
 
 logger = logging.getLogger(__name__)
 

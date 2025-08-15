@@ -24,29 +24,29 @@ from discord.ext import commands, tasks
 
 from .helpers.env import BOT_PREFIX, BOT_INTENTS, FLASK_ENV, BOT_TOKEN
 try:
-    from modules.discord_bot.helpers.status_logger_patch import announce_status
+    from satpambot.bot.modules.discord_bot.helpers.status_logger_patch import announce_status
 except Exception:
     async def announce_status(*args, **kwargs):
         return None
 try:
-    from modules.discord_bot.helpers.status_logger_patch import log_selected_channel
+    from satpambot.bot.modules.discord_bot.helpers.status_logger_patch import log_selected_channel
 except Exception:
     def log_selected_channel(*args, **kwargs):
         pass
 try:
-    from modules.discord_bot.helpers.log_once import log_once
+    from satpambot.bot.modules.discord_bot.helpers.log_once import log_once
 except Exception:
     def log_once(key, printer):
         try:
             printer()
         except Exception:
             pass
-from modules.discord_bot.helpers import env
+from satpambot.bot.modules.discord_bot.helpers import env
 from .cogs_loader import load_cogs
 from .background_tasks import run_background_tasks
 from . import message_handlers
 from .helpers.log_utils import upsert_status_embed_in_channel
-from modules.discord_bot.helpers.status_logger_patch import log_env_summary_once
+from satpambot.bot.modules.discord_bot.helpers.status_logger_patch import log_env_summary_once
 
 # Kurangi noise log lib
 logging.getLogger("discord").setLevel(logging.WARNING)

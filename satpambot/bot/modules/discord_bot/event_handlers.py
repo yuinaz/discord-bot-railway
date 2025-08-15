@@ -15,7 +15,7 @@ from discord.ext import commands
 
 # Optional resolver (ID->NAME) if helpers.env exists
 try:
-    from modules.discord_bot.helpers import env as _env
+    from satpambot.bot.modules.discord_bot.helpers import env as _env
 except Exception:
     _env = None  # fallback to name-only lookups
 

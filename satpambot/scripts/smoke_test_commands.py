@@ -17,8 +17,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Allow running from project root or via scripts/
 try:
-    from modules.discord_bot.discord_bot import SatpamBot  # type: ignore
-    from modules.discord_bot.cogs_loader import load_all_cogs  # type: ignore
+    from satpambot.bot.modules.discord_bot.discord_bot import SatpamBot  # type: ignore
+    from satpambot.bot.modules.discord_bot.cogs_loader import load_all_cogs  # type: ignore
 except Exception as e:
     print("❌ Import failed:", e)
     print("Hint: ensure this file is inside <project>/scripts/ and run: python scripts/smoke_test_commands.py")

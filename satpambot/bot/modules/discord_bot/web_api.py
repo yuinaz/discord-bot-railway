@@ -12,7 +12,7 @@ from flask import Blueprint, request, jsonify
 
 def _get_bot():
     try:
-        from modules.discord_bot.discord_bot import bot
+        from satpambot.bot.modules.discord_bot.discord_bot import bot
         return bot
     except Exception:
         return None

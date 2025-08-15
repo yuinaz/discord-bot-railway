@@ -1,5 +1,5 @@
 from discord.ext import commands
-from modules.discord_bot.utils.notifier import format_log_message
+from satpambot.bot.modules.discord_bot.utils.notifier import format_log_message
 
 def register_debug_commands(bot: commands.Bot):
     @bot.command(name="status")

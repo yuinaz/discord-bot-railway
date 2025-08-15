@@ -3,7 +3,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 from ..helpers.ban_embed import build_ban_embed
-from modules.discord_bot.helpers.permissions import is_mod_or_admin
+from satpambot.bot.modules.discord_bot.helpers.permissions import is_mod_or_admin
 def _allowed_mentions_for(target: Optional[discord.Member]) -> discord.AllowedMentions:
     return discord.AllowedMentions(users=[target] if target else [], roles=False, everyone=False, replied_user=False)
 class TestbanHybrid(commands.Cog):

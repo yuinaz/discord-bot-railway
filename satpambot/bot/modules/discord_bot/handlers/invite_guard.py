@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re, logging, discord
-from modules.discord_bot.utils.actions import delete_message_safe
+from satpambot.bot.modules.discord_bot.utils.actions import delete_message_safe
 
 logger = logging.getLogger(__name__)
 INVITE_RE = re.compile(r"(?:https?://)?(?:discord(?:app)?\.com/invite/|discord\.gg/|dis\.gd/)([A-Za-z0-9-]+)", re.I)
