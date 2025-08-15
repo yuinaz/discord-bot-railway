@@ -18,7 +18,26 @@ def setup_logging() -> logging.Logger:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     log = logging.getLogger("SatpamBot")
-    logging.getLogger("werkzeug").setLevel(logging.INFO)
+
+    # ---- SENYAPKAN /healthz & HEAD / dari werkzeug ----
+    class _SilenceHealthz(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            msg = record.getMessage()
+            # Render health check /healthz
+            if '"/healthz' in msg:
+                return False
+            # HEAD / dari health probe internal
+            if '"HEAD / ' in msg:
+                return False
+            return True
+
+    wz = logging.getLogger("werkzeug")
+    quiet = os.getenv("QUIET_HEALTHZ", "1").strip().lower() in {"1", "true", "yes", "y", "on"}
+    if quiet:
+        wz.addFilter(_SilenceHealthz())
+        wz.setLevel(logging.WARNING)
+
+    # kurangi noise lib lain
     logging.getLogger("engineio").setLevel(logging.WARNING)
     logging.getLogger("socketio").setLevel(logging.WARNING)
     return log
@@ -85,10 +104,9 @@ def build_mini_app():
     def bot_ready():
         return jsonify({"ready": state["ready"]}), 200
 
-    # <- tambahan sesuai permintaan
+    # callback (mis. OAuth/webhook ringan)
     @app.get("/callback")
     def callback():
-        # tempatkan logic OAuth/webhook ringan di sini bila dibutuhkan
         return "ok", 200
 
     return app, state
