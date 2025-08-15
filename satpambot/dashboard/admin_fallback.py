@@ -1,45 +1,83 @@
 import os
-from flask import Blueprint, request, session, redirect, render_template, jsonify
+from flask import Blueprint, request, session, redirect, url_for, render_template_string, render_template
 
 admin_fallback_bp = Blueprint("admin_fallback", __name__)
 
-# Attach theme helpers if available
-@admin_fallback_bp.record_once
-def _init_theme(setup_state):
-    try:
-        from satpambot.app_theme_context_patch import attach_theme_context, register_theme_routes
-        app = setup_state.app
-        attach_theme_context(app)
-        register_theme_routes(app)
-    except Exception:
-        pass
+def _get_creds():
+    user = os.getenv("ADMIN_USERNAME") or os.getenv("SUPER_ADMIN_USER")
+    pwd  = os.getenv("ADMIN_PASSWORD") or os.getenv("SUPER_ADMIN_PASS")
+    return (user or "").strip(), (pwd or "").strip()
 
-def _creds():
-    u = os.getenv("ADMIN_USERNAME") or os.getenv("SUPER_ADMIN_USER")
-    p = os.getenv("ADMIN_PASSWORD") or os.getenv("SUPER_ADMIN_PASS")
-    return (u or "").strip(), (p or "").strip()
-
-@admin_fallback_bp.route("/admin/login", methods=["GET", "POST"])
+@admin_fallback_bp.route("/admin/login", methods=["GET","POST"])
+@admin_fallback_bp.route("/login", methods=["GET","POST"])
 def admin_login():
-    USER, PASS = _creds()
-    if not USER or not PASS:
-        return render_template("login.html", err="Set ADMIN_USERNAME/ADMIN_PASSWORD atau SUPER_ADMIN_USER/SUPER_ADMIN_PASS di Render.")
-    err = None
-    if request.method == "POST"):
+    want_user, want_pass = _get_creds()
+    if not want_user or not want_pass:
+        html = '''<html><head><title>Login Admin</title></head>
+<body style="background:#0f1320;color:#e6e6e6;font-family:system-ui,Segoe UI,Arial,sans-serif;">
+  <div style="max-width:720px;margin:8vh auto;padding:24px;border-radius:16px;background:#161b2e;border:1px solid #28314f">
+    <h2 style="margin-top:0">Login Admin tidak aktif</h2>
+    <p>Set environment berikut di server Anda:</p>
+    <pre style="background:#0b0f1a;padding:12px;border-radius:10px;white-space:pre-wrap;">ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-strong-password</pre>
+    <p>Atau gunakan SUPER_ADMIN_USER / SUPER_ADMIN_PASS.</p>
+  </div>
+</body></html>'''
+        return html, 503
+
+    msg = ""
+    if request.method == "POST":
         u = (request.form.get("username") or "").strip()
         p = (request.form.get("password") or "").strip()
-        if u == USER and p == PASS:
+        if u == want_user and p == want_pass:
             session["is_admin"] = True
             session["admin_user"] = u
-            return redirect("/")
-        err = "Username / password salah"
-    return render_template("login.html", err=err)
+            return redirect(url_for("admin_fallback.admin_home"))
+        msg = "Username / password salah."
 
-@admin_fallback_bp.route("/logout")
+    # Coba pakai templates/login.html jika ada
+    try:
+        return render_template("login.html", message=msg)
+    except Exception:
+        bg = os.getenv("DASHBOARD_BG_URL", "")
+        logo = os.getenv("DASHBOARD_LOGO_URL", "")
+        bgstyle = ("background-image:url('%s');background-size:cover;background-position:center;" % bg) if bg else ""
+        logo_tag = ('<img class="logo" src="%s" alt="logo">' % logo) if logo else ""
+        msg_html = ('<div class="err">%s</div>' % msg) if msg else ""
+        html = '''<!doctype html><html><head>
+<meta charset="utf-8"><title>Login Admin</title>
+<style>
+  body { margin:0; background:#0f1320; color:#e6e6e6; font-family:system-ui,Segoe UI,Arial,sans-serif; %(bgstyle)s }
+  .card { max-width:560px; margin:10vh auto; padding:28px; border-radius:16px; background:#161b2e; border:1px solid #28314f; box-shadow:0 10px 30px rgba(0,0,0,.35) }
+  input,button { width:100%; padding:12px 14px; border-radius:10px; border:1px solid #334; outline:none; background:#0b0f1a; color:#e6e6e6; margin-top:10px }
+  button { background:#3b82f6; border:0; cursor:pointer }
+  .logo { display:block; margin:0 auto 12px auto; max-width:120px; border-radius:12px }
+  .err { color:#ff8b8b; margin:8px 0 0 0 }
+</style>
+</head><body>
+  <div class="card">
+    %(logo_tag)s
+    <h2 style="margin-top:0">Login Admin</h2>
+    %(msg_html)s
+    <form method="post" autocomplete="off">
+      <input name="username" placeholder="Username" required>
+      <input type="password" name="password" placeholder="Password" required>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+</body></html>''' % {"bgstyle": bgstyle, "logo_tag": logo_tag, "msg_html": msg_html}
+        return render_template_string(html)
+
+@admin_fallback_bp.route("/admin/logout", methods=["GET","POST"])
 def admin_logout():
     session.clear()
-    return redirect("/")
+    return redirect(url_for("admin_fallback.admin_login"))
 
-@admin_fallback_bp.route("/api/me")
-def me():
-    return jsonify({"admin": bool(session.get("is_admin")), "user": session.get("admin_user")})
+@admin_fallback_bp.route("/admin")
+def admin_home():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin_fallback.admin_login"))
+    try:
+        return render_template("dashboard.html")
+    except Exception:
+        return "<h3>Admin dashboard</h3><p>Login berhasil.</p>", 200

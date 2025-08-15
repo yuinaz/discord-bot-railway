@@ -183,16 +183,7 @@ def ping():
     return "pong", 200
 
 from flask import redirect
-@app.route('/discord/login')
-def discord_login_alias():
-    rules={r.rule for r in app.url_map.iter_rules()}
-    for cand in ('/login','/admin/login','/auth/login','/dashboard/login'):
-        if cand in rules: return redirect(cand,302)
-    return redirect('/',302)
 
-import os as _os
-from flask import send_from_directory as _sfd
-_ASSETS_DIR=_os.path.join(_os.path.dirname(__file__),'static','assets')
 @app.route('/assets/<path:filename>')
 def _assets(filename):
     return _sfd(_ASSETS_DIR, filename)
@@ -209,7 +200,7 @@ except Exception:
 try:
     from .admin_fallback import admin_fallback_bp
 except Exception:
-    from admin_fallback import admin_fallback_bp
+    from .admin_fallback import admin_fallback_bp
 try:
     app.register_blueprint(admin_fallback_bp)
 except Exception:
@@ -217,41 +208,26 @@ except Exception:
 
 # Aliases so these URLs always work
 from flask import redirect
-@app.route('/login')
-def _login_alias():
-    return redirect('/admin/login', 302)
-
-@app.route('/discord/login')
-def _discord_login_alias():
-    return redirect('/admin/login', 302)
 
 
 
-# === ADMIN FALLBACK START ===
-import os
+
+
+
+
+
 try:
-    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY') or os.getenv('SECRET_KEY') or 'dev-key'
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['SESSION_COOKIE_SECURE'] = bool(os.getenv('SESSION_COOKIE_SECURE','1')!='0')
+    from flask import redirect
+    # Root -> /login jika belum ada rule '/'
+    if not any(getattr(r, "rule", None) == "/" for r in app.url_map.iter_rules()):
+        @app.route("/")
+        def __root_redirect_to_login():
+            return redirect("/login", code=302)
+    # /discord/login -> /login jika belum ada rule '/discord/login'
+    if not any(getattr(r, "rule", None) == "/discord/login" for r in app.url_map.iter_rules()):
+        @app.route("/discord/login")
+        def __discord_login_redirect_to_login():
+            return redirect("/login", code=302)
 except Exception:
     pass
-
-try:
-    from .admin_fallback import admin_fallback_bp
-except Exception:
-    from admin_fallback import admin_fallback_bp
-try:
-    app.register_blueprint(admin_fallback_bp)
-except Exception:
-    pass
-
-from flask import redirect
-@app.route('/login')
-def _login_alias():
-    return redirect('/admin/login', 302)
-
-@app.route('/discord/login')
-def _discord_login_alias():
-    return redirect('/admin/login', 302)
-# === ADMIN FALLBACK END ===
 
