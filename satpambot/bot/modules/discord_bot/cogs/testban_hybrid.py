@@ -13,7 +13,6 @@ class TestbanHybrid(commands.Cog):
         self.bot = bot
 
     async def _send_simulation(self, ctx_or_inter, member: Optional[discord.Member] = None):
-        interaction = ctx_or_inter if isinstance(ctx_or_inter, discord.Interaction) else getattr(ctx_or_inter, 'interaction', None)
         author = (ctx_or_inter.user if isinstance(ctx_or_inter, discord.Interaction) else ctx_or_inter.author)
         if not isinstance(author, discord.Member) or not is_mod_or_admin(author):
             msg = '❌ Kamu tidak punya izin untuk menjalankan perintah ini.'
