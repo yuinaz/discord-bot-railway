@@ -111,5 +111,64 @@ button{margin-top:12px;border:none;background:#5865F2;color:#fff;font-weight:600
     @app.route('/discord/login')
     def _discord_login_alias():
         return _redirect('/admin/login', 302)
-
 def serve_dashboard():
+    import os, importlib
+    port = int(os.getenv("PORT", "10000"))
+    candidates = ("satpambot.dashboard.app", "dashboard.app")
+    mod = None
+    last_err = None
+    for name in candidates:
+        try:
+            mod = importlib.import_module(name)
+            break
+        except Exception as e:
+            last_err = e
+            mod = None
+
+    if mod is None:
+        # Fallback mini web
+        from flask import Flask, redirect
+        mini = Flask("mini-web")
+        try:
+            _bind_admin_login(mini)
+        except Exception:
+            pass
+
+        @mini.route("/")
+        def _root():
+            return redirect("/admin/login", 302)
+
+        mini.run(host="0.0.0.0", port=port)
+        return
+
+    app = getattr(mod, "app", None)
+    socketio = getattr(mod, "socketio", None)
+    if app is None:
+        from flask import Flask, redirect
+        mini = Flask("mini-web")
+        try:
+            _bind_admin_login(mini)
+        except Exception:
+            pass
+
+        @mini.route("/")
+        def _root():
+            return redirect("/admin/login", 302)
+
+        mini.run(host="0.0.0.0", port=port)
+        return
+
+    # Bind login fallback ke dashboard utama
+    try:
+        _bind_admin_login(app)
+    except Exception:
+        pass
+
+    if socketio is not None:
+        try:
+            socketio.run(app, host="0.0.0.0", port=port)
+        except TypeError:
+            socketio.run(app, host="0.0.0.0", port=port)
+    else:
+        app.run(host="0.0.0.0", port=port)
+
