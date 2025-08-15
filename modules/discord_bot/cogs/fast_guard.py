@@ -1,147 +1,103 @@
-
 from __future__ import annotations
-import os, re, asyncio, time, collections
+import re, logging, asyncio
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 import discord
 from discord.ext import commands
 from modules.discord_bot.utils.actions import delete_message_safe
+from modules.discord_bot.helpers.log_utils import find_text_channel
 
-INVITE_RE = re.compile(r"(?:https?://)?(?:www\.)?(?:discord\.gg|discord\.com/invite)/([A-Za-z0-9-]+)", re.I)
-URL_RE    = re.compile(r"https?://[^\s>)+\"']+", re.I)
+log = logging.getLogger(__name__)
 
-def _split_set(value: str) -> set[str]:
-    return {x.strip().lower() for x in value.split(",") if x.strip()}
+SUSPICIOUS_WORDS = {
+    "verify","verifikasi","login","nitro","gift","hadiah","steam","wallet",
+    "crypto","airdrop","bot token","2fa","sync","appeal","banned","suspend",
+    "claim","redeem","unlock","kode","otp","payout",
+}
+PHISH_BRANDS = {"discord","steam","epic","roblox","valorant","garena","facebook","instagram","tiktok"}
+SUSPICIOUS_TLDS = {".ru",".cn",".rest",".xyz",".click",".top",".gq",".tk",".ml",".cf",".icu",".zip",".mov",".mom"}
+URL_RX = re.compile(r"https?://[^\s>]+", re.I)
+INVITE_RX = re.compile(r"(?:https?://)?(?:discord(?:app)?\.com/invite/|discord\.gg/|dis\.gd/)([A-Za-z0-9-]+)", re.I)
+
+TIMEOUT_MINUTES = int((__import__('os').getenv("FAST_GUARD_TIMEOUT_MINUTES") or "10"))
+MENTION_THRESHOLD = int((__import__('os').getenv("FAST_GUARD_MENTION_THRESHOLD") or "6"))
+
+def _extract_urls(text: str) -> List[str]:
+    return URL_RX.findall(text or "")
+
+def _looks_suspicious_text(text: str) -> bool:
+    t = (text or "").lower()
+    if sum(1 for w in SUSPICIOUS_WORDS if w in t) >= 2:
+        return True
+    if any(b in t for b in PHISH_BRANDS) and ("http://" in t or "https://" in t):
+        return True
+    return False
+
+def _looks_suspicious_url(url: str) -> bool:
+    u = url.lower()
+    if any(u.endswith(tld) for tld in SUSPICIOUS_TLDS):
+        return True
+    if "xn--" in u:  # punycode
+        return True
+    # brand lookalike (very light)
+    for brand in PHISH_BRANDS:
+        if brand in u and "discord.com" not in u and "steamcommunity.com" not in u:
+            return True
+    return False
 
 class FastGuard(commands.Cog):
-    """Fast ban untuk link phishing & undangan NSFW; sekarang dengan rate-limit & cache aman."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.enabled = os.getenv("FAST_GUARD_ENABLED", "1") != "0"
-        self.bad_domains = _split_set(os.getenv("FAST_BAD_DOMAINS", ""))
-        self.bad_keywords = _split_set(os.getenv("FAST_BAD_KEYWORDS", ""))
-        self.strict_invite = os.getenv("FAST_INVITE_STRICT", "1") != "0"
-        self.strict_on_error = os.getenv("FAST_INVITE_STRICT_ON_ERROR", "1") != "0"
-        self.allow_guild_ids = {int(x) for x in _split_set(os.getenv("INVITE_ALLOW_GUILD_IDS", "")) if x.isdigit()}
-        self.allow_codes = _split_set(os.getenv("INVITE_ALLOW_CODES", ""))
-        self.del_secs = min(int(os.getenv("FAST_BAN_DELETE_SECONDS", str(7*24*3600))), 7*24*3600)
-
-        # Rate-limit & cache for invite fetches
-        self._fetch_limit = int(os.getenv("FAST_INVITE_FETCH_LIMIT", "8"))     # requests
-        self._fetch_window = int(os.getenv("FAST_INVITE_FETCH_WINDOW", "60"))  # seconds
-        self._fetch_times = collections.deque()  # timestamps
-        self._invite_cache: dict[str, tuple[str, float]] = {}  # code -> (status, expire_at)
-        self._invite_ttl = int(os.getenv("FAST_INVITE_CACHE_TTL", "900"))  # 15 min
-
-    # --------------- helpers ---------------
-    def _fetch_budget_ok(self) -> bool:
-        now = time.time()
-        while self._fetch_times and now - self._fetch_times[0] > self._fetch_window:
-            self._fetch_times.popleft()
-        return len(self._fetch_times) < self._fetch_limit
-
-    def _mark_fetch(self):
-        self._fetch_times.append(time.time())
-
-    def _cache_get(self, code: str) -> str | None:
-        ent = self._invite_cache.get(code.lower())
-        if not ent:
-            return None
-        status, exp = ent
-        if time.time() > exp:
-            self._invite_cache.pop(code.lower(), None)
-            return None
-        return status
-
-    def _cache_set(self, code: str, status: str, ttl: int | None = None):
-        self._invite_cache[code.lower()] = (status, time.time() + (ttl or self._invite_ttl))
-
-    async def _ban(self, message: discord.Message, reason: str) -> bool:
-        await delete_message_safe(message, actor='fast_guard')
-except Exception:
-            pass
-        m = message.author
-        if not isinstance(m, discord.Member):
-            return False
-        try:
-            await message.guild.ban(m, reason=f"FastGuard: {reason}", delete_message_seconds=self.del_secs)
-            return True
-        except Exception:
-            return False
-
-    async def _check_invites(self, message: discord.Message) -> bool:
-        content = message.content or ""
-        codes = [m.group(1) for m in INVITE_RE.finditer(content)]
-        if not codes:
-            return False
-        # Allowlist short-circuit
-        if any(c.lower() in self.allow_codes for c in codes):
-            return False
-
-        code = codes[0].lower()
-        cached = self._cache_get(code)
-        if cached == "allow":
-            return False
-        if cached == "nsfw":
-            return await self._ban(message, f"NSFW invite {code}")
-        if cached == "unknown" and self.strict_invite:
-            return await self._ban(message, f"Unknown/Untrusted invite {code} (cached)")
-
-        # Budget check
-        if not self._fetch_budget_ok():
-            # Too many lookups; degrade based on policy
-            if self.strict_invite:
-                return await self._ban(message, f"Untrusted invite {code} (rate-limited)")
-            return False
-
-        # Try resolve via API
-        self._mark_fetch()
-        try:
-            inv = await asyncio.wait_for(self.bot.fetch_invite(code, with_counts=False), timeout=2.0)
-            # If invite guild is in allowlist -> allow
-            if inv and getattr(inv, "guild", None) and getattr(inv.guild, "id", None) in self.allow_guild_ids:
-                self._cache_set(code, "allow")
-                return False
-            # If channel nsfw -> ban
-            if inv and getattr(inv, "channel", None) and getattr(inv.channel, "nsfw", False):
-                self._cache_set(code, "nsfw")
-                return await self._ban(message, f"NSFW invite {code}")
-            # Unknown guild, handle by policy
-            if self.strict_invite:
-                self._cache_set(code, "unknown", ttl=120)  # short TTL to avoid hammering
-                return await self._ban(message, f"Unknown/Untrusted invite {code}")
-            self._cache_set(code, "unknown", ttl=120)
-            return False
-        except Exception as e:
-            # Handle 429/Cloudflare
-            msg = str(e)
-            self._cache_set(code, "unknown", ttl=120)
-            if "429" in msg or "rate limit" in msg.lower():
-                if self.strict_on_error:
-                    return await self._ban(message, f"Untrusted invite {code} (429)")
-                return False
-            # Other errors: best-effort policy
-            if self.strict_on_error and self.strict_invite:
-                return await self._ban(message, f"Untrusted invite {code} (error)")
-            return False
-
-    async def _check_urls(self, message: discord.Message) -> bool:
-        content = (message.content or "").lower()
-        hosts = [u.split('://',1)[-1].split('/',1)[0].split('@')[-1].lower() for u in URL_RE.findall(content)]
-        hit = any(any(bd in h for bd in self.bad_domains) for h in hosts) or any(kw in content for kw in self.bad_keywords)
-        if hit:
-            return await self._ban(message, "phishing url/keywords")
-        return False
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if (not self.enabled) or message.author.bot or (not message.guild):
-            return
-        # Skip command prefixes
-        if message.content and message.content.lstrip().startswith(("!", "/")):
-            return
-        if await self._check_invites(message):
-            return
-        if await self._check_urls(message):
-            return
+        try:
+            if not message.guild or getattr(message.author, "bot", False):
+                return
+            content = getattr(message, "content", "") or ""
+            urls = _extract_urls(content)
+            mentions = getattr(message, "mentions", []) or []
+            triggers = []
+
+            if len(mentions) >= MENTION_THRESHOLD:
+                triggers.append(f"mention>{MENTION_THRESHOLD}")
+
+            if _looks_suspicious_text(content):
+                triggers.append("text")
+
+            if any(_looks_suspicious_url(u) for u in urls):
+                triggers.append("url")
+
+            # Discord invites outside current guild are suspicious here (FastGuard path)
+            if INVITE_RX.search(content):
+                triggers.append("invite")
+
+            if not triggers:
+                return
+
+            # Action: timeout + delete
+            timed_out = False
+            try:
+                until = datetime.now(timezone.utc) + timedelta(minutes=TIMEOUT_MINUTES)
+                await message.author.edit(timeout=until, reason=f"FastGuard: {','.join(triggers)}")
+                timed_out = True
+            except Exception:
+                pass
+            try:
+                await delete_message_safe(message, actor="FastGuard")
+            except Exception:
+                pass
+
+            # Log
+            try:
+                ch = await find_text_channel(self.bot, name="log-botphising")
+                if ch:
+                    act = "timeout+delete" if timed_out else "delete"
+                    await ch.send(f"🛡️ [FastGuard] {act} {message.author.mention} in {message.channel.mention} — reason: {', '.join(triggers)}")
+            except Exception:
+                pass
+        except Exception:
+            log.debug("FastGuard listener error", exc_info=True)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(FastGuard(bot))

@@ -19,8 +19,23 @@ def setup_logging() -> logging.Logger:
     )
     log = logging.getLogger("SatpamBot")
 
+    class _DropWarnings(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            return record.levelno != logging.WARNING
+    logging.getLogger().addFilter(_DropWarnings())
+
     # ---- SENYAPKAN /healthz & HEAD / dari werkzeug ----
     class _SilenceHealthz(logging.Filter):
+        pass
+
+    class _SilenceSpam(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            msg = record.getMessage()
+            if 'We are being rate limited' in msg:
+                return False
+            if '[cogs_loader] skip' in msg:
+                return False
+            return True
         def filter(self, record: logging.LogRecord) -> bool:
             msg = record.getMessage()
             # Render health check /healthz
@@ -35,11 +50,14 @@ def setup_logging() -> logging.Logger:
     quiet = os.getenv("QUIET_HEALTHZ", "1").strip().lower() in {"1", "true", "yes", "y", "on"}
     if quiet:
         wz.addFilter(_SilenceHealthz())
+        logging.getLogger().addFilter(_SilenceSpam())
         wz.setLevel(logging.WARNING)
 
     # kurangi noise lib lain
     logging.getLogger("engineio").setLevel(logging.WARNING)
     logging.getLogger("socketio").setLevel(logging.WARNING)
+    logging.getLogger("discord").setLevel(logging.ERROR)
+    logging.getLogger("discord.http").setLevel(logging.ERROR)
     return log
 
 log = setup_logging()
