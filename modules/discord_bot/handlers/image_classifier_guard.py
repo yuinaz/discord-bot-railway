@@ -1,44 +1,35 @@
+from __future__ import annotations
+import logging, discord
 from modules.discord_bot.utils.actions import delete_message_safe
-# Image classifier guard (auto)
-import os, logging, discord
 from modules.discord_bot.helpers.image_classifier import classify_image
-from modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelisted_channel  # permissions import
-from modules.discord_bot.helpers.db import log_action
+from modules.discord_bot.helpers.permissions import is_exempt_user, is_whitelisted_channel
 from modules.discord_bot.helpers.log_utils import find_text_channel
 
+logger = logging.getLogger(__name__)
+
 async def handle_image_classifier(message: discord.Message):
-    if is_whitelisted_channel(getattr(message,'channel',None)) or is_exempt_user(getattr(message,'author',None)): return
     try:
-        if not message.attachments:
+        if not message or getattr(message.author, "bot", False):
             return
-        for att in message.attachments:
-            if not (att.content_type or "").startswith("image"):
-                continue
-            img_bytes = await att.read()
-            res = classify_image(img_bytes)
-            if not res.get("enabled"):
-                continue
-            if res.get("verdict") == "black":
-                # always delete
-                await delete_message_safe(message, actor='image_classifier_guard')
-except Exception: pass
-                # log
-                try:
-                    ch = find_text_channel(message.guild, "log-satpam-chat") if message.guild else None
+        if is_whitelisted_channel(getattr(message,'channel',None)) or is_exempt_user(getattr(message,'author',None)):
+            return
+        atts = getattr(message, "attachments", []) or []
+        if not atts:
+            return
+        for att in atts:
+            try:
+                data = await att.read()
+                res = classify_image(data)
+                if not res or not res.get("enabled"):
+                    continue
+                verdict = res.get("verdict")
+                if verdict == "black":
+                    await delete_message_safe(message, actor='image_classifier_guard')
+                    ch = await find_text_channel(message.guild, "log-botphising") if message.guild else None
                     if ch:
-                        await ch.send(f"🛡️ Deteksi gambar scam (no text) dari {message.author.mention}. score={res.get('score'):.3f} (≥ {res.get('threshold')}). Action={res.get('action')}")
-                except Exception: pass
-                # punitive action per config
-                act = (res.get("action") or "delete").lower()
-                if message.guild and act in ("ban","kick"):
-                    try:
-                        if act=="ban" and message.guild.me.guild_permissions.ban_members:
-                            await message.guild.ban(message.author, reason="Image scam classifier", delete_message_days=1)
-                        elif act=="kick" and message.guild.me.guild_permissions.kick_members:
-                            await message.guild.kick(message.author, reason="Image scam classifier")
-                    except Exception:
-                        pass
-                # Once one image is flagged, stop scanning others in this message
-                return
-    except Exception as e:
-        logging.debug(f"[image_classifier_guard] error: {e}")
+                        await ch.send(f"🧹 [ImageGuard] Deleted blacklisted image from {message.author.mention} in {message.channel.mention}")
+                    return
+            except Exception:
+                logger.debug("Image classifier on attachment failed", exc_info=True)
+    except Exception:
+        logger.debug("handle_image_classifier failed", exc_info=True)

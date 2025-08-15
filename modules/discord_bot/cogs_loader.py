@@ -1,66 +1,39 @@
-
-# Exclude cogs that cause duplicate commands or are intentionally disabled
-
 from __future__ import annotations
 
-COGS_EXCLUDE = {
-    'modules.discord_bot.cogs.moderation_test',
-    'modules.discord_bot.cogs.slash_basic',
-}
+import logging
+import pkgutil
+import importlib
 
+logger = logging.getLogger(__name__)
 
-import logging, pkgutil, os
-from typing import List
+DEFAULT_SKIP = {'commands_probe'}
 
-logger = logging.getLogger("cogs_loader")
+def _iter_cogs_package(package_name: str):
+    try:
+        pkg = importlib.import_module(package_name)
+    except Exception:
+        return []
+    for m in pkgutil.iter_modules(pkg.__path__, package_name + "."):
+        yield m.name
 
-PRIORITY = [
-    "modules.discord_bot.cogs.fast_guard",
-    "modules.discord_bot.cogs.anti_image_phish_advanced",
-    "modules.discord_bot.cogs.presence_fix",
-    "modules.discord_bot.cogs.status_sticky_auto",
-    "modules.discord_bot.cogs.slash_sync",
-    "modules.discord_bot.cogs.testban_hybrid",
-    "modules.discord_bot.cogs.status_sticky_manual_proxy",
-]
-
-# Skip list for production (can be overridden by ENV)
-DEFAULT_SKIP = {"commands_probe"}
-if os.getenv("DEBUG_PROBE", "0") == "1":
-    DEFAULT_SKIP.discard("commands_probe")
-
-def _iter_cogs_package() -> List[str]:
-    import modules.discord_bot.cogs as cogs_pkg
-    names = []
-    for mod in pkgutil.iter_modules(cogs_pkg.__path__, cogs_pkg.__name__ + "."):
-        if not mod.ispkg:
-            names.append(mod.name)
-    return sorted(set(names))
+def _iter_all_candidates():
+    names = list(_iter_cogs_package("modules.discord_bot.cogs"))
+    if not names:
+        names = list(_iter_cogs_package("discord_bot.cogs"))
+    return names
 
 async def load_all(bot):
     loaded = set()
-    for name in PRIORITY:
-        try:
-            base = name.split(".")[-1]
-            if base in DEFAULT_SKIP:
-                logger.info(f"[cogs_loader] skip (default): {name}")
-                continue
-            await bot.load_extension(name)
-            logger.info(f"[cogs_loader] loaded {name}")
-            loaded.add(base)
-        except Exception as e:
-            logger.warning(f"[cogs_loader] skip {name}: {e}")
-    for name in _iter_cogs_package():
+    for name in _iter_all_candidates():
         base = name.split(".")[-1]
         if base in loaded or base in DEFAULT_SKIP:
-            if base in DEFAULT_SKIP:
-                logger.info(f"[cogs_loader] skip (default): {name}")
             continue
         try:
             await bot.load_extension(name)
+            loaded.add(base)
             logger.info(f"[cogs_loader] loaded {name}")
-        except Exception as e:
-            logger.warning(f"[cogs_loader] skip {name}: {e}")
+        except Exception:
+            logger.debug(f"[cogs_loader] skip {name}", exc_info=True)
 
 async def load_cogs(bot):
     return await load_all(bot)
