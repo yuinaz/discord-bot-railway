@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block content %}
+<div class='card'><h2>Pengaturan</h2><div style='margin-bottom:12px'><label>Theme</label>
+<div><select id='themeSel'></select><button class='btn' onclick='applyTheme()'>Apply</button></div></div>
+<div class='card' style='margin-top:12px'><h3>Tema & Background — live preview</h3>
+<form id='bgForm'><input type='file' name='file' accept='image/*'><button class='btn' type='submit'>Upload & Apply Background</button></form>
+<form id='logoForm' style='margin-top:8px'><input type='file' name='file' accept='image/*'><button class='btn' type='submit'>Upload Logo</button></form>
+<div style='margin-top:12px'><a class='btn' href='/assets-manager'>Open Assets Manager</a></div></div></div>
+<script>
+async function loadThemes(){const r=await fetch('/theme/list');const j=await r.json();const s=document.getElementById('themeSel');s.innerHTML='';(j.themes||[]).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o);});const cur=await (await fetch('/theme')).json();if(cur.theme) s.value=cur.theme;}
+async function applyTheme(){const v=document.getElementById('themeSel').value;await fetch('/theme/apply?set='+encodeURIComponent(v));}
+document.getElementById('bgForm').addEventListener('submit', async (e)=>{e.preventDefault();const fd=new FormData(e.target);const r=await fetch('/upload/background',{method:'POST',body:fd});const j=await r.json();if(j.status==='success') alert('Background updated');});
+document.getElementById('logoForm').addEventListener('submit', async (e)=>{e.preventDefault();const fd=new FormData(e.target);const r=await fetch('/upload/logo',{method:'POST',body:fd});const j=await r.json();if(j.status==='success') alert('Logo updated');});
+loadThemes();
+</script>{% endblock %}

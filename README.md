@@ -1,20 +1,46 @@
-# 🛡️ SatpamBot – Discord Security Bot + Dashboard + Desktop Widget
-(README ringkas — versi lengkap tersedia di INSTALLATION.txt)
 
-Fitur: URL Guard + VirusTotal, OCR + blockwords editor, image hash blacklist, image classifier no-text, autoban NSFW, whitelist channel/role, logging embed+sticker+ban-log upsert, live stats; dashboard tema & security; widget web + Windows notifier; desktop widget (Electron) dengan tray, restart, auto-update & HMAC.
+# SatpamBot — Monorepo (with original files kept)
 
-## Quick Start
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-ENV_PROFILE=local python main.py
+Struktur:
 ```
-- Dashboard: http://localhost:8080/dashboard
-- Desktop widget: `cd desktop-widget && npm install && npm start`
+/bot/           → Bot Discord (MODE=botmini)
+/dashboard/     → Dashboard Flask
+/original_src/  → Salinan utuh isi ZIP lama untuk tes lokal
+.github/workflows/ → Deploy Hooks Render (path filter)
+```
 
-Lihat **INSTALLATION.txt** untuk langkah detail, ENV lengkap, build installer Windows, dan auto-update.
+## Render
+### Botmini (root: `bot/`)
+Build: `pip install -r requirements.txt`  
+Start: `MODE=botmini python main.py`  
+Env: `DISCORD_TOKEN`, `SHARED_DASH_TOKEN`, `ERRORLOG_WEBHOOK_URL`, (opsional) `BOT_SUPERVISE=1`, `BOT_START_DELAY=10`, `QUIET_HEALTHZ=1`  
+Auto Deploy: OFF (pakai Deploy Hook)
 
+### Dashboard (root: `dashboard/`)
+Build: `pip install -r requirements.txt`  
+Start: `gunicorn "app:app" --bind 0.0.0.0:$PORT --workers 2 --threads 4`  
+Env: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `OAUTH_REDIRECT_URI`, `BOT_BASE_URL`, `SHARED_DASH_TOKEN`, `SESSION_SECRET`, (ops) `SUPER_ADMIN_USER`, `SUPER_ADMIN_PASS`  
+Auto Deploy: OFF (pakai Deploy Hook)
 
-### Ban Log Channels (optional)
-- `BAN_LOG_CHANNEL_ID` untuk embed detail ban.
-- `MOD_COMMAND_CHANNEL_ID` akan menyimpan 1 embed ban-list yang di-update (upsert).
+## GitHub Secrets (untuk workflow)
+- `RENDER_DASH_DEPLOY_HOOK` → Deploy Hook URL dashboard (Render → Settings)
+- `RENDER_BOT_DEPLOY_HOOK`  → Deploy Hook URL bot
+
+## Local testing
+### Bot
+```
+cd bot
+python -m venv .venv && . .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+# set ENV (atau salin .env.example → .env)
+python main.py
+```
+
+### Dashboard
+```
+cd dashboard
+python -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+# set ENV (atau salin .env.example → .env)
+python app.py  # atau: gunicorn "app:app" --bind 127.0.0.1:8000
+```

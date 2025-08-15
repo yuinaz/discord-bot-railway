@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}🛡️ Security Settings{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
+    <h3>🛡️ Security Settings</h3><a class="btn btn-outline-light" href="/image-classifier">Image Classifier</a>
+    <a href="/blacklist-image" class="btn btn-outline-light">Blacklist Gambar</a>
+  </div>
+
+  <div class="row g-3">
+  <div class="col-12">
+    <div class="card bg-dark text-light mb-3">
+      <div class="card-header">📊 URL Guard Stats (Last 1h)</div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-md-3"><div class="h5 mb-0" id="st_vt_net">0</div><div class="text-muted">VT Net Calls</div></div>
+          <div class="col-md-3"><div class="h5 mb-0" id="st_vt_cache">0</div><div class="text-muted">VT Cache Hits</div></div>
+          <div class="col-md-3"><div class="h5 mb-0" id="st_cache_rate">0%</div><div class="text-muted">Cache Hit Rate</div></div>
+          <div class="col-md-3"><div class="h5 mb-0" id="st_actions">0 / 0</div><div class="text-muted">Actions (Black / Sus)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+    <div class="col-md-6">
+      <div class="card bg-dark text-light h-100">
+        <div class="card-header">Whitelist Domains</div>
+        <div class="card-body">
+          <form method="post">
+            <input type="hidden" name="action" value="save_lists">
+            <div class="mb-2"><textarea name="whitelist" class="form-control" rows="10">{% for d in wl %}{{ d }}
+{% endfor %}</textarea></div>
+            <div class="text-muted">Satu domain per baris. Contoh: <code>reddit.com</code></div>
+            <div class="mt-3 text-end"><button class="btn btn-primary">💾 Simpan List</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card bg-dark text-light h-100">
+        <div class="card-header">Blacklist Domains</div>
+        <div class="card-body">
+          <form method="post">
+            <input type="hidden" name="action" value="save_lists">
+            <div class="mb-2"><textarea name="blacklist" class="form-control" rows="10">{% for d in bl %}{{ d }}
+{% endfor %}</textarea></div>
+            <div class="text-muted">Domain mencurigakan atau confirmed phishing.</div>
+            <div class="mt-3 text-end"><button class="btn btn-primary">💾 Simpan List</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-dark text-light mt-3">
+    <div class="card-header">Module Flags</div>
+    <div class="card-body">
+      <form method="post">
+        <input type="hidden" name="action" value="save_flags">
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="OCR_ENABLED" {% if cfg.OCR_ENABLED or (cfg.OCR_ENABLED is not defined and (env('OCR_ENABLED') or 'true') == 'true') %}checked{% endif %}>
+              <label class="form-check-label">OCR Enabled</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="NSFW_INVITE_AUTOBAN" {% if cfg.NSFW_INVITE_AUTOBAN or (cfg.NSFW_INVITE_AUTOBAN is not defined and (env('NSFW_INVITE_AUTOBAN') or 'true') == 'true') %}checked{% endif %}>
+              <label class="form-check-label">NSFW Invite Autoban</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="URL_RESOLVE_ENABLED" {% if cfg.URL_RESOLVE_ENABLED or (cfg.URL_RESOLVE_ENABLED is not defined and (env('URL_RESOLVE_ENABLED') or 'true') == 'true') %}checked{% endif %}>
+              <label class="form-check-label">URL Resolve Shortlink</label>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="URL_AUTOBAN_CRITICAL" {% if cfg.URL_AUTOBAN_CRITICAL or (cfg.URL_AUTOBAN_CRITICAL is not defined and (env('URL_AUTOBAN_CRITICAL') or 'true') == 'true') %}checked{% endif %}>
+              <label class="form-check-label">Auto Action for Critical Links</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="VIRUSTOTAL_ENABLED" {% if cfg.VIRUSTOTAL_ENABLED or (cfg.VIRUSTOTAL_ENABLED is not defined and (env('VIRUSTOTAL_ENABLED') or 'true') == 'true') %}checked{% endif %}>
+              <label class="form-check-label">VirusTotal Check</label>
+            </div>
+            <div class="mt-2">
+              <label class="form-label">Critical Action</label>
+              <select name="URL_CRITICAL_ACTION" class="form-select">
+                {% for opt in ['ban','kick','delete'] %}
+                <option value="{{ opt }}" {% if (cfg.URL_CRITICAL_ACTION or 'ban') == opt %}selected{% endif %}>{{ opt|capitalize }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mt-2">
+              <label class="form-label">VirusTotal Timeout (s)</label>
+              <input name="VIRUSTOTAL_TIMEOUT" class="form-control" value="{{ cfg.VIRUSTOTAL_TIMEOUT or '5' }}">
+            </div>
+          </div>
+        </div>
+        <div class="text-end mt-3"><button class="btn btn-primary">💾 Simpan Flags</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card bg-dark text-light mt-3">
+  <div class="card-header">OCR Blockwords</div>
+  <div class="card-body">
+    <form method="post">
+      <input type="hidden" name="action" value="save_ocr">
+      <div class="mb-2">
+        <textarea name="ocr_words" class="form-control" rows="3" placeholder="contoh: nitro, giveaway, $2500">{{ (cfg.OCR_BLOCKWORDS if cfg.OCR_BLOCKWORDS is defined else '') }}</textarea>
+      </div>
+      <div class="text-end"><button class="btn btn-primary">💾 Simpan Blockwords</button></div>
+      <div class="form-text">Pisahkan dengan koma. Disimpan ke <code>config/ocr.json</code> dan otomatis digabung dengan ENV <code>OCR_BLOCKWORDS</code>.</div>
+    </form>
+  </div>
+
+  <div class="card bg-dark text-light mt-3">
+    <div class="card-header">Whitelist Channel & Exempt Role</div>
+    <div class="card-body">
+      <form method="post">
+        <input type="hidden" name="action" value="save_lists_roles">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Exempt Roles (comma separated)</label>
+            <input class="form-control" name="roles" placeholder="Admin, Moderator, Whitelist">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Whitelist Channels (comma or #channel)</label>
+            <input class="form-control" name="channels" placeholder="#announcements, #rules, #faq">
+          </div>
+        </div>
+        <div class="text-end mt-3"><button class="btn btn-primary">💾 Simpan</button></div>
+      </form>
+    </div>
+  </div>
+
+
+<div class="card bg-dark text-light mb-3">
+  <div class="card-header">Environment</div>
+  <div class="card-body">
+    <div>Active profile: <span class="badge bg-primary">{{ active_profile|upper }}</span></div>
+    <button class="btn btn-outline-light mt-2" onclick="(async()=>{const r=await fetch('/env-check');const j=await r.json();alert(JSON.stringify(j,null,2));})()">Validate Env</button>
+  </div>
+</div>
+
+</div>
+{% endblock %}
+
+
+<script>
+function loadStats(){
+  fetch('/security-stats').then(r=>r.json()).then(j=>{
+    if(!j.ok) return;
+    const d = j.data || {};
+    document.getElementById('st_vt_net').textContent = d.vt_net || 0;
+    document.getElementById('st_vt_cache').textContent = d.vt_cache || 0;
+    document.getElementById('st_cache_rate').textContent = ((d.cache_rate||0).toFixed(1)) + '%';
+    document.getElementById('st_actions').textContent = (d.black_actions||0) + ' / ' + (d.sus_actions||0);
+  }).catch(()=>{});
+}
+loadStats();
+setInterval(loadStats, 10000);
+</script>
