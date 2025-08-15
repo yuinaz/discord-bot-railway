@@ -105,7 +105,7 @@ class LinkGuard(commands.Cog):
         if action == "timeout":
             try:
                 if msg.guild and isinstance(msg.author, discord.Member):
-                    await msg.author.timeout(discord.utils.utcnow() + discord.timedelta(minutes=10),
+                    await timeout_member_safe(msg, minutes=10, reason="Suspicious link (LinkGuard)", actor="LinkGuard") + discord.timedelta(minutes=10),
                                              reason="Suspicious link (LinkGuard)")
             except Exception:
                 pass
