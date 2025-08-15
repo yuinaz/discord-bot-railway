@@ -6,6 +6,10 @@ from typing import List, Optional, Tuple, Set
 
 import discord
 from discord.ext import commands
+from modules.discord_bot.utils.actions import (
+    delete_message_safe, timeout_member_safe, kick_member_safe, send_log_for_message,
+)
+
 from discord import ForumChannel
 
 from modules.discord_bot.utils.mod_guard import claim
@@ -94,8 +98,7 @@ class LinkGuard(commands.Cog):
         reason_text = "• " + "\n• ".join(reasons)
 
         if action == "delete":
-            try: await msg.delete()
-            except Exception: pass
+            await delete_message_safe(msg, actor="LinkGuard")
             if log_ch: await log_ch.send(f"🧹 **Deleted suspicious message** dari {who} di {where}\n{reason_text}")
             return
 
@@ -106,17 +109,12 @@ class LinkGuard(commands.Cog):
                                              reason="Suspicious link (LinkGuard)")
             except Exception:
                 pass
-            try: await msg.delete()
-            except Exception: pass
+            await delete_message_safe(msg, actor="LinkGuard")
             if log_ch: await log_ch.send(f"⏳ **Timeout 10m + delete** {who} di {where}\n{reason_text}")
             return
 
         if action == "kick":
-            try:
-                if msg.guild and isinstance(msg.author, discord.Member):
-                    await msg.guild.kick(msg.author, reason="Suspicious link (LinkGuard)")
-            except Exception:
-                pass
+            await kick_member_safe(msg, reason="Suspicious link (LinkGuard)", actor="LinkGuard")
             if log_ch: await log_ch.send(f"👢 **Kick** {who} di {where}\n{reason_text}")
             return
 
