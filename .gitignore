@@ -11,3 +11,6 @@ Thumbs.db
 bot/data/vt_cache.json
 # Kecualikan jika memang ingin dilacak:
 !dashboard/superadmin.db
+original_src/
+__pycache__/
+*.pyc
