@@ -1,14 +1,8 @@
-# Env & local config
 .env
 .env.*
 .env.local
 .env.prod
-
-# Uploaded/media
 **/static/uploads/
-satpambot/dashboard/static/uploads/
-
-# Databases & caches
 *.sqlite3
 *.db
 **/__pycache__/
@@ -18,14 +12,10 @@ satpambot/dashboard/static/uploads/
 .cache/
 htmlcov/
 .coverage*
-
-# Python build
 build/
 dist/
 .eggs/
 *.egg-info/
-
-# Node/FE artefacts
 node_modules/
 dist/
 build/
@@ -38,8 +28,6 @@ yarn-debug.log*
 pnpm-debug.log*
 .pnp
 .pnp.js
-
-# IDE/OS
 .vscode/
 .idea/
 *.iml
