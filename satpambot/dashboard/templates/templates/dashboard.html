@@ -1,6 +1,0 @@
-{% extends "base.html" %}{% block content %}
-<div class='card'><h2>Traffic</h2><div id='traffic'>-</div></div>
-<div class='card'><h2>Incident</h2><div id='incident'>0</div></div>
-<script>
-async function refresh(){const r=await fetch('/api/live');const j=await r.json();document.getElementById('traffic').textContent=`CPU: ${j.cpu??'-'}% • MEM: ${j.mem??'-'}% • Req: ${j.requests}`;document.getElementById('incident').textContent=(j.incidents_series||[]).reduce((a,b)=>a+b,0);}setInterval(refresh,5000);refresh();
-</script>{% endblock %}

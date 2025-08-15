@@ -55,3 +55,7 @@ Thumbs.db
 *.zip
 *.7z
 *.rar
+
+# prevent duplicate template subtree
+satpambot/dashboard/templates/templates/
+**/templates/templates/
