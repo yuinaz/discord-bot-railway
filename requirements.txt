@@ -1,10 +1,10 @@
-flask>=2.2
+Flask>=3.0
 flask-socketio>=5.3.6
 python-socketio>=5.11.0
 python-engineio>=4.9.1
 werkzeug>=2.2
 python-dotenv>=1.0
-requests>=2.28
+requests>=2.31
 discord.py>=2.3
 aiohttp>=3.9
 aiosqlite>=0.19
@@ -24,6 +24,7 @@ eventlet>=0.35.2
 greenlet>=3.0
 opencv-python-headless>=4.10
 tzdata>=2024.1
+gunicorn>=21.2
 
 # --- SatpamBot security ---
 discord.py
