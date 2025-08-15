@@ -5,15 +5,15 @@ log = logging.getLogger(__name__)
 
 def _should_run_bot() -> bool:
     v = (os.getenv("RUN_BOT") or "").strip().lower()
-    if v in ("0","false","no","off"):
+    if v in ("0","false","no","off"):  # explicit off
         return False
-    if v in ("1","true","yes","on"):
+    if v in ("1","true","yes","on"):   # explicit on
         return True
-    # AUTO: kalau ada token -> run; kalau nggak ada -> skip (web tetap hidup)
+    # AUTO: ada token -> run; tanpa token -> skip (web tetap hidup)
     return bool(os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN"))
 
 def import_bot_module():
-    # PRIORITAS: ENV override -> shim_runner (aman) -> modul lama
+    # PRIORITAS: ENV override -> shim_runner (AMAN) -> modul lama (legacy)
     names = [
         os.getenv("DISCORD_BOT_MODULE") or "satpambot.bot.modules.discord_bot.shim_runner",
         "satpambot.bot.modules.discord_bot.discord_bot",
@@ -34,7 +34,7 @@ def import_bot_module():
 
 async def run_once():
     mod, name = import_bot_module()
-    # Cari entrypoint dan PASTIKAN di-await
+    # Cari entrypoint dan PASTIKAN di-await bila coroutine
     for attr in ("start_bot","run_bot","main","start"):
         if hasattr(mod, attr):
             fn = getattr(mod, attr)
