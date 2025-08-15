@@ -1,21 +1,16 @@
 services:
-  - type: worker
-    name: satpambot-worker
+  - type: web
+    name: satpambot-bot
     env: python
-    plan: starter
+    rootDirectory: bot
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    autoDeploy: true
-    envVars:
-      - key: DISCORD_TOKEN
-        sync: false   # isi di dashboard
-      - key: BAN_LOG_CHANNEL_ID
-        value: "1400375184048787566"
-      - key: BOT_PREFIX
-        value: "!"
-      - key: GUILD_ID
-        value: "<ID_GUILD_TES_KAMU>"   # penting agar /ping muncul instan
-      - key: OCR_SCAM_STRICT
-        value: "true"
-      - key: OCR_LANG
-        value: "eng+ind"
+    startCommand: MODE=botmini python main.py
+    autoDeploy: false
+
+  - type: web
+    name: satpambot-dashboard
+    env: python
+    rootDirectory: dashboard
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn "app:app" --bind 0.0.0.0:$PORT --workers 2 --threads 4
+    autoDeploy: false
