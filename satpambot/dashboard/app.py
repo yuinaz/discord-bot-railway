@@ -176,3 +176,47 @@ try:
 except Exception:
     pass
 
+
+# --- quiet access log for health/ping routes & lightweight endpoints ---
+try:
+    import logging
+    from flask import request, jsonify
+
+    _QUIET_PATHS = {"/ping", "/healthz", "/api/ping", "/api/live"}
+
+    @app.before_request
+    def __mute_health_accesslog():
+        # tandai request agar tidak dilog kalau termasuk quiet paths atau healthcheck UA
+        ua = (request.headers.get("User-Agent") or "").lower()
+        if request.path in _QUIET_PATHS or "uptimerobot" in ua or "render" in ua:
+            # flag khusus yang kita cek di after_request
+            request.environ["_suppress_access_log"] = True
+
+    @app.after_request
+    def __custom_accesslog(resp):
+        # kalau tidak health/ping, tulis access log sederhana via logger 'entry'
+        try:
+            if not request.environ.get("_suppress_access_log"):
+                logging.getLogger("entry").info("%s %s %s", request.method, request.path, resp.status_code)
+        except Exception:
+            pass
+        return resp
+
+    # Sediakan /ping dan /healthz kalau belum ada (HEAD/GET, no body 204)
+    if not any(getattr(r, "rule", None) == "/ping" for r in app.url_map.iter_rules()):
+        @app.route("/ping", methods=["GET","HEAD"])
+        def __ping(): return ("", 204)
+    if not any(getattr(r, "rule", None) == "/healthz" for r in app.url_map.iter_rules()):
+        @app.route("/healthz", methods=["GET","HEAD"])
+        def __healthz(): return ("", 204)
+
+    # Fallback API (kalau bot OFF): /api/ping & /api/live
+    if not any(getattr(r, "rule", None) == "/api/ping" for r in app.url_map.iter_rules()):
+        @app.get("/api/ping")
+        def __api_ping_fallback(): return jsonify(ok=True, pong=True), 200
+    if not any(getattr(r, "rule", None) == "/api/live" for r in app.url_map.iter_rules()):
+        @app.get("/api/live")
+        def __api_live_fallback(): return jsonify(ok=True, live=True, bot="off"), 200
+except Exception:
+    pass
+
