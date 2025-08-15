@@ -22,3 +22,9 @@ __pycache__/
 *.log
 *.db
 *.jsonl
+.env.local
+.env.prod
+dashboard/static/uploads/
+.env.local
+.env.prod
+dashboard/static/uploads/
