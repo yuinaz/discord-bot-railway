@@ -1,0 +1,2 @@
+-r satpambot/bot/requirements.txt
+-r satpambot/dashboard/requirements.txt

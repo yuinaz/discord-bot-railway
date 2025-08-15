@@ -1,30 +1,47 @@
-__pycache__/
-*.pyc
-.venv/
+# Env & local config
+.env
+.env.*
+.env.local
+.env.prod
+
+# Uploaded/media
+**/static/uploads/
+satpambot/dashboard/static/uploads/
+
+# Databases & caches
+*.sqlite3
+*.db
+**/__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.cache/
+htmlcov/
+.coverage*
+
+# Python build
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Node/FE artefacts
 node_modules/
+dist/
+build/
+.next/
+out/
+.vite/
+storybook-static/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.pnp
+.pnp.js
+
+# IDE/OS
+.vscode/
+.idea/
+*.iml
 .DS_Store
 Thumbs.db
-*.zip
-# DB lokal dan cache (jangan track di git)
-*.db
-*.jsonl
-bot/data/vt_cache.json
-# Kecualikan jika memang ingin dilacak:
-!dashboard/superadmin.db
-original_src/
-__pycache__/
-*.pyc
-original_src/
-__pycache__/
-*.pyc
-.venv/
-*.zip
-*.log
-*.db
-*.jsonl
-.env.local
-.env.prod
-dashboard/static/uploads/
-.env.local
-.env.prod
-dashboard/static/uploads/
