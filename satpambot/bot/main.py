@@ -79,7 +79,7 @@ async def run_once():
             last = e; tried.append(f"{name} ({e})")
     raise ImportError("Tidak menemukan modul bot. Tried: " + ", ".join(tried)) from last
 
-async def supervise():
+async def supervise(*a, **kw):
     if _env("BOT_SUPERVISE", "1") == "0": return await run_once()
     delay = int(_env("BOT_RETRY_DELAY", "12") or "12")
     while True:
