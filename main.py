@@ -4,37 +4,26 @@ from werkzeug.serving import WSGIRequestHandler
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, "satpambot"))
 
-# --- Reduce Flask/Werkzeug log noise (especially /ping) ---
 class NoPingWSGIRequestHandler(WSGIRequestHandler):
     def log_request(self, code='-', size='-'):
-        try:
-            # Avoid logging health checks
-            if getattr(self, 'path', '').startswith('/ping'):
-                return
-        except Exception:
-            pass
+        if getattr(self, 'path', '').startswith('/ping'):
+            return
         super().log_request(code, size)
 
-# Lower werkzeug verbosity (still shows startup lines)
 logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 def ensure_dirs():
     for rel in ("satpambot/dashboard/static/uploads", "satpambot/bot/data"):
-        try:
-            os.makedirs(os.path.join(BASE_DIR, rel), exist_ok=True)
-        except Exception:
-            pass
+        try: os.makedirs(os.path.join(BASE_DIR, rel), exist_ok=True)
+        except Exception: pass
 
 def try_start_bot():
     mode = os.getenv("MODE", "both").lower()
     if mode not in ("both", "bot", "botmini"):
-        print(f"[INFO] MODE={mode} -> bot disabled")
-        return
+        print(f"[INFO] MODE={mode} -> bot disabled"); return
     token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
     if not token:
-        print("[INFO] BOT_TOKEN/DISCORD_TOKEN not set -> skip bot")
-        return
-
+        print("[INFO] BOT_TOKEN/DISCORD_TOKEN not set -> skip bot"); return
     def _run():
         try:
             candidates = [
@@ -50,29 +39,24 @@ def try_start_bot():
                     for fn in ("main", "run_bot", "run", "start"):
                         if hasattr(mod, fn):
                             func = getattr(mod, fn)
-                            if inspect.iscoroutinefunction(func):
-                                return asyncio.run(func())
+                            if inspect.iscoroutinefunction(func): return asyncio.run(func())
                             res = func()
-                            if inspect.iscoroutine(res):
-                                return asyncio.run(res)
+                            if inspect.iscoroutine(res): return asyncio.run(res)
                             return
                 except Exception as e:
                     print(f"[WARN] bot entry {mod_name} failed: {e}")
             print("[INFO] No bot entrypoint matched; skip.")
         except Exception as e:
             print("[ERROR] Bot fatal:", e)
-
     supervise = os.getenv("BOT_SUPERVISE", "1") != "0"
     if supervise:
         async def supervise_loop():
             delay = int(os.getenv("BOT_RETRY_DELAY", "12"))
             while True:
                 try:
-                    await asyncio.to_thread(_run)
-                    return
+                    await asyncio.to_thread(_run); return
                 except Exception as e:
-                    print("[ERROR] Bot crash:", e)
-                    await asyncio.sleep(delay)
+                    print("[ERROR] Bot crash:", e); await asyncio.sleep(delay)
         threading.Thread(target=lambda: asyncio.run(supervise_loop()), daemon=True).start()
     else:
         threading.Thread(target=_run, daemon=True).start()
@@ -92,20 +76,12 @@ def serve_dashboard():
             port = int(os.getenv("PORT", "10000"))
             if sock_attr and hasattr(mod, sock_attr):
                 sock = getattr(mod, sock_attr)
-                try:
-                    sock.run(app, host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler)
-                    return
-                except Exception:
-                    pass
-            try:
-                app.add_url_rule("/ping", "ping", lambda: ("ok", 200))
-            except Exception:
-                pass
-            app.run(host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler)
-            return
-        except Exception:
-            continue
-    # Minimal fallback
+                try: sock.run(app, host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler); return
+                except Exception: pass
+            try: app.add_url_rule("/ping", "ping", lambda: ("ok", 200))
+            except Exception: pass
+            app.run(host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler); return
+        except Exception: continue
     from flask import Flask
     mini = Flask("mini-web")
     @mini.get("/ping")
@@ -114,6 +90,4 @@ def serve_dashboard():
     mini.run(host="0.0.0.0", port=port, request_handler=NoPingWSGIRequestHandler)
 
 if __name__ == "__main__":
-    ensure_dirs()
-    try_start_bot()
-    serve_dashboard()
+    ensure_dirs(); try_start_bot(); serve_dashboard()
