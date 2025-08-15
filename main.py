@@ -1,302 +1,255 @@
-# SatpamBot/main.py
+# main.py — SatpamBot (hardened for Render) — 2025-08-15
 from __future__ import annotations
 
 import os
 import gc
+import signal
 import logging
 import asyncio
-import random
 import importlib
-import time
-from typing import Optional
+from typing import Optional, Any
 
-try:
-    import aiohttp  # type: ignore
-except Exception:
-    aiohttp = None  # type: ignore
-
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-)
-log = logging.getLogger("startup")
-
-# ===== throttle log /ping (default 30 menit) =====
-LOG_PING = os.getenv("LOG_PING", "0") == "1"
-PING_LOG_INTERVAL = int(os.getenv("PING_LOG_INTERVAL", "1800"))  # detik; 1800 = 30 menit
-_last_ping_log_ts = 0.0
-
-# ===== state untuk /bot_ready =====
-ACTIVE_BOT: Optional[object] = None
-
-class _NoHealthz(logging.Filter):
-    def filter(self, record):
-        try:
-            msg = record.getMessage()
-        except Exception:
-            return True
-        for path in ("/healthz", "/ping"):
-            if (f'"GET {path} ' in msg) or (f'"HEAD {path} ' in msg) or (path in msg):
-                return False
-        return True
-
-CF_HINTS = (
-    "Error 1015",
-    "Access denied | discord.com",
-    "cf-error-details",
-    "cdn-cgi/challenge",
-    "You are being rate limited",
-)
-
-class PreflightError(Exception):
-    pass
-
-def _get_token() -> str:
-    token = (
-        os.getenv("DISCORD_TOKEN")
-        or os.getenv("BOT_TOKEN")
-        or os.getenv("DISCORD_BOT_TOKEN")
-        or os.getenv("DISCORD_BOT_TOKEN_LOCAL")
-        or ""
+# ---------- logging ----------
+def setup_logging() -> logging.Logger:
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=getattr(logging, level, logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    if not token:
-        raise RuntimeError("DISCORD_TOKEN / BOT_TOKEN / DISCORD_BOT_TOKEN tidak diset")
-    return token
+    log = logging.getLogger("SatpamBot")
+    logging.getLogger("werkzeug").setLevel(logging.INFO)
+    logging.getLogger("engineio").setLevel(logging.WARNING)
+    logging.getLogger("socketio").setLevel(logging.WARNING)
+    return log
 
-def _new_bot():
-    import modules.discord_bot.discord_bot as dmod  # type: ignore
-    dmod = importlib.reload(dmod)
-    return dmod.bot
+log = setup_logging()
 
-async def _preflight_gateway_ok(timeout: float = 8.0) -> bool:
-    if aiohttp is None:
-        return True
+# ---------- helpers ----------
+def env_bool(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return v.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+def get_port() -> int:
     try:
+        return int(os.getenv("PORT", "10000"))
+    except Exception:
+        return 10000
+
+def get_token() -> str:
+    for k in ("DISCORD_TOKEN", "BOT_TOKEN", "DISCORD_BOT_TOKEN"):
+        val = os.getenv(k, "").strip()
+        if val:
+            return val
+    raise RuntimeError("ENV DISCORD_TOKEN / BOT_TOKEN tidak diset")
+
+async def preflight_gateway_ok(timeout: float = 8.0) -> bool:
+    # cek cepat ke Discord API sebelum start bot
+    try:
+        import aiohttp  # lazy import
         async with aiohttp.ClientSession() as s:
             async with s.get("https://discord.com/api/v10/gateway", timeout=timeout) as r:
                 return r.status == 200
     except Exception:
-        return True
+        return True  # kalau gagal cek, jangan blokir start
 
-async def _force_close_http_session(bot):
-    # Tutup bot & session http dengan rapi saat retry/exit
+# ---------- web ----------
+def import_web_app():
     try:
-        await bot.close()
-    except Exception:
-        pass
-    try:
-        http = getattr(bot, "http", None)
-        sess = getattr(http, "_HTTPClient__session", None)
-        if sess and hasattr(sess, "closed") and not sess.closed:
-            await sess.close()
-    except Exception:
-        pass
-    await asyncio.sleep(0)
-    gc.collect()
-
-# ---------------- Web routes helper ----------------
-def _add_common_routes(app):
-    from flask import Response, jsonify
-
-    @app.route("/")
-    def _root():
-        return Response("ok", mimetype="text/plain")
-
-    @app.route("/healthz")
-    def _hz():
-        return Response("ok", mimetype="text/plain")
-
-    @app.route("/ping")
-    def _ping():
-        global _last_ping_log_ts
-        if LOG_PING:
-            now = time.monotonic()
-            if now - _last_ping_log_ts >= PING_LOG_INTERVAL:
-                logging.getLogger("startup").info("[keepalive] /ping received")
-                _last_ping_log_ts = now
-        return Response("pong", mimetype="text/plain")
-
-    @app.route("/bot_ready")
-    def _bot_ready():
-        try:
-            ready = bool(ACTIVE_BOT and getattr(ACTIVE_BOT, "is_ready")())
-        except Exception:
-            ready = False
-        status = 200 if ready else 503
-        return jsonify({"bot_ready": ready}), status
-
-    @app.route("/callback")
-    def _callback():
-        # Callback sederhana untuk OAuth/Invite – cukup 200 OK
-        return Response("ok", mimetype="text/plain")
-
-# ---------------- Full web (dashboard) ----------------
-def run_web() -> None:
-    from app import app, bootstrap
-    try:
-        bootstrap(); log.info("bootstrap: OK")
+        mod = importlib.import_module("app")
+        return getattr(mod, "app", None), getattr(mod, "socketio", None)
     except Exception as e:
-        log.warning("bootstrap error: %s", e)
+        log.warning("app.py tidak bisa diimport: %s", e)
+        return None, None
 
-    try:
-        _add_common_routes(app)
-    except Exception:
-        pass
+def build_mini_app():
+    from flask import Flask, jsonify
+    app = Flask("mini-web")
+    state = {"ready": False}
 
-    logging.getLogger("werkzeug").addFilter(_NoHealthz())
-    port = int(os.getenv("PORT", "10000"))
-    log.info("Starting web on :%s", port)
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
+    @app.get("/")
+    def root():
+        return "ok", 200
 
-# ---------------- Mini web (untuk MODE=botmini) ----------------
-def run_mini_web() -> None:
-    """
-    Mini HTTP server agar service bot dianggap Web Service di Render Free.
-    Punya route: /, /ping, /healthz, /bot_ready, /callback
-    """
-    try:
-        from flask import Flask
-        app = Flask("mini")
-        _add_common_routes(app)
-        logging.getLogger("werkzeug").addFilter(_NoHealthz())
-        port = int(os.getenv("PORT", "10000"))
-        log.info("Starting mini web on :%s", port)
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
+    @app.get("/healthz")
+    def healthz():
+        return jsonify({"ok": True, "bot_ready": state["ready"]}), 200
+
+    @app.get("/ping")
+    def ping():
+        return "pong", 200
+
+    @app.get("/bot_ready")
+    def bot_ready():
+        return jsonify({"ready": state["ready"]}), 200
+
+    # <- tambahan sesuai permintaan
+    @app.get("/callback")
+    def callback():
+        # tempatkan logic OAuth/webhook ringan di sini bila dibutuhkan
+        return "ok", 200
+
+    return app, state
+
+def run_web(app, socketio=None, host="0.0.0.0", port: int = 10000):
+    if socketio is not None:
+        log.info("Starting web (socketio) on %s:%s", host, port)
+        socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True)
+    else:
+        log.info("Starting web (flask) on %s:%s", host, port)
+        app.run(host=host, port=port, use_reloader=False)
+
+# ---------- bot ----------
+def import_bot_module():
+    mod = importlib.import_module("modules.discord_bot.discord_bot")
+    return importlib.reload(mod)
+
+async def run_bot(shared_app=None, ready_flag: Optional[dict] = None):
+    import inspect
+
+    token = get_token()
+    start_delay = float(os.getenv("BOT_START_DELAY", "0") or 0)
+    if start_delay > 0:
+        log.info("Menunggu %.1fs (BOT_START_DELAY)...", start_delay)
+        await asyncio.sleep(start_delay)
+
+    if not await preflight_gateway_ok():
+        log.warning("Preflight Discord gagal; coba lagi 5s...")
+        await asyncio.sleep(5)
+
+    mod = import_bot_module()
+
+    # inject Flask app jika modul bot mengekspose setter
+    if shared_app is not None:
+        set_flask_app = getattr(mod, "set_flask_app", None)
+        if callable(set_flask_app):
+            try:
+                set_flask_app(shared_app)
+                log.info("Flask app dihubungkan ke modul bot.")
+            except Exception as e:
+                log.warning("set_flask_app error: %s", e)
+
+    # prefer run_bot() bila ada
+    run_fn = getattr(mod, "run_bot", None)
+    if callable(run_fn):
+        log.info("Menjalankan bot via run_bot()...")
+        params_len = len(inspect.signature(run_fn).parameters)
+        if inspect.iscoroutinefunction(run_fn):
+            await (run_fn() if params_len == 0 else run_fn(token))  # type: ignore
+        else:
+            # fungsi sync
+            await (asyncio.to_thread(run_fn) if params_len == 0 else asyncio.to_thread(run_fn, token))  # type: ignore
         return
-    except Exception:
-        # fallback tanpa Flask
-        import http.server, socketserver, json
-        class Handler(http.server.SimpleHTTPRequestHandler):
-            def do_GET(self):
-                global ACTIVE_BOT, _last_ping_log_ts
-                if self.path in ("/", "/healthz", "/ping", "/bot_ready", "/callback"):
-                    if self.path == "/ping":
-                        if LOG_PING:
-                            now = time.monotonic()
-                            if now - _last_ping_log_ts >= PING_LOG_INTERVAL:
-                                logging.getLogger("startup").info("[keepalive] /ping received")
-                                _last_ping_log_ts = now
-                        body, status, ctype = b"pong", 200, "text/plain"
-                    elif self.path == "/bot_ready":
-                        try:
-                            ready = bool(ACTIVE_BOT and getattr(ACTIVE_BOT, "is_ready")())
-                        except Exception:
-                            ready = False
-                        body = json.dumps({"bot_ready": ready}).encode("utf-8")
-                        status, ctype = (200 if ready else 503), "application/json"
-                    else:
-                        body, status, ctype = b"ok", 200, "text/plain"
-                    self.send_response(status)
-                    self.send_header("Content-Type", ctype)
-                    self.end_headers()
-                    self.wfile.write(body)
-                else:
-                    self.send_error(404)
-            def log_message(self, *args, **kwargs): pass
-        port = int(os.getenv("PORT", "10000"))
-        with socketserver.TCPServer(("", port), Handler) as httpd:
-            log.info("Starting mini web on :%s", port)
-            httpd.serve_forever()
 
-# ---------------- Discord Bot ----------------
-async def _start_bot_async(bot) -> None:
-    token = _get_token()
-    if aiohttp is not None:
+    # fallback ke bot.start()
+    bot = getattr(mod, "bot", None)
+    if bot is None:
+        raise RuntimeError("modules.discord_bot.discord_bot tidak punya run_bot() atau bot")
+
+    async def mark_ready():
+        if hasattr(bot, "wait_until_ready"):
+            try:
+                await bot.wait_until_ready()
+                if ready_flag is not None:
+                    ready_flag["ready"] = True
+                    log.info("Bot READY.")
+            except Exception:
+                pass
+
+    log.info("Menjalankan bot via bot.start()...")
+    await asyncio.gather(mark_ready(), bot.start(token))  # type: ignore
+
+async def supervise_bot(start_coro_factory, *, min_backoff=3, max_backoff=60):
+    """Auto-restart kalau bot crash. Aktifkan dengan ENV BOT_SUPERVISE=1."""
+    backoff = min_backoff
+    while True:
         try:
-            # Longgarkan koneksi sedikit (tanpa menyentuh session internal)
-            bot.http.connector = aiohttp.TCPConnector(
-                limit=3,
-                limit_per_host=2,
-                ttl_dns_cache=600
-            )
+            await start_coro_factory()
+            log.info("Bot selesai (exit normal). Restart 5s...")
+            await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.exception("Bot crash: %s", e)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, max_backoff)
+
+# ---------- orchestrator ----------
+def main():
+    mode = os.getenv("MODE", "bot").strip().lower()
+    if mode in {"minibot", "mini-bot"}:
+        mode = "botmini"
+
+    log.info("🌐 Mode: %s", mode)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = get_port()
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    def on_signal(*_):
+        log.info("Signal diterima, shutdown...")
+        # biarkan tugas dibatalkan di finally
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, on_signal)
         except Exception:
             pass
-    if os.getenv("DISABLE_PREFLIGHT") != "1":
-        ok = await _preflight_gateway_ok()
-        if not ok:
-            raise PreflightError("Gateway preflight failed")
-    await bot.start(token)
 
-async def bot_runner() -> None:
-    from discord.errors import HTTPException
-    global ACTIVE_BOT
+    async def run_mode():
+        web_app, socketio = (None, None)
+        if mode in {"web", "both"}:
+            web_app, socketio = import_web_app()
+            if web_app is None:
+                log.warning("app.py tidak ditemukan, pakai mini web.")
+                web_app, _ = build_mini_app()
 
-    tries = 0
-    # Delay awal (ENV) atau jitter kecil
+        if mode == "botmini":
+            mini_app, ready = build_mini_app()
+            web_task = asyncio.to_thread(lambda: mini_app.run(host=host, port=port, use_reloader=False))
+            bot_coro_factory = (lambda: run_bot(shared_app=None, ready_flag=ready))
+            if env_bool("BOT_SUPERVISE", False):
+                await asyncio.gather(web_task, supervise_bot(bot_coro_factory))
+            else:
+                await asyncio.gather(web_task, bot_coro_factory())
+            return
+
+        if mode == "web":
+            run_web(web_app, socketio, host=host, port=port)  # type: ignore
+            return
+
+        if mode == "bot":
+            bot_coro_factory = (lambda: run_bot(shared_app=None))
+            if env_bool("BOT_SUPERVISE", False):
+                await supervise_bot(bot_coro_factory)
+            else:
+                await bot_coro_factory()
+            return
+
+        if mode == "both":
+            assert web_app is not None
+            web_runner = asyncio.to_thread(lambda: run_web(web_app, socketio, host=host, port=port))  # type: ignore
+            bot_coro_factory = (lambda: run_bot(shared_app=web_app))
+            if env_bool("BOT_SUPERVISE", False):
+                await asyncio.gather(web_runner, supervise_bot(bot_coro_factory))
+            else:
+                await asyncio.gather(web_runner, bot_coro_factory())
+            return
+
+        log.warning("MODE '%s' tidak dikenal. Default ke 'bot'.", mode)
+        await run_bot(shared_app=None)
+
     try:
-        start_delay = int(os.getenv("BOT_START_DELAY", "").strip() or "0")
-    except Exception:
-        start_delay = 0
-    if start_delay > 0:
-        log.info("Delaying first login for %ss (BOT_START_DELAY).", start_delay)
-        await asyncio.sleep(start_delay)
-    else:
-        await asyncio.sleep(random.randint(5, 15))
-
-    while True:
-        bot = _new_bot()
-        ACTIVE_BOT = bot  # simpan untuk /bot_ready
+        loop.run_until_complete(run_mode())
+    finally:
         try:
-            await _start_bot_async(bot)
-            break  # keluar normal jika bot.stop() dipanggil
-        except PreflightError as e:
-            await _force_close_http_session(bot)
-            tries += 1
-            base = 60 * (2 ** min(tries - 1, 4))
-            sleep_s = min(900, base + random.randint(0, 30))  # max 15m
-            logging.warning("[status] %s. Backoff %ss (try %s).", e, sleep_s, tries)
-            await asyncio.sleep(sleep_s)
-            continue
-        except HTTPException as e:
-            body = getattr(e, "text", "") or ""
-            is_cf = (getattr(e, "status", None) == 429) and any(h in body for h in CF_HINTS)
-            await _force_close_http_session(bot)
-            if is_cf:
-                tries += 1
-                base = 60 * (2 ** min(tries - 1, 4))
-                sleep_s = min(900, base + random.randint(0, 30))
-                logging.warning("[status] 429/Cloudflare. Backoff %ss (try %s).", sleep_s, tries)
-                await asyncio.sleep(sleep_s)
-                continue
-            logging.exception("[status] HTTPException status=%s; retry 30s", getattr(e, "status", "?"))
-            await asyncio.sleep(30)
+            for t in asyncio.all_tasks(loop):
+                t.cancel()
         except Exception:
-            await _force_close_http_session(bot)
-            logging.exception("[status] Bot crashed; retry 30s")
-            await asyncio.sleep(30)
-        finally:
-            # kalau belum ready, jangan pegang referensi supaya GC bersih
-            try:
-                ACTIVE_BOT = bot if getattr(bot, "is_ready")() else None
-            except Exception:
-                ACTIVE_BOT = None
-            if ACTIVE_BOT is None:
-                del bot
-                gc.collect()
-
-# ---------------- Orchestrator ----------------
-def main() -> None:
-    mode = os.getenv("MODE", "bot").lower()
-    log.info("Mode: %s", mode)
-    if mode == "web":
-        run_web(); return
-    if mode == "bot":
-        asyncio.run(bot_runner()); return
-    if mode == "both":
-        async def orchestrate():
-            web_task = asyncio.create_task(asyncio.to_thread(run_web))
-            bot_task = asyncio.create_task(bot_runner())
-            await asyncio.gather(web_task, bot_task)
-        asyncio.run(orchestrate()); return
-    if mode == "botmini":
-        async def orchestrate_mini():
-            web_task = asyncio.create_task(asyncio.to_thread(run_mini_web))
-            bot_task = asyncio.create_task(bot_runner())
-            await asyncio.gather(web_task, bot_task)
-        asyncio.run(orchestrate_mini()); return
-    log.warning("MODE tidak dikenal: %s. Default ke 'bot'.", mode)
-    asyncio.run(bot_runner())
+            pass
+        gc.collect()
 
 if __name__ == "__main__":
     main()
