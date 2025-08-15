@@ -1,5 +1,30 @@
 # ---- Python ----
 __pycache__/
+<<<<<<< HEAD
+*.pyc
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db
+*.zip
+# DB lokal dan cache (jangan track di git)
+*.db
+*.jsonl
+bot/data/vt_cache.json
+# Kecualikan jika memang ingin dilacak:
+!dashboard/superadmin.db
+original_src/
+__pycache__/
+*.pyc
+original_src/
+__pycache__/
+*.pyc
+.venv/
+*.zip
+*.log
+*.db
+*.jsonl
+=======
 *.py[cod]
 *.pyd
 .Python
@@ -60,3 +85,4 @@ storybook-static/
 *.iml
 .DS_Store
 Thumbs.db
+>>>>>>> origin/main
