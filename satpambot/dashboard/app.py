@@ -264,9 +264,3 @@ def __root_conditional_dashboard():
 @app.get("/__dashboard")
 def __root_dashboard():
     return render_template("dashboard.html")
-
-
-@app.get("/logout")
-def logout():
-    session.pop("admin", None)
-    return redirect(url_for("login"))
