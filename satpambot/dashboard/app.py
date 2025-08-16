@@ -172,3 +172,37 @@ def __debug_templates():
             found[fp] = os.path.exists(fp)
     return jsonify(paths=paths, found=found)
 # === PATCH END ===
+
+@app.get("/theme/list")
+@login_required
+def theme_list():
+    from flask import jsonify
+    base = os.path.join(os.path.dirname(__file__), "static", "themes")
+    themes = []
+    try:
+        if os.path.isdir(base):
+            for n in os.listdir(base):
+                if n.endswith(".css"):
+                    themes.append(os.path.splitext(n)[0])
+    except Exception:
+        pass
+    if not themes:
+        themes = ["default","dark","light"]
+    return jsonify(ok=True, themes=themes)
+
+@app.get("/api/guilds")
+@login_required
+def api_guilds():
+    from flask import jsonify
+    return jsonify(ok=True, guilds=[])
+
+@app.get("/assets-manager")
+@login_required
+def assets_manager():
+    return render_template("assets_manager.html")
+
+@app.get("/favicon.ico")
+def favicon():
+    from flask import send_from_directory
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    return send_from_directory(static_dir, "favicon.ico", mimetype="image/x-icon")
