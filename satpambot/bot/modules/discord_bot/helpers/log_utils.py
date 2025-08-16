@@ -175,3 +175,100 @@ async def announce_bot_online(guild: discord.Guild, bot_tag: str):
     except Exception:
         # Best-effort only; don't crash on startup
         pass
+
+# ==== compat patch: find_text_channel (only if missing) ====
+try:
+    _ = find_text_channel  # type: ignore  # noqa: F821
+except NameError:
+    from typing import Optional, Union
+
+    def _parse_int(x) -> Optional[int]:
+        try:
+            if x is None:
+                return None
+            if isinstance(x, int):
+                return x
+            s = str(x).strip()
+            if s.isdigit():
+                return int(s)
+        except Exception:
+            pass
+        return None
+
+    def find_text_channel(
+        guild,
+        id_or_name: Optional[Union[int, str]] = None,
+        *,
+        channel_id: Optional[Union[int, str]] = None,
+        name: Optional[str] = None,
+    ):
+        """
+        Cari text channel di guild.
+
+        Argumen fleksibel:
+          - id_or_name: bisa int id channel, atau nama channel (case-insensitive)
+          - channel_id: spesifik id (int/str)
+          - name: spesifik nama (str)
+
+        Return: discord.TextChannel | None
+        """
+        if guild is None:
+            return None
+
+        # 1) by ID (paling presisi)
+        cid = _parse_int(channel_id if channel_id is not None else id_or_name)
+        if cid is not None:
+            ch = getattr(guild, "get_channel", None)
+            if callable(ch):
+                c = guild.get_channel(cid)
+                # Di discord.py v2, bisa dapat Thread/Category; filter text channel
+                if getattr(c, "type", None) and getattr(getattr(c, "type", None), "text", False):
+                    return c
+                # Fallback: iter semua channels cari id cocok yg bertipe text
+            for c in getattr(guild, "channels", []) or []:
+                try:
+                    if getattr(c, "id", None) == cid and getattr(c, "type", None) and getattr(c.type, "text", False):
+                        return c
+                except Exception:
+                    continue
+
+        # 2) by name (case-insensitive, exact lalu partial)
+        nm = (name if name is not None else (id_or_name if isinstance(id_or_name, str) else None))
+        if isinstance(nm, str) and nm.strip():
+            nm_l = nm.strip().lstrip("#").lower()
+
+            # exact match dulu
+            for c in getattr(guild, "channels", []) or []:
+                try:
+                    if getattr(c, "type", None) and getattr(c.type, "text", False):
+                        if str(getattr(c, "name", "")).lower() == nm_l:
+                            return c
+                except Exception:
+                    continue
+
+            # partial match
+            for c in getattr(guild, "channels", []) or []:
+                try:
+                    if getattr(c, "type", None) and getattr(c.type, "text", False):
+                        if nm_l in str(getattr(c, "name", "")).lower():
+                            return c
+                except Exception:
+                    continue
+
+        # 3) fallback: text channel pertama yang bisa kirim pesan
+        for c in getattr(guild, "channels", []) or []:
+            try:
+                if getattr(c, "type", None) and getattr(c.type, "text", False):
+                    perms = getattr(c, "permissions_for", None)
+                    me = getattr(guild, "me", None)
+                    if callable(perms) and me is not None:
+                        if perms(me).send_messages:
+                            return c
+                    else:
+                        # jika tidak bisa cek perms, ya sudah return duluan
+                        return c
+            except Exception:
+                continue
+
+        return None
+# ==== end compat patch ====
