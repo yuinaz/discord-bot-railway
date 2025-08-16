@@ -224,3 +224,24 @@ def theme_apply():
     theme = (request.args.get("set") or "default").strip()
     session["theme"] = theme
     return jsonify(ok=True, theme=theme)
+
+# --- dev quick login context ---
+@app.context_processor
+def _inject_dev_login():
+    flag = str(os.getenv("DEBUG_DEV_LOGIN","0")).lower() in ("1","true","yes","on")
+    user = os.getenv("DEV_FAKE_USER","satpamleina")
+    return {"dev_fake_login": flag, "dev_fake_user": user}
+
+# --- dev quick login-as ---
+@app.get("/dev/login-as/<username>")
+def dev_login_as(username):
+    # hanya aktif jika DEBUG_DEV_LOGIN=1
+    flag = str(os.getenv("DEBUG_DEV_LOGIN","0")).lower() in ("1","true","yes","on")
+    if not flag:
+        from flask import abort
+        return abort(404)
+    session["admin"] = True
+    session["username"] = username
+    session["display_name"] = username
+    # arahkan ke dashboard (alias)
+    return redirect(url_for("dashboard_alias"))
