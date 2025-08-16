@@ -90,34 +90,29 @@ if __name__ == "__main__":
     if app is None:
         raise SystemExit("Flask app not found")
     if socketio:
-# === SILENCE /api/live ===
-try:
-    import logging
-    from werkzeug.serving import WSGIRequestHandler
 
-    class _SilenceLive(logging.Filter):
-        def filter(self, record):
-            try:
-                m = record.getMessage()
-            except Exception:
-                return True
-            # drop only /api/live access lines
-            return "/api/live" not in m
-
-    # filter akses log werkzeug
-    logging.getLogger("werkzeug").addFilter(_SilenceLive())
-
-    # patch handler HTTP agar tidak log /api/live
-    _orig_log_request = WSGIRequestHandler.log_request
-    def _log_request_sans_live(self, code='-', size='-'):
-        p = getattr(self, 'path', '')
-        if p.startswith("/api/live"):
-            return
-        return _orig_log_request(self, code, size)
-    WSGIRequestHandler.log_request = _log_request_sans_live
-except Exception:
-    pass
-# === END ===
+        # === SILENCE /api/live ===
+        try:
+            import logging
+            from werkzeug.serving import WSGIRequestHandler
+            class _SilenceLive(logging.Filter):
+                def filter(self, record):
+                    try:
+                        m = record.getMessage()
+                    except Exception:
+                        return True
+                    return "/api/live" not in m
+            logging.getLogger("werkzeug").addFilter(_SilenceLive())
+            _orig_log_request = WSGIRequestHandler.log_request
+            def _log_request_sans_live(self, code='-', size='-'):
+                p = getattr(self, 'path', '')
+                if p.startswith("/api/live"):
+                    return
+                return _orig_log_request(self, code, size)
+            WSGIRequestHandler.log_request = _log_request_sans_live
+        except Exception:
+            pass
+        # === END ===
         socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True)
     else:
         app.run(host=HOST, port=PORT)
