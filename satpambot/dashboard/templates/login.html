@@ -1,27 +1,36 @@
-{% extends "base.html" %}
-{% block title %}Login{% endblock %}
-{% block body %}
-<div class="auth-wrap">
-  <canvas id="particle-canvas" aria-hidden="true"></canvas>
-
-  <div class="login-card card shadow-lg">
-    <div class="card-body">
-      <h5 class="mb-3 text-center">Masuk Dashboard</h5>
-      <form method="post" action="{{ url_for('login') }}">
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input name="username" class="form-control form-control-lg" autocomplete="username" required />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-control form-control-lg" autocomplete="current-password" required />
-        </div>
-        <button class="btn btn-primary w-100 btn-lg">Login</button>
-      </form>
-    </div>
+{% extends 'base.html' %}
+{% block title %}Masuk Dashboard - SatpamBot{% endblock %}
+{% block content %}
+<canvas id="particle-canvas" style="position:fixed;inset:0;z-index:0"></canvas>
+<div class="container" style="position:relative;z-index:1;max-width:540px;margin-top:10vh">
+  <div class="card">
+    <h2 style="text-align:center">Masuk Dashboard</h2>
+    {% if error %}<div class="badge" style="color:#ff6b81">Kredensial salah</div>{% endif %}
+    <form method="post">
+      <div class="form-group" style="margin-bottom:10px">
+        <label>Username</label>
+        <input name="user" class="input" style="width:100%" required />
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Password</label>
+        <input type="password" name="pass" class="input" style="width:100%" required />
+      </div>
+      <button class="btn primary" style="width:100%">Login</button>
+    </form>
   </div>
 </div>
-
-<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}?v={{ cache_bust|default(1) }}">
-<script src="{{ url_for('static', filename='js/particles_login.js') }}?v={{ cache_bust|default(1) }}"></script>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/particles.min.js') }}"></script>
+<script>
+// simple particles background init
+(function(){
+  const c = document.getElementById('particle-canvas');
+  if(!c || !window.particlesJS) return;
+  particlesJS('particle-canvas', {
+    particles:{ number:{value:60}, color:{value:'#9aa4b2'}, size:{value:2}, line_linked:{enable:true, distance:140, color:'#9aa4b2', opacity:0.5, width:1} },
+    interactivity:{ detect_on:'canvas', events:{ onhover:{enable:true, mode:'repulse'} } }
+  });
+})();
+</script>
 {% endblock %}
