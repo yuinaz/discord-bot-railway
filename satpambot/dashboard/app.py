@@ -206,3 +206,21 @@ def favicon():
     from flask import send_from_directory
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     return send_from_directory(static_dir, "favicon.ico", mimetype="image/x-icon")
+
+@app.get("/theme")
+def theme_css():
+    from flask import send_from_directory, session
+    theme = (session.get("theme") or "default").strip()
+    base = os.path.join(os.path.dirname(__file__), "static", "themes")
+    css = f"{theme}.css"
+    if not os.path.isfile(os.path.join(base, css)):
+        css = "default.css"
+    return send_from_directory(base, css, mimetype="text/css")
+
+@app.get("/theme/apply")
+@login_required
+def theme_apply():
+    from flask import jsonify, request, session
+    theme = (request.args.get("set") or "default").strip()
+    session["theme"] = theme
+    return jsonify(ok=True, theme=theme)
