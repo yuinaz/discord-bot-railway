@@ -152,8 +152,6 @@ async def notify_to_ngobrol(guild: discord.Guild, user: discord.User, reason: st
             embed.set_footer(text="🧹 Dibersihkan oleh SatpamBot")
             await ngobrol_ch.send(embed=embed)
 
-            # Kirim sticker FibiLaugh jika ada
-            sticker = discord.utils.get(guild.stickers, name="FibiLaugh")
             if sticker:
                 await ngobrol_ch.send(stickers=[sticker])
         except Exception as e:

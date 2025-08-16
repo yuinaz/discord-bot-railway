@@ -144,9 +144,7 @@ class ModerationTest(commands.Cog):
     async def testban_cmd(self, ctx: commands.Context, *, target: discord.Member | str | None = None):
         username = target.display_name if isinstance(target, discord.Member) else (target or ctx.author.display_name)
         buf = _compose_poster(username=username, mode="testban")
-        file = discord.File(buf, filename="ban_card.png")
         embed = discord.Embed(colour=discord.Colour.green(), description="(Simulasi)")
-        embed.set_image(url="attachment://ban_card.png")
         await ctx.send(file=file, embed=embed)
 
     @commands.command(name="ban", aliases=["banpreview", "bp"])
@@ -154,9 +152,7 @@ class ModerationTest(commands.Cog):
     async def ban_cmd(self, ctx: commands.Context, *, target: discord.Member | str | None = None):
         username = target.display_name if isinstance(target, discord.Member) else (target or ctx.author.display_name)
         buf = _compose_poster(username=username, mode="ban")
-        file = discord.File(buf, filename="ban_card.png")
         embed = discord.Embed(colour=discord.Colour.red())
-        embed.set_image(url="attachment://ban_card.png")
         await ctx.send(file=file, embed=embed)
 
 async def setup(bot: commands.Bot):

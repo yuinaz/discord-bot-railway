@@ -29,8 +29,6 @@ async def send_ban_embed(guild: discord.Guild, user: discord.Member, reason: str
     try:
         await channel.send(embed=emb)
         try:
-            stk = next((s for s in guild.stickers if 'fibilaugh' in s.name.lower()), None)
-            if stk:
                 await channel.send(stickers=[stk])
         except Exception:
             pass
