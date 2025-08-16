@@ -93,6 +93,7 @@ if __name__ == "__main__":
 
 
 
+
         # === SILENCE /api/live ===
         try:
             import logging
@@ -106,18 +107,16 @@ if __name__ == "__main__":
                         return True
                     return "/api/live" not in m
 
-            # pasang filter ke logger dan handlernya
-            for name in ("werkzeug", "werkzeug.serving"):
+            # filter di root logger & werkzeug supaya baris /api/live dibuang
+            logging.getLogger().addFilter(_SilenceLive())
+            for name in ("werkzeug","werkzeug.serving"):
                 lg = logging.getLogger(name)
-                if lg:
-                    lg.addFilter(_SilenceLive())
-                    for h in list(getattr(lg, "handlers", []) or []):
-                        try:
-                            h.addFilter(_SilenceLive())
-                        except Exception:
-                            pass
+                lg.addFilter(_SilenceLive())
+                for h in list(getattr(lg, "handlers", []) or []):
+                    try: h.addFilter(_SilenceLive())
+                    except Exception: pass
 
-            # patch handler supaya baris akses /api/live tidak ditulis
+            # patch handler agar akses /api/live tak dicetak
             _orig_log_request = WSGIRequestHandler.log_request
             def _log_request_sans_live(self, code='-', size='-'):
                 line = getattr(self, "requestline", "") or ""
