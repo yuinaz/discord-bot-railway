@@ -149,24 +149,6 @@ def dashboard_alias():
     return render_template("dashboard.html")
 
 # Halaman settings & servers
-@app.get("/settings")
-@login_required
-def settings_page():
-    return render_template("settings.html")
-
-@app.get("/servers")
-@login_required
-def servers_page():
-    return render_template("servers.html")
-
-# Liveness sederhana untuk front-end
-@app.get("/api/live")
-def __api_live_fallback():
-    from flask import jsonify
-    live = str(os.getenv("RUN_BOT","0")).lower() not in ("0","false")
-    return jsonify(ok=True, live=bool(live))
-
-# Debug: lihat search paths & keberadaan file
 @app.get("/__debug/templates")
 def __debug_templates():
     from flask import jsonify
