@@ -21,7 +21,7 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, s
 from flask_socketio import SocketIO
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__, static_folder="static", template_folder="templates")
+app = Flask("main", static_folder="static", template_folder="templates")
 app.config["SECRET_KEY"] = os.getenv("SESSION_SECRET", os.getenv("SECRET_KEY", "satpambot-dev"))
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
@@ -220,3 +220,53 @@ try:
 except Exception:
     pass
 
+
+
+
+# --- LOGIN (compat baseline) ---
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        user = request.form.get("user", "")
+        pw = request.form.get("pass", "")
+        user_env = os.getenv("ADMIN_USERNAME", os.getenv("SUPER_ADMIN_USER", "admin"))
+        pass_env = (os.getenv("ADMIN_PASSWORD")
+                    or os.getenv("SUPER_ADMIN_PASS")
+                    or os.getenv("SUPER_ADMIN_PASSWORD")
+                    or "admin")
+        if user == user_env and pw == pass_env:
+            session["admin"] = user
+            nxt = request.args.get("next")
+            return redirect(nxt or url_for("__root_dashboard"))
+        return render_template("login.html", error="Kredensial salah.")
+    return render_template("login.html", error=None)
+
+
+
+@app.route("/admin/login", methods=["GET","POST"])
+def admin_login():
+    if request.method == "POST":
+        return login()
+    return redirect(url_for("login"))
+
+
+
+@app.before_request
+def __root_conditional_dashboard():
+    try:
+        if request.path == "/" or request.path == "":
+            if session.get("admin") or session.get("oauth") or session.get("discord_user"):
+                return render_template("dashboard.html")
+    except Exception:
+        pass
+    return None
+
+@app.get("/__dashboard")
+def __root_dashboard():
+    return render_template("dashboard.html")
+
+
+@app.get("/logout")
+def logout():
+    session.pop("admin", None)
+    return redirect(url_for("login"))
