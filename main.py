@@ -91,38 +91,43 @@ if __name__ == "__main__":
         raise SystemExit("Flask app not found")
     if socketio:
 
-# === SILENCE /api/live ===
-try:
-    import logging
-    from werkzeug.serving import WSGIRequestHandler
 
-    class _SilenceLive(logging.Filter):
-        def filter(self, record):
-            try:
-                m = record.getMessage()
-            except Exception:
-                return True
-            return "/api/live" not in m
 
-    # pasang filter di logger dan semua handler terkait
-    for name in ("werkzeug", "werkzeug.serving"):
-        lg = logging.getLogger(name)
-        lg.addFilter(_SilenceLive())
-        for h in list(getattr(lg, "handlers", []) or []):
-            h.addFilter(_SilenceLive())
+        # === SILENCE /api/live ===
+        try:
+            import logging
+            from werkzeug.serving import WSGIRequestHandler
 
-    # patch handler request agar tidak log baris yang mengandung /api/live
-    _orig_log_request = WSGIRequestHandler.log_request
-    def _log_request_sans_live(self, code='-', size='-'):
-        line = getattr(self, "requestline", "") or ""
-        if "/api/live" in line:
-            return
-        return _orig_log_request(self, code, size)
-    WSGIRequestHandler.log_request = _log_request_sans_live
-except Exception:
-    pass
-# === END ===
+            class _SilenceLive(logging.Filter):
+                def filter(self, record):
+                    try:
+                        m = record.getMessage()
+                    except Exception:
+                        return True
+                    return "/api/live" not in m
 
+            # pasang filter ke logger dan handlernya
+            for name in ("werkzeug", "werkzeug.serving"):
+                lg = logging.getLogger(name)
+                if lg:
+                    lg.addFilter(_SilenceLive())
+                    for h in list(getattr(lg, "handlers", []) or []):
+                        try:
+                            h.addFilter(_SilenceLive())
+                        except Exception:
+                            pass
+
+            # patch handler supaya baris akses /api/live tidak ditulis
+            _orig_log_request = WSGIRequestHandler.log_request
+            def _log_request_sans_live(self, code='-', size='-'):
+                line = getattr(self, "requestline", "") or ""
+                if "/api/live" in line:
+                    return
+                return _orig_log_request(self, code, size)
+            WSGIRequestHandler.log_request = _log_request_sans_live
+        except Exception:
+            pass
+        # === END ===
         socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True)
     else:
         app.run(host=HOST, port=PORT)
