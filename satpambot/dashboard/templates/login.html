@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block body %}
+<div class="auth-wrap">
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+  <div class="login-card card shadow-lg">
+    <div class="card-body">
+      <h5 class="mb-3 text-center">Masuk Dashboard</h5>
+      <form method="post" action="{{ url_for('login') }}">
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input name="username" class="form-control form-control-lg" autocomplete="username" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" class="form-control form-control-lg" autocomplete="current-password" required />
+        </div>
+        <button class="btn btn-primary w-100 btn-lg">Login</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}?v={{ cache_bust|default(1) }}">
+<script src="{{ url_for('static', filename='js/particles_login.js') }}?v={{ cache_bust|default(1) }}"></script>
+{% endblock %}

@@ -1,11 +1,23 @@
 <div class="topbar">
-    <div>
-        <button id="toggleSidebar" class="btn btn-sm btn-light me-2">☰</button>
-        <strong>Dashboard SatpamBot</strong>
-    </div>
-    <div>
-        👤 {{ username or 'Guest' }}
-        <button id="toggleTheme" class="btn btn-sm btn-secondary ms-3">🌓</button>
-    </div>
+  <div class="left">
+    <button class="btn" onclick="goBack()">← Back</button>
+    {% if logo_url %}
+      <img class="logo" src="{{ logo_url }}" alt="logo" />
+    {% else %}
+      <script>
+        (function(){
+          const u = localStorage.getItem('logoUrl');
+          if (u){
+            const img = new Image();
+            img.src = u; img.className='logo'; img.alt='logo';
+            document.currentScript.parentElement.appendChild(img);
+          }
+        })();
+      </script>
+    {% endif %}
+  </div>
+  <div class="right">
+    <a class="btn" href="/theme">🎨 Theme</a>
+    <button class="btn" onclick="toggleTheme()">🌓 Theme</button>
+  </div>
 </div>
-

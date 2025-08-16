@@ -2,7 +2,7 @@ import asyncio
 from typing import Optional
 try:
     # Prefer bot-side log utils if available
-    from satpambot.bot.modules.discord_bot.helpers.log_utils import find_text_channel, MOD_CMD_NAME
+    from ...discord_bot.helpers.log_utils import find_text_channel, MOD_CMD_NAME
 except Exception:
     find_text_channel = None
     MOD_CMD_NAME = "mod-command"

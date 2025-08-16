@@ -7,8 +7,9 @@ from typing import Optional
 import discord
 from discord.ext import commands
 
-from modules.discord_bot.helpers.log_utils import find_text_channel
+from .log_utils import find_text_channel
 from modules.discord_bot.helpers.ban_embed import build_ban_embed, reason_hash
+from ..utils.actions import delete_message_safe
 
 async def _find_existing_with_marker(
     channel: discord.TextChannel,
@@ -112,7 +113,7 @@ async def post_ban_embed(
 
     if delete_command and getattr(ctx, "message", None):
         try:
-            await ctx.message.delete()
+            await delete_message_safe(ctx.message)
         except Exception:
             pass
 
