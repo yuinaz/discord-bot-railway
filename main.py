@@ -15,22 +15,20 @@ try:
 # === AUTO RUN_BOT based on token from .env/.env.local ===
 try:
     import os
-    # cari token di beberapa nama env umum
-    _token = None
-    for k in ("DISCORD_TOKEN","DISCORD_BOT_TOKEN","BOT_TOKEN","TOKEN","TOKEN_BOT"):
-        v = os.getenv(k)
-        if v and v.strip():
-            _token = v.strip()
-            os.environ["DISCORD_TOKEN"] = _token  # normalisasi untuk runner bot
+    token = None
+    for key in ("DISCORD_TOKEN","DISCORD_BOT_TOKEN","BOT_TOKEN","TOKEN","TOKEN_BOT"):
+        val = os.getenv(key)
+        if val and val.strip():
+            token = val.strip()
+            os.environ["DISCORD_TOKEN"] = token  # normalize
             break
-    # mode run
-    rb = (os.getenv("RUN_BOT") or "auto").strip().lower()
-    # nyalakan otomatis jika token ada dan RUN_BOT 'auto'/kosong/'0'/'false'/'off'
-    if (_token and rb in ("auto","","0","false","off")) or rb in ("1","true","yes","on","only"):
+    run_bot = (os.getenv("RUN_BOT","auto").strip().lower())
+    if token and run_bot in ("auto","","0","false","off"):
         os.environ["RUN_BOT"] = "1"
 except Exception:
     pass
 # === END AUTO ===
+
 except Exception:
     pass
 
