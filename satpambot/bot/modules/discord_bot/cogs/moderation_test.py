@@ -26,9 +26,7 @@ def _find_fibi_asset() -> Path | None:
     here = Path(__file__).resolve()
     roots = [p for i, p in enumerate(here.parents) if i < 6] + [Path.cwd()]
     for r in roots:
-        for cand in (r / "assets" / "fibilaugh.png", r / "assets" / "fibi.png"):
-            if cand.exists():
-                return cand
+    return None
     return None
 
 def _text_len(draw: ImageDraw.ImageDraw, text: str, font) -> float:
@@ -77,7 +75,7 @@ def _compose_poster(username: str, mode: str = "testban") -> BytesIO:
         raise RuntimeError("Pillow belum terpasang. Install pillow.")
     src = _find_fibi_asset()
     if not src or not src.exists():
-        raise FileNotFoundError("assets/fibilaugh.png tidak ditemukan.")
+        return None
 
     W, H = CARD_W, CARD_H
 
