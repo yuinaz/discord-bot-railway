@@ -59,3 +59,4 @@ Thumbs.db
 # prevent duplicate template subtree
 satpambot/dashboard/templates/templates/
 **/templates/templates/
+NUL
