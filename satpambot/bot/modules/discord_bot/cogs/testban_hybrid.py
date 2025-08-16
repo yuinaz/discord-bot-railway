@@ -12,7 +12,8 @@ from discord.ext import commands
 # permissions helper (sudah ada di repo)
 from modules.discord_bot.helpers.permissions import is_mod_or_admin
 # cari text-channel fleksibel (sudah dipatch sebelumnya)
-from modules.discord_bot.helpers.log_utils import find_text_channel
+from ..helpers.log_utils import find_text_channel
+from ..utils.actions import delete_message_safe
 
 # === Embed builder (tanpa asset/sticker) ===
 def _build_ban_embed(
@@ -158,7 +159,7 @@ class TestBanHybrid(commands.Cog):
                 pass
             else:
                 # hapus command user (tidak fatal kalau gagal)
-                await ctx.message.delete()
+                await delete_message_safe(ctx.message)
         except Exception:
             pass
 

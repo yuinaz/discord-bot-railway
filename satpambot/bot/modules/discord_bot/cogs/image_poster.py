@@ -7,7 +7,8 @@ import discord
 from discord.ext import commands
 
 from modules.discord_bot.helpers.ban_embed import build_ban_embed, reason_hash
-from modules.discord_bot.helpers.log_utils import find_text_channel
+from ..helpers.log_utils import find_text_channel
+from ..utils.actions import delete_message_safe
 
 class ImagePoster(commands.Cog):
     """Poster ringan tanpa gambar (fallback)."""
@@ -41,7 +42,7 @@ class ImagePoster(commands.Cog):
         emb.title = "Information"
         await ch.send(embed=emb)
         try:
-            await ctx.message.delete()
+            await delete_message_safe(ctx.message)
         except Exception:
             pass
 

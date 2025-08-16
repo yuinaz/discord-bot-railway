@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import discord
 from discord.ext import commands
 from satpambot.bot.modules.discord_bot.utils.actions import delete_message_safe
-from satpambot.bot.modules.discord_bot.helpers.log_utils import find_text_channel
+from ..helpers.log_utils import find_text_channel
 
 log = logging.getLogger(__name__)
 
