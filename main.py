@@ -1,188 +1,95 @@
-# main.py
-# -*- coding: utf-8 -*-
-import os
-import sys
-import importlib
-import asyncio
-import threading
-import logging
-from typing import Optional
 
-# =========================
-# Logging
-# =========================
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+import os, logging, asyncio, threading
+
 logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    level=getattr(logging, os.getenv("LOG_LEVEL","INFO").upper(), logging.INFO),
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-log = logging.getLogger("entry")
+log = logging.getLogger()
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
-# =========================
-# Utility
-# =========================
-def env_bool(name: str, default: Optional[bool] = None) -> Optional[bool]:
-    v = os.getenv(name)
-    if v is None:
-        return default
-    v = v.strip().lower()
-    if v in ("1", "true", "yes", "on"):
-        return True
-    if v in ("0", "false", "no", "off"):
-        return False
-    return default
+RUN_BOT = os.getenv("RUN_BOT","1")
+HOST    = os.getenv("HOST","0.0.0.0")
+PORT    = int(os.getenv("PORT","5000"))
 
+log.info("ENTRY main.py start | RUN_BOT='%s' | PORT=%s", RUN_BOT, PORT)
 
-def should_run_bot() -> bool:
-    """
-    Default: JALAN kalau ada token (DISCORD_TOKEN/BOT_TOKEN).
-    Bisa dipaksa OFF dengan RUN_BOT=0, atau ON dengan RUN_BOT=1.
-    """
-    forced = env_bool("RUN_BOT", None)
-    if forced is not None:
-        return forced
-    token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
-    return bool(token)
+app = None
+socketio = None
+loaded_from = None
 
-
-def get_port() -> int:
+try:
+    from satpambot.dashboard.app import app as _app
+    app = _app
+    loaded_from = "satpambot.dashboard.app"
     try:
-        return int(os.getenv("PORT", "10000"))
+        from satpambot.dashboard.app import socketio as _socketio
+        socketio = _socketio
     except Exception:
-        return 10000
-
-
-# =========================
-# Dashboard (Flask) loader
-# =========================
-def load_dashboard_app():
-    """
-    Coba import dashboard utama: satpambot.dashboard.app
-    Harus expose variabel 'app' (Flask instance).
-    Kalau gagal, bikin mini-app fallback supaya Render tetap UP.
-    """
+        socketio = None
+except Exception:
     try:
-        mod = importlib.import_module("satpambot.dashboard.app")
-        app = getattr(mod, "app", None)
-        if app is None:
-            raise RuntimeError("satpambot.dashboard.app ditemukan, tapi tidak ada 'app'")
-        log.info("✅ Dashboard app loaded: satpambot.dashboard.app")
-        # Kurangi spam log GET /ping
+        from app import app as _app
+        app = _app
+        loaded_from = "app"
         try:
-            @app.before_request
-            def _noisy_ping_filter():
-                from flask import request
-                if request.path == "/ping":
-                    # Turunkan level ke DEBUG supaya gak banjiri log
-                    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+            from app import socketio as _socketio
+            socketio = _socketio
         except Exception:
-            pass
-        return app
+            socketio = None
     except Exception as e:
-        log.warning("app dashboard gagal diimport: %s; pakai mini fallback.", e)
-        from flask import Flask, jsonify, redirect
+        log.exception("Gagal import dashboard app: %s", e)
+        raise SystemExit(2)
 
-        mini = Flask("mini-web")
+log.info("✅ Dashboard app loaded: %s", loaded_from)
 
-        @mini.route("/ping")
-        def _ping():
-            return "ok"
-
-        @mini.route("/healthz")
-        def _healthz():
-            return jsonify(ok=True)
-
-        @mini.route("/")
-        def _root():
-            return redirect("/ping", code=302)
-
-        return mini
-
-
-def run_web(app):
-    host = "0.0.0.0"
-    port = get_port()
-    log.info("🌐 Starting Flask on %s:%s", host, port)
-    # Development server sudah cukup untuk Render; gunakan WSGI bila perlu.
-    app.run(host=host, port=port, use_reloader=False)
-
-
-# =========================
-# Bot runner (thread)
-# =========================
-def _bot_thread_main():
-    """
-    Jalan di thread terpisah; aman untuk asyncio.run().
-    Coba shim modern dulu, lalu fallback legacy bila ada.
-    Tidak meledak jika modul tidak ada → web tetap hidup.
-    """
-    candidates = [
-        # Rekomendasi (mono)
-        ("satpambot.bot.modules.discord_bot.shim_runner", "start_bot"),
-        # Fallback legacy (kalau masih ada)
-        ("satpambot.bot.modules.discord_bot.discord_bot", "start_bot"),
-        ("satpambot.bot.modules.discord_bot.discord_bot", "main"),
-    ]
-    last_err = None
-    for mod_name, fn_name in candidates:
-        try:
-            mod = importlib.import_module(mod_name)
-            fn = getattr(mod, fn_name, None)
-            if fn is None:
-                raise AttributeError(f"{mod_name} tidak punya fungsi {fn_name}")
-
-            if asyncio.iscoroutinefunction(fn):
-                asyncio.run(fn())
-            else:
-                fn()
-            log.info("🤖 Bot runner OK via %s.%s", mod_name, fn_name)
-            return
-        except Exception as e:
-            last_err = e
-            log.warning("Gagal start bot via %s.%s: %s", mod_name, fn_name, e)
-    if last_err:
-        log.error("Bot crash: %s", last_err)
-
-
-def start_bot_background_if_needed():
-    if not should_run_bot():
-        log.info("🧪 RUN_BOT=0 atau token tidak tersedia → bot dimatikan.")
-        return
-
+def _start_bot_bg():
     token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
     if not token:
-        log.warning("ENV DISCORD_TOKEN / BOT_TOKEN tidak diset → bot tidak dijalankan.")
+        log.info("🧪 RUN_BOT=0 atau token tidak tersedia → bot dimatikan.")
+        return
+    start = None
+    try:
+        from satpambot.bot.modules.discord_bot.discord_bot import start_bot as start
+    except Exception:
+        try:
+            from satpambot.bot.modules.discord_bot.shim_runner import start_bot as start
+        except Exception:
+            start = None
+    if not start:
+        log.info("🧪 Runner bot tidak ditemukan → bot dimatikan.")
         return
 
-    t = threading.Thread(target=_bot_thread_main, name="bot-thread", daemon=True)
-    t.start()
-    log.info("🚀 Bot thread started.")
+    async def _run():
+        try:
+            await start()
+        except Exception as e:
+            log.exception("Bot crash: %s", e)
+            await asyncio.sleep(5)
 
-
-# =========================
-# Entry point
-# =========================
-def main():
-    log.info(
-        "ENTRY main.py start | RUN_BOT=%r | PORT=%s",
-        os.getenv("RUN_BOT", ""),
-        get_port(),
-    )
-    app = load_dashboard_app()
-    # Jalankan bot di background bila memenuhi syarat
-    start_bot_background_if_needed()
-    # Jalankan web (blok sampai exit)
-    run_web(app)
-
+    try:
+        asyncio.run(_run())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_run())
 
 if __name__ == "__main__":
-    # Pastikan project root ada di sys.path
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    try:
-        main()
-    except KeyboardInterrupt:
-        log.info("Shutdown requested by user.")
-    except Exception as e:
-        log.exception("Fatal error: %s", e)
-        raise
+    if RUN_BOT in ("0","false","False"):
+        log.info("🧪 RUN_BOT=0 atau token tidak tersedia → bot dimatikan.")
+    else:
+        t = threading.Thread(target=_start_bot_bg, name="DiscordBotThread", daemon=True)
+        t.start()
+
+    log.info("🌐 Starting Flask on %s:%s", HOST, PORT)
+    if app is None:
+        raise SystemExit("Flask app not found")
+    if socketio:
+        socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True)
+    else:
+        app.run(host=HOST, port=PORT)
