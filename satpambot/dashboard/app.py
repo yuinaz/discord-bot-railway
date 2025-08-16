@@ -1,9 +1,10 @@
+import os, time, random
+from flask import Flask, session, redirect, url_for, request, render_template, jsonify
 
-import os
+# Explicit folders but relative to project root if run with PYTHONPATH=.
+app = Flask("main", template_folder="templates", static_folder="static")
 
 from functools import wraps
-from flask import session, redirect, url_for, request
-
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -11,229 +12,23 @@ def login_required(fn):
             return redirect(url_for("login", next=request.url))
         return fn(*args, **kwargs)
     return wrapper
-import json
-import sqlite3
-from datetime import datetime
-from functools import wraps
-from pathlib import Path
 
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session
-from flask_socketio import SocketIO
-from werkzeug.utils import secure_filename
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-please-change')
+app.jinja_env.globals['cache_bust'] = os.getenv('CACHE_BUST', '1')
 
-app = Flask("main", static_folder="static", template_folder="templates")
-app.config["SECRET_KEY"] = os.getenv("SESSION_SECRET", os.getenv("SECRET_KEY", "satpambot-dev"))
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+@app.get("/ping")
+def ping(): return "pong", 200
 
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
-DB_PATH = DATA_DIR / "app.db"
-CFG_PATH = DATA_DIR / "config.json"
+@app.get("/healthz")
+def healthz(): return "ok", 200
 
-def init_db():
-    with sqlite3.connect(DB_PATH) as c:
-        c.execute("CREATE TABLE IF NOT EXISTS assets (key TEXT PRIMARY KEY, mime TEXT, data BLOB, updated_at TEXT)")
-        c.execute("""CREATE TABLE IF NOT EXISTS asset_history (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        category TEXT, filename TEXT, mime TEXT, url TEXT, data BLOB,
-                        is_active INTEGER DEFAULT 0, created_at TEXT
-                    )""")
-        c.commit()
-
-def bootstrap():
-    init_db()
-    if not CFG_PATH.exists():
-        CFG_PATH.write_text(json.dumps({"theme": "default.css"}, indent=2), encoding="utf-8")
-    return True
-
-def login_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not session.get("admin"):
-            return redirect(url_for("login", next=request.url))
-        return fn(*args, **kwargs)
-    return wrapper
-
-def _save_asset(category: str, local_path: Path, url: str) -> str:
-    mime = "image/png" if local_path.suffix.lower() == ".png" else "image/jpeg"
-    raw = local_path.read_bytes()
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("REPLACE INTO assets(key, mime, data, updated_at) VALUES (?,?,?,?)",
-                     (category, mime, raw, datetime.utcnow().isoformat()))
-        conn.execute("UPDATE asset_history SET is_active=0 WHERE category=?", (category,))
-        conn.execute("""INSERT INTO asset_history(category, filename, mime, url, data, is_active, created_at)
-                        VALUES (?,?,?,?,?,1,?)""", (category, local_path.name, mime, url, raw, datetime.utcnow().isoformat()))
-        conn.commit()
-    socketio.emit("asset_updated", {"category": category, "url": url}, broadcast=True)
-    return url
-
-def _theme_name() -> str:
-    if CFG_PATH.exists():
-        try:
-            cfg = json.loads(CFG_PATH.read_text(encoding="utf-8"))
-            return cfg.get("theme", "default.css")
-        except Exception:
-            pass
-    return "default.css"
-
-
-@app.route("/ping", methods=["GET","HEAD"])
-def ping():
-    return "pong", 200
-
-from flask import redirect
-
-@app.route('/assets/<path:filename>')
-def _assets(filename):
-    return _sfd(_ASSETS_DIR, filename)
-
-
-# --- admin fallback integration ---
-import os
-try:
-    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-key')
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['SESSION_COOKIE_SECURE'] = bool(os.getenv('SESSION_COOKIE_SECURE','1')!='0')
-except Exception:
-    pass
-try:
-    from .admin_fallback import admin_fallback_bp
-except Exception:
-    from .admin_fallback import admin_fallback_bp
-try:
-    app.register_blueprint(admin_fallback_bp)
-except Exception:
-    pass
-
-# Aliases so these URLs always work
-from flask import redirect
-
-
-
-
-
-
-
-
-try:
-    from flask import redirect
-    # Root -> /login jika belum ada rule '/'
-    if not any(getattr(r, "rule", None) == "/" for r in app.url_map.iter_rules()):
-        @app.route("/")
-        def __root_redirect_to_login():
-            return redirect("/login", code=302)
-    # /discord/login -> /login jika belum ada rule '/discord/login'
-    if not any(getattr(r, "rule", None) == "/discord/login" for r in app.url_map.iter_rules()):
-        @app.route("/discord/login")
-        def __discord_login_redirect_to_login():
-            return redirect("/login", code=302)
-except Exception:
-    pass
-
-
-# --- force alias to /login (safe; runs before routes) ---
-try:
-    from flask import request, redirect
-    @app.before_request
-    def _force_login_alias():
-        if request.path in ("/", "/discord/login"):
-            return redirect("/login", code=302)
-except Exception:
-    pass
-
-
-# --- hard override: force /login to use admin_fallback, plus aliases ---
-try:
-    from flask import request, redirect
-    from .admin_fallback import admin_login  # form user/pass (ENV)
-    @app.before_request
-    def _login_overrides():
-        # Aliases menuju /login
-        if request.path in ("/", "/discord/login"):
-            return redirect("/login", code=302)
-        # Paksa /login selalu pakai admin_fallback (hindari handler lama "Invalid request!")
-        if request.path == "/login" and request.method in ("GET","POST"):
-            return admin_login()
-except Exception:
-    pass
-
-
-# --- API fallback saat bot OFF (dipasang hanya kalau route belum ada) ---
-try:
-    import os
-    from flask import jsonify
-    # /api/live
-    if not any(getattr(r, "rule", None) == "/api/live" for r in app.url_map.iter_rules()):
-        @app.get("/api/live")
-        def __api_live_fallback():
-            return jsonify(ok=True, live=True, bot="off", env=os.getenv("ENV","local")), 200
-    # /api/ping
-    if not any(getattr(r, "rule", None) == "/api/ping" for r in app.url_map.iter_rules()):
-        @app.get("/api/ping")
-        def __api_ping_fallback():
-            return jsonify(ok=True, pong=True), 200
-except Exception:
-    pass
-
-
-# --- quiet access log for health/ping routes & lightweight endpoints ---
-try:
-    import logging
-    from flask import request, jsonify
-
-    _QUIET_PATHS = {"/ping", "/healthz", "/api/ping", "/api/live"}
-
-    @app.before_request
-    def __mute_health_accesslog():
-        # tandai request agar tidak dilog kalau termasuk quiet paths atau healthcheck UA
-        ua = (request.headers.get("User-Agent") or "").lower()
-        if request.path in _QUIET_PATHS or "uptimerobot" in ua or "render" in ua:
-            # flag khusus yang kita cek di after_request
-            request.environ["_suppress_access_log"] = True
-
-    @app.after_request
-    def __custom_accesslog(resp):
-        # kalau tidak health/ping, tulis access log sederhana via logger 'entry'
-        try:
-            if not request.environ.get("_suppress_access_log"):
-                logging.getLogger("entry").info("%s %s %s", request.method, request.path, resp.status_code)
-        except Exception:
-            pass
-        return resp
-
-    # Sediakan /ping dan /healthz kalau belum ada (HEAD/GET, no body 204)
-    if not any(getattr(r, "rule", None) == "/ping" for r in app.url_map.iter_rules()):
-        @app.route("/ping", methods=["GET","HEAD"])
-        def __ping(): return ("", 204)
-    if not any(getattr(r, "rule", None) == "/healthz" for r in app.url_map.iter_rules()):
-        @app.route("/healthz", methods=["GET","HEAD"])
-        def __healthz(): return ("", 204)
-
-    # Fallback API (kalau bot OFF): /api/ping & /api/live
-    if not any(getattr(r, "rule", None) == "/api/ping" for r in app.url_map.iter_rules()):
-        @app.get("/api/ping")
-        def __api_ping_fallback(): return jsonify(ok=True, pong=True), 200
-    if not any(getattr(r, "rule", None) == "/api/live" for r in app.url_map.iter_rules()):
-        @app.get("/api/live")
-        def __api_live_fallback(): return jsonify(ok=True, live=True, bot="off"), 200
-except Exception:
-    pass
-
-
-
-
-# --- LOGIN (compat baseline) ---
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
-        user = request.form.get("user", "")
-        pw = request.form.get("pass", "")
-        user_env = os.getenv("ADMIN_USERNAME", os.getenv("SUPER_ADMIN_USER", "admin"))
-        pass_env = (os.getenv("ADMIN_PASSWORD")
-                    or os.getenv("SUPER_ADMIN_PASS")
-                    or os.getenv("SUPER_ADMIN_PASSWORD")
-                    or "admin")
+        user = request.form.get("user","")
+        pw = request.form.get("pass","")
+        user_env = os.getenv("ADMIN_USERNAME", os.getenv("SUPER_ADMIN_USER","admin"))
+        pass_env = (os.getenv("ADMIN_PASSWORD") or os.getenv("SUPER_ADMIN_PASS") or os.getenv("SUPER_ADMIN_PASSWORD") or "admin")
         if user == user_env and pw == pass_env:
             session["admin"] = user
             nxt = request.args.get("next")
@@ -241,15 +36,16 @@ def login():
         return render_template("login.html", error="Kredensial salah.")
     return render_template("login.html", error=None)
 
-
-
 @app.route("/admin/login", methods=["GET","POST"])
 def admin_login():
     if request.method == "POST":
         return login()
     return redirect(url_for("login"))
 
-
+@app.get("/logout")
+def logout():
+    session.pop("admin", None)
+    return redirect(url_for("login"))
 
 @app.before_request
 def __root_conditional_dashboard():
@@ -265,8 +61,132 @@ def __root_conditional_dashboard():
 def __root_dashboard():
     return render_template("dashboard.html")
 
+# --- API stubs for dashboard ---
+@app.get("/api/stats")
+def api_stats():
+    return jsonify({
+        "online": random.randint(5, 60),
+        "messages_today": random.randint(100, 900),
+        "warnings": random.randint(0, 5),
+        "uptime": time.strftime("%H:%M:%S", time.gmtime(time.time()%86400)),
+    })
 
-@app.get("/logout")
-def logout():
-    session.pop("admin", None)
-    return redirect(url_for("login"))
+@app.get("/api/traffic")
+def api_traffic():
+    labels = [f"{h:02d}:00" for h in range(24)]
+    values = [random.randint(0, 50) for _ in labels]
+    return jsonify({"labels": labels, "values": values})
+
+@app.get("/api/top_guilds")
+def api_top():
+    return jsonify([{"name": f"Guild {i}", "count": random.randint(1, 99)} for i in range(1,7)])
+
+@app.get("/api/mini-monitor")
+def api_mm():
+    return jsonify({"uptime": "3d 12h", "cpu": round(random.uniform(4, 27),1), "ram": random.randint(350, 1200)})
+
+
+@app.get("/settings")
+@login_required
+def settings_page():
+    # render template from package templates; ChoiceLoader already set
+    return render_template("settings.html")
+
+
+@app.get("/servers")
+@login_required
+def servers_page():
+    # render template from package templates
+    return render_template("servers.html")
+
+
+@app.get("/api/live")
+def __api_live_fallback():
+    from flask import jsonify
+    return jsonify(ok=True, live=True, bot=os.getenv("RUN_BOT","0") not in ("0","false","False"))
+# === PATCH START: dashboard templates/routing ===
+import os
+from jinja2 import ChoiceLoader, FileSystemLoader
+from functools import wraps
+
+# Dual template loader (package + root)
+try:
+    pkg_templates = os.path.join(os.path.dirname(__file__), "templates")
+    root_templates = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "templates"))
+    loaders = []
+    if os.path.isdir(pkg_templates):
+        loaders.append(FileSystemLoader(pkg_templates))
+    if os.path.isdir(root_templates):
+        loaders.append(FileSystemLoader(root_templates))
+    if loaders:
+        app.jinja_loader = ChoiceLoader(loaders)
+except Exception:
+    pass
+
+# login_required (ringan) bila belum ada
+try:
+    login_required
+except NameError:
+    def login_required(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not (session.get("admin") or session.get("oauth") or session.get("discord_user")):
+                return redirect(url_for("login", next=request.url))
+            return fn(*args, **kwargs)
+        return wrapper
+
+# Hindari loop redirect pada /login
+@app.before_request
+def __login_loop_guard():
+    p = request.path or "/"
+    if p in ("/login", "/admin/login"):
+        return None
+
+# Alias /dashboard
+@app.get("/dashboard")
+@login_required
+def dashboard_alias():
+    return render_template("dashboard.html")
+
+# Halaman settings & servers
+@app.get("/settings")
+@login_required
+def settings_page():
+    return render_template("settings.html")
+
+@app.get("/servers")
+@login_required
+def servers_page():
+    return render_template("servers.html")
+
+# Liveness sederhana untuk front-end
+@app.get("/api/live")
+def __api_live_fallback():
+    from flask import jsonify
+    live = str(os.getenv("RUN_BOT","0")).lower() not in ("0","false")
+    return jsonify(ok=True, live=bool(live))
+
+# Debug: lihat search paths & keberadaan file
+@app.get("/__debug/templates")
+def __debug_templates():
+    from flask import jsonify
+    paths = []
+    try:
+        loader = app.jinja_loader
+        loaders = getattr(loader, "loaders", [loader])
+        for L in loaders:
+            sp = getattr(L, "searchpath", None)
+            if isinstance(sp, (list,tuple)):
+                paths.extend(list(sp))
+            elif isinstance(sp, str):
+                paths.append(sp)
+    except Exception:
+        pass
+    names = ["base.html","login.html","dashboard.html","settings.html","servers.html"]
+    found = {}
+    for base in paths:
+        for n in names:
+            fp = os.path.join(base, n)
+            found[fp] = os.path.exists(fp)
+    return jsonify(paths=paths, found=found)
+# === PATCH END ===
