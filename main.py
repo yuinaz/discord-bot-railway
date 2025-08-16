@@ -11,6 +11,26 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
     load_dotenv('.env.local', override=True)
+
+# === AUTO RUN_BOT based on token from .env/.env.local ===
+try:
+    import os
+    # cari token di beberapa nama env umum
+    _token = None
+    for k in ("DISCORD_TOKEN","DISCORD_BOT_TOKEN","BOT_TOKEN","TOKEN","TOKEN_BOT"):
+        v = os.getenv(k)
+        if v and v.strip():
+            _token = v.strip()
+            os.environ["DISCORD_TOKEN"] = _token  # normalisasi untuk runner bot
+            break
+    # mode run
+    rb = (os.getenv("RUN_BOT") or "auto").strip().lower()
+    # nyalakan otomatis jika token ada dan RUN_BOT 'auto'/kosong/'0'/'false'/'off'
+    if (_token and rb in ("auto","","0","false","off")) or rb in ("1","true","yes","on","only"):
+        os.environ["RUN_BOT"] = "1"
+except Exception:
+    pass
+# === END AUTO ===
 except Exception:
     pass
 
