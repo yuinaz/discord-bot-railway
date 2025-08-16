@@ -1,17 +1,12 @@
-
-(function(){
-  async function tick(){
-    try{
-      const res = await fetch('/api/live_stats', {cache:'no-store'});
-      if(!res.ok){ return; }
-      const j = await res.json();
-      if(j && j.uptime){
-        document.getElementById('mm-uptime').textContent = 'Uptime: ' + j.uptime;
-        document.getElementById('mm-cpu').textContent = 'CPU: ' + j.cpu + '%';
-        document.getElementById('mm-ram').textContent = 'RAM: ' + j.ram + ' MB';
-      }
-    }catch(e){ /* silent */ }
-  }
-  tick();
-  setInterval(tick, 3000);
-})();
+async function refreshMini(){
+  try{
+    const d = await (await fetch("/api/mini-monitor",{cache:"no-store"})).json(); // { uptime, cpu, ram }
+    const u = document.getElementById("mm-uptime");
+    const c = document.getElementById("mm-cpu");
+    const r = document.getElementById("mm-ram");
+    if(u) u.textContent = "Uptime: " + (d.uptime || "--");
+    if(c) c.textContent = "CPU: " + (d.cpu ?? "--") + "%";
+    if(r) r.textContent = "RAM: " + (d.ram ?? "--") + " MB";
+  }catch(e){}
+}
+refreshMini(); setInterval(refreshMini, 4000);
