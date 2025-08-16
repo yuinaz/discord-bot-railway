@@ -176,6 +176,39 @@ if __name__ == "__main__":
 
     if socketio:
         # gunakan socketio jika tersedia
+# === SILENCE /api/live,/ping ===
+try:
+    import logging
+    from werkzeug.serving import WSGIRequestHandler
+    SILENCE_PATHS = {"/api/live", "/ping"}
+
+    class _SilencePaths(logging.Filter):
+        def filter(self, record):
+            try:
+                m = record.getMessage()
+            except Exception:
+                return True
+            return not any(sp in m for sp in SILENCE_PATHS)
+
+    # pasang filter ke logger werkzeug + handlers
+    for name in ("werkzeug","werkzeug.serving"):
+        lg = logging.getLogger(name)
+        lg.addFilter(_SilencePaths())
+        for h in list(getattr(lg, "handlers", []) or []):
+            try: h.addFilter(_SilencePaths())
+            except Exception: pass
+
+    # patch handler agar akses ke path di atas tidak dicetak
+    _orig_log_request = WSGIRequestHandler.log_request
+    def _log_request_sans_paths(self, code='-', size='-'):
+        line = getattr(self, "requestline", "") or ""
+        if any(sp in line for sp in SILENCE_PATHS):
+            return
+        return _orig_log_request(self, code, size)
+    WSGIRequestHandler.log_request = _log_request_sans_paths
+except Exception:
+    pass
+# === END ===
         socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True)
     else:
         app.run(host=HOST, port=PORT)
