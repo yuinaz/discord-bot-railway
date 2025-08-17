@@ -6,7 +6,89 @@
     <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
     <h3>🛡️ Security Settings</h3><a class="btn btn-outline-light" href="/image-classifier">Image Classifier</a>
     <a href="/blacklist-image" class="btn btn-outline-light">Blacklist Gambar</a>
+  
+  <div class="row g-3 mt-2">
+    <div class="col-md-6">
+      <div class="card bg-dark text-light h-100">
+        <div class="card-header">🧪 Phishing Detection Settings</div>
+        <div class="card-body">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="autobanSwitch">
+            <label class="form-check-label" for="autobanSwitch">Autoban phishing</label>
+          </div>
+          <div class="mt-3">
+            <label for="thresholdRange" class="form-label">Ambang kemiripan (pHash): <span id="thVal">8</span></label>
+            <input type="range" class="form-range" id="thresholdRange" min="1" max="16" step="1" value="8">
+            <div class="text-muted small">Semakin kecil = semakin ketat (lebih mirip). Default: 8.</div>
+          </div>
+          <div class="mt-3">
+            <label for="threadName" class="form-label">Nama thread log ban</label>
+            <input type="text" id="threadName" class="form-control" placeholder="Ban Log">
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+  <script>
+  async function __loadCfg(){
+    const r = await fetch('/api/phish-config'); const j = await r.json();
+    document.getElementById('autobanSwitch').checked = !!j.autoban;
+    document.getElementById('thresholdRange').value = j.threshold ?? 8;
+    document.getElementById('thVal').textContent = j.threshold ?? 8;
+    document.getElementById('threadName').value = j.log_thread_name || 'Ban Log';
+  }
+  async function __saveCfg(p){
+    await fetch('/api/phish-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(p)});
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const thr = document.getElementById('thresholdRange');
+    document.getElementById('autobanSwitch').addEventListener('change', e => __saveCfg({autoban: e.target.checked}));
+    thr.addEventListener('input', e => document.getElementById('thVal').textContent = e.target.value);
+    thr.addEventListener('change', e => __saveCfg({threshold: parseInt(e.target.value)}));
+    document.getElementById('threadName').addEventListener('change', e => __saveCfg({log_thread_name: e.target.value}));
+    __loadCfg();
+  });
+  </script>
+
+  <div class="row g-3 mt-2">
+    <div class="col-md-6">
+      <div class="card bg-dark text-light h-100">
+        <div class="card-header">✅ Whitelist Domains (Realtime)</div>
+        <div class="card-body">
+          <div class="mb-2">
+            <textarea id="wlTextarea" class="form-control" rows="10" placeholder="contoh:
+facebook.com
+tiktok.com
+m.facebook.com
+t.co"></textarea>
+          </div>
+          <div class="text-muted small">Satu domain per baris. Berlaku untuk subdomain (mis. <code>facebook.com</code> akan meliputi <code>m.facebook.com</code>).</div>
+          <div class="mt-3 d-flex gap-2">
+            <button id="wlSave" class="btn btn-primary">💾 Simpan</button>
+            <span id="wlStatus" class="align-self-center small text-success" style="display:none;">Tersimpan ✔</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  async function wlLoad(){
+    const r = await fetch('/api/whitelist'); const j = await r.json();
+    document.getElementById('wlTextarea').value = (j.domains||[]).join('\n');
+  }
+  async function wlSave(){
+    const text = document.getElementById('wlTextarea').value;
+    await fetch('/api/whitelist', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})});
+    const st = document.getElementById('wlStatus'); st.style.display = 'inline';
+    setTimeout(()=> st.style.display='none', 1200);
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    wlLoad();
+    document.getElementById('wlSave').addEventListener('click', wlSave);
+  });
+  </script>
+
+
 
   <div class="row g-3">
   <div class="col-12">
@@ -143,86 +225,24 @@
   </div>
 </div>
 
-
-  <div class="row g-3 mt-2">
-    <div class="col-md-6">
-      <div class="card bg-dark text-light h-100">
-        <div class="card-header">🧪 Phishing Detection Settings</div>
-        <div class="card-body">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="autobanSwitch">
-            <label class="form-check-label" for="autobanSwitch">Autoban phishing</label>
-          </div>
-          <div class="mt-3">
-            <label for="thresholdRange" class="form-label">Ambang kemiripan (pHash): <span id="thVal">8</span></label>
-            <input type="range" class="form-range" id="thresholdRange" min="1" max="16" step="1" value="8">
-          </div>
-          <div class="mt-3">
-            <label for="threadName" class="form-label">Nama thread log ban</label>
-            <input type="text" id="threadName" class="form-control" placeholder="Ban Log">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-  async function __loadCfg(){
-    const r = await fetch('/api/phish-config'); const j = await r.json();
-    document.getElementById('autobanSwitch').checked = !!j.autoban;
-    document.getElementById('thresholdRange').value = j.threshold ?? 8;
-    document.getElementById('thVal').textContent = j.threshold ?? 8;
-    document.getElementById('threadName').value = j.log_thread_name || 'Ban Log';
-  }
-  async function __saveCfg(p){
-    await fetch('/api/phish-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(p)});
-  }
-  document.addEventListener('DOMContentLoaded', () => {
-    __loadCfg();
-    const thr = document.getElementById('thresholdRange');
-    document.getElementById('autobanSwitch').addEventListener('change', e => __saveCfg({autoban: e.target.checked}));
-    thr.addEventListener('input', e => document.getElementById('thVal').textContent = e.target.value);
-    thr.addEventListener('change', e => __saveCfg({threshold: parseInt(e.target.value)}));
-    document.getElementById('threadName').addEventListener('change', e => __saveCfg({log_thread_name: e.target.value}));
-  });
-  </script>
+</div>
+{% endblock %}
 
 
-  <div class="row g-3 mt-2">
-    <div class="col-md-6">
-      <div class="card bg-dark text-light h-100">
-        <div class="card-header">✅ Whitelist Domains (Realtime)</div>
-        <div class="card-body">
-          <div class="mb-2">
-            <textarea id="wlTextarea" class="form-control" rows="10" placeholder="facebook.com
-m.facebook.com
-l.facebook.com
-lm.facebook.com
-tiktok.com
-vm.tiktok.com"></textarea>
-          </div>
-          <div class="mt-2 d-flex gap-2">
-            <button id="wlSave" class="btn btn-primary">💾 Simpan</button>
-            <span id="wlSaved" class="small text-success" style="display:none;">Tersimpan ✔</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-  async function wlLoad(){
-    const r = await fetch('/api/whitelist'); const j = await r.json();
-    document.getElementById('wlTextarea').value = (j.domains||[]).join('\n');
-  }
-  async function wlSave(){
-    const text = document.getElementById('wlTextarea').value;
-    await fetch('/api/whitelist', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})});
-    const st = document.getElementById('wlSaved'); st.style.display='inline'; setTimeout(()=> st.style.display='none', 1500);
-  }
-  document.addEventListener('DOMContentLoaded', ()=>{
-    wlLoad(); document.getElementById('wlSave').addEventListener('click', wlSave);
-  });
-  </script>
-
+<script>
+function loadStats(){
+  fetch('/security-stats').then(r=>r.json()).then(j=>{
+    if(!j.ok) return;
+    const d = j.data || {};
+    document.getElementById('st_vt_net').textContent = d.vt_net || 0;
+    document.getElementById('st_vt_cache').textContent = d.vt_cache || 0;
+    document.getElementById('st_cache_rate').textContent = ((d.cache_rate||0).toFixed(1)) + '%';
+    document.getElementById('st_actions').textContent = (d.black_actions||0) + ' / ' + (d.sus_actions||0);
+  }).catch(()=>{});
+}
+loadStats();
+setInterval(loadStats, 10000);
+</script>
 
   <div class="row g-3 mt-2">
     <div class="col-md-6">
@@ -236,6 +256,7 @@ vm.tiktok.com"></textarea>
           <div class="mb-2">
             <label class="form-label">Background (CSS)</label>
             <input type="text" id="loginBg" class="form-control" placeholder="linear-gradient(120deg,#f093fb 0%,#f5576c 100%)">
+            <div class="small text-muted mt-1">Bisa <code>linear-gradient(...)</code> atau <code>url('/static/bg.jpg') center/cover no-repeat</code></div>
           </div>
           <div class="mb-2 form-check form-switch">
             <input class="form-check-input" type="checkbox" id="loginParticles">
@@ -264,24 +285,8 @@ vm.tiktok.com"></textarea>
     const el = document.getElementById('uiSaved'); el.style.display='inline';
     setTimeout(()=> el.style.display='none', 1200);
   }
-  document.addEventListener('DOMContentLoaded', ()=>{ uiLoad(); document.getElementById('uiSave').addEventListener('click', uiSave); });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    uiLoad();
+    document.getElementById('uiSave').addEventListener('click', uiSave);
+  });
   </script>
-
-</div>
-{% endblock %}
-
-
-<script>
-function loadStats(){
-  fetch('/security-stats').then(r=>r.json()).then(j=>{
-    if(!j.ok) return;
-    const d = j.data || {};
-    document.getElementById('st_vt_net').textContent = d.vt_net || 0;
-    document.getElementById('st_vt_cache').textContent = d.vt_cache || 0;
-    document.getElementById('st_cache_rate').textContent = ((d.cache_rate||0).toFixed(1)) + '%';
-    document.getElementById('st_actions').textContent = (d.black_actions||0) + ' / ' + (d.sus_actions||0);
-  }).catch(()=>{});
-}
-loadStats();
-setInterval(loadStats, 10000);
-</script>
