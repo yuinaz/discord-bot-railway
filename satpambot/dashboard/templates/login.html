@@ -1,40 +1,62 @@
-{% extends 'base.html' %}
-{% block title %}<h2>Masuk Dashboard</h2> - SatpamBot{% endblock %}
-{% block content %}
-<canvas id="particle-canvas" style="position:fixed;inset:0;z-index:0"></canvas>
-<div class="container" style="position:relative;z-index:1;max-width:540px;margin-top:10vh">
-  <div class="card">
-    <h2 style="text-align:center"><h2>Masuk Dashboard</h2></h2>
-    {% if error %}<div class="badge" style="color:#ff6b81">Kredensial salah</div>{% endif %}
-    <div class="login-card">
-<form class="login-form" method="post">
-      <div class="form-group" style="margin-bottom:10px">
-        <label>Username</label>
-        <input name="user" class="input" style="width:100%" required />
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login • SatpamBot</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+</head>
+<body class="login-page">
+<div id="particles-js"></div>
+
+<main class="wrap">
+  <section class="card" role="region" aria-label="Login Card">
+    <div class="tab-shadow" aria-hidden="true"></div>
+    <div class="avatar"><img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Logo"></div>
+    <h1>Masuk Dashboard</h1>
+
+    {% if error %}
+      <div class="alert">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login" class="grid" autocomplete="on">
+      <div class="input">
+        <img class="icon" src="{{ url_for('static', filename='img/icon-user.svg') }}" alt="user">
+        <input id="username" name="username" type="text" placeholder="Email / Username"
+               autocomplete="username" value="{{ request.form.username or '' }}" required>
       </div>
-      <div class="form-group" style="margin-bottom:12px">
-        <label>Password</label>
-        <input type="password" name="pass" class="input" style="width:100%" required />
+      <div class="input">
+        <img class="icon" src="{{ url_for('static', filename='img/icon-lock.svg') }}" alt="lock">
+        <input id="password" name="password" type="password" placeholder="Password"
+               autocomplete="current-password" required>
       </div>
-      <button class="login-btn btn-primary"Login</button>
+
+      <div class="row-helpers">
+        <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
+        <a href="#" onclick="return false">Forgot Password?</a>
+      </div>
+
+      <button type="submit" class="btn-login">LOGIN</button>
     </form>
-</div>
-  </div>
-</div>
-{% endblock %}
-{% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/particles.min.js') }}"></script>
+  </section>
+</main>
+
 <script>
-// simple particles background init
 (function(){
-  const c = document.getElementById('particle-canvas');
-  if(!c || !window.particlesJS) return;
-  particlesJS('particle-canvas', {
-    particles:{ number:{value:60}, color:{value:'#9aa4b2'}, size:{value:2}, line_linked:{enable:true, distance:140, color:'#9aa4b2', opacity:0.5, width:1} },
-    interactivity:{ detect_on:'canvas', events:{ onhover:{enable:true, mode:'repulse'} } }
-  });
+  function init(){ if(!window.particlesJS){ setTimeout(init, 180); return; }
+    particlesJS("particles-js",{
+      particles:{ number:{value:70}, size:{value:2},
+        move:{enable:true, speed:1}, line_linked:{enable:true, opacity:.22},
+        color:{ value:"#60a5fa" } },
+      interactivity:{ events:{ onhover:{ enable:true, mode:"grab" } } }
+    });
+  }
+  var s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js";
+  s.onload=init; document.head.appendChild(s);
 })();
 </script>
-{% endblock %}
-
-{ 0nclude "partials/dev_login.html" 
+</body>
+</html>
