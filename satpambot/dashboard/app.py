@@ -1,5 +1,6 @@
+from werkzeug.utils import secure_filename
 import os, time, random
-from flask import Flask, session, redirect, url_for, request, render_template, jsonify
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
 # Explicit folders but relative to project root if run with PYTHONPATH=.
 app = Flask("main", template_folder="templates", static_folder="static")
@@ -252,3 +253,27 @@ def dev_login_as(username):
 @app.get("/uptime")
 def uptime():
     return "OK", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+# --- stub: /discord/login (redirect ke /login) ---
+@app.get("/discord/login")
+def discord_login_stub():
+    return redirect(url_for("login"))
+
+
+# --- upload background ke static/uploads ---
+@app.post("/upload/background")
+def upload_background():
+    file = request.files.get("file")
+    if not file:
+        return jsonify(ok=False, error="no file"), 400
+    save_dir = os.path.join(os.path.dirname(__file__), "static", "uploads")
+    os.makedirs(save_dir, exist_ok=True)
+    from datetime import datetime
+    raw = file.filename or "background.bin"
+    name, ext = os.path.splitext(raw)
+    fname = f"bg_{{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}}{{ext or '.bin'}}"
+    path = os.path.join(save_dir, fname)
+    file.save(path)
+    rel = f"uploads/{{fname}}"
+    return jsonify(ok=True, path=f"/static/{{rel}}")
