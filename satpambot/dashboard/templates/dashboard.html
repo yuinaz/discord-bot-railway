@@ -1,16 +1,21 @@
+{% extends 'base.html' %}
 {% extends "base.html" %}{% block content %}
 <div class='card'><h2>Traffic</h2><div id='traffic'>-</div></div>
 <div class='card'><h2>Incident</h2><div id='incident'>0</div></div>
 <script>
 async function refresh(){const r=await fetch('/api/live');const j=await r.json();document.getElementById('traffic').textContent=`CPU: ${j.cpu??'-'}% • MEM: ${j.mem??'-'}% • Req: ${j.requests}`;document.getElementById('incident').textContent=(j.incidents_series||[]).reduce((a,b)=>a+b,0);}setInterval(refresh,5000);refresh();
-</script>
-<div id="floatingBans" style="position:fixed;right:16px;bottom:16px;max-width:360px;z-index:9999;"></div>
+</script>{% endblock %}
+<div id="floatingBans" style="position:fixed;right:16px;bottom:16px;max-width:360px;z-index:9999;">
+</div>
 <script>
 (function(){
-  const root = document.getElementById('floatingBans'); const seen = new Set();
+  const root = document.getElementById('floatingBans');
+  const seen = new Set();
   function card(item){
-    const el = document.createElement('div'); el.className='card shadow-lg mb-2';
-    el.style.transition='transform .2s ease, opacity .2s ease'; el.style.transform='translateY(20px)'; el.style.opacity='0';
+    const el = document.createElement('div');
+    el.className = 'card shadow-lg mb-2';
+    el.style.transition = 'transform .2s ease, opacity .2s ease';
+    el.style.transform = 'translateY(20px)'; el.style.opacity = '0';
     el.innerHTML = `<div class="card-body p-2">
       <div class="d-flex justify-content-between align-items-center">
         <div><strong>🚫 Banned</strong></div>
@@ -28,13 +33,15 @@ async function refresh(){const r=await fetch('/api/live');const j=await r.json()
       const r = await fetch('/api/recent-bans'); const j = await r.json();
       (j.items||[]).forEach(it=>{
         const key = it.key || (it.guild_id+'-'+it.user_id+'-'+it.ts);
-        if(!key || seen.has(key)) return; seen.add(key);
-        root.prepend(card(it)); while(root.children.length>6){ root.lastChild.remove(); }
+        if(!key || seen.has(key)) return;
+        seen.add(key);
+        root.prepend(card(it));
+        // limit widgets in DOM
+        while(root.children.length > 6){ root.lastChild.remove(); }
       });
-    }catch(e){}
+    }catch(e){ /* ignore */ }
     setTimeout(tick, 4000);
   }
   tick();
 })();
 </script>
-{% endblock %}
