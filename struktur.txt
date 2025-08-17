@@ -1,957 +1,331 @@
-.
-./.git
-./.git/COMMIT_EDITMSG
-./.git/config
-./.git/description
-./.git/FETCH_HEAD
-./.git/HEAD
-./.git/hooks
-./.git/hooks/applypatch-msg.sample
-./.git/hooks/commit-msg.sample
-./.git/hooks/fsmonitor-watchman.sample
-./.git/hooks/post-update.sample
-./.git/hooks/pre-applypatch.sample
-./.git/hooks/pre-commit.sample
-./.git/hooks/pre-merge-commit.sample
-./.git/hooks/pre-push.sample
-./.git/hooks/pre-rebase.sample
-./.git/hooks/pre-receive.sample
-./.git/hooks/prepare-commit-msg.sample
-./.git/hooks/push-to-checkout.sample
-./.git/hooks/sendemail-validate.sample
-./.git/hooks/update.sample
-./.git/index
-./.git/info
-./.git/info/exclude
-./.git/logs
-./.git/logs/HEAD
-./.git/logs/refs
-./.git/logs/refs/heads
-./.git/logs/refs/heads/main
-./.git/logs/refs/remotes
-./.git/logs/refs/remotes/origin
-./.git/logs/refs/remotes/origin/backup
-./.git/logs/refs/remotes/origin/backup/pre-replace-20250810-082753
-./.git/logs/refs/remotes/origin/fix
-./.git/logs/refs/remotes/origin/fix/dashboard-aug12
-./.git/logs/refs/remotes/origin/HEAD
-./.git/logs/refs/remotes/origin/main
-./.git/objects
-./.git/objects/00
-./.git/objects/00/4caf06923777e966f1901ff11d85b53e237b21
-./.git/objects/01
-./.git/objects/01/33abb76931f39697eaba294cec7c1544828cb2
-./.git/objects/01/996509c87bb75fe6a8ca97d8f8547876e13e78
-./.git/objects/01/c8e2350b9785b30a7e1a2d4fdeb9294038d251
-./.git/objects/02
-./.git/objects/02/66005f1a40f219d34783849dd80ccc9dc3aa4e
-./.git/objects/02/a5c10db8deb3e6bca99eaf447d850b5f903a1b
-./.git/objects/03
-./.git/objects/03/c9096b7644c7a983223565c95b689ea08f4be4
-./.git/objects/03/ff8da4ed00aff72fa13968b342ce4d7c34e7f5
-./.git/objects/04
-./.git/objects/04/a68d965289374f0d71c0b85eff30205f96836a
-./.git/objects/04/fedc02244d724acbc3a99b0e429860c6f08486
-./.git/objects/09
-./.git/objects/09/56aa9ced4d4de6114393fe5f8129f0bdf7f954
-./.git/objects/09/a7e29f045b28d764b89d93f86943b33afac644
-./.git/objects/09/acdfa17f8eb7e9333dea0b731f63447bef1fe6
-./.git/objects/0a
-./.git/objects/0a/6f3fc9fa1b4227e6df46a477146760e0038d7a
-./.git/objects/0a/f2c99fab93995c5bd69a92126f49bc0a8fd575
-./.git/objects/0b
-./.git/objects/0b/13aeb9b498df8a1a8418533b403718bab2fdb0
-./.git/objects/0d
-./.git/objects/0d/6f74b1dfe42de68649ee6b6a1c57881d31e40d
-./.git/objects/0d/9f197f472995b9d921351100b8a02f695349d6
-./.git/objects/0d/f219818f025ae207ee99afd3eb9f89d6a38685
-./.git/objects/0e
-./.git/objects/0e/5854bb3dcd8dc6510dae2937207faba780e3e0
-./.git/objects/0f
-./.git/objects/0f/5e26e96c7bea47c15dc6238a7bc6782ecba803
-./.git/objects/0f/77a48c123efa886fcb0418a6db451addaa8b58
-./.git/objects/0f/8320aadec947b2d1ccc19be621462ca912e23e
-./.git/objects/0f/ae150c338563d076c486a38a729b64c7ea9fb3
-./.git/objects/10
-./.git/objects/10/44a18eac83e16069940780533f33d80f465fb0
-./.git/objects/11
-./.git/objects/11/4d3547eb7390855a264bdde1166c1289e3fddb
-./.git/objects/11/685535ae9c7f4fbf6d395ba093d8be02954080
-./.git/objects/12
-./.git/objects/12/94126838b49152e176fdda72936f34baf65410
-./.git/objects/13
-./.git/objects/13/75b47fc94101dc3bc5bf2974d41f08ab8ff057
-./.git/objects/13/783b9c1592e414b7930d37769888757b2bf658
-./.git/objects/13/8bf90716cbde28d477dc24689287533ca78f94
-./.git/objects/13/c88e5d39957fdd1e8def4451d7194908dfc379
-./.git/objects/14
-./.git/objects/14/34516f4c846df005f58392e0bea27bdf573242
-./.git/objects/15
-./.git/objects/15/94b9310868c2a1fbd85d6a272fb6d1add13f71
-./.git/objects/16
-./.git/objects/16/a2fdeb505d57488f4d4b7fed2e1947d546694b
-./.git/objects/17
-./.git/objects/17/188146364054b7b19e1218e800659a78241ffb
-./.git/objects/17/d2cf0f550ba68da4da04bb84829efc8440503f
-./.git/objects/18
-./.git/objects/18/2e433ed9d575c34137ed4fce9a0cce52d127c5
-./.git/objects/19
-./.git/objects/19/0b7f79b2c769a32262ae6b35be15b06f3feeea
-./.git/objects/19/730795435b81dd4f3de22f16fc561c5095381d
-./.git/objects/1a
-./.git/objects/1a/7d62c65f866e5001ee358a03f164376c4bc228
-./.git/objects/1c
-./.git/objects/1c/e585d08ddf67ccd6f5183c4fa982ff3205324c
-./.git/objects/1d
-./.git/objects/1d/41c1b5d2e26ba660cb14d22ab8a7193f484a2f
-./.git/objects/1d/447bd81c9c9e6fc3d682a0655137b32cfb69ef
-./.git/objects/1e
-./.git/objects/1e/9a39b39fdb3daf067788b9eec6d4868481e3b9
-./.git/objects/20
-./.git/objects/20/4a840c6cda6f68c1f9e8afc76699fedc1f9066
-./.git/objects/20/518288084817fbf411ae07de06bee3f6618993
-./.git/objects/22
-./.git/objects/22/1354d45ff50c121dbd294ff4646d4d9d6c273e
-./.git/objects/22/5bd368dfb34114710d5960d5d33011d0600c9a
-./.git/objects/25
-./.git/objects/25/b24b79b3949fda9e2700dfadd2dc638d904db7
-./.git/objects/26
-./.git/objects/26/58914cf603ece0b1eb87fd19c177e9613ea5da
-./.git/objects/27
-./.git/objects/27/4304466b1ed2317edf52f18d40c685ed72a2eb
-./.git/objects/29
-./.git/objects/29/4fe2683cd75dae2d48b79ff65631015f03eeac
-./.git/objects/2b
-./.git/objects/2b/48cdc70b77794b3b75af8574d37569ed50a336
-./.git/objects/2b/9244e3d0d954cf2fa02daeb24aa2a5a382ec6e
-./.git/objects/2c
-./.git/objects/2c/497aff69b249cdca8ccd434f9f3fa2b02e81d5
-./.git/objects/2d
-./.git/objects/2d/8fb236354a02f9b8bbefec68ba37883abb7a25
-./.git/objects/2d/e1d4e7a1008d947f228e87d203ea6c9b06f61c
-./.git/objects/2e
-./.git/objects/2e/769a233d9ead7f1c2ccf379a6d6c56897614c1
-./.git/objects/2f
-./.git/objects/2f/4852bc0bf5a422ef0f6762dc715def91d48819
-./.git/objects/34
-./.git/objects/34/370dabcb5189a835f73df56d5cf2ea40eeac5a
-./.git/objects/34/92d65b8de41d26e58e437d9d0e7c77182c8c93
-./.git/objects/34/93d1f50cf7ae713fce12e95749b2bfb1472d90
-./.git/objects/35
-./.git/objects/35/0145a255d04941c81bdbb319ef02fe2c97c5f7
-./.git/objects/35/1c99e4d4602100ec319bfd0b89ffe047b45d8a
-./.git/objects/35/3ec2294965ee60f1d0dc5d237a37598d6f7a52
-./.git/objects/35/a04d8a3ff6ec588b1eb9ac0cfeb059b9e35f97
-./.git/objects/35/f6d894526b173992b9072f8a4a9dedfb87e238
-./.git/objects/35/fba91a76d5d04f5ea821483837b21cf99bc7c6
-./.git/objects/36
-./.git/objects/36/1dc0e00aa447c790e3ef7aa8dfa6b804ca73d0
-./.git/objects/36/6882dfd1fa4a7941f96020f9e2a8d0cac97f01
-./.git/objects/38
-./.git/objects/38/e64f73cd7170c11f6c3786fe583737b915a83e
-./.git/objects/39
-./.git/objects/39/4c5b9c7214c428602d71d0162f91bf2b23d42e
-./.git/objects/39/9e7fd1f90a245ab5595c580046853b4d39b9ee
-./.git/objects/3a
-./.git/objects/3a/7fc0e3a73141c942ec307b406a3856a80d173e
-./.git/objects/3b
-./.git/objects/3b/7ae58950bee9b5b56e1e826f4632d87a0c57c3
-./.git/objects/3b/ef880a40f37328386c9166ab2e8b0270747627
-./.git/objects/3c
-./.git/objects/3c/41de5d8bccf47e3963607d57b19a6fb8371db7
-./.git/objects/3c/b21ef4959e77c9a16b1512fbb9d78753a3eed6
-./.git/objects/3d
-./.git/objects/3d/65df6faaaf5025339d7c2d2db6c731239ba34c
-./.git/objects/3e
-./.git/objects/3e/305d4dae976b5b88876497d109790a261188e4
-./.git/objects/3f
-./.git/objects/3f/473d22ba3ea70c6c5f71e8c72d3c64f6832549
-./.git/objects/3f/f82e74423e6b21a8deadb69ac719fee71a4712
-./.git/objects/40
-./.git/objects/40/788d9ee925a1e84a523ccfd8313bd8348d55d0
-./.git/objects/40/8962e26d053b00c4ffafc67c2bb2087c1db04d
-./.git/objects/41
-./.git/objects/41/2d951458ed45cd958a04967e817c9fd7b68751
-./.git/objects/42
-./.git/objects/42/5e622b9083ec4467d76cef6761eb6133ce8b4e
-./.git/objects/43
-./.git/objects/43/7c5160916bbfe84b99df714cdc845b3a6a9075
-./.git/objects/44
-./.git/objects/44/78ed8a25be5edfb6bfcb37befac9e5e88e117e
-./.git/objects/45
-./.git/objects/45/26a58eb77f0d236b65f1bc5e7cbc7cbc757bfd
-./.git/objects/45/2fb781254b1b1122d7b46d3243519a1728f586
-./.git/objects/45/50ed014af916ccf7078c6386bc79dd115b9a7a
-./.git/objects/45/8e564b760042d878337ad63a95b0978ccc475f
-./.git/objects/45/ecabfd182fef7c54b988425a23a39c106ab76d
-./.git/objects/46
-./.git/objects/46/ff50085e33e7499e30051f3a57305b3c027a42
-./.git/objects/47
-./.git/objects/47/2ade34b02095df5a502bd58977e85d94266bdb
-./.git/objects/47/f0c9ee181f115583ccf336a97f12997a843bcf
-./.git/objects/48
-./.git/objects/48/41aae3f372b76bc0b540c91d99c375e6310b10
-./.git/objects/48/966646fe8518447dd7e09f7a3b13b96531b57f
-./.git/objects/48/e76f14c53d518bbb2fd8427d4cd376613baf4b
-./.git/objects/4b
-./.git/objects/4b/78e0b3a0c9eb2d0cd7a88e322e583ca83ebe9d
-./.git/objects/4b/7dd2c05b6256797a5b12c893da213ba3913e9d
-./.git/objects/4c
-./.git/objects/4c/54543b4427cdb2647d6f1605f573057a1edcec
-./.git/objects/4d
-./.git/objects/4d/0cdcf2019d62f26f2e21d5fa5d373a62fcef92
-./.git/objects/4d/4f48db9ad72d161751b4e100b3aa81e09f775c
-./.git/objects/4d/a128f67b56f554e0e8ae3479fd60b55d09d3f5
-./.git/objects/4e
-./.git/objects/4e/92c2dda29e050819aee59f2ee14b9b00b628d6
-./.git/objects/50
-./.git/objects/50/272c34172d0314fb8a6d17db37ff668cf356ef
-./.git/objects/50/c307d7d201ff7af36430e761865f2e7c719eeb
-./.git/objects/51
-./.git/objects/51/bc533da2b70a78348fd1d12b66bd1ebbe1e1a2
-./.git/objects/52
-./.git/objects/52/7238859a4c98c6e1c4c0ff7e44e440f7cf55ac
-./.git/objects/53
-./.git/objects/53/1c49efa4fcadf9d05e9aa2371da9fdb52f5133
-./.git/objects/53/4ea933ff251acf9a0388c5dbebbb3fcc829894
-./.git/objects/54
-./.git/objects/54/6f3c8de171cfec01188be38bc1466f33545866
-./.git/objects/55
-./.git/objects/55/4cc0f47a33a1cc01ccab91f172e695f6f9690f
-./.git/objects/55/7c873b551468c27fbb5fa157da3ada78a11af7
-./.git/objects/56
-./.git/objects/56/f0a1f55c73f8f7bd951e529f3db24abd5d3c43
-./.git/objects/57
-./.git/objects/57/4118f51de219f79b8ef8b980358699f45ad7a8
-./.git/objects/58
-./.git/objects/58/1e08160dee6d47a6d8389ffc48b5e39a910094
-./.git/objects/58/7633e576ef80f00ef6a4262d55a5f5274e515e
-./.git/objects/5a
-./.git/objects/5a/3a2a492c8e9b57e44f801df6fa8128a46cecc0
-./.git/objects/5b
-./.git/objects/5b/1da53a729698a79304b332ecacf591c401c7d7
-./.git/objects/5b/dfde566409857cd1f3fa7b8a55610bce992cf8
-./.git/objects/5c
-./.git/objects/5c/12e5c18b28c8872b92630efe0d04827e335b55
-./.git/objects/5d
-./.git/objects/5d/24972534622c82f5fb1ec98c55f50e05df306e
-./.git/objects/5f
-./.git/objects/5f/25dd6694f318c540b7a77de8642c14a0bcef82
-./.git/objects/5f/edc54b5ba8be1734ef884d06973aa74e08c58f
-./.git/objects/60
-./.git/objects/60/5a331770e4980d5d5d1a2ed8ddec6d1c25a6a6
-./.git/objects/60/8b4b0828ec108df874a7b6971250020d88c799
-./.git/objects/61
-./.git/objects/61/80e88fc4d4a847e13db2a2109dc84e21316c5a
-./.git/objects/61/ae29bcc54e11bbd4437ee630c1af1c5f87690e
-./.git/objects/61/ef11604adaa7a1d056d9d35c7bb3f28aab597a
-./.git/objects/61/f7077fe4e29fcb77b1d51e42efdbd6d8413dab
-./.git/objects/63
-./.git/objects/63/7a451b3bf1500e68eff8764330cb54905f9be1
-./.git/objects/63/cb6d571ad7464a4bbe4c7cca86ef5fda8505e2
-./.git/objects/63/fb674200b9645c7938111265e97f8a56054840
-./.git/objects/64
-./.git/objects/64/8fc011d6d36c4d52304db208af6cf1b8c6f409
-./.git/objects/65
-./.git/objects/65/d1047c52fade37b83c5a32c645c4d4bc5fabc8
-./.git/objects/66
-./.git/objects/66/ab5a1bed745dc85738a9ac3b15db41347cbeb6
-./.git/objects/66/e534e7814a2cdd2375894395f58b4bc0bef757
-./.git/objects/67
-./.git/objects/67/b2cbfc8d236f86f37b762607e331c970fa8acf
-./.git/objects/68
-./.git/objects/68/41d91cda12d2ea9d2c937f00e1089f300ccf13
-./.git/objects/68/8d29be31f30bbd4a354fbb4e7baf3ee712d553
-./.git/objects/6a
-./.git/objects/6a/b806fb1fdf6421f2d6ef511c8be85e444e8b88
-./.git/objects/6b
-./.git/objects/6b/2b957c3217442cceea2fd275c224bd55cc7eeb
-./.git/objects/6b/963ffeed593855c5286331ed57853b9b1b9c0b
-./.git/objects/6c
-./.git/objects/6c/c0f5087ac9f04a077870b9651e4c0db53bafc3
-./.git/objects/6d
-./.git/objects/6d/4c006e36e47b3050c258a99f3c415d4369bd50
-./.git/objects/6e
-./.git/objects/6e/267c35f795ac4482fd83d6f1cc0f368e100030
-./.git/objects/6f
-./.git/objects/6f/8f55aec8a562cbfbb9400b627ac3fe632565f9
-./.git/objects/70
-./.git/objects/70/d2703e5343972cd0360e5fd6e78fc0fc0e9ac9
-./.git/objects/70/da5f8d787c2b69b433e8c80b10fcfaa0873d4c
-./.git/objects/71
-./.git/objects/71/d181c334602228e8b267d5a52e0752c425c44a
-./.git/objects/72
-./.git/objects/72/351ec00c4fe53dd50455ddc47158cb45a157b4
-./.git/objects/73
-./.git/objects/73/1e343615898bdda3682953464f786831e8d1e1
-./.git/objects/74
-./.git/objects/74/bf0a920ca408901338421a09700b144071c42d
-./.git/objects/75
-./.git/objects/75/1a0f541933239c1ccd567bd9ecb6a6540a41dd
-./.git/objects/75/d9ce44cda3722b4077052fc549459c71a55a63
-./.git/objects/75/fd8984ed7fdd2110bad3eca8e63db011d8f58d
-./.git/objects/76
-./.git/objects/76/ed9cfd9f28ef12d93ec83d6c43f88f2e05a6d3
-./.git/objects/77
-./.git/objects/77/7e2b65693f2fd513d22163d44e36e101621a15
-./.git/objects/78
-./.git/objects/78/07248a747f93c5adde7e8e2239cd21f87175f2
-./.git/objects/78/a398d56a2c2b5eed2c419350fbdf2e78b551ec
-./.git/objects/7a
-./.git/objects/7a/4d011b9235662346bd5f09a127fb9387f392e8
-./.git/objects/7b
-./.git/objects/7b/2c7aa9290db524024f3b8d6855fcb9b841c1fe
-./.git/objects/7b/74a8d0712b411b609a8b4941ece5632c18d91a
-./.git/objects/7b/7a09968d521f30f621e7c1910260a63a2a4fe0
-./.git/objects/7c
-./.git/objects/7c/72d36276cb3947e805479bd2b07feae3de8cb2
-./.git/objects/7c/c87b9e2968aa15378ab7648a1a528df6dfeaaf
-./.git/objects/7d
-./.git/objects/7d/194aa9b6f4536a62ffd4732a168c52d7e05ac3
-./.git/objects/7d/1c2ee54f5f1f7fef471ecb1f60f9b7d2afd920
-./.git/objects/7d/3ee36c6d99787dbde08ce1ed32912185be2836
-./.git/objects/7d/9b255f867f6f4b1ababaf6f4eed5ffbe5cbd68
-./.git/objects/7d/c422d8a99724f0d4115a237302f29149d5e166
-./.git/objects/7e
-./.git/objects/7e/b751f23596e02ab840198637721dd599ac2650
-./.git/objects/80
-./.git/objects/80/383084f1fb14629cf984ba7f575dc1cef58799
-./.git/objects/80/919ab0988f87be85e6a8fa6f1ee880c9a0ea0a
-./.git/objects/80/e9729fc38b0b65aaf72f666d0bcc021e8e95e2
-./.git/objects/82
-./.git/objects/82/7b09ddae85a47a758b9229e9ea9ddf664fbdaa
-./.git/objects/83
-./.git/objects/83/f5f20309a3c3def3109fdd4a24939dbc094db6
-./.git/objects/84
-./.git/objects/84/5fc60d70192f02a01bf0c4996a0d2a7aad18a2
-./.git/objects/84/bdaea3412a8429ec1d884e67f913a7e88d598e
-./.git/objects/86
-./.git/objects/86/60d7e233d317d5fd94336cfe9f16314a15b6bb
-./.git/objects/86/ee6a401c4c4e28ade72494c5de81f1c6241aea
-./.git/objects/87
-./.git/objects/87/c49fa12ebe416b70feeeb7562d37c12a0e17c5
-./.git/objects/89
-./.git/objects/89/0d6175020b6ed959bb30a31bdd767f44742055
-./.git/objects/89/e7070e7c7a1d65ff2da8b8b557271c8d03dfd2
-./.git/objects/8b
-./.git/objects/8b/7e09488057ee97df50a583472ee9cb6e6a6e3d
-./.git/objects/8b/81b859a5e5106933c26d7bab855b44ecba738a
-./.git/objects/8b/ad339a2cb72c2990ab19dee88db55f4d4d6621
-./.git/objects/8b/b8b764b98d694672de32913d153cbf97af71db
-./.git/objects/8b/ea6937e957ea81a3ea2940d5a7f229a13727e9
-./.git/objects/8c
-./.git/objects/8c/0a35925fd4071dfa1edda937bb9f1600f4b145
-./.git/objects/8c/26541e93ff38f2b3e730c3647de308c0486085
-./.git/objects/8c/b082673275d7f8f87bd3d8e468330473a0c459
-./.git/objects/8d
-./.git/objects/8d/ab5ddccd192d59ab84ab0a98cc0edcdb231819
-./.git/objects/8d/cf44d5c825522cc451a2422f4b6776ecb92be3
-./.git/objects/8d/f8a0f66d547afa327ff1d60af083e469b358e9
-./.git/objects/8e
-./.git/objects/8e/19dd7d970cb908fc1277e7315b79c01289107f
-./.git/objects/8e/84bdeb7e3c0e9574d31fa7b64b5445a142baff
-./.git/objects/8e/f1459c3344265041b0303f51959062a62bd99d
-./.git/objects/90
-./.git/objects/90/cd5dafaa2b8dc6f53b49598319c4d0e4418298
-./.git/objects/91
-./.git/objects/91/a581ab502b1d00a751674ce2b29926a5f90d1c
-./.git/objects/93
-./.git/objects/93/34a58fe8cc0ca310c6340d933ff9f9bc2fc01e
-./.git/objects/94
-./.git/objects/94/0cf1bb8bd260508fdad2bd870f1f3f94538232
-./.git/objects/94/1b095ff3a3ef302507c2aaf2fb7ba2c8381982
-./.git/objects/95
-./.git/objects/95/215564ef93808204d4970511087684070062e0
-./.git/objects/96
-./.git/objects/96/5fcf5265ca64efd0820f21cddadda6eb508be7
-./.git/objects/96/78147bb313b8613a885f352f31b49676afd9a5
-./.git/objects/96/dd96d495d38f02f0f540169c01537f09d3f152
-./.git/objects/97
-./.git/objects/97/75bcaeac0eb05054ff1046001ccb928883b810
-./.git/objects/99
-./.git/objects/99/8b87ae985ebc29c696e72428621b18af6ca4be
-./.git/objects/9a
-./.git/objects/9a/b323b8e924c00ee6634ca8e9d418b71973926e
-./.git/objects/9a/be8f2d7f987532155f79ae17b0f7afb01afe81
-./.git/objects/9b
-./.git/objects/9b/2b6be73a5a85fc378d24c4ba038b23854c0a30
-./.git/objects/9b/8c9e3aee6ae0d8f5af0dd398310ffab0c7e1da
-./.git/objects/9b/a08e543f2794fd22cb2b80a0527d530da1fada
-./.git/objects/9d
-./.git/objects/9d/474a6658217283997236d1fedc5eb0ec6ce105
-./.git/objects/9d/8c0562308838c25861b4ec3c4f7036d796a289
-./.git/objects/a1
-./.git/objects/a1/ce84db86a353248987af9018bb1bd1813ddba7
-./.git/objects/a2
-./.git/objects/a2/2e9b829452ef34e1efec1a7990fdde13ac787b
-./.git/objects/a2/f928cd3a20df5b3b070ba5abc047133e85d60e
-./.git/objects/a3
-./.git/objects/a3/1a58f48d5bd115e273b908f46b5e32887a89be
-./.git/objects/a3/40f2696604b486cc83a5aefac73206dd17ecee
-./.git/objects/a3/420d60910c5f6cee6ab93a7ddb503468a46d87
-./.git/objects/a3/ea8f472a52dee1e3138d7828e5b40def305a6f
-./.git/objects/a4
-./.git/objects/a4/06ce5d19530b4c0dc2b5a8219670ea1b562dec
-./.git/objects/a4/836de03ea963e145814c0e45bbda7030aa9348
-./.git/objects/a4/845e32845667b5a7ad87bac922a6ee8d08bf36
-./.git/objects/a5
-./.git/objects/a5/9decc5461b563dc7295ea1125127a763ae9dd0
-./.git/objects/a5/ddda0a3ea787ad1eacc86a9cfb839ffc54051f
-./.git/objects/a7
-./.git/objects/a7/24cfaf98e4cfb08bfa7ca16ebe1d0b460c53a4
-./.git/objects/a9
-./.git/objects/a9/1758f86e60526033402e2d1557af4abbb79b13
-./.git/objects/a9/c257d2c10875ce65a714b25408b44fc5f48966
-./.git/objects/aa
-./.git/objects/aa/1c6621a807f38bc69d3729fb4bd3d67caffab5
-./.git/objects/aa/404b64e37a438408478107cf558b5400910b10
-./.git/objects/ab
-./.git/objects/ab/3036dd9c9ff3b181bc343c88d2036da8780774
-./.git/objects/ab/ccd358a096715854b275297c928fbda4479994
-./.git/objects/ac
-./.git/objects/ac/fd2da8eec13422c77d7b3b58939535882a44e5
-./.git/objects/ad
-./.git/objects/ad/03023e0720abcb47f6e53963aa11677d5dab80
-./.git/objects/ae
-./.git/objects/ae/ccfa21bbca2b33ece30962042f931c5a9a5c69
-./.git/objects/af
-./.git/objects/af/5b438962ce739fb09d4753a7f72be85c9cdf24
-./.git/objects/af/a4a1d1bd0ff458e67133d26a595f470637b69e
-./.git/objects/b0
-./.git/objects/b0/1b9dc27f1fec52f6883e84dd5251d04b44cf1a
-./.git/objects/b0/4f21b3386994dcf8b03a1665cf06197fd552cb
-./.git/objects/b0/c27c36c4a6080ce1286d000ac9c133748e81eb
-./.git/objects/b1
-./.git/objects/b1/1830245d63c1be70ff3f570a791816d506962a
-./.git/objects/b1/3177eb66365cc6c3c03a0e71064e14a85db51c
-./.git/objects/b1/8488093bc4d1992d901207da92efa126c28f56
-./.git/objects/b3
-./.git/objects/b3/7b532192abf6a2b0586d3e7d602f92254cdee5
-./.git/objects/b3/d46d127fce3c8c3d2cb8a234a6d3f7bb8bbcaf
-./.git/objects/b3/e1ddd7986c64ceb42fc18e3367a024c09e5a1f
-./.git/objects/b3/fa72052c3d44f9858f93003b85f3c88eb06297
-./.git/objects/b4
-./.git/objects/b4/474db986908bfb7bb91f805e43a5552d73e249
-./.git/objects/b5
-./.git/objects/b5/66f0b98dfc73284684010dc6451b74d23435af
-./.git/objects/b5/990d4bec58273a5c93f75f376f63974a7ccdb8
-./.git/objects/b6
-./.git/objects/b6/5696e81c12f31beba3808768886a2efc31b125
-./.git/objects/b6/72e78b464ce75840622ab9580843bf9de011fa
-./.git/objects/b7
-./.git/objects/b7/5160244a09c1bd48bd1aac5045fc8487c099d7
-./.git/objects/b7/550fb8d7ecc2ba7b775c612c991cedee1f20b3
-./.git/objects/b7/7f0aea88c3ca318faa4cad1f0ceb56046086dc
-./.git/objects/b7/c089974778532857c5e0d8c38bb9cd379f99ed
-./.git/objects/b7/dc5f5fa44ff74316191a8470c0187c9bc9aee6
-./.git/objects/b8
-./.git/objects/b8/9213e1dad74bb8893f4307949be893c7762690
-./.git/objects/b9
-./.git/objects/b9/9daa9191cef5ee1679a134b4019f70f86816e9
-./.git/objects/ba
-./.git/objects/ba/5b4faecd45395fcef8c14f2decec0e2a4c89d8
-./.git/objects/bb
-./.git/objects/bb/ccd61c9267aa3bc7df168cd2acc94a7ada962a
-./.git/objects/bc
-./.git/objects/bc/b7037bce7e3895e4ec4e9cfb88a70b82dbc3e0
-./.git/objects/bd
-./.git/objects/bd/daaea73d40a5b9257679efcda3c2f518331ae6
-./.git/objects/be
-./.git/objects/be/3d16653f545e556277e4db41719d77d24477b7
-./.git/objects/be/3e8acae0273c0b407c0b93029f5748eddf90d6
-./.git/objects/be/e47954c1e6d007fc5fc7e35ed2c43f86db5059
-./.git/objects/be/f2692e7530a69b4ee7770e12cd715f6b1cab61
-./.git/objects/bf
-./.git/objects/bf/2f31e6e30552e762cab158c3203d54c4ff6b18
-./.git/objects/c0
-./.git/objects/c0/9fc843701af5e21b510d095c814d4ccba1c517
-./.git/objects/c1
-./.git/objects/c1/8168ef0a3998e7a87c40016a6cec602b8af46f
-./.git/objects/c1/958a98681e79ab3e1d2be3512a12d61db9370a
-./.git/objects/c2
-./.git/objects/c2/4c6ecdc0c13b5b7abf6b1c8e41690667744660
-./.git/objects/c2/d0cfc3471791e36a2522c2e4c2d51e5b74c4af
-./.git/objects/c3
-./.git/objects/c3/910a78c6359a855b576e2af347c00e5947fdeb
-./.git/objects/c3/fb3812bb9c1365e93c28414b044596eac7a013
-./.git/objects/c6
-./.git/objects/c6/731ab569eed2c1db80f5edec6ba4e8d4c3d5c3
-./.git/objects/c7
-./.git/objects/c7/747a8288867398f7844b4bc96fe1f7ff5bab29
-./.git/objects/c7/d241584e243e955825943ea540b37011a7d039
-./.git/objects/c7/f0aa3aab16f9b330345af85b4a466d61810124
-./.git/objects/c8
-./.git/objects/c8/22e1f11e3bdb16f46ddc10d74e00e63c614f4b
-./.git/objects/c8/53c4cb7d6ce10c5a0b94f1c00cf43e74fe3710
-./.git/objects/c9
-./.git/objects/c9/f017f2f913e4469beaad6b9f5094604962dddf
-./.git/objects/ca
-./.git/objects/ca/9597c2c374bd97e8f411a3d812ef0a11159ab3
-./.git/objects/cb
-./.git/objects/cb/1c9ea747b9211e4900dfdf2ff04b1c098b6ef5
-./.git/objects/cb/b0b3523ee80e6dee63e816717a816f4b173639
-./.git/objects/cb/c455a251a6b1d4921a4362e59d0a30def847c9
-./.git/objects/cb/e0427a8c3e967dbb52207a9e7f582e2037d41d
-./.git/objects/cd
-./.git/objects/cd/22fd013da11ae219302bb18753da9ff72dc4db
-./.git/objects/cd/a91c10cadc75c1e4489b5eb2da9aec373fb5fd
-./.git/objects/ce
-./.git/objects/ce/487055c8ca1815aacacaf943bc0bdd16fa548b
-./.git/objects/ce/622db2192bd6724c9b0d8f4ee8d483c1eb1782
-./.git/objects/cf
-./.git/objects/cf/ace762e07545c39fcc9d58c67ec5801f770359
-./.git/objects/d0
-./.git/objects/d0/2ad24473a2c2a28538d9a92d9726c332468a7b
-./.git/objects/d0/42adda163c646b50b9952c7d62001df1dcbcaf
-./.git/objects/d0/5919c7e51e357a057f683c01b93d226ff14701
-./.git/objects/d0/badbef294404ad073561160be39f56a7fe2cb4
-./.git/objects/d1
-./.git/objects/d1/538ff3bcc55226b01c1bc93bd8ac5e3258bcf9
-./.git/objects/d1/7a403297b82cbde750c54baf3ac5b47aede205
-./.git/objects/d2
-./.git/objects/d2/3ed85148f211702799ad6c4f093fcc566d8e9c
-./.git/objects/d2/7e9cadce15d1636500ef9279da175cdb440f04
-./.git/objects/d2/ecc2644614a26db916c2a47339232a471b5e15
-./.git/objects/d3
-./.git/objects/d3/80faf0ee0ee2a545a27a6cb4d700f0dbe4f9f4
-./.git/objects/d4
-./.git/objects/d4/06d353c97c817490af2eaaabf564461192dcf7
-./.git/objects/d5
-./.git/objects/d5/2962e3eaa1c97fd4093360cdf9c60974354071
-./.git/objects/d5/2c4932ae764fda2a471528165a718d32ef0082
-./.git/objects/d5/85aa166904f17c3fa1b3d642d95ef0977a5d83
-./.git/objects/d5/ed14e9d49031736965e3e695792ef6f1052262
-./.git/objects/d6
-./.git/objects/d6/209f47a6e4e0e8dc8609505474242ba7ee514f
-./.git/objects/d6/b791899b973a7a6b965f7880b47d4c307d08ca
-./.git/objects/d8
-./.git/objects/d8/3d3bcbbf350f4213f444c9823f60596205d226
-./.git/objects/d8/ae7dd43dd6ac099e03e1ab93ba336563368a01
-./.git/objects/d8/d38892bd61694802eef9601d87e2f1bc68fa75
-./.git/objects/d9
-./.git/objects/d9/cf9e48bceef061140b7b7cf2a16ba77c12858d
-./.git/objects/db
-./.git/objects/db/6d0c596396f0433fd38f3b52b8983ec20c9b61
-./.git/objects/db/83496dd54bbaacf93d853842bd94f093273724
-./.git/objects/db/c20bd4c3050c67061e4ad78438465bfd13c430
-./.git/objects/dc
-./.git/objects/dc/07f58f292e37cce1fd1a0cc1cebfa80d8e126f
-./.git/objects/dd
-./.git/objects/dd/b211957b877e3b145836fe0448835d102c07de
-./.git/objects/dd/bd6eacec38412e31a439ccf3d3cc4135982616
-./.git/objects/dd/db9e86f2796f7f4948fad0077eef7145e59754
-./.git/objects/de
-./.git/objects/de/36c464d60c5d46d9ab268ee7a3ddfb00d934a9
-./.git/objects/de/c3782ca2234039cbdfa24e1a53e994c8ed0f76
-./.git/objects/de/d22b786551ea361ed192a672a7e8c3ec4a92e1
-./.git/objects/df
-./.git/objects/df/fc6b115a5b9cba70089fedc57f31239455d04c
-./.git/objects/e1
-./.git/objects/e1/50e2db5724424845c76166480f605bc9bb52cf
-./.git/objects/e2
-./.git/objects/e2/22c6bf55c81cd1558795e777945bfb73125ea9
-./.git/objects/e2/9c669ce610c10b38692b6e8dc121ba650297e7
-./.git/objects/e2/ab087506e566d1eecfe244b108a9d361762b22
-./.git/objects/e3
-./.git/objects/e3/6059f8a0aedc8de846fd1ca76f1ed0cdcf280c
-./.git/objects/e3/743f16e9b042a00b8098ec1c449c8ac75434da
-./.git/objects/e4
-./.git/objects/e4/2c477e8822ef3228a234e1d7f9426cd718b1f0
-./.git/objects/e4/4cb691aa41851c6864255cdaedbbbde5f8cc2b
-./.git/objects/e5
-./.git/objects/e5/76d3da27e8aa71e478bb5192dc4d7e21b8b776
-./.git/objects/e6
-./.git/objects/e6/9de29bb2d1d6434b8b29ae775ad8c2e48c5391
-./.git/objects/e6/a0d58683e105def0cd1f990d822cdcefe37064
-./.git/objects/e7
-./.git/objects/e7/3f5746109b58205eb7fd60bf74b2d061c537dc
-./.git/objects/e7/80b4e7bac3b0c5c811edab4d236055ea42dd25
-./.git/objects/e8
-./.git/objects/e8/39a6686b7f9db4b45938940b404f0a4df9cee3
-./.git/objects/e8/ecf876109a95f7bc86fe250e162b1de66106ba
-./.git/objects/e9
-./.git/objects/e9/0bce68c2e7440dd22212766e3937f57b0d4aca
-./.git/objects/e9/2bdeb8aeee156eb64f1d595ab8c536c13cea6b
-./.git/objects/e9/bab00fb27177791e0807b35ef11af4e9b3670f
-./.git/objects/ea
-./.git/objects/ea/c7b9fe355fc8fea925740b2ac7a87dc36b9385
-./.git/objects/ee
-./.git/objects/ee/443c6dd333c9f8a73076c7fa515650a606dc43
-./.git/objects/ee/a50b1f6764db5074426d94ee5b009301fae814
-./.git/objects/f0
-./.git/objects/f0/58b4ed07ab84022f11bd7c23634cb88e2d90a1
-./.git/objects/f1
-./.git/objects/f1/32bdd90fb11f41cd94e49f6abb890bead84907
-./.git/objects/f2
-./.git/objects/f2/fc530d1224ada7ea5b8acf79c099e618ee8ed3
-./.git/objects/f3
-./.git/objects/f3/0dcc34e08dcb4413aa58917a36bf457f442aeb
-./.git/objects/f3/27a377335d2562fbbdac53f3cd0002615f48ce
-./.git/objects/f3/f607d2983a64aa126c5acfd371f4d245757795
-./.git/objects/f3/ffd84f1e5c92ae97a3afea16db737211dd5951
-./.git/objects/f5
-./.git/objects/f5/c08eb4b897ef8d2832cfb75115c1c9a8ede983
-./.git/objects/f6
-./.git/objects/f6/35bf37339b210e868f180be3b06ee1dde75008
-./.git/objects/f6/c317346fcf973f167dd082c14edc5447fa0592
-./.git/objects/f7
-./.git/objects/f7/02fff99e03fb44a917ae1e956018159981cf9a
-./.git/objects/f8
-./.git/objects/f8/745e4cc819df6a046dfa414ae07c625b4ade1b
-./.git/objects/f8/7638b0abef2d06db6b793a808f47e3207e00d6
-./.git/objects/f9
-./.git/objects/f9/291ab249a232c00da64907b63f52edffd6ed41
-./.git/objects/f9/3fe92b3fb9b832a251d16f3628c7477bddc53c
-./.git/objects/f9/94c12acf1e080ef979ed8a548f656b8dc75d0c
-./.git/objects/fb
-./.git/objects/fb/b95aeeadb696ef2e9aa4e4a2bef9cae95ce8ce
-./.git/objects/fc
-./.git/objects/fc/5ce42953616ffad551ebaad2bcd6eb0da58ca8
-./.git/objects/fd
-./.git/objects/fd/035ce4e1fd96c2a2d0232f27e4fdea253cd69b
-./.git/objects/fd/69d4753119282701337713d949c5c384093d64
-./.git/objects/fe
-./.git/objects/fe/216ef8643106248f0a7f4f0119ef18fd39df49
-./.git/objects/ff
-./.git/objects/ff/2d8a37bf162ce32b0f2cf9ef85c56363bdc938
-./.git/objects/ff/4855431ec780a35afb94747c799781ed88a127
-./.git/objects/ff/84b62b7cc6ee39ca9be5f65e919db305ec379c
-./.git/objects/ff/eeb0d11897c0ed3428c405517e05dcc783ae14
-./.git/objects/info
-./.git/objects/pack
-./.git/objects/pack/pack-f469f876d15d1f898518095faed9364359a5f944.idx
-./.git/objects/pack/pack-f469f876d15d1f898518095faed9364359a5f944.pack
-./.git/objects/pack/pack-f469f876d15d1f898518095faed9364359a5f944.rev
-./.git/ORIG_HEAD
-./.git/REBASE_HEAD
-./.git/refs
-./.git/refs/heads
-./.git/refs/heads/main
-./.git/refs/remotes
-./.git/refs/remotes/origin
-./.git/refs/remotes/origin/backup
-./.git/refs/remotes/origin/backup/pre-replace-20250810-082753
-./.git/refs/remotes/origin/fix
-./.git/refs/remotes/origin/fix/dashboard-aug12
-./.git/refs/remotes/origin/HEAD
-./.git/refs/remotes/origin/main
-./.git/refs/tags
-./.github
-./.github/workflows
-./.github/workflows/deploy-bot.yml
-./.github/workflows/deploy-dashboard.yml
-./.gitignore
-./=2.0
-./app.py
-./apply_dashboard_fix.sh
-./auto_push.py
-./blacklist.txt
-./blacklist_image_hashes.txt
-./CHANGELOG.md
-./data
-./data/phish_config.json
-./data/phish_phash.json
-./data/ui_config.json
-./data/whitelist_domains.json
-./DEPLOY_NOTES.txt
-./error.log
-./install.sh
-./main.py
-./main.py.bak
-./modules
-./modules/__init__.py
-./patch_app_theme.py
-./pr_branch_steps.sh
-./push_fix.bat
-./README.md
-./README_PATCH.md
-./README_PATCH.txt
-./render.yaml
-./requirements.txt
-./run_grep_checks_auto.sh
-./satpambot
-./satpambot/app_theme_context_patch.py
-./satpambot/assets
-./satpambot/assets/fibilaugh.png
-./satpambot/assets/fibi_icon.png
-./satpambot/bot
-./satpambot/bot/main.py
-./satpambot/bot/modules
-./satpambot/bot/modules/assets
-./satpambot/bot/modules/assets/FibiLaugh.png
-./satpambot/bot/modules/database.py
-./satpambot/bot/modules/discord_bot
-./satpambot/bot/modules/discord_bot/ai
-./satpambot/bot/modules/discord_bot/ai/chatgpt_handler.py
-./satpambot/bot/modules/discord_bot/ai/__init__.py
-./satpambot/bot/modules/discord_bot/background_tasks.py
-./satpambot/bot/modules/discord_bot/cogs
-./satpambot/bot/modules/discord_bot/cogs/admin.py
-./satpambot/bot/modules/discord_bot/cogs/anti_image_phish_advanced.py
-./satpambot/bot/modules/discord_bot/cogs/anti_image_phish_signature.py
-./satpambot/bot/modules/discord_bot/cogs/anti_invite_autoban.py
-./satpambot/bot/modules/discord_bot/cogs/banlog_thread.py
-./satpambot/bot/modules/discord_bot/cogs/commands_probe.py
-./satpambot/bot/modules/discord_bot/cogs/errorlog_bridge.py
-./satpambot/bot/modules/discord_bot/cogs/fast_guard.py
-./satpambot/bot/modules/discord_bot/cogs/health.py
-./satpambot/bot/modules/discord_bot/cogs/image_poster.py
-./satpambot/bot/modules/discord_bot/cogs/info.py
-./satpambot/bot/modules/discord_bot/cogs/link_guard.py
-./satpambot/bot/modules/discord_bot/cogs/log_viewer.py
-./satpambot/bot/modules/discord_bot/cogs/metrics.py
-./satpambot/bot/modules/discord_bot/cogs/moderation_extras.py
-./satpambot/bot/modules/discord_bot/cogs/moderation_test.py
-./satpambot/bot/modules/discord_bot/cogs/ocr_guard.py
-./satpambot/bot/modules/discord_bot/cogs/poll.py
-./satpambot/bot/modules/discord_bot/cogs/prefix_guard.py
-./satpambot/bot/modules/discord_bot/cogs/presence_clock_sticky.py
-./satpambot/bot/modules/discord_bot/cogs/presence_fix.py
-./satpambot/bot/modules/discord_bot/cogs/slash_basic.py
-./satpambot/bot/modules/discord_bot/cogs/slash_sync.py
-./satpambot/bot/modules/discord_bot/cogs/status_sticky_auto.py
-./satpambot/bot/modules/discord_bot/cogs/status_sticky_manual_proxy.py
-./satpambot/bot/modules/discord_bot/cogs/testban_hybrid.py
-./satpambot/bot/modules/discord_bot/cogs/whitelist.py
-./satpambot/bot/modules/discord_bot/cogs/__init__.py
-./satpambot/bot/modules/discord_bot/cogs_loader.py
-./satpambot/bot/modules/discord_bot/commands
-./satpambot/bot/modules/discord_bot/commands/ai_commands.py
-./satpambot/bot/modules/discord_bot/commands/debug_commands.py
-./satpambot/bot/modules/discord_bot/commands/general_commands.py
-./satpambot/bot/modules/discord_bot/commands/image_commands.py
-./satpambot/bot/modules/discord_bot/commands/moderation_commands.py
-./satpambot/bot/modules/discord_bot/commands/__init__.py
-./satpambot/bot/modules/discord_bot/config
-./satpambot/bot/modules/discord_bot/config/loader.py
-./satpambot/bot/modules/discord_bot/config/__init__.py
-./satpambot/bot/modules/discord_bot/discord_bot.py
-./satpambot/bot/modules/discord_bot/event_handlers.py
-./satpambot/bot/modules/discord_bot/handlers
-./satpambot/bot/modules/discord_bot/handlers/image_classifier_guard.py
-./satpambot/bot/modules/discord_bot/handlers/image_handler.py
-./satpambot/bot/modules/discord_bot/handlers/invite_guard.py
-./satpambot/bot/modules/discord_bot/handlers/ocr_handler.py
-./satpambot/bot/modules/discord_bot/handlers/url_guard.py
-./satpambot/bot/modules/discord_bot/handlers/__init__.py
-./satpambot/bot/modules/discord_bot/helpers
-./satpambot/bot/modules/discord_bot/helpers/banlog.py
-./satpambot/bot/modules/discord_bot/helpers/ban_embed.py
-./satpambot/bot/modules/discord_bot/helpers/ban_poster.py
-./satpambot/bot/modules/discord_bot/helpers/config_manager.py
-./satpambot/bot/modules/discord_bot/helpers/db.py
-./satpambot/bot/modules/discord_bot/helpers/env.py
-./satpambot/bot/modules/discord_bot/helpers/env_loader.py
-./satpambot/bot/modules/discord_bot/helpers/error_handler.py
-./satpambot/bot/modules/discord_bot/helpers/file_tools.py
-./satpambot/bot/modules/discord_bot/helpers/flaskdb.py
-./satpambot/bot/modules/discord_bot/helpers/image_check.py
-./satpambot/bot/modules/discord_bot/helpers/image_classifier.py
-./satpambot/bot/modules/discord_bot/helpers/image_hashing.py
-./satpambot/bot/modules/discord_bot/helpers/image_utils.py
-./satpambot/bot/modules/discord_bot/helpers/load_all_cogs.py
-./satpambot/bot/modules/discord_bot/helpers/logger_utils.py
-./satpambot/bot/modules/discord_bot/helpers/log_once.py
-./satpambot/bot/modules/discord_bot/helpers/log_utils.py
-./satpambot/bot/modules/discord_bot/helpers/metrics_agg.py
-./satpambot/bot/modules/discord_bot/helpers/notify_hooks.py
-./satpambot/bot/modules/discord_bot/helpers/ocr_check.py
-./satpambot/bot/modules/discord_bot/helpers/once.py
-./satpambot/bot/modules/discord_bot/helpers/paginator.py
-./satpambot/bot/modules/discord_bot/helpers/permissions.py
-./satpambot/bot/modules/discord_bot/helpers/sheets_webhook.py
-./satpambot/bot/modules/discord_bot/helpers/stats.py
-./satpambot/bot/modules/discord_bot/helpers/status_logger_patch.py
-./satpambot/bot/modules/discord_bot/helpers/sticky.py
-./satpambot/bot/modules/discord_bot/helpers/threaded_log.py
-./satpambot/bot/modules/discord_bot/helpers/url_check.py
-./satpambot/bot/modules/discord_bot/helpers/ws.py
-./satpambot/bot/modules/discord_bot/helpers/__init__.py
-./satpambot/bot/modules/discord_bot/logger_utils.py
-./satpambot/bot/modules/discord_bot/message_handlers.py
-./satpambot/bot/modules/discord_bot/routes
-./satpambot/bot/modules/discord_bot/routes/editor_blacklist.py
-./satpambot/bot/modules/discord_bot/routes/status_route.py
-./satpambot/bot/modules/discord_bot/routes/__init__.py
-./satpambot/bot/modules/discord_bot/shim_runner.py
-./satpambot/bot/modules/discord_bot/tasks.py
-./satpambot/bot/modules/discord_bot/utils
-./satpambot/bot/modules/discord_bot/utils/actions.py
-./satpambot/bot/modules/discord_bot/utils/mod_guard.py
-./satpambot/bot/modules/discord_bot/utils/notifier.py
-./satpambot/bot/modules/discord_bot/utils/threat_core.py
-./satpambot/bot/modules/discord_bot/web_api.py
-./satpambot/bot/modules/discord_bot/__init__.py
-./satpambot/bot/modules/editor
-./satpambot/bot/modules/editor/editor.py
-./satpambot/bot/modules/editor/editor_blacklist.py
-./satpambot/bot/modules/editor/routes.py
-./satpambot/bot/modules/editor/templates
-./satpambot/bot/modules/editor/templates/editor_blacklist.html
-./satpambot/bot/modules/editor/__init__.py
-./satpambot/bot/modules/image_utils_fixed.py
-./satpambot/bot/modules/logger
-./satpambot/bot/modules/logger/helpers
-./satpambot/bot/modules/logger/helpers/logger_utils.py
-./satpambot/bot/modules/__init__.py
-./satpambot/bot/requirements.txt
-./satpambot/bot/runtime.txt
-./satpambot/config
-./satpambot/config/theme.json
-./satpambot/dashboard
-./satpambot/dashboard/admin_fallback.py
-./satpambot/dashboard/app.py
-./satpambot/dashboard/data
-./satpambot/dashboard/data/app.db
-./satpambot/dashboard/data/config.json
-./satpambot/dashboard/data/stats.json
-./satpambot/dashboard/requirements.txt
-./satpambot/dashboard/runtime.txt
-./satpambot/dashboard/static
-./satpambot/dashboard/static/bg.jpg
-./satpambot/dashboard/static/bot_avatar.gif
-./satpambot/dashboard/static/bot_avatar.png
-./satpambot/dashboard/static/css
-./satpambot/dashboard/static/css/auth.css
-./satpambot/dashboard/static/css/custom.css
-./satpambot/dashboard/static/css/dashboard.css
-./satpambot/dashboard/static/css/login.css
-./satpambot/dashboard/static/css/responsive.css
-./satpambot/dashboard/static/css/theme.css
-./satpambot/dashboard/static/dashboard.css
-./satpambot/dashboard/static/favicon.ico
-./satpambot/dashboard/static/icon-default.png
-./satpambot/dashboard/static/img
-./satpambot/dashboard/static/img/icon-lock.svg
-./satpambot/dashboard/static/img/icon-user.svg
-./satpambot/dashboard/static/img/login-user.svg
-./satpambot/dashboard/static/img/logo.svg
-./satpambot/dashboard/static/js
-./satpambot/dashboard/static/js/dashboard.js
-./satpambot/dashboard/static/js/login_particles.js
-./satpambot/dashboard/static/js/mini_monitor.js
-./satpambot/dashboard/static/js/particles.min.js
-./satpambot/dashboard/static/js/particles_login.js
-./satpambot/dashboard/static/login.css
-./satpambot/dashboard/static/themes
-./satpambot/dashboard/static/themes/aromax.css
-./satpambot/dashboard/static/themes/bg-dashboard.css
-./satpambot/dashboard/static/themes/bg-live.css
-./satpambot/dashboard/static/themes/bg-stars.css
-./satpambot/dashboard/static/themes/blue.css
-./satpambot/dashboard/static/themes/cyberpunk.css
-./satpambot/dashboard/static/themes/dark.css
-./satpambot/dashboard/static/themes/default.css
-./satpambot/dashboard/static/themes/glass.css
-./satpambot/dashboard/static/themes/light.css
-./satpambot/dashboard/static/themes/matrix.css
-./satpambot/dashboard/static/themes/minimal.css
-./satpambot/dashboard/static/themes/neo.css
-./satpambot/dashboard/static/themes/neon.css
-./satpambot/dashboard/static/uploads
-./satpambot/dashboard/static/widget
-./satpambot/dashboard/static/widget/widget.css
-./satpambot/dashboard/static/widget/widget.js
-./satpambot/dashboard/superadmin.db
-./satpambot/dashboard/templates
-./satpambot/dashboard/templates/admin_blacklist.html
-./satpambot/dashboard/templates/admin_log.html
-./satpambot/dashboard/templates/assets_manager.html
-./satpambot/dashboard/templates/backup.html
-./satpambot/dashboard/templates/bans.html
-./satpambot/dashboard/templates/base.html
-./satpambot/dashboard/templates/base_patch.html
-./satpambot/dashboard/templates/change_password.html
-./satpambot/dashboard/templates/chat.html
-./satpambot/dashboard/templates/dashboard.html
-./satpambot/dashboard/templates/editor.html
-./satpambot/dashboard/templates/editor_blacklist.html
-./satpambot/dashboard/templates/embed2.html
-./satpambot/dashboard/templates/event_log.html
-./satpambot/dashboard/templates/grafik.html
-./satpambot/dashboard/templates/heatmap.html
-./satpambot/dashboard/templates/image_classifier.html
-./satpambot/dashboard/templates/landing.html
-./satpambot/dashboard/templates/layout.html
-./satpambot/dashboard/templates/login.html
-./satpambot/dashboard/templates/login.html.bak
-./satpambot/dashboard/templates/logout.html
-./satpambot/dashboard/templates/logs.html
-./satpambot/dashboard/templates/log_ai.html
-./satpambot/dashboard/templates/notifikasi.html
-./satpambot/dashboard/templates/partials
-./satpambot/dashboard/templates/partials/dev_login.html
-./satpambot/dashboard/templates/partials/logout_nav.html
-./satpambot/dashboard/templates/partials/mini_monitor.html
-./satpambot/dashboard/templates/phishing.html
-./satpambot/dashboard/templates/phish_lab.html
-./satpambot/dashboard/templates/plugin.html
-./satpambot/dashboard/templates/poll.html
-./satpambot/dashboard/templates/profil.html
-./satpambot/dashboard/templates/provision.html
-./satpambot/dashboard/templates/resource.html
-./satpambot/dashboard/templates/role_maker.html
-./satpambot/dashboard/templates/scheduler.html
-./satpambot/dashboard/templates/security.html
-./satpambot/dashboard/templates/servers.html
-./satpambot/dashboard/templates/server_summary.html
-./satpambot/dashboard/templates/settings.html
-./satpambot/dashboard/templates/settings_assets.html
-./satpambot/dashboard/templates/settings_theme.html
-./satpambot/dashboard/templates/sidebar.html
-./satpambot/dashboard/templates/sso.html
-./satpambot/dashboard/templates/themes.html
-./satpambot/dashboard/templates/topbar.html
-./satpambot/dashboard/templates/users_guilds.html
-./satpambot/dashboard/templates/user_locator.html
-./satpambot/dashboard/templates/widget.html
-./satpambot/dashboard/__pycache__
-./satpambot/dashboard/__pycache__/app.cpython-313.pyc
-./satpambot/desktop-widget
-./satpambot/desktop-widget/index.html
-./satpambot/desktop-widget/main.js
-./satpambot/desktop-widget/package.json
-./satpambot/desktop-widget/preload.js
-./satpambot/desktop-widget/renderer.js
-./satpambot/desktop-widget/styles.css
-./satpambot/init_superadmin_db.py
-./satpambot/scripts
-./satpambot/scripts/add_to_blacklist.py
-./satpambot/scripts/sheets_test.py
-./satpambot/scripts/smoke_test_commands.py
-./satpambot/scripts/smoke_test_message_flow.py
-./satpambot/scripts/tree.py
-./satpambot/settings.json
-./satpambot/tests
-./satpambot/tests/conftest.py
-./satpambot/tests/test_discord_commands.py
-./satpambot/tests/test_flask_routes.py
-./satpambot/theme_helpers.py
-./satpambot/tools
-./satpambot/tools/windows_notifier.py
-./satpambot/__init__.py
-./satpambot/__pycache__
-./satpambot/__pycache__/__init__.cpython-313.pyc
-./satpambot_dashboard_fix.patch
-./scripts
-./scripts/apply_fix_all_404.sh
-./scripts/apply_ui_patch_safe.py
-./scripts/check_archive_refs.py
-./scripts/cleanup_login_ui.py
-./scripts/dedupe_dashboard_patch.py
-./scripts/fix_all.py
-./scripts/fix_dup_routes.py
-./scripts/fix_env_autorun.py
-./scripts/fix_live_silencer.py
-./scripts/fix_login_and_logo.py
-./scripts/fix_main_header.py
-./scripts/fix_silencer_indent.py
-./scripts/insert_silencer.py
-./scripts/validate_ui_patch.py
-./static
-./static/dashboard.css
-./struktur.txt
-./update_requirements_satpambot.bat
-./whitelist.txt
-./__pycache__
-./__pycache__/app.cpython-313.pyc
+Struktur (preview 4 level) dari project ter-extract:
+└── data
+    ├── phish_config.json
+    └── phish_phash.json
+    ├── recent_bans.json
+    ├── ui_config.json
+    ├── whitelist_domains.json
+├── SatpamBot
+│   ├── .git
+│   │   ├── hooks
+│   │   │   ├── applypatch-msg.sample
+│   │   │   ├── commit-msg.sample
+│   │   │   ├── fsmonitor-watchman.sample
+│   │   │   ├── post-update.sample
+│   │   │   ├── pre-applypatch.sample
+│   │   │   ├── pre-commit.sample
+│   │   │   ├── pre-merge-commit.sample
+│   │   │   ├── pre-push.sample
+│   │   │   ├── pre-rebase.sample
+│   │   │   ├── pre-receive.sample
+│   │   │   ├── prepare-commit-msg.sample
+│   │   │   ├── push-to-checkout.sample
+│   │   │   ├── sendemail-validate.sample
+│   │   │   └── update.sample
+│   │   ├── info
+│   │   │   └── exclude
+│   │   ├── logs
+│   │   │   └── refs
+│   │   │   ├── HEAD
+│   │   ├── objects
+│   │   │   ├── 00
+│   │   │   ├── 01
+│   │   │   ├── 02
+│   │   │   ├── 03
+│   │   │   ├── 04
+│   │   │   ├── 09
+│   │   │   ├── 0a
+│   │   │   ├── 0d
+│   │   │   ├── 0e
+│   │   │   ├── 0f
+│   │   │   ├── 10
+│   │   │   ├── 11
+│   │   │   ├── 13
+│   │   │   ├── 14
+│   │   │   ├── 15
+│   │   │   ├── 16
+│   │   │   ├── 17
+│   │   │   ├── 18
+│   │   │   ├── 19
+│   │   │   ├── 1a
+│   │   │   ├── 1c
+│   │   │   ├── 1d
+│   │   │   ├── 1e
+│   │   │   ├── 20
+│   │   │   ├── 22
+│   │   │   ├── 25
+│   │   │   ├── 26
+│   │   │   ├── 27
+│   │   │   ├── 29
+│   │   │   ├── 2b
+│   │   │   ├── 2c
+│   │   │   ├── 2d
+│   │   │   ├── 2e
+│   │   │   ├── 2f
+│   │   │   ├── 34
+│   │   │   ├── 35
+│   │   │   ├── 36
+│   │   │   ├── 38
+│   │   │   ├── 39
+│   │   │   ├── 3a
+│   │   │   ├── 3b
+│   │   │   ├── 3c
+│   │   │   ├── 3d
+│   │   │   ├── 3e
+│   │   │   ├── 3f
+│   │   │   ├── 40
+│   │   │   ├── 41
+│   │   │   ├── 42
+│   │   │   ├── 43
+│   │   │   ├── 44
+│   │   │   ├── 45
+│   │   │   ├── 46
+│   │   │   ├── 47
+│   │   │   ├── 48
+│   │   │   ├── 4b
+│   │   │   ├── 4c
+│   │   │   ├── 4d
+│   │   │   ├── 4e
+│   │   │   ├── 50
+│   │   │   ├── 51
+│   │   │   ├── 52
+│   │   │   ├── 53
+│   │   │   ├── 54
+│   │   │   ├── 55
+│   │   │   ├── 57
+│   │   │   ├── 58
+│   │   │   ├── 5a
+│   │   │   ├── 5b
+│   │   │   ├── 5c
+│   │   │   ├── 5d
+│   │   │   ├── 5f
+│   │   │   ├── 60
+│   │   │   ├── 61
+│   │   │   ├── 63
+│   │   │   ├── 64
+│   │   │   ├── 65
+│   │   │   ├── 66
+│   │   │   ├── 67
+│   │   │   ├── 68
+│   │   │   ├── 6a
+│   │   │   ├── 6b
+│   │   │   ├── 6d
+│   │   │   ├── 6e
+│   │   │   ├── 6f
+│   │   │   ├── 70
+│   │   │   ├── 71
+│   │   │   ├── 73
+│   │   │   ├── 74
+│   │   │   ├── 75
+│   │   │   ├── 76
+│   │   │   ├── 77
+│   │   │   ├── 78
+│   │   │   ├── 7b
+│   │   │   ├── 7c
+│   │   │   ├── 7d
+│   │   │   ├── 80
+│   │   │   ├── 82
+│   │   │   ├── 83
+│   │   │   ├── 84
+│   │   │   ├── 86
+│   │   │   ├── 87
+│   │   │   ├── 89
+│   │   │   ├── 8b
+│   │   │   ├── 8c
+│   │   │   ├── 8d
+│   │   │   ├── 8e
+│   │   │   ├── 90
+│   │   │   ├── 91
+│   │   │   ├── 94
+│   │   │   ├── 95
+│   │   │   ├── 96
+│   │   │   ├── 97
+│   │   │   ├── 99
+│   │   │   ├── 9a
+│   │   │   ├── 9b
+│   │   │   ├── 9d
+│   │   │   ├── a1
+│   │   │   ├── a2
+│   │   │   ├── a3
+│   │   │   ├── a4
+│   │   │   ├── a5
+│   │   │   ├── a7
+│   │   │   ├── a9
+│   │   │   ├── aa
+│   │   │   ├── ac
+│   │   │   ├── ad
+│   │   │   ├── ae
+│   │   │   ├── af
+│   │   │   ├── b0
+│   │   │   ├── b1
+│   │   │   ├── b3
+│   │   │   ├── b4
+│   │   │   ├── b5
+│   │   │   ├── b6
+│   │   │   ├── b7
+│   │   │   ├── b8
+│   │   │   ├── b9
+│   │   │   ├── ba
+│   │   │   ├── bb
+│   │   │   ├── bc
+│   │   │   ├── bd
+│   │   │   ├── be
+│   │   │   ├── bf
+│   │   │   ├── c0
+│   │   │   ├── c1
+│   │   │   ├── c2
+│   │   │   ├── c3
+│   │   │   ├── c6
+│   │   │   ├── c7
+│   │   │   ├── c8
+│   │   │   ├── cb
+│   │   │   ├── cd
+│   │   │   ├── ce
+│   │   │   ├── d0
+│   │   │   ├── d1
+│   │   │   ├── d2
+│   │   │   ├── d3
+│   │   │   ├── d4
+│   │   │   ├── d5
+│   │   │   ├── d6
+│   │   │   ├── d8
+│   │   │   ├── d9
+│   │   │   ├── db
+│   │   │   ├── dc
+│   │   │   ├── dd
+│   │   │   ├── de
+│   │   │   ├── df
+│   │   │   ├── e1
+│   │   │   ├── e2
+│   │   │   ├── e3
+│   │   │   ├── e4
+│   │   │   ├── e5
+│   │   │   ├── e6
+│   │   │   ├── e7
+│   │   │   ├── e8
+│   │   │   ├── e9
+│   │   │   ├── ee
+│   │   │   ├── f0
+│   │   │   ├── f1
+│   │   │   ├── f2
+│   │   │   ├── f3
+│   │   │   ├── f5
+│   │   │   ├── f6
+│   │   │   ├── f7
+│   │   │   ├── f8
+│   │   │   ├── f9
+│   │   │   ├── fb
+│   │   │   ├── fc
+│   │   │   ├── fd
+│   │   │   ├── fe
+│   │   │   ├── ff
+│   │   │   ├── info
+│   │   │   └── pack
+│   │   └── refs
+│   │       ├── heads
+│   │       ├── remotes
+│   │       └── tags
+│   │   ├── COMMIT_EDITMSG
+│   │   ├── config
+│   │   ├── description
+│   │   ├── FETCH_HEAD
+│   │   ├── HEAD
+│   │   ├── index
+│   │   ├── ORIG_HEAD
+│   │   ├── REBASE_HEAD
+│   ├── .github
+│   │   └── workflows
+│   │       ├── deploy-bot.yml
+│   │       └── deploy-dashboard.yml
+│   └── __pycache__
+│       └── app.cpython-313.pyc
+│   ├── modules
+│   │   └── __init__.py
+│   ├── satpambot
+│   │   └── __pycache__
+│   │       └── __init__.cpython-313.pyc
+│   │   ├── assets
+│   │   │   └── fibi_icon.png
+│   │   │   ├── fibilaugh.png
+│   │   ├── bot
+│   │   │   ├── modules
+│   │   │   ├── main.py
+│   │   │   ├── requirements.txt
+│   │   │   └── runtime.txt
+│   │   ├── config
+│   │   │   └── theme.json
+│   │   ├── dashboard
+│   │   │   └── __pycache__
+│   │   │   ├── data
+│   │   │   ├── static
+│   │   │   ├── templates
+│   │   │   ├── admin_fallback.py
+│   │   │   ├── app.py
+│   │   │   ├── requirements.txt
+│   │   │   ├── runtime.txt
+│   │   │   ├── superadmin.db
+│   │   ├── desktop-widget
+│   │   │   ├── index.html
+│   │   │   ├── main.js
+│   │   │   ├── package.json
+│   │   │   ├── preload.js
+│   │   │   ├── renderer.js
+│   │   │   └── styles.css
+│   │   ├── scripts
+│   │   │   ├── add_to_blacklist.py
+│   │   │   ├── sheets_test.py
+│   │   │   ├── smoke_test_commands.py
+│   │   │   ├── smoke_test_message_flow.py
+│   │   │   └── tree.py
+│   │   ├── tests
+│   │   │   ├── conftest.py
+│   │   │   ├── test_discord_commands.py
+│   │   │   └── test_flask_routes.py
+│   │   ├── tools
+│   │   │   └── windows_notifier.py
+│   │   ├── __init__.py
+│   │   ├── app_theme_context_patch.py
+│   │   ├── init_superadmin_db.py
+│   │   ├── settings.json
+│   │   ├── theme_helpers.py
+│   ├── scripts
+│   │   ├── apply_fix_all_404.sh
+│   │   ├── apply_ui_patch_safe.py
+│   │   ├── check_archive_refs.py
+│   │   ├── cleanup_login_ui.py
+│   │   ├── dedupe_dashboard_patch.py
+│   │   ├── fix_all.py
+│   │   ├── fix_dup_routes.py
+│   │   ├── fix_env_autorun.py
+│   │   ├── fix_live_silencer.py
+│   │   ├── fix_login_and_logo.py
+│   │   ├── fix_main_header.py
+│   │   ├── fix_silencer_indent.py
+│   │   ├── insert_silencer.py
+│   │   └── validate_ui_patch.py
+│   ├── static
+│   │   └── dashboard.css
+│   ├── .gitignore
+│   ├── =2.0
+│   ├── app.py
+│   ├── apply_dashboard_fix.sh
+│   ├── auto_push.py
+│   ├── blacklist.txt
+│   ├── blacklist_image_hashes.txt
+│   ├── CHANGELOG.md
+│   ├── DEPLOY_NOTES.txt
+│   ├── error.log
+│   ├── install.sh
+│   ├── main.py
+│   ├── main.py.bak
+│   ├── patch_app_theme.py
+│   ├── pr_branch_steps.sh
+│   ├── push_fix.bat
+│   ├── README.md
+│   ├── README_PATCH.md
+│   ├── render.yaml
+│   ├── requirements.txt
+│   ├── run_grep_checks_auto.sh
+│   ├── satpambot_dashboard_fix.patch
+│   ├── update_requirements_satpambot.bat
+│   ├── whitelist.txt
