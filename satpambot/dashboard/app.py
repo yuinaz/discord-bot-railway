@@ -277,3 +277,191 @@ def upload_background():
     file.save(path)
     rel = f"uploads/{{fname}}"
     return jsonify(ok=True, path=f"/static/{{rel}}")
+
+
+# === Phish signature API (pHash) ===
+from PIL import Image
+import imagehash, io, json
+from pathlib import Path
+
+PHASH_FILE = Path(os.getenv("PHISH_PHASH_FILE") or "data/phish_phash.json")
+def _phash_load():
+    if PHASH_FILE.exists():
+        try:
+            return json.loads(PHASH_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"phash":[]}
+
+def _phash_save(obj):
+    PHASH_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PHASH_FILE.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+@app.post("/api/phish-signature")
+@login_required
+def api_phish_signature():
+    f = request.files.get("file")
+    if not f:
+        return jsonify(ok=False, error="no file"), 400
+    try:
+        img = Image.open(io.BytesIO(f.read())).convert("RGB")
+        h = imagehash.phash(img)
+        hstr = str(h)
+        db = _phash_load()
+        if hstr not in db["phash"]:
+            db["phash"].append(hstr)
+            _phash_save(db)
+        return jsonify(ok=True, phash=hstr, count=len(db["phash"]))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+@app.get("/phish-lab")
+@login_required
+def phish_lab():
+    db = _phash_load()
+    return render_template("phish_lab.html", hashes=db.get("phash", []))
+
+
+# === Phish config (no ENV) ===
+import json
+PHISH_CONFIG_PATH = os.path.join("data", "phish_config.json")
+
+def _cfg_load():
+    try:
+        with open(PHISH_CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}
+
+def _cfg_save(obj):
+    os.makedirs(os.path.dirname(PHISH_CONFIG_PATH), exist_ok=True)
+    with open(PHISH_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+@app.get("/api/phish-config")
+@login_required
+def api_phish_cfg_get():
+    return jsonify(_cfg_load())
+
+@app.post("/api/phish-config")
+@login_required
+def api_phish_cfg_post():
+    data = request.get_json(silent=True) or {}
+    cfg = _cfg_load()
+    if "autoban" in data:
+        cfg["autoban"] = bool(data["autoban"])
+    if "threshold" in data:
+        try:
+            v = int(data["threshold"]); v = max(1, min(16, v))
+            cfg["threshold"] = v
+        except Exception:
+            pass
+    if "log_thread_name" in data:
+        name = str(data["log_thread_name"]).strip() or "Ban Log"
+        cfg["log_thread_name"] = name
+    _cfg_save(cfg)
+    return jsonify({"ok": True, **cfg})
+
+
+# === Recent bans API (read from data/recent_bans.json) ===
+import json, time
+RECENT_BANS_PATH = os.path.join("data","recent_bans.json")
+def _recent_bans_load():
+    try:
+        with open(RECENT_BANS_PATH,"r",encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"items":[]}
+
+@app.get("/api/recent-bans")
+def api_recent_bans():
+    data = _recent_bans_load()
+    # keep only latest 50 on read (optional cleanup)
+    items = sorted(data.get("items", []), key=lambda x: x.get("ts", 0), reverse=True)[:50]
+    return {"items": items, "ts": int(time.time())}
+
+
+# === Whitelist API (realtime) ===
+import json
+WL_PATH = os.path.join("data","whitelist_domains.json")
+
+def _wl_load():
+    try:
+        return json.load(open(WL_PATH,"r",encoding="utf-8"))
+    except Exception:
+        return []
+
+def _wl_save(domains):
+    os.makedirs(os.path.dirname(WL_PATH), exist_ok=True)
+    # normalize: lowercase, strip, unique, sort
+    norm = sorted({(d or "").strip().lower() for d in domains if (d or "").strip()})
+    json.dump(norm, open(WL_PATH,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+    return norm
+
+@app.get("/api/whitelist")
+@login_required
+def api_whitelist_get():
+    return {"domains": _wl_load()}
+
+@app.post("/api/whitelist")
+@login_required
+def api_whitelist_post():
+    data = request.get_json(silent=True) or {}
+    # support "text" (multiline) or "domains" list
+    if "text" in data and isinstance(data["text"], str):
+        items = [ln.strip() for ln in data["text"].splitlines()]
+        saved = _wl_save(items)
+        return {"ok": True, "domains": saved}
+    if "domains" in data and isinstance(data["domains"], list):
+        saved = _wl_save(data["domains"])
+        return {"ok": True, "domains": saved}
+    return {"ok": False, "error": "invalid payload"}, 400
+
+
+# --- Theme injection (default to dark.css) ---
+@app.context_processor
+def inject_theme_path():
+    try:
+        theme = session.get("theme_css")
+    except Exception:
+        theme = None
+    if not theme:
+        theme = "/static/themes/dark.css"
+    return {"theme_path": theme}
+
+
+# --- UI Config for login (logo/background) ---
+import json, os
+UI_CFG_PATH = os.path.join("data","ui_config.json")
+
+def _ui_cfg_load():
+    try:
+        return json.load(open(UI_CFG_PATH,"r",encoding="utf-8"))
+    except Exception:
+        return {}
+
+@app.context_processor
+def inject_login_ui():
+    cfg = _ui_cfg_load()
+    # default values
+    logo = cfg.get("login_logo") or "/static/img/login-user.svg"
+    bg   = cfg.get("login_bg") or "linear-gradient(120deg,#f093fb 0%,#f5576c 100%)"
+    particles = bool(cfg.get("login_particles", True))
+    return {"login_logo": logo, "login_bg": bg, "login_particles": particles}
+
+
+@app.get("/api/ui-config")
+@login_required
+def api_ui_cfg_get():
+    return _ui_cfg_load()
+
+@app.post("/api/ui-config")
+@login_required
+def api_ui_cfg_post():
+    data = request.get_json(silent=True) or {}
+    cfg = _ui_cfg_load()
+    if "login_logo" in data: cfg["login_logo"] = str(data["login_logo"]).strip()
+    if "login_bg" in data: cfg["login_bg"] = str(data["login_bg"]).strip()
+    if "login_particles" in data: cfg["login_particles"] = bool(data["login_particles"])
+    _ui_cfg_save(cfg)
+    return {"ok": True, **cfg}

@@ -25,10 +25,4 @@ greenlet>=3.0
 opencv-python-headless>=4.10
 tzdata>=2024.1
 gunicorn>=21.2
-
-# --- SatpamBot security ---
-discord.py
-Flask
-aiohttp
-Pillow
-python-dotenv
+imagehash

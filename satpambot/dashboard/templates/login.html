@@ -1,62 +1,39 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login • SatpamBot</title>
-  <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">
+  <link rel="stylesheet" href="/static/css/login.css">
 </head>
-<body class="login-page">
-<div id="particles-js"></div>
-
-<main class="wrap">
-  <section class="card" role="region" aria-label="Login Card">
-    <div class="tab-shadow" aria-hidden="true"></div>
-    <div class="avatar"><img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Logo"></div>
-    <h1>Masuk Dashboard</h1>
-
-    {% if error %}
-      <div class="alert">{{ error }}</div>
-    {% endif %}
-
-    <form method="post" action="/login" class="grid" autocomplete="on">
-      <div class="input">
-        <img class="icon" src="{{ url_for('static', filename='img/icon-user.svg') }}" alt="user">
-        <input id="username" name="username" type="text" placeholder="Email / Username"
-               autocomplete="username" value="{{ request.form.username or '' }}" required>
+<body class="login-page" style="--login-bg: {{ login_bg }};">
+  <canvas id="particles" class="particles"></canvas>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="avatar">
+        <img src="{{ login_logo }}" alt="logo" onerror="this.style.display='none'">
+        <div class="fallback" aria-hidden="true"></div>
       </div>
-      <div class="input">
-        <img class="icon" src="{{ url_for('static', filename='img/icon-lock.svg') }}" alt="lock">
-        <input id="password" name="password" type="password" placeholder="Password"
-               autocomplete="current-password" required>
-      </div>
-
-      <div class="row-helpers">
-        <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
-        <a href="#" onclick="return false">Forgot Password?</a>
-      </div>
-
-      <button type="submit" class="btn-login">LOGIN</button>
-    </form>
-  </section>
-</main>
-
-<script>
-(function(){
-  function init(){ if(!window.particlesJS){ setTimeout(init, 180); return; }
-    particlesJS("particles-js",{
-      particles:{ number:{value:70}, size:{value:2},
-        move:{enable:true, speed:1}, line_linked:{enable:true, opacity:.22},
-        color:{ value:"#60a5fa" } },
-      interactivity:{ events:{ onhover:{ enable:true, mode:"grab" } } }
-    });
-  }
-  var s=document.createElement("script");
-  s.src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js";
-  s.onload=init; document.head.appendChild(s);
-})();
-</script>
+      <form method="post" action="/login">
+        <div class="field">
+          <span class="icon">👤</span>
+          <input type="text" name="username" placeholder="Email ID" required autofocus>
+        </div>
+        <div class="field">
+          <span class="icon">🔒</span>
+          <input type="password" name="password" placeholder="Password" required>
+        </div>
+        <div class="row">
+          <label class="remember"><input type="checkbox" name="remember" value="1"> Remember me</label>
+          <a class="forgot" href="/change-password">Forgot Password?</a>
+        </div>
+        <button class="btn-login" type="submit">LOGIN</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    const ENABLE_PARTICLES = {{ 'true' if login_particles else 'false' }};
+  </script>
+  <script src="/static/js/login_particles.js"></script>
 </body>
 </html>
