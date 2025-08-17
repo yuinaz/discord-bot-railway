@@ -180,7 +180,7 @@ if __name__ == "__main__":
 try:
     import logging
     from werkzeug.serving import WSGIRequestHandler
-    SILENCE_PATHS = {"/api/live", "/ping"}
+    SILENCE_PATHS = {"/api/live", "/ping", "/healthz", "/uptime"}
 
     class _SilencePaths(logging.Filter):
         def filter(self, record):
