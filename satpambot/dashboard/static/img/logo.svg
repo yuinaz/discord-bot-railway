@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40" viewBox="0 0 160 40">
+<defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#7c3aed"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+<rect rx="8" width="160" height="40" fill="url(#g)"/>
+<path d="M18 10l10 5v6c0 6-6 9-10 10-4-1-10-4-10-10v-6l10-5z" fill="#111827" opacity=".95"/>
+<text x="48" y="26" font-family="Inter,Segoe UI,Arial" font-size="16" fill="#fff" font-weight="700">SatpamBot</text>
+</svg>

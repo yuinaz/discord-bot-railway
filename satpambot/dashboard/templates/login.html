@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
-{% block title %}Masuk Dashboard - SatpamBot{% endblock %}
+{% block title %}<h2>Masuk Dashboard</h2> - SatpamBot{% endblock %}
 {% block content %}
 <canvas id="particle-canvas" style="position:fixed;inset:0;z-index:0"></canvas>
 <div class="container" style="position:relative;z-index:1;max-width:540px;margin-top:10vh">
   <div class="card">
-    <h2 style="text-align:center">Masuk Dashboard</h2>
+    <h2 style="text-align:center"><h2>Masuk Dashboard</h2></h2>
     {% if error %}<div class="badge" style="color:#ff6b81">Kredensial salah</div>{% endif %}
-    <form method="post">
+    <div class="login-card">
+<form class="login-form" method="post">
       <div class="form-group" style="margin-bottom:10px">
         <label>Username</label>
         <input name="user" class="input" style="width:100%" required />
@@ -15,8 +16,9 @@
         <label>Password</label>
         <input type="password" name="pass" class="input" style="width:100%" required />
       </div>
-      <button class="btn primary" style="width:100%">Login</button>
+      <button class="login-btn btn-primary"Login</button>
     </form>
+</div>
   </div>
 </div>
 {% endblock %}
