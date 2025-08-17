@@ -1,3 +1,4 @@
+from satpambot.bot.modules.discord_bot.utils.whitelist_guard import should_skip_moderation
 from __future__ import annotations
 import re, logging, asyncio
 from datetime import datetime, timedelta, timezone
@@ -50,8 +51,13 @@ class FastGuard(commands.Cog):
         self.bot = bot
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    \1
         try:
+            if await should_skip_moderation(message):
+                return
+        except Exception:
+            pass
+try:
             if not message.guild or getattr(message.author, "bot", False):
                 return
             content = getattr(message, "content", "") or ""

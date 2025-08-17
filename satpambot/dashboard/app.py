@@ -1,8 +1,11 @@
 from werkzeug.utils import secure_filename
 import os, time, random
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from dotenv import load_dotenv
+from flask import
+from pathlib import Path Flask, jsonify, redirect, render_template, request, session, url_for
 
 # Explicit folders but relative to project root if run with PYTHONPATH=.
+BASE_DIR = Path(__file__).parent
 app = Flask("main", template_folder="templates", static_folder="static")
 
 from functools import wraps
@@ -104,7 +107,9 @@ def servers_page():
 
 @app.get("/api/live")
 def __api_live_fallback():
-    from flask import jsonify
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path jsonify
     return jsonify(ok=True, live=True, bot=os.getenv("RUN_BOT","0") not in ("0","false","False"))
 # === PATCH START: dashboard templates/routing ===
 import os
@@ -153,7 +158,9 @@ def dashboard_alias():
 # Halaman settings & servers
 @app.get("/__debug/templates")
 def __debug_templates():
-    from flask import jsonify
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path jsonify
     paths = []
     try:
         loader = app.jinja_loader
@@ -178,7 +185,9 @@ def __debug_templates():
 @app.get("/theme/list")
 @login_required
 def theme_list():
-    from flask import jsonify
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path jsonify
     base = os.path.join(os.path.dirname(__file__), "static", "themes")
     themes = []
     try:
@@ -195,7 +204,9 @@ def theme_list():
 @app.get("/api/guilds")
 @login_required
 def api_guilds():
-    from flask import jsonify
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path jsonify
     return jsonify(ok=True, guilds=[])
 
 @app.get("/assets-manager")
@@ -205,13 +216,17 @@ def assets_manager():
 
 @app.get("/favicon.ico")
 def favicon():
-    from flask import send_from_directory
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path send_from_directory
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     return send_from_directory(static_dir, "favicon.ico", mimetype="image/x-icon")
 
 @app.get("/theme")
 def theme_css():
-    from flask import send_from_directory, session
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path send_from_directory, session
     theme = (session.get("theme") or "default").strip()
     base = os.path.join(os.path.dirname(__file__), "static", "themes")
     css = f"{theme}.css"
@@ -222,7 +237,9 @@ def theme_css():
 @app.get("/theme/apply")
 @login_required
 def theme_apply():
-    from flask import jsonify, request, session
+    from dotenv import load_dotenv
+from flask import
+from pathlib import Path jsonify, request, session
     theme = (request.args.get("set") or "default").strip()
     session["theme"] = theme
     return jsonify(ok=True, theme=theme)
@@ -240,7 +257,9 @@ def dev_login_as(username):
     # hanya aktif jika DEBUG_DEV_LOGIN=1
     flag = str(os.getenv("DEBUG_DEV_LOGIN","0")).lower() in ("1","true","yes","on")
     if not flag:
-        from flask import abort
+        from dotenv import load_dotenv
+from flask import
+from pathlib import Path abort
         return abort(404)
     session["admin"] = True
     session["username"] = username
@@ -279,146 +298,21 @@ def upload_background():
     return jsonify(ok=True, path=f"/static/{{rel}}")
 
 
-# === Phish signature API (pHash) ===
-from PIL import Image
-import imagehash, io, json
-from pathlib import Path
-
-PHASH_FILE = Path(os.getenv("PHISH_PHASH_FILE") or "data/phish_phash.json")
-def _phash_load():
-    if PHASH_FILE.exists():
-        try:
-            return json.loads(PHASH_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {"phash":[]}
-
-def _phash_save(obj):
-    PHASH_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PHASH_FILE.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-
-@app.post("/api/phish-signature")
-@login_required
-def api_phish_signature():
-    f = request.files.get("file")
-    if not f:
-        return jsonify(ok=False, error="no file"), 400
-    try:
-        img = Image.open(io.BytesIO(f.read())).convert("RGB")
-        h = imagehash.phash(img)
-        hstr = str(h)
-        db = _phash_load()
-        if hstr not in db["phash"]:
-            db["phash"].append(hstr)
-            _phash_save(db)
-        return jsonify(ok=True, phash=hstr, count=len(db["phash"]))
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-
-@app.get("/phish-lab")
-@login_required
-def phish_lab():
-    db = _phash_load()
-    return render_template("phish_lab.html", hashes=db.get("phash", []))
+from flask import send_from_directory
+@app.route("/static/<path:filename>")
+def _static(filename):
+    return send_from_directory(app.static_folder, filename)
 
 
-# === Phish config (no ENV) ===
-import json
-PHISH_CONFIG_PATH = os.path.join("data", "phish_config.json")
 
-def _cfg_load():
-    try:
-        with open(PHISH_CONFIG_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}
-
-def _cfg_save(obj):
-    os.makedirs(os.path.dirname(PHISH_CONFIG_PATH), exist_ok=True)
-    with open(PHISH_CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2)
-
-@app.get("/api/phish-config")
-@login_required
-def api_phish_cfg_get():
-    return jsonify(_cfg_load())
-
-@app.post("/api/phish-config")
-@login_required
-def api_phish_cfg_post():
-    data = request.get_json(silent=True) or {}
-    cfg = _cfg_load()
-    if "autoban" in data:
-        cfg["autoban"] = bool(data["autoban"])
-    if "threshold" in data:
-        try:
-            v = int(data["threshold"]); v = max(1, min(16, v))
-            cfg["threshold"] = v
-        except Exception:
-            pass
-    if "log_thread_name" in data:
-        name = str(data["log_thread_name"]).strip() or "Ban Log"
-        cfg["log_thread_name"] = name
-    _cfg_save(cfg)
-    return jsonify({"ok": True, **cfg})
+def _admin_creds():
+    import os
+    user = os.getenv("ADMIN_USERNAME") or os.getenv("ADMIN_USER") or os.getenv("ADMIN") or "admin"
+    pwd  = os.getenv("ADMIN_PASSWORD") or os.getenv("ADMIN_PASS") or os.getenv("PASSWORD") or ""
+    return user, pwd
 
 
-# === Recent bans API (read from data/recent_bans.json) ===
-import json, time
-RECENT_BANS_PATH = os.path.join("data","recent_bans.json")
-def _recent_bans_load():
-    try:
-        with open(RECENT_BANS_PATH,"r",encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"items":[]}
 
-@app.get("/api/recent-bans")
-def api_recent_bans():
-    data = _recent_bans_load()
-    # keep only latest 50 on read (optional cleanup)
-    items = sorted(data.get("items", []), key=lambda x: x.get("ts", 0), reverse=True)[:50]
-    return {"items": items, "ts": int(time.time())}
-
-
-# === Whitelist API (realtime) ===
-import json
-WL_PATH = os.path.join("data","whitelist_domains.json")
-
-def _wl_load():
-    try:
-        return json.load(open(WL_PATH,"r",encoding="utf-8"))
-    except Exception:
-        return []
-
-def _wl_save(domains):
-    os.makedirs(os.path.dirname(WL_PATH), exist_ok=True)
-    # normalize: lowercase, strip, unique, sort
-    norm = sorted({(d or "").strip().lower() for d in domains if (d or "").strip()})
-    json.dump(norm, open(WL_PATH,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
-    return norm
-
-@app.get("/api/whitelist")
-@login_required
-def api_whitelist_get():
-    return {"domains": _wl_load()}
-
-@app.post("/api/whitelist")
-@login_required
-def api_whitelist_post():
-    data = request.get_json(silent=True) or {}
-    # support "text" (multiline) or "domains" list
-    if "text" in data and isinstance(data["text"], str):
-        items = [ln.strip() for ln in data["text"].splitlines()]
-        saved = _wl_save(items)
-        return {"ok": True, "domains": saved}
-    if "domains" in data and isinstance(data["domains"], list):
-        saved = _wl_save(data["domains"])
-        return {"ok": True, "domains": saved}
-    return {"ok": False, "error": "invalid payload"}, 400
-
-
-# --- Theme injection (default to dark.css) ---
 @app.context_processor
 def inject_theme_path():
     try:
@@ -430,38 +324,100 @@ def inject_theme_path():
     return {"theme_path": theme}
 
 
-# --- UI Config for login (logo/background) ---
-import json, os
-UI_CFG_PATH = os.path.join("data","ui_config.json")
 
+import os, json
+UI_CFG_PATH = os.path.join("data","ui_config.json")
 def _ui_cfg_load():
-    try:
-        return json.load(open(UI_CFG_PATH,"r",encoding="utf-8"))
-    except Exception:
-        return {}
+    try: return json.load(open(UI_CFG_PATH,"r",encoding="utf-8"))
+    except Exception: return {}
+def _ui_cfg_save(cfg: dict):
+    os.makedirs(os.path.dirname(UI_CFG_PATH), exist_ok=True)
+    json.dump(cfg, open(UI_CFG_PATH,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
 
 @app.context_processor
 def inject_login_ui():
     cfg = _ui_cfg_load()
-    # default values
     logo = cfg.get("login_logo") or "/static/img/login-user.svg"
     bg   = cfg.get("login_bg") or "linear-gradient(120deg,#f093fb 0%,#f5576c 100%)"
     particles = bool(cfg.get("login_particles", True))
     return {"login_logo": logo, "login_bg": bg, "login_particles": particles}
 
-
 @app.get("/api/ui-config")
-@login_required
-def api_ui_cfg_get():
-    return _ui_cfg_load()
+def api_ui_cfg_get(): return _ui_cfg_load()
 
 @app.post("/api/ui-config")
-@login_required
 def api_ui_cfg_post():
     data = request.get_json(silent=True) or {}
     cfg = _ui_cfg_load()
     if "login_logo" in data: cfg["login_logo"] = str(data["login_logo"]).strip()
-    if "login_bg" in data: cfg["login_bg"] = str(data["login_bg"]).strip()
+    if "login_bg" in data:   cfg["login_bg"]   = str(data["login_bg"]).strip()
     if "login_particles" in data: cfg["login_particles"] = bool(data["login_particles"])
     _ui_cfg_save(cfg)
     return {"ok": True, **cfg}
+
+
+
+WL_PATH = os.path.join("data","whitelist_domains.json")
+def _wl_load():
+    try: return json.load(open(WL_PATH,"r",encoding="utf-8"))
+    except Exception: return []
+def _wl_save(domains):
+    os.makedirs(os.path.dirname(WL_PATH), exist_ok=True)
+    norm = sorted({(d or "").strip().lower() for d in (domains or []) if (d or "").strip()})
+    json.dump(norm, open(WL_PATH,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+    return norm
+
+@app.get("/api/whitelist")
+def api_whitelist_get(): return {"domains": _wl_load()}
+
+@app.post("/api/whitelist")
+def api_whitelist_post():
+    data = request.get_json(silent=True) or {}
+    if "text" in data and isinstance(data["text"], str):
+        items = [ln.strip() for ln in data["text"].splitlines()]
+        saved = _wl_save(items); return {"ok": True, "domains": saved}
+    if "domains" in data and isinstance(data["domains"], list):
+        saved = _wl_save(data["domains"]); return {"ok": True, "domains": saved}
+    return {"ok": False, "error": "invalid payload"}, 400
+
+
+
+PHISH_CONFIG_PATH = os.path.join("data", "phish_config.json")
+def _cfg_load():
+    try: return json.load(open(PHISH_CONFIG_PATH,"r",encoding="utf-8"))
+    except Exception: return {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}
+def _cfg_save(obj):
+    os.makedirs(os.path.dirname(PHISH_CONFIG_PATH), exist_ok=True)
+    json.dump(obj, open(PHISH_CONFIG_PATH,"w",encoding="utf-8"), ensure_ascii=False, indent=2)
+
+@app.get("/api/phish-config")
+def api_phish_cfg_get(): return _cfg_load()
+
+@app.post("/api/phish-config")
+def api_phish_cfg_post():
+    data = request.get_json(silent=True) or {}
+    cfg = _cfg_load()
+    if "autoban" in data: cfg["autoban"] = bool(data["autoban"])
+    if "threshold" in data:
+        try:
+            v = max(1, min(16, int(data["threshold"]))); cfg["threshold"] = v
+        except Exception: pass
+    if "log_thread_name" in data:
+        name = str(data["log_thread_name"]).strip() or "Ban Log"
+        cfg["log_thread_name"] = name
+    _cfg_save(cfg); return {"ok": True, **cfg}
+
+
+
+import time
+RECENT_BANS_PATH = os.path.join("data","recent_bans.json")
+def _recent_bans_load():
+    try: return json.load(open(RECENT_BANS_PATH,"r",encoding="utf-8"))
+    except Exception: return {"items":[]}
+
+@app.get("/api/recent-bans")
+def api_recent_bans():
+    data = _recent_bans_load()
+    items = sorted(data.get("items", []), key=lambda x: x.get("ts", 0), reverse=True)[:50]
+    return {"items": items, "ts": int(time.time())}
+
