@@ -1,3 +1,4 @@
+from satpambot.bot.modules.discord_bot.utils.whitelist_guard import should_skip_moderation
 from __future__ import annotations
 import os, io, json
 from pathlib import Path
@@ -56,8 +57,13 @@ class AntiImagePhishSignature(commands.Cog):
         _ensure_db()
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.attachments:
+    \1
+        try:
+            if await should_skip_moderation(message):
+                return
+        except Exception:
+            pass
+if message.author.bot or not message.attachments:
             return
         try:
             imgs = [a for a in message.attachments if (a.content_type or "").startswith("image/")]
