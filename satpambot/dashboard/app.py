@@ -20,7 +20,8 @@ app.jinja_env.globals['cache_bust'] = os.getenv('CACHE_BUST', '1')
 def ping(): return "pong", 200
 
 @app.get("/healthz")
-def healthz(): return "ok", 200
+def healthz():
+    return ("", 204)
 
 @app.route("/login", methods=["GET","POST"])
 def login():
@@ -245,3 +246,9 @@ def dev_login_as(username):
     session["display_name"] = username
     # arahkan ke dashboard (alias)
     return redirect(url_for("dashboard_alias"))
+
+
+# --- uptime endpoint (UptimeRobot) ---
+@app.get("/uptime")
+def uptime():
+    return "OK", 200, {"Content-Type": "text/plain; charset=utf-8"}
