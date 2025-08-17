@@ -56,8 +56,14 @@ body::before{
 }catch(e){}})();
 </script>
 
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
-<body><div class='container'><nav><a href='/dashboard'>Dashboard</a><a href='/servers'>Servers</a><a href='/settings'>Pengaturan</a><a href='/assets-manager'>Assets</a><div style='flex:1'></div><a href='/logout'>Logout</a></nav>
+<body><div class='container'><nav>
+  <div class="brand">
+    <img class="logo" src="{{ url_for('static', filename='img/logo.svg') }}" alt="SatpamBot">
+    <span class="title">SatpamBot</span>
+  </div>
+<a href='/dashboard'>Dashboard</a><a href='/servers'>Servers</a><a href='/settings'>Pengaturan</a><a href='/assets-manager'>Assets</a><div style='flex:1'></div><a href='/logout'>Logout</a></nav>
 {% block content %}{% endblock %}</div><!-- SB_THEME_GLOBAL_WIDGET -->
 <div id="sb-theme-widget" class="sb-translucent">
   <button class="mini muted" id="sb-mini">–</button>
