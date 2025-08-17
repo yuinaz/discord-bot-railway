@@ -23,4 +23,6 @@ taptap.cn
 bilibili.com
 bilibili.tv
 play.google.com
+facebook.com
+tiktok.com
 vxbilibili.com
