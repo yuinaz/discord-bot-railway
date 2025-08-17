@@ -1,0 +1,61 @@
+
+{% extends 'base.html' %}
+{% block title %}🧪 Phish Lab (Image Signatures){% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <a href="/dashboard" class="btn btn-outline-light">⬅️ Dashboard</a>
+    <h3>🧪 Phish Lab</h3>
+  </div>
+
+  <div class="card bg-dark text-light mb-3">
+    <div class="card-header">Drag & Drop Gambar Phishing</div>
+    <div class="card-body">
+      <div id="dropzone" class="border border-secondary rounded p-5 text-center" style="min-height:160px;">
+        Letakkan gambar di sini atau klik untuk memilih file.
+        <input id="fileInput" type="file" accept="image/*" multiple hidden>
+      </div>
+      <div id="result" class="mt-3 small text-muted"></div>
+      <script>
+        const dz = document.getElementById('dropzone');
+        const fi = document.getElementById('fileInput');
+        dz.addEventListener('click', () => fi.click());
+        dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('bg-secondary'); });
+        dz.addEventListener('dragleave', e => { dz.classList.remove('bg-secondary'); });
+        dz.addEventListener('drop', async e => {
+          e.preventDefault(); dz.classList.remove('bg-secondary');
+          const files = [...e.dataTransfer.files];
+          for (const f of files) await uploadOne(f);
+        });
+        fi.addEventListener('change', async e => {
+          const files = [...fi.files];
+          for (const f of files) await uploadOne(f);
+          fi.value = '';
+        });
+        async function uploadOne(file){
+          const fd = new FormData(); fd.append('file', file);
+          const r = await fetch('/api/phish-signature', { method:'POST', body: fd });
+          const j = await r.json();
+          const p = document.createElement('div');
+          if (j.ok) p.textContent = `✅ ${file.name} → pHash ${j.phash} (total: ${j.count})`;
+          else p.textContent = `❌ ${file.name} → ${j.error}`;
+          document.getElementById('result').prepend(p);
+        }
+      </script>
+    </div>
+  </div>
+
+  <div class="card bg-dark text-light">
+    <div class="card-header">Signature Terdaftar</div>
+    <div class="card-body">
+      {% if hashes %}
+        <ul class="mb-0">
+          {% for h in hashes %}<li><code>{{ h }}</code></li>{% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-muted">Belum ada signature. Unggah minimal satu gambar phishing di atas.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

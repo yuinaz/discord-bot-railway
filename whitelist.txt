@@ -26,3 +26,8 @@ play.google.com
 facebook.com
 tiktok.com
 vxbilibili.com
+facebook.com
+m.facebook.com
+fb.com
+tiktok.com
+vm.tiktok.com
