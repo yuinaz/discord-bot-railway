@@ -20,6 +20,8 @@ except Exception:
     SocketIO = None  # type: ignore
 
 from jinja2 import ChoiceLoader, FileSystemLoader, TemplateNotFound
+# quiet access log for /healthz and ensure route
+from satpambot.dashboard.healthz_quiet import silence_healthz_logs, ensure_healthz_route
 
 # =========================
 # Env loading (.env + .env.local)
@@ -71,6 +73,9 @@ def _import_dashboard_app():
 
 app, socketio = _import_dashboard_app()
 
+# silence werkzeug access logs for /healthz (/favicon.ico too)
+silence_healthz_logs()
+
 # Secret key (kompatibel nama env lama/baru)
 app.secret_key = os.getenv("FLASK_SECRET") or os.getenv("SECRET_KEY", "changeme")
 APP_START_TS = time.time()
@@ -121,6 +126,8 @@ if not _has_route("/login"):
 
 # =========================
 # Ops/health routes untuk UptimeRobot/Render
+# make sure /healthz exists (idempotent)
+ensure_healthz_route(app)
 # =========================
 if not _has_route("/healthz"):
     @app.get("/healthz")
