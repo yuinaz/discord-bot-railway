@@ -1,194 +1,114 @@
-# satpambot/dashboard/app.py
-from __future__ import annotations
-
 import os
-import json
 import time
-from pathlib import Path
-
-from dotenv import load_dotenv
-from flask import (
-    Flask, render_template, request, redirect, url_for, session,
-    send_from_directory, jsonify
-)
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
 from flask_socketio import SocketIO
+from dotenv import load_dotenv
+import psutil
 
-# --- init ------------------------------------------------------------
 load_dotenv()
 
-BASE_DIR = Path(__file__).parent
-app = Flask(
-    __name__,
-    static_folder=str(BASE_DIR / "static"),
-    static_url_path="/static",
-)
-# secret key untuk session (gunakan ENV jika ada)
-app.secret_key = os.getenv("FLASK_SECRET", "satpambot-secret")
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "changeme")
 
-# SocketIO (mode threading biar aman di Render tanpa eventlet/gevent)
-socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode="eventlet", cors_allowed_origins="*")
 
-# Fallback static route (kadang perlu di Render)
-@app.route("/static/<path:filename>")
-def _static(filename: str):
-    return send_from_directory(app.static_folder, filename)
+APP_START_TS = time.time()
 
-# Health check + root (biar Render tidak “Deploying” terus)
-@app.get("/healthz")
-def healthz():
-    return jsonify(ok=True, status="alive")
-
-@app.get("/")
-def root():
-    # boleh dialihkan ke login atau tampil OK sederhana
-    return "OK", 200
-    # return redirect(url_for("login"))  # kalau sudah ada view login()
-
-# --- helper admin creds ----------------------------------------------
-def _admin_creds():
-    user = os.getenv("ADMIN_USERNAME") or os.getenv("ADMIN_USER") or os.getenv("ADMIN") or "admin"
-    pwd  = os.getenv("ADMIN_PASSWORD") or os.getenv("ADMIN_PASS") or os.getenv("PASSWORD") or ""
-    return user, pwd
-
-# --- THEME context ---------------------------------------------------
-@app.context_processor
-def inject_theme_path():
-    theme = None
-    try:
-        theme = session.get("theme_css")
-    except Exception:
-        pass
-    if not theme:
-        theme = "/static/themes/dark.css"
-    return {"theme_path": theme}
-
-# --- LOGIN UI config (logo/bg/particles) -----------------------------
-UI_CFG_PATH = os.path.join("data", "ui_config.json")
-
-def _ui_cfg_load() -> dict:
-    try:
-        return json.load(open(UI_CFG_PATH, "r", encoding="utf-8"))
-    except Exception:
-        return {}
-
-def _ui_cfg_save(cfg: dict) -> None:
-    os.makedirs(os.path.dirname(UI_CFG_PATH), exist_ok=True)
-    json.dump(cfg, open(UI_CFG_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+def is_logged_in():
+    return session.get("logged_in") is True
 
 @app.context_processor
-def inject_login_ui():
-    cfg = _ui_cfg_load()
-    logo = cfg.get("login_logo") or "/static/img/login-user.svg"
-    bg   = cfg.get("login_bg") or "linear-gradient(120deg,#f093fb 0%,#f5576c 100%)"
-    particles = bool(cfg.get("login_particles", True))
-    return {"login_logo": logo, "login_bg": bg, "login_particles": particles}
+def inject_globals():
+    return {
+        "theme": os.getenv("THEME", "dark"),
+        "dash_bg": os.getenv("DASH_BG_IMAGE", "/static/img/bg-login.jpg"),
+        "cache_bust": int(APP_START_TS)
+    }
 
-@app.get("/api/ui-config")
-def api_ui_cfg_get():
-    return _ui_cfg_load()
+@app.route("/")
+def home():
+    if not is_logged_in():
+        return redirect(url_for("login"))
+    return redirect(url_for("dashboard"))
 
-@app.post("/api/ui-config")
-def api_ui_cfg_post():
-    data = request.get_json(silent=True) or {}
-    cfg = _ui_cfg_load()
-    if "login_logo" in data: cfg["login_logo"] = str(data["login_logo"]).strip()
-    if "login_bg" in data:   cfg["login_bg"]   = str(data["login_bg"]).strip()
-    if "login_particles" in data: cfg["login_particles"] = bool(data["login_particles"])
-    _ui_cfg_save(cfg)
-    return {"ok": True, **cfg}
-
-# --- WHITELIST API ---------------------------------------------------
-WL_PATH = os.path.join("data", "whitelist_domains.json")
-
-def _wl_load() -> list[str]:
-    try:
-        return json.load(open(WL_PATH, "r", encoding="utf-8"))
-    except Exception:
-        return []
-
-def _wl_save(domains: list[str]) -> list[str]:
-    os.makedirs(os.path.dirname(WL_PATH), exist_ok=True)
-    norm = sorted({(d or "").strip().lower() for d in (domains or []) if (d or "").strip()})
-    json.dump(norm, open(WL_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-    return norm
-
-@app.get("/api/whitelist")
-def api_whitelist_get():
-    return {"domains": _wl_load()}
-
-@app.post("/api/whitelist")
-def api_whitelist_post():
-    data = request.get_json(silent=True) or {}
-    if "text" in data and isinstance(data["text"], str):
-        items = [ln.strip() for ln in data["text"].splitlines()]
-        return {"ok": True, "domains": _wl_save(items)}
-    if "domains" in data and isinstance(data["domains"], list):
-        return {"ok": True, "domains": _wl_save(data["domains"])}
-    return {"ok": False, "error": "invalid payload"}, 400
-
-# --- PHISH CONFIG API -----------------------------------------------
-PHISH_CONFIG_PATH = os.path.join("data", "phish_config.json")
-
-def _cfg_load() -> dict:
-    try:
-        return json.load(open(PHISH_CONFIG_PATH, "r", encoding="utf-8"))
-    except Exception:
-        return {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}
-
-def _cfg_save(cfg: dict) -> None:
-    os.makedirs(os.path.dirname(PHISH_CONFIG_PATH), exist_ok=True
-    )
-    json.dump(cfg, open(PHISH_CONFIG_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-
-@app.get("/api/phish-config")
-def api_phish_cfg_get():
-    return _cfg_load()
-
-@app.post("/api/phish-config")
-def api_phish_cfg_post():
-    data = request.get_json(silent=True) or {}
-    cfg = _cfg_load()
-    if "autoban" in data: cfg["autoban"] = bool(data["autoban"])
-    if "threshold" in data:
-        try:
-            v = max(1, min(16, int(data["threshold"])))
-            cfg["threshold"] = v
-        except Exception:
-            pass
-    if "log_thread_name" in data:
-        name = str(data["log_thread_name"]).strip() or "Ban Log"
-        cfg["log_thread_name"] = name
-    _cfg_save(cfg)
-    return {"ok": True, **cfg}
-
-# --- RECENT BANS (untuk floating widget) -----------------------------
-RECENT_BANS_PATH = os.path.join("data", "recent_bans.json")
-
-def _recent_bans_load() -> dict:
-    try:
-        return json.load(open(RECENT_BANS_PATH, "r", encoding="utf-8"))
-    except Exception:
-        return {"items": []}
-
-@app.get("/api/recent-bans")
-def api_recent_bans():
-    data = _recent_bans_load()
-    items = sorted(data.get("items", []), key=lambda x: x.get("ts", 0), reverse=True)[:50]
-    return {"items": items, "ts": int(time.time())}
-
-# --------------------------------------------------------------------
-# Tambahkan route login-mu di bawah ini (jika belum ada). Contoh minimal:
-@app.get("/login")
-def login_page():
-    # render template login.html (sudah ada di templates)
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        expected_user = os.getenv("ADMIN_USERNAME", "admin")
+        expected_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+        uname = request.form.get("username", "")
+        pwd = request.form.get("password", "")
+        if uname == expected_user and pwd == expected_pass:
+            session["logged_in"] = True
+            session["username"] = uname
+            return redirect(url_for("dashboard"))
+        else:
+            return render_template("login.html", error="Username / password salah.")
     return render_template("login.html")
 
-@app.post("/login")
-def login_post():
-    u = request.form.get("username", "")
-    p = request.form.get("password", "")
-    admin_u, admin_p = _admin_creds()
-    if u == admin_u and p == admin_p:
-        session["auth"] = True
-        return redirect(url_for("root"))
-    return "Invalid credentials", 401
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+@app.route("/dashboard")
+def dashboard():
+    if not is_logged_in():
+        return redirect(url_for("login"))
+    return render_template("dashboard.html")
+
+@app.route("/metrics")
+def metrics():
+    cpu = psutil.cpu_percent(interval=0.05)
+    mem = psutil.virtual_memory()
+    return jsonify({
+        "cpu": cpu,
+        "ram_mb": int(mem.used/1024/1024),
+        "ram_total_mb": int(mem.total/1024/1024)
+    })
+
+@app.route("/uptime")
+def uptime():
+    seconds = int(time.time() - APP_START_TS)
+    return jsonify({
+        "uptime_seconds": seconds,
+        "started_at": datetime.utcfromtimestamp(APP_START_TS).isoformat() + "Z"
+    })
+
+@app.route("/api/servers")
+def api_servers():
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify([
+        {"name": "Gateway-01", "status": "online", "ping_ms": 12},
+        {"name": "Bot-Core", "status": "online", "ping_ms": 28},
+        {"name": "DB-Node", "status": "degraded", "ping_ms": 140}
+    ])
+
+DISCORD_ENABLED = os.getenv("DISCORD_ENABLED", "true").lower() == "true"
+if DISCORD_ENABLED:
+    try:
+        from modules.discord_bot import run_bot, set_flask_app
+        set_flask_app(app)
+    except Exception as e:
+        print(f"[WARN] Discord module not loaded: {e}")
+
+@socketio.on("connect")
+def on_connect():
+    pass
+
+@app.route("/start-bot")
+def start_bot_route():
+    if DISCORD_ENABLED:
+        from modules.discord_bot import run_bot, bot_running
+        if not bot_running():
+            run_bot(background=True)
+            return "Bot starting", 200
+        else:
+            return "Bot already running", 200
+    return "Discord disabled", 200
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template("404.html"), 404
