@@ -1,178 +1,170 @@
+# main.py — Entrypoint stabil untuk lokal & Render
+# - Load .env / .env.prod / .env.local (prioritas .env.local)
+# - Start Flask (atau SocketIO) tanpa reloader (Ctrl+C aman)
+# - Start bot di background jika token ada (tanpa event loop ganda)
+
 import os
 import logging
-import asyncio
 import threading
+import signal
+import sys
+import inspect
+import asyncio
+from pathlib import Path
 
 # =========================
-# Env loading (.env + .env.local override)
+# Env loading berlapis
 # =========================
 try:
     from dotenv import load_dotenv
-    load_dotenv()
-    load_dotenv(".env.local", override=True)
-except Exception:
-    pass  # kalau python-dotenv tidak ada, lanjut
+    ROOT = Path(__file__).resolve().parent
 
-# =========================
-# Auto-enable RUN_BOT jika ada token (normalize ke DISCORD_TOKEN)
-# =========================
+    f = ROOT / ".env"
+    if f.exists():
+        load_dotenv(f, override=False)
+
+    if (os.getenv("ENV") or os.getenv("APP_ENV") or os.getenv("FLASK_ENV") or "").lower().startswith("prod"):
+        pf = ROOT / ".env.prod"
+        if pf.exists():
+            load_dotenv(pf, override=True)
+
+    lf = ROOT / ".env.local"
+    if lf.exists():
+        load_dotenv(lf, override=True)
+except Exception:
+    pass
+
+# Normalisasi token + RUN_BOT
 try:
     token = None
     for key in ("DISCORD_TOKEN", "DISCORD_BOT_TOKEN", "BOT_TOKEN", "TOKEN", "TOKEN_BOT"):
-        val = os.getenv(key)
-        if val and val.strip():
-            token = val.strip()
-            os.environ["DISCORD_TOKEN"] = token  # normalisasi nama
+        v = os.getenv(key)
+        if v and v.strip():
+            token = v.strip()
+            os.environ["DISCORD_TOKEN"] = token  # normalisasi
             break
-    rb = (os.getenv("RUN_BOT", "auto").strip().lower())
-    if (token and rb in ("auto", "", "0", "false", "off")) or rb in ("1", "true", "yes", "on", "only"):
+    rb = (os.getenv("RUN_BOT") or "").strip().lower()
+    if token and rb in ("", "0", "false", "off"):
         os.environ["RUN_BOT"] = "1"
 except Exception:
     pass
 
 # =========================
-# Logging setup
+# Logging
 # =========================
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO),
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-log = logging.getLogger()
+log = logging.getLogger("entry")
 
 # =========================
-# Silence akses log untuk path ringan (tanpa matikan log lain)
+# Import Flask app (dengan socketio jika ada)
 # =========================
+from app import app as app  # type: ignore
 try:
-    from werkzeug.serving import WSGIRequestHandler
+    from app import socketio as socketio  # type: ignore
+except Exception:
+    socketio = None
 
-    SILENCE_PATHS = {"/api/live", "/ping", "/healthz", "/uptime"}
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", os.getenv("RENDER_PORT", "8080")))
+RUN_BOT = os.getenv("RUN_BOT", "0")
 
-    class _SilencePaths(logging.Filter):
-        def filter(self, record: logging.LogRecord) -> bool:
+log.info("ENTRY main.py start | RUN_BOT='%s' | PORT=%s", RUN_BOT, PORT)
+log.info("✅ Dashboard app loaded: app")
+
+# =========================
+# Signal handler -> Ctrl+C aman
+# =========================
+def _sigint(signum, frame):
+    print("\n^C received, shutting down...", flush=True)
+    try:
+        if socketio:
             try:
-                msg = record.getMessage()
-            except Exception:
-                return True
-            return not any(p in msg for p in SILENCE_PATHS)
-
-    for name in ("werkzeug", "werkzeug.serving"):
-        lg = logging.getLogger(name)
-        lg.addFilter(_SilencePaths())
-        for h in list(getattr(lg, "handlers", []) or []):
-            try:
-                h.addFilter(_SilencePaths())
+                socketio.stop()
             except Exception:
                 pass
+    finally:
+        os._exit(0)
 
-    _orig_log_request = WSGIRequestHandler.log_request
-
-    def _log_request_sans_paths(self, code="-", size="-"):
-        line = getattr(self, "requestline", "") or ""
-        if any(p in line for p in SILENCE_PATHS):
-            return
-        return _orig_log_request(self, code, size)
-
-    WSGIRequestHandler.log_request = _log_request_sans_paths
+try:
+    signal.signal(signal.SIGINT, _sigint)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, _sigint)
 except Exception:
     pass
 
 # =========================
-# Konfigurasi dasar
+# Bot background starter (tanpa event loop ganda)
 # =========================
-RUN_BOT = os.getenv("RUN_BOT", "0")
-HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", os.getenv("RENDER_PORT", "8080")))
-
-# =========================
-# Import Flask app (utama: satpambot.dashboard.app; fallback: app)
-# =========================
-app = None
-socketio = None
-loaded_from = None
-
-try:
-    from satpambot.dashboard.app import app as _app  # type: ignore
-    app = _app
-    loaded_from = "satpambot.dashboard.app"
+def _import_start_run():
+    start_bot = run_bot = None
     try:
-        from satpambot.dashboard.app import socketio as _socketio  # type: ignore
-        socketio = _socketio
+        from satpambot.bot.modules.discord_bot.discord_bot import start_bot as _s  # type: ignore
+        start_bot = _s
     except Exception:
-        socketio = None
-except Exception:
+        pass
     try:
-        from app import app as _app  # type: ignore
-        app = _app
-        loaded_from = "app"
+        from satpambot.bot.modules.discord_bot.discord_bot import run_bot as _r  # type: ignore
+        run_bot = _r
+    except Exception:
+        pass
+    if start_bot is None:
         try:
-            from app import socketio as _socketio  # type: ignore
-            socketio = _socketio
+            from modules.discord_bot.discord_bot import start_bot as _s2  # type: ignore
+            start_bot = _s2
         except Exception:
-            socketio = None
-    except Exception as e:
-        log.exception("Gagal import dashboard app: %s", e)
-        raise SystemExit(2)
+            pass
+    if run_bot is None:
+        try:
+            from modules.discord_bot.discord_bot import run_bot as _r2  # type: ignore
+            run_bot = _r2
+        except Exception:
+            pass
+    return start_bot, run_bot
 
-# =========================
-# Log startup baseline
-# =========================
-log.info("ENTRY main.py start | RUN_BOT='%s' | PORT=%s", RUN_BOT, PORT)
-log.info("✅ Dashboard app loaded: %s", loaded_from)
-
-# =========================
-# Bot runner di background thread (jika aktif)
-# =========================
 def _start_bot_bg():
     tkn = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
     if not tkn:
         log.info("🧪 RUN_BOT=0 atau token tidak tersedia → bot dimatikan.")
         return
-
-    # cari runner
-    start = None
+    start_bot, run_bot = _import_start_run()
     try:
-        from satpambot.bot.modules.discord_bot.discord_bot import start_bot as start  # type: ignore
-    except Exception:
-        try:
-            from satpambot.bot.modules.discord_bot.shim_runner import start_bot as start  # type: ignore
-        except Exception:
-            start = None
-
-    if not start:
+        if start_bot and inspect.iscoroutinefunction(start_bot):
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(start_bot())
+            finally:
+                loop.close()
+            return
+        if run_bot:
+            try:
+                run_bot()
+            except TypeError:
+                try:
+                    run_bot(background=True)
+                except Exception:
+                    run_bot()
+            return
         log.info("🧪 Runner bot tidak ditemukan → bot dimatikan.")
-        return
-
-    async def _run():
-        try:
-            await start()
-        except Exception as e:
-            log.exception("Bot crash: %s", e)
-            await asyncio.sleep(5)
-
-    try:
-        asyncio.run(_run())
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(_run())
+    except Exception as e:
+        log.exception("Bot crash: %s", e)
 
 # =========================
 # Main
 # =========================
 if __name__ == "__main__":
     if RUN_BOT.lower() in ("1", "true", "yes", "on", "only"):
-        th = threading.Thread(target=_start_bot_bg, name="DiscordBotThread", daemon=True)
-        th.start()
+        threading.Thread(target=_start_bot_bg, name="DiscordBotThread", daemon=True).start()
+        log.info("🤖 Bot supervisor started in background")
     else:
         log.info("🧪 RUN_BOT=0 atau token tidak tersedia → bot dimatikan.")
 
     log.info("🌐 Starting Flask on %s:%s", HOST, PORT)
 
-    if app is None:
-        raise SystemExit("Flask app not found")
-
+    # Jalankan tanpa reloader (Ctrl+C aman). Jika ada socketio, pakai itu.
     if socketio:
-        # Render pakai Werkzeug; allow_unsafe supaya tidak error di prod dev-server
-        socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True)
+        socketio.run(app, host=HOST, port=PORT, allow_unsafe_werkzeug=True, debug=False, use_reloader=False)
     else:
-        app.run(host=HOST, port=PORT)
+        app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
