@@ -1,36 +1,24 @@
 from __future__ import annotations
-import os, datetime
-import pytz
-import discord
 from discord.ext import commands, tasks
-
-TZ = os.getenv("STICKY_CLOCK_TZ","Asia/Jakarta")
-
+try:
+    from satpambot.bot.modules.discord_bot.helpers import log_utils
+except Exception:
+    import importlib; log_utils = importlib.import_module("satpambot.bot.modules.discord_bot.helpers.log_utils")
 class PresenceClockSticky(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
-        self._last_min = None
-        self.loop.start()
-
-    @tasks.loop(seconds=30)
-    async def loop(self):
-        try:
-            tz = pytz.timezone(TZ)
-            now = datetime.datetime.now(tz)
-            m = now.minute
-            if m == self._last_min:
-                return
-            self._last_min = m
-            text = f"Online • {now:%H:%M}"
-            await self.bot.change_presence(
-                status=discord.Status.online,
-                activity=discord.Activity(type=discord.ActivityType.watching, name=text)
-            )
-        except Exception:
-            pass
-
-    @loop.before_loop
-    async def _wait(self):
-        await self.bot.wait_until_ready()
-
+        try: self._heartbeat.start()
+        except Exception: pass
+    @commands.Cog.listener()
+    async def on_ready(self):
+        for g in getattr(self.bot, "guilds", []):
+            await log_utils.upsert_status_embed(self.bot, g)
+    @tasks.loop(minutes=5)
+    async def _heartbeat(self):
+        for g in getattr(self.bot, "guilds", []):
+            await log_utils.upsert_status_embed(self.bot, g)
+    @_heartbeat.before_loop
+    async def _before(self):
+        if hasattr(self.bot, "wait_until_ready"):
+            await self.bot.wait_until_ready()
 async def setup(bot): await bot.add_cog(PresenceClockSticky(bot))
