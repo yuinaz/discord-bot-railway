@@ -19,6 +19,17 @@ app = Flask(
 )
 app.secret_key = os.getenv("FLASK_SECRET", "satpambot-secret")
 socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+# Extend Jinja loader to include other template roots (root /templates & editor/templates)
+from jinja2 import ChoiceLoader, FileSystemLoader
+try:
+    extra_loaders = [
+        FileSystemLoader(str((Path(__file__).resolve().parents[2] / "bot" / "modules" / "editor" / "templates"))),
+        FileSystemLoader(str(Path().resolve() / "templates")),
+    ]
+    app.jinja_loader = ChoiceLoader([app.jinja_loader, *extra_loaders])
+except Exception:
+    pass
+
 
 @app.route("/static/<path:filename>")
 def _static(filename):
@@ -30,7 +41,13 @@ def healthz():
 
 @app.get("/")
 def root():
-    return "OK", 200
+    # Dashboard home: jika belum login → ke /login, kalau sudah → render dashboard.html
+    try:
+        if not session.get("auth"):
+            return redirect(url_for("login_page"))
+    except Exception:
+        pass
+    return render_template("dashboard.html")
 
 def _admin_creds():
     user = os.getenv("ADMIN_USERNAME") or os.getenv("ADMIN_USER") or os.getenv("ADMIN") or "admin"
