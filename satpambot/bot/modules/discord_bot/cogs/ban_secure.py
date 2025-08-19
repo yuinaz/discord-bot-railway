@@ -96,28 +96,32 @@ class BanSecure(commands.Cog):
         except Exception as e:
             log.warning("Gagal tulis banlog: %s", e)
 
-    @commands.command(name="tb", aliases=["testban"])
-    @require_mod()
-    @commands.guild_only()
-    async def testban(self, ctx: commands.Context, member: Optional[discord.Member]=None, *, reason: str=""):
-        # target: mention / reply / last human message
-        target = await _resolve_target(ctx, member)
-        if not isinstance(target, discord.Member):
-            return await ctx.reply("Tidak ada target untuk simulasi. Coba **reply** pesan target atau **mention**.\nFormat: `!tb @user [alasan]`", mention_author=False)
+        @commands.command(name="tb", aliases=["testban"])
+        @require_mod()
+        @commands.guild_only()
+        async def testban(self, ctx: commands.Context, member: Optional[discord.Member]=None, *, reason: str=""):
+            # Guard duplicate trigger
+            if not self._guard(ctx.message.id):
+                return
+            # Resolve target but DO NOT enforce hierarchy/permissions (simulation must always work)
+            target = await _resolve_target(ctx, member)
+            if not isinstance(target, discord.Member):
+                # best-effort fallback to author (should rarely happen in guild)
+                target = ctx.author if isinstance(ctx.author, discord.Member) else None
 
-        me = ctx.guild.me
-        ok, why = _can_act(me, target)
-        if not ok:
-            em = _embed_sim_fail(getattr(target, "mention", str(target)), why, ctx.author)
+            try:
+                em = _embed_sim_ok(target, ctx.author)
+            except Exception:
+                # As last resort, build a minimal embed without member-specific fields
+                em = discord.Embed(
+                    title="💀 Simulasi Ban oleh SatpamBot",
+                    description=f"{getattr(target,'mention', 'Seorang pengguna')} terdeteksi mengirim pesan mencurigakan.\n(Pesan ini hanya simulasi untuk pengujian.)",
+                    color=0x2F3136,
+                )
+                em.set_footer(text="Simulasi testban")
+
             await ctx.reply(embed=em, mention_author=False)
-            await self._log(ctx.guild, em)
-            return
-
-        em = _embed_sim_ok(target, ctx.author)
-        await ctx.reply(embed=em, mention_author=False)
-        await self._log(ctx.guild, em)
-
-    @commands.command(name="ban")
+            await self._log(ctx.guild, em)@commands.command(name="ban")
     @require_mod()
     @commands.guild_only()
     @commands.has_guild_permissions(ban_members=True)
