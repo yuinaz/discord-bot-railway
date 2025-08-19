@@ -8,15 +8,23 @@ except Exception:
 log = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
 intents.guilds = True
+intents.members = True  # required for some moderation checks
+intents.message_content = True  # ensure enabled in Discord Dev Portal
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+PREFIX = os.getenv("COMMAND_PREFIX", "!")
+allowed_mentions = discord.AllowedMentions(everyone=False, users=True, roles=False, replied_user=False)
+
+bot = commands.Bot(command_prefix=PREFIX, intents=intents, allowed_mentions=allowed_mentions)
 
 @bot.event
 async def on_ready():
-    log.info("✅ Bot login as %s (%s)", bot.user, bot.user.id if bot.user else "?")
+    import time
+    if not getattr(bot, 'start_time', None): bot.start_time = time.time()
+    try:
+        log.info("✅ Bot login as %s (%s)", bot.user, bot.user.id if bot.user else "?")
+    except Exception:
+        log.info("✅ Bot login.")
 
 @bot.event
 async def setup_hook():

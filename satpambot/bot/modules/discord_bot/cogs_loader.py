@@ -3,7 +3,7 @@ import logging, pkgutil, importlib, os
 logger = logging.getLogger(__name__)
 
 DEFAULT_SKIP = {'commands_probe'}
-DISABLED_COGS = set((os.getenv('DISABLED_COGS') or 'image_poster').split(','))
+DISABLED_COGS = set((os.getenv('DISABLED_COGS') or 'image_poster,ban_commands,ban_overrides,testban_hybrid').split(','))
 
 def _iter_cogs_package(package_name: str):
     try:

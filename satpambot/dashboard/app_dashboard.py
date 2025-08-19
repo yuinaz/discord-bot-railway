@@ -9,7 +9,7 @@ load_dotenv()
 
 MOD_DIR = Path(__file__).resolve().parent
 DASH_DIR = MOD_DIR
-DATA_DIR = Path("data")
+DATA_DIR = Path("data"); DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(
     __name__,
