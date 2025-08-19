@@ -1,7 +1,6 @@
 import logging, discord
 from discord.ext import commands
 log = logging.getLogger("friendly_errors")
-
 async def _infer_member(ctx: commands.Context):
     if ctx.message.mentions:
         m = ctx.message.mentions[0]
@@ -16,10 +15,8 @@ async def _infer_member(ctx: commands.Context):
             except Exception: pass
     except Exception: pass
     return None
-
 class FriendlyErrors(commands.Cog):
     def __init__(self, bot): self.bot = bot
-
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: Exception):
         if hasattr(ctx.command, 'on_error'): return
@@ -40,5 +37,4 @@ class FriendlyErrors(commands.Cog):
         log.exception("Command error: %s", error)
         try: await ctx.reply("⚠️ Error tak terduga. Sudah dicatat di log.", delete_after=10)
         except Exception: pass
-
 async def setup(bot): await bot.add_cog(FriendlyErrors(bot))
