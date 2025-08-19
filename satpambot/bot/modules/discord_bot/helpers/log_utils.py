@@ -1,4 +1,20 @@
 from __future__ import annotations
+# --- Timezone helpers (WIB) ---
+try:
+    from zoneinfo import ZoneInfo
+except Exception:  # Py<3.9 fallback
+    from backports.zoneinfo import ZoneInfo  # type: ignore
+ASIA_JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
+def _fmt_wib(ts=None):
+    import datetime as _dt
+    if ts is None:
+        ts = _dt.datetime.now(ASIA_JAKARTA_TZ)
+    elif isinstance(ts, (int, float)):
+        ts = _dt.datetime.fromtimestamp(ts, ASIA_JAKARTA_TZ)
+    elif isinstance(ts, _dt.datetime) and ts.tzinfo is None:
+        ts = ts.replace(tzinfo=ASIA_JAKARTA_TZ)
+    return ts.strftime("%d %b %Y %H:%M WIB")
+
 import asyncio, logging, os, time, hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
