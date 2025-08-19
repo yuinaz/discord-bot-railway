@@ -1,5 +1,5 @@
 from __future__ import annotations
-import logging, asyncio
+import logging
 from typing import Optional
 import discord
 from discord.ext import commands
@@ -11,9 +11,67 @@ GREEN = 0x3BA55D
 RED   = 0xED4245
 YEL   = 0xFEE75C
 
-def _embed(title: str, desc: str, ok: bool|None=None) -> discord.Embed:
-    color = GREEN if ok is True else RED if ok is False else YEL
-    return discord.Embed(title=title, description=desc, color=color)
+async def _resolve_target(ctx: commands.Context, member: Optional[discord.Member]) -> Optional[discord.Member]:
+    # direct arg
+    if isinstance(member, discord.Member):
+        return member
+    # mentions
+    if ctx.message.mentions:
+        for m in ctx.message.mentions:
+            if isinstance(m, discord.Member) and not m.bot:
+                return m
+    # reply reference
+    ref = getattr(ctx.message, "reference", None)
+    if ref:
+        try:
+            msg = None
+            if getattr(ref, "resolved", None) and isinstance(ref.resolved, discord.Message):
+                msg = ref.resolved
+            elif getattr(ref, "message_id", None):
+                msg = await ctx.channel.fetch_message(ref.message_id)
+            if msg and isinstance(msg.author, discord.Member) and not msg.author.bot:
+                return msg.author
+        except Exception:
+            pass
+    # last human message
+    try:
+        async for m in ctx.channel.history(limit=20):
+            if m.id == ctx.message.id:
+                continue
+            a = m.author
+            if isinstance(a, discord.Member) and not a.bot:
+                return a
+    except Exception:
+        pass
+    return None
+
+def _embed_sim_ok(target: discord.Member, moderator: discord.Member) -> discord.Embed:
+    # Harus PERSIS seperti contoh pengguna
+    title = "💀 Simulasi Ban oleh SatpamBot"
+    desc  = f"{target.mention} terdeteksi mengirim pesan mencurigakan.\n\n(Pesan ini hanya simulasi untuk pengujian.)"
+    e = discord.Embed(title=title, description=desc, color=YEL)
+    # Garis kecil "Simulasi testban" sesuai contoh
+    e.add_field(name="🏷️ Simulasi testban", value="\u200b", inline=False)
+    e.set_footer(text=f"Moderator: {moderator}")
+    return e
+
+def _embed_sim_fail(target_text: str, why: str, moderator: discord.Member) -> discord.Embed:
+    e = discord.Embed(
+        title="❌ Simulasi Ban Gagal",
+        description=f"{target_text} tidak dapat disimulasikan untuk diban.\n\nDetail: {why}",
+        color=RED
+    )
+    e.set_footer(text=f"Moderator: {moderator}")
+    return e
+
+def _embed_banned(target: discord.Member, moderator: discord.Member) -> discord.Embed:
+    e = discord.Embed(
+        title="⛔ BANNED",
+        description=f"{target.mention} telah diban.",
+        color=GREEN
+    )
+    e.set_footer(text=f"Moderator: {moderator}")
+    return e
 
 def _can_act(me: discord.Member, target: discord.Member) -> tuple[bool, str]:
     if target.id == me.id:
@@ -42,45 +100,55 @@ class BanSecure(commands.Cog):
     @require_mod()
     @commands.guild_only()
     async def testban(self, ctx: commands.Context, member: Optional[discord.Member]=None, *, reason: str=""):
-        """Simulasi ban: cek apakah BOT **bisa** memban target (tanpa eksekusi)."""
-        if not isinstance(member, discord.Member):
-            return await ctx.reply("Format: `!tb @user [alasan]`", mention_author=False)
+        # target: mention / reply / last human message
+        target = await _resolve_target(ctx, member)
+        if not isinstance(target, discord.Member):
+            return await ctx.reply("Tidak ada target untuk simulasi. Coba **reply** pesan target atau **mention**.\nFormat: `!tb @user [alasan]`", mention_author=False)
+
         me = ctx.guild.me
-        ok, why = _can_act(me, member)
+        ok, why = _can_act(me, target)
         if not ok:
-            await ctx.reply(f"❌ Tidak bisa ban **{member}**: {why}", mention_author=False)
-            await self._log(ctx.guild, _embed("TEST BAN GAGAL", f"Mod: {ctx.author.mention}\nTarget: {member.mention}\nAlasan: {reason or '-'}\nDetail: {why}", ok=False))
+            em = _embed_sim_fail(getattr(target, "mention", str(target)), why, ctx.author)
+            await ctx.reply(embed=em, mention_author=False)
+            await self._log(ctx.guild, em)
             return
-        await ctx.reply(f"🧪 OK. Bot **DAPAT** memban **{member}** (simulasi).", mention_author=False)
-        await self._log(ctx.guild, _embed("TEST BAN OK", f"Mod: {ctx.author.mention}\nTarget: {member.mention}\nAlasan: {reason or '-'}", ok=True))
+
+        em = _embed_sim_ok(target, ctx.author)
+        await ctx.reply(embed=em, mention_author=False)
+        await self._log(ctx.guild, em)
 
     @commands.command(name="ban")
     @require_mod()
     @commands.guild_only()
     @commands.has_guild_permissions(ban_members=True)
     async def ban(self, ctx: commands.Context, member: Optional[discord.Member]=None, *, reason: str=""):
-        """Ban member dan catat ke banlog thread."""
-        if not isinstance(member, discord.Member):
-            return await ctx.reply("Format: `!ban @user [alasan]`", mention_author=False)
+        target = await _resolve_target(ctx, member)
+        if not isinstance(target, discord.Member):
+            return await ctx.reply("Tidak ada target. Format: `!ban @user [alasan]` atau **reply** pesan target lalu ketik `!ban`", mention_author=False)
+
         me = ctx.guild.me
-        ok, why = _can_act(me, member)
+        ok, why = _can_act(me, target)
         if not ok:
-            await ctx.reply(f"❌ Tidak bisa ban **{member}**: {why}", mention_author=False)
-            await self._log(ctx.guild, _embed("BAN GAGAL", f"Mod: {ctx.author.mention}\nTarget: {member.mention}\nAlasan: {reason or '-'}\nDetail: {why}", ok=False))
+            em = _embed_sim_fail(getattr(target, "mention", str(target)), why, ctx.author)
+            await ctx.reply(embed=em, mention_author=False)
+            await self._log(ctx.guild, em)
             return
         try:
-            await member.ban(reason=reason or f"Moderator: {ctx.author}")
-            await ctx.reply(f"✅ Dibanned: **{member}**", mention_author=False)
-            await self._log(ctx.guild, _embed("BANNED", f"Mod: {ctx.author.mention}\nTarget: {member.mention}\nAlasan: {reason or '-'}", ok=True))
+            await target.ban(reason=reason or f"Moderator: {ctx.author}")
+            em = _embed_banned(target, ctx.author)
+            await ctx.reply(embed=em, mention_author=False)
+            await self._log(ctx.guild, em)
         except discord.Forbidden:
-            await ctx.reply("❌ Gagal ban: Forbidden (izin bot kurang).", mention_author=False)
-            await self._log(ctx.guild, _embed("BAN GAGAL", f"Mod: {ctx.author.mention}\nTarget: {member.mention}\nDetail: Forbidden", ok=False))
+            em = _embed_sim_fail(target.mention, "Forbidden: izin bot kurang.", ctx.author)
+            await ctx.reply(embed=em, mention_author=False)
+            await self._log(ctx.guild, em)
         except discord.HTTPException as e:
-            await ctx.reply(f"❌ Gagal ban: {e}", mention_author=False)
-            await self._log(ctx.guild, _embed("BAN GAGAL", f"Mod: {ctx.author.mention}\nTarget: {member.mention}\nDetail: {e}", ok=False))
+            em = _embed_sim_fail(target.mention, f"HTTP: {e}", ctx.author)
+            await ctx.reply(embed=em, mention_author=False)
+            await self._log(ctx.guild, em)
 
 async def setup(bot: commands.Bot):
-    # if old commands exist, remove them to avoid conflicts
+    # Remove command lama yang mungkin nabrak
     for name in ("ban","tb","testban"):
         try:
             cmd = bot.get_command(name)
