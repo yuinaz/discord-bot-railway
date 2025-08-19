@@ -15,25 +15,31 @@ def _to_int(val: str) -> int:
 # -------------- Resolution helpers --------------
 def _resolve_thread_host_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
     """Return the channel where the Ban Log THREAD must live.
-    Always prefer #log-botphising (LOG_CHANNEL_ID/LOG_CHANNEL_NAME).
+    STRICT: Only #log-botphising via LOG_CHANNEL_ID or LOG_CHANNEL_NAME ('log-botphising').
     """
-    # ID wins
+    # 1) Explicit ID
     log_id = _to_int(os.getenv("LOG_CHANNEL_ID", ""))
     if log_id:
         ch = guild.get_channel(log_id)
         if isinstance(ch, discord.TextChannel):
+            log.info("[banlog] host=ID  #%s (%s)", getattr(ch, "name","?"), getattr(ch,"id","?"))
             return ch
-    # Name (explicit)
-    for key in ("LOG_CHANNEL_NAME", ):
-        nm = (os.getenv(key, "") or "").strip()
-        if nm:
-            cand = discord.utils.get(guild.text_channels, name=nm)
-            if isinstance(cand, discord.TextChannel):
-                return cand
-    # Hard default
+
+    # 2) Explicit NAME
+    name = (os.getenv("LOG_CHANNEL_NAME","") or "").strip()
+    if name:
+        cand = discord.utils.get(guild.text_channels, name=name)
+        if isinstance(cand, discord.TextChannel):
+            log.info("[banlog] host=NAME #%s (%s)", getattr(cand, "name","?"), getattr(cand,"id","?"))
+            return cand
+
+    # 3) Hard default: exact 'log-botphising' only
     cand = discord.utils.get(guild.text_channels, name="log-botphising")
     if isinstance(cand, discord.TextChannel):
+        log.info("[banlog] host=DEFAULT #%s (%s)", getattr(cand, "name","?"), getattr(cand,"id","?"))
         return cand
+
+    log.warning("[banlog] host channel for thread NOT FOUND (expected #log-botphising).")
     return None
 
 def _resolve_announce_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
@@ -51,7 +57,7 @@ def _resolve_announce_channel(guild: discord.Guild) -> Optional[discord.TextChan
         cand = discord.utils.get(guild.text_channels, name=nm)
         if isinstance(cand, discord.TextChannel):
             return cand
-    # Default common name
+    # default
     for name_try in ("💬︲ngobrol", "ngobrol", "general"):
         cand = discord.utils.get(guild.text_channels, name=name_try)
         if isinstance(cand, discord.TextChannel):
@@ -63,12 +69,10 @@ async def get_banlog_thread(guild: discord.Guild) -> Optional[discord.Thread]:
     """Get or create the 'Ban Log' thread UNDER #log-botphising ONLY."""
     host = _resolve_thread_host_channel(guild)
     if not isinstance(host, discord.TextChannel):
-        log.warning("[banlog] host channel for thread not found in guild %s", getattr(guild, "name", "?"))
         return None
 
     # Search existing threads ONLY under this host
     try:
-        # active
         for th in host.threads:
             if isinstance(th, discord.Thread) and th.name == TARGET_THREAD_NAME:
                 if th.archived:
@@ -94,6 +98,7 @@ async def get_banlog_thread(guild: discord.Guild) -> Optional[discord.Thread]:
     # Create new one under the correct host
     try:
         th = await host.create_thread(name=TARGET_THREAD_NAME, type=discord.ChannelType.public_thread, auto_archive_duration=10080)
+        log.info("[banlog] created thread '%s' under #%s (%s)", TARGET_THREAD_NAME, getattr(host,'name','?'), getattr(host,'id','?'))
         return th
     except Exception as e:
         log.warning("[banlog] create_thread failed under #%s: %s", getattr(host, "name","?"), e)

@@ -1,38 +1,37 @@
-
 <!doctype html>
 <html lang="id">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>SatpamBot Dashboard - Login</title>
+    <title>SatpamBot - Login</title>
     <link rel="stylesheet" href="/dashboard-static/css/login_modern.css">
     <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
   </head>
   <body>
-    <a class="back" href="javascript:history.back()">⟵ Kembali</a>
-    <div class="login-wrap">
-      <div class="card">
+    <div class="login-centre">
+      <div class="card-wrap">
         <div class="avatar">👤</div>
-        <h1>Masuk</h1>
-        <p class="desc">Gunakan kredensial admin yang valid.</p>
-        <form method="post">
-          <div class="form-row">
-            <div class="label">👤</div>
-            <input class="input" name="username" placeholder="Username" required>
+        <div class="card">
+          <div class="title">Masuk</div>
+          <p class="desc">Gunakan kredensial admin yang valid.</p>
+          <form method="post" id="loginForm">
+            <div class="form-row">
+              <div class="icon">👤</div>
+              <input class="input" name="username" placeholder="Username" required>
+            </div>
+            <div class="form-row">
+              <div class="icon">🔒</div>
+              <input class="input" type="password" name="password" placeholder="Password" required>
+            </div>
+            <div class="help">
+              <label><input type="checkbox" name="remember"> Ingat saya</label>
+              <a href="#">Lupa password?</a>
+            </div>
+          </form>
+          <div class="dock">
+            <button type="submit" form="loginForm">LOGIN</button>
           </div>
-          <div class="form-row">
-            <div class="label">🔒</div>
-            <input class="input" type="password" name="password" placeholder="Password" required>
-          </div>
-          <div class="actions">
-            <label><input type="checkbox" name="remember"> Ingat saya</label>
-            <a class="link" href="#">Lupa password?</a>
-          </div>
-          <div class="actions" style="justify-content:center;margin-top:12px">
-            <button class="btn" type="submit">Login</button>
-          </div>
-        </form>
-        <div class="note">Tampilan login mengikuti <b>Theme</b> dan <b>Background</b> dari Settings.</div>
+        </div>
       </div>
     </div>
   </body>
