@@ -232,3 +232,83 @@ def api_metrics():
         {"name":"Local Web (127.0.0.1:8080)","status":"DOWN","ping_ms":1},
         {"name":"Discord API","status":"UP","ping_ms":5},
     ]})
+
+
+
+from flask import render_template, redirect, url_for, request, jsonify, send_from_directory
+import time, os, json
+from pathlib import Path
+
+UPLOAD_DIR = DATA_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+UI_CFG = DATA_DIR / "ui_config.json"
+
+def _load_ui():
+    try:
+        return json.loads(UI_CFG.read_text('utf-8')) if UI_CFG.exists() else {}
+    except Exception:
+        return {}
+def _save_ui(d):
+    UI_CFG.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding='utf-8')
+
+@app.get("/dashboard")
+def dash_home():
+    return render_template("dashboard.html")
+
+@app.get("/dashboard/settings")
+def dash_settings():
+    return render_template("settings.html")
+
+@app.get("/settings")
+def alias_settings():
+    return redirect(url_for('dash_settings'))
+
+@app.get("/dashboard-static/<path:filename>")
+def dash_static(filename):
+    return send_from_directory(str(Path(__file__).parent / "static"), filename)
+
+@app.get("/api/ui-config")
+def api_ui_get():
+    return jsonify(_load_ui())
+
+@app.post("/api/ui-config")
+def api_ui_set():
+    d = _load_ui()
+    body = request.get_json(silent=True) or {}
+    for k in ("logo_url","theme","accent_color","background_mode","background_url","apply_to_login"):
+        if k in body: d[k] = body[k]
+    _save_ui(d); return jsonify({"ok":True,"cfg":d})
+
+@app.post("/api/upload/background")
+def api_upload_bg():
+    f = request.files.get('file')
+    if not f: return jsonify({"ok":False,"error":"no file"}), 400
+    name = f"bg_{int(time.time())}_{f.filename.replace(' ','_')}"
+    path = UPLOAD_DIR / name; f.save(str(path))
+    url = f"/uploads/{name}"
+    d = _load_ui(); d["background_url"] = url; _save_ui(d)
+    return jsonify({"ok":True,"url":url})
+
+@app.get("/uploads/<path:filename>")
+def uploaded_files(filename): return send_from_directory(str(UPLOAD_DIR), filename)
+
+@app.get("/api/metrics")
+def api_metrics():
+    series = {"total":[1,2,3,4,6,8,9,11,13,14], "lat":[110,90,120,80,70,95,88,92,86,90], "up":[1,1,1,1,1,1,1,1,1,1], "g":[1,1,1,1,1,1,1,1,1,1]}
+    try:
+        import psutil, os as _os
+        mem = psutil.Process(_os.getpid()).memory_info().rss/1024/1024
+        cpu = psutil.cpu_percent(interval=0.05)
+    except Exception:
+        mem, cpu = 0, 0
+    start = int(getattr(app, 'start_ts', time.time())); 
+    if not getattr(app, 'start_ts', None): app.start_ts = start
+    servers=[{"name":"Local Web (127.0.0.1:8080)","status":"DOWN","ping_ms":1}]
+    ping_ms = None
+    try:
+        import requests
+        t0=time.time(); requests.get("https://discord.com/api/v10/gateway", timeout=2)
+        ping_ms=int((time.time()-t0)*1000); servers.append({"name":"Discord API","status":"UP","ping_ms":ping_ms})
+    except Exception:
+        servers.append({"name":"Discord API","status":"DOWN","ping_ms":None})
+    return jsonify({"uptime":int(time.time()-start),"cpu":cpu,"mem_mb":mem,"servers":servers,"series":series,"guilds":1,"latency_ms":ping_ms,"total_msgs":0})
