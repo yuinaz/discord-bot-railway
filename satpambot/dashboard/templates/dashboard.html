@@ -1,41 +1,27 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="grid">
-  <div class="card">
-    <div class="card-title">Status Servers</div>
-    <div class="card-body">
-      <table id="servers-table">
-        <thead><tr><th>Nama</th><th>Status</th><th>Ping</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">Activity</div>
-    <div class="card-body">
-      <div id="activity-log">Menunggu data...</div>
-    </div>
-  </div>
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="grid grid-4" id="top-cards">
+  <div class="card" id="card-views"><div class="kpi"><div class="kpi-title">Total Messages</div><div class="kpi-value" id="kpi-total">--</div><canvas data-spark="total"></canvas></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-title">Avg Latency (ms)</div><div class="kpi-value" id="kpi-lat">--</div><canvas data-spark="lat"></canvas></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-title">Uptime</div><div class="kpi-value" id="kpi-up">--</div><canvas data-spark="up"></canvas></div></div>
+  <div class="card"><div class="kpi"><div class="kpi-title">Guilds</div><div class="kpi-value" id="kpi-g">--</div><canvas data-spark="g"></canvas></div></div>
 </div>
 
-<script>
-async function loadServers(){
-  try{
-    const res = await fetch('/api/servers');
-    if(!res.ok){ throw new Error('unauthorized'); }
-    const data = await res.json();
-    const tbody = document.querySelector('#servers-table tbody');
-    tbody.innerHTML = '';
-    data.forEach(s => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${s.name}</td><td>${s.status}</td><td>${s.ping_ms} ms</td>`;
-      tbody.appendChild(tr);
-    });
-  } catch(e){
-    document.querySelector('#activity-log').textContent = 'Gagal memuat data.';
-  }
-}
-loadServers();
-</script>
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">Status Servers</div>
+    <table class="table" id="tbl-servers">
+      <thead><tr><th>Nama</th><th>Status</th><th>Ping</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-title">Activity</div>
+    <div id="activity">Gagal memuat data.</div>
+  </div>
+</div>
+<script src="/dashboard-static/js/mini_monitor.js?v=1"></script>
 {% endblock %}
