@@ -2,9 +2,7 @@ from __future__ import annotations
 import os, json, discord
 from discord.ext import commands
 from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread
-
 RECENT_PATH = os.getenv("RECENT_BANS_PATH", "data/recent_bans.json")
-
 def _append_recent_ban(user: discord.abc.User, guild: discord.Guild | None):
     try:
         try:
@@ -17,11 +15,9 @@ def _append_recent_ban(user: discord.abc.User, guild: discord.Guild | None):
         json.dump(data, open(RECENT_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     except Exception:
         pass
-
 class BanLogThread(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
         th_or_ch = await get_banlog_thread(guild)
@@ -33,5 +29,4 @@ class BanLogThread(commands.Cog):
             _append_recent_ban(user, guild)
         except Exception:
             pass
-
 async def setup(bot): await bot.add_cog(BanLogThread(bot))

@@ -2,7 +2,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 MAX_LIMIT = 1000
-
 @app_commands.command(name="clearchat", description="Bersihkan sejumlah pesan dari channel ini.")
 @app_commands.describe(jumlah=f"Jumlah pesan yang dihapus (1–{MAX_LIMIT})")
 @app_commands.guild_only()
@@ -16,5 +15,4 @@ async def clearchat(interaction: discord.Interaction, jumlah: app_commands.Range
     await interaction.response.defer(ephemeral=True, thinking=True)
     deleted = await channel.purge(limit=jumlah, reason=f"/clearchat by {interaction.user}")
     await interaction.followup.send(f"✅ {len(deleted)} pesan dibersihkan.", ephemeral=True)
-
 async def setup(bot: commands.Bot): bot.tree.add_command(clearchat)
