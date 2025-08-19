@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Dashboard • SatpamBot</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -62,14 +61,10 @@ hr{border:0;border-top:1px solid var(--line);margin:10px 0 14px}
 <script>
 async function getJSON(u){try{const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw 0;return await r.json()}catch(e){return null}}
 function fmtUptime(s){if(s==null)return"--";const d=Math.floor(s/86400);s%=86400;const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);const sec=s%60;let out=[];if(d)out.push(d+"d");if(h)out.push(h+"h");if(m)out.push(m+"m");out.push(sec+"s");return out.join(" ")}
+function applyTheme(colors){const r=document.documentElement.style; r.setProperty('--bg',colors.bg); r.setProperty('--text',colors.text); r.setProperty('--panel',colors.panel); r.setProperty('--line',colors.line); r.setProperty('--muted',colors.muted);}
 function applyUI(ui){
   if(!ui) return;
   const root=document.documentElement.style;
-  if(ui.theme==="light"){
-    root.setProperty("--bg","#f3f4f6"); root.setProperty("--text","#111827"); root.setProperty("--panel","#ffffff"); root.setProperty("--line","#e5e7eb"); root.setProperty("--muted","#6b7280");
-  }else{
-    root.setProperty("--bg","#0b111b"); root.setProperty("--text","#e6edf3"); root.setProperty("--panel","#111827"); root.setProperty("--line","#1f2937"); root.setProperty("--muted","#9aa4b2");
-  }
   if(ui.accent){ root.setProperty("--accent", ui.accent); }
   if(ui.bg_url){
     document.body.style.backgroundImage = "linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)), url('"+ui.bg_url+"')";
@@ -81,10 +76,16 @@ function applyUI(ui){
   if(ui.logo_url){ logo.src = ui.logo_url; logo.style.display="block"; } else { logo.style.display="none"; }
 }
 async function refresh(){
-  const ui = await getJSON("/api/ui-settings"); applyUI(ui);
+  const themes = await getJSON("/api/ui-themes"); const ui = await getJSON("/api/ui-settings");
+  if(themes && ui){ const name = ui.theme || "dark"; const idx = themes.themes.indexOf(name); const pick = name; 
+    // fetch theme colors from server map via a tiny trick: embed in window on settings page only; here we fallback client-side defaults
+    const map = {"dark":{"bg":"#0b111b","text":"#e6edf3","panel":"#111827","line":"#1f2937","muted":"#9aa4b2"},"light":{"bg":"#f3f4f6","text":"#111827","panel":"#ffffff","line":"#e5e7eb","muted":"#6b7280"},"nord":{"bg":"#2e3440","text":"#eceff4","panel":"#3b4252","line":"#434c5e","muted":"#d8dee9"},"dracula":{"bg":"#282a36","text":"#f8f8f2","panel":"#1e1f29","line":"#44475a","muted":"#bd93f9"},"ocean":{"bg":"#0f172a","text":"#e2e8f0","panel":"#111827","line":"#1f2937","muted":"#94a3b8"},"forest":{"bg":"#0b1310","text":"#e2f7e1","panel":"#0f1d18","line":"#1b2a24","muted":"#9fd4b5"}};
+    applyTheme(map[pick] || map.dark);
+  }
+  applyUI(ui);
   const mon=await getJSON("/api/monitor"); if(mon){document.getElementById("uptime").textContent=fmtUptime(mon.uptime_s||0);document.getElementById("cpu").textContent=mon.cpu_percent==null?"--":mon.cpu_percent;document.getElementById("ram").textContent=mon.mem_mb==null?"--":mon.mem_mb;}
-  const act=await getJSON("/api/activity"); const box=document.getElementById("activity"); if(act && act.lines && act.lines.length){box.classList.remove("center"); box.innerHTML = "<pre class='small' style='white-space:pre-wrap'>"+act.lines.map(x=>x.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))).join("\n")+"</pre>";}
-  const s=await getJSON("/api/servers"); const tb=document.getElementById("servers"); if(s && s.servers && s.servers.length){tb.innerHTML=s.servers.map(row=>`<tr><td>${row.name||"-"}</td><td><span class="badge">${row.status||"-"}</span></td><td>${row.ping||"-"}</td></tr>`).join("")}
+  const act=await getJSON("/api/activity"); const box=document.getElementById("activity"); if(act && act.lines && act.lines.length){box.classList.remove("center"); box.innerHTML = "<pre class='small' style='white-space:pre-wrap'>"+act.lines.map(x=>x.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))).join("\\n")+"</pre>";}
+  const s=await getJSON("/api/servers"); const tb=document.getElementById("servers"); if(s && s.servers && s.servers.length){tb.innerHTML=s.servers.map(row=>`<tr><td>${row.name||"-"}</td><td><span class="badge" style="border-color:${row.status==='UP'?'#22c55e':'#ef4444'};color:${row.status==='UP'?'#86efac':'#fecaca'}">${row.status||"-"}</span></td><td>${row.ping||"-"}</td></tr>`).join("")}
 }
 refresh(); setInterval(refresh, 8000);
 </script>

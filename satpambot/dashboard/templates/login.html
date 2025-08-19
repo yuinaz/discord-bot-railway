@@ -2,68 +2,65 @@
 <html lang="id">
 <head>
   <meta charset="utf-8">
+  <title>Login • SatpamBot</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login · SatpamBot</title>
   <link rel="stylesheet" href="/static/css/login_modern.css?v={{ cache_bust|default(0) }}">
+  <style>
+    :root{ --bg:#0b111b; --text:#e6edf3; --panel:#ffffff; --line:#e5e7eb; --muted:#6b7280; --accent:#2563eb; }
+    #particles-js{ position:fixed; inset:0; z-index:-2; opacity:.85; pointer-events:none; }
+    #bgVideo{ position:fixed; inset:0; z-index:-3; min-width:100%; min-height:100%; width:auto; height:auto; object-fit:cover; display:none; }
+  </style>
 </head>
-<body class="login-bg"
-      style="--dash-bg: url('{{ dash_bg|default('/static/img/bg-login.jpg') }}');">
-  <div id="particles"></div>
-
-  <div class="login-center">
-    <!-- action="" => submit ke URL yang sama; aman untuk endpoint apa pun -->
-    <form class="login-card" method="post" action="">
-      <div class="avatar-wrap">
-        <div class="avatar-circle" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="52" height="52" role="img" aria-label="user">
-            <path d="M12 12c2.7614 0 5-2.2386 5-5s-2.2386-5-5-5-5 2.2386-5 5 2.2386 5 5 5zm0 2c-4.4183 0-8 3.134-8 7v1h16v-1c0-3.866-3.5817-7-8-7z" fill="currentColor"/>
-          </svg>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="grid">
+        <div class="left">
+          <div class="brand">
+            <img src="/static/img/icon-user.svg" alt="Logo">
+            <h1>SatpamBot Dashboard</h1>
+          </div>
+          <p class="tag">
+            Selamat datang kembali. Masuk untuk mengelola bot & dashboard.
+            Tampilan login ini mengikuti <b>Theme</b> dan <b>Background</b> dari Settings.
+          </p>
+          <ul class="tag" style="margin:0; padding-left:18px;">
+            <li>Background mode: <i>Image</i>, <i>Particles</i>, atau <i>Video</i></li>
+            <li>Theme: Dark/Light + preset lain & custom JSON</li>
+            <li>Warna aksen mengikuti Settings</li>
+          </ul>
+        </div>
+        <div class="right">
+          <form class="form" method="post" action="">
+            <h2>Masuk</h2>
+            <p class="sub">Gunakan kredensial admin yang valid.</p>
+            {% if error %}
+              <div class="error">{{ error }}</div>
+            {% endif %}
+            <label for="username">Username</label>
+            <input id="username" name="username" type="text" placeholder="username" autocomplete="username" required>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required>
+            <div class="row">
+              <label class="remember">
+                <input type="checkbox" name="remember" value="1">
+                <span>Ingat saya</span>
+              </label>
+              <a href="#" style="color:#334155; font-size:12px; text-decoration:none" onclick="return false">Lupa password?</a>
+            </div>
+            {% if next_url %}
+              <input type="hidden" name="next" value="{{ next_url }}">
+            {% endif %}
+            <button class="btn" type="submit">Login</button>
+            <p class="note">Dengan masuk, Anda menyetujui ketentuan yang berlaku.</p>
+          </form>
         </div>
       </div>
-
-      <h1 class="title">Masuk</h1>
-
-      {% set flashed = get_flashed_messages() if get_flashed_messages else [] %}
-      {% if error or flashed %}
-        <div class="alert">{{ error or flashed|join(', ') }}</div>
-      {% endif %}
-
-      <label class="field">
-        <span class="icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/>
-          </svg>
-        </span>
-        <input class="input" name="username" placeholder="Email ID / Username"
-               value="{{ request.form.username|default('admin') }}"
-               autocomplete="username" required>
-      </label>
-
-      <label class="field">
-        <span class="icon">
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-7h-1V7a5 5 0 10-10 0v3H6c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zm-3 0H9V7a3 3 0 016 0v3z" fill="currentColor"/>
-          </svg>
-        </span>
-        <input class="input" name="password" type="password" placeholder="Password"
-               autocomplete="current-password" required>
-      </label>
-
-      <div class="row opts">
-        <label class="remember">
-          <input type="checkbox" name="remember" value="1">
-          <span>Remember me</span>
-        </label>
-        <a class="muted" href="#" tabindex="-1">Forgot Password?</a>
-      </div>
-
-      <!-- Tombol LOGIN sebagai pill putih di luar kartu (seperti gambar 2) -->
-      <button class="pill-login" type="submit">
-        LOGIN
-      </button>
-    </form>
+    </div>
   </div>
-
+  <div id="particles-js"></div>
+  <video id="bgVideo" autoplay muted loop playsinline></video>
   <script src="/static/js/particles_login.js?v={{ cache_bust|default(0) }}"></script>
+  <script src="/dashboard-static/ui_theme_bridge.js"></script>
 </body>
 </html>
