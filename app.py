@@ -1,257 +1,260 @@
-# app.py — Root Flask app (lengkap) yang:
-# - memetakan template/static ke satpambot/dashboard/*
-# - menambah /healthz, /metrics, /uptime, /favicon.ico, 404 aman, /shutdown
-# - menyediakan /start-bot untuk menyalakan bot
-# - mendeteksi dashboard app & bot runner secara fleksibel (termasuk app_dashboard)
-
-import os
-import time
-import threading
-import inspect
-import asyncio
-from datetime import datetime
-from pathlib import Path
-
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
-try:
-    # Jika ada SocketIO di dashboard, nanti kita re-bind ke sini
-    from flask_socketio import SocketIO
-except Exception:
-    SocketIO = None  # type: ignore
-
-from jinja2 import ChoiceLoader, FileSystemLoader, TemplateNotFound
-# quiet access log for /healthz and ensure route
-from satpambot.dashboard.healthz_quiet import silence_healthz_logs, ensure_healthz_route
-
-# =========================
-# Env loading (.env + .env.local)
-# =========================
-try:
-    from dotenv import load_dotenv, find_dotenv
-    load_dotenv(find_dotenv(usecwd=True))  # .env dari CWD ke atas
-    local = Path(__file__).with_name(".env.local")
-    if local.exists():
-        load_dotenv(local, override=True)    # prioritas .env.local
-except Exception:
-    pass
-
-# =========================
-# Coba import dashboard app yang "asli", lalu patch di sini
-# =========================
-def _import_dashboard_app():
-    """
-    Deteksi modul dashboard dari beberapa kemungkinan lokasi/penamaan:
-      - satpambot.dashboard.app_dashboard
-      - satpambot.dashboard.app
-      - dashboard.app_dashboard
-      - dashboard.app
-    Kalau semua gagal -> mini web.
-    """
-    candidates = [
-        "satpambot.dashboard.app_dashboard",
-        "satpambot.dashboard.app",
-        "dashboard.app_dashboard",
-        "dashboard.app",
-    ]
-    for mod in candidates:
-        try:
-            m = __import__(mod, fromlist=["app", "socketio"])
-            app = getattr(m, "app")
-            socketio = getattr(m, "socketio", None)
-            return app, socketio
-        except Exception:
-            continue
-
-    # fallback kalau tidak ada dashboard sama sekali: bikin mini-app
-    mini = Flask("mini-web")
-
-    @mini.get("/login")
-    def _login_stub():
-        return "Dashboard tidak tersedia (mini web).", 503
-
-    return mini, None
-
-app, socketio = _import_dashboard_app()
-
-# silence werkzeug access logs for /healthz (/favicon.ico too)
 silence_healthz_logs()
 
-# Secret key (kompatibel nama env lama/baru)
-app.secret_key = os.getenv("FLASK_SECRET") or os.getenv("SECRET_KEY", "changeme")
+from satpambot.dashboard.healthz_quiet import silence_healthz_logs, ensure_healthz_route
+from satpambot.dashboard.webui import register_webui
+import os
+import time
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
+from flask_socketio import SocketIO
+from dotenv import load_dotenv
+import psutil
+
+load_dotenv()
+
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "changeme")
+
+socketio = SocketIO(app, async_mode="eventlet", cors_allowed_origins="*")
+
 APP_START_TS = time.time()
 
-# =========================
-# Template & static mapping ke dashboard/*
-# (ditambahkan/diduplikasi aman; tidak meledak jika sudah ada)
-# =========================
-_BASE_DIR = os.path.dirname(__file__)
-_TPL_DIR = os.path.join(_BASE_DIR, "satpambot", "dashboard", "templates")
-_STA_DIR = os.path.join(_BASE_DIR, "satpambot", "dashboard", "static")
+def is_logged_in():
+    return session.get("logged_in") is True
 
-if os.path.isdir(_TPL_DIR):
-    try:
-        app.jinja_loader = ChoiceLoader([app.jinja_loader, FileSystemLoader(_TPL_DIR)])
-    except Exception:
-        app.jinja_env.loader = ChoiceLoader([app.jinja_env.loader, FileSystemLoader(_TPL_DIR)])
-
-if os.path.isdir(_STA_DIR) and "static_custom" not in app.view_functions:
-    app.add_url_rule("/static/<path:filename>", "static_custom", lambda filename: send_from_directory(_STA_DIR, filename))
-
-# =========================
-# Context globals (opsional)
-# =========================
 @app.context_processor
 def inject_globals():
     return {
         "theme": os.getenv("THEME", "dark"),
         "dash_bg": os.getenv("DASH_BG_IMAGE", "/static/img/bg-login.jpg"),
-        "cache_bust": int(APP_START_TS),
+        "cache_bust": int(APP_START_TS)
     }
 
-# =========================
-# Routes minimum (jaga jika dashboard tidak punya root/login)
-# =========================
-def _has_route(rule: str) -> bool:
-    return any(r.rule == rule for r in app.url_map.iter_rules())
+@app.route("/")
+def home():
+    if not is_logged_in():
+        return redirect(url_for("login"))
+    return redirect(url_for("dashboard"))
 
-if not _has_route("/"):
-    @app.get("/")
-    def _root():
-        return redirect(url_for("login")) if _has_route("/login") else ("OK", 200)
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        expected_user = os.getenv("ADMIN_USERNAME", "admin")
+        expected_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+        uname = request.form.get("username", "")
+        pwd = request.form.get("password", "")
+        if uname == expected_user and pwd == expected_pass:
+            session["logged_in"] = True
+            session["username"] = uname
+            return redirect(url_for("dashboard"))
+        else:
+            return render_template("login.html", error="Username / password salah.")
+    return render_template("login.html")
 
-if not _has_route("/login"):
-    @app.get("/login")
-    def _login_fallback():
-        return "Login page not provided by dashboard.", 200
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
-# =========================
-# Ops/health routes untuk UptimeRobot/Render
-# make sure /healthz exists (idempotent)
-ensure_healthz_route(app)
-# =========================
-if not _has_route("/healthz"):
-    @app.get("/healthz")
-    def healthz():
-        return "ok", 200
+@app.route("/dashboard")
+def dashboard():
+    if not is_logged_in():
+        return redirect(url_for("login"))
+    return render_template("dashboard.html")
 
-if not _has_route("/uptime"):
-    @app.get("/uptime")
-    def uptime():
-        seconds = int(time.time() - APP_START_TS)
-        return jsonify({
-            "uptime_seconds": seconds,
-            "started_at": datetime.utcfromtimestamp(APP_START_TS).isoformat() + "Z"
-        })
+@app.route("/metrics")
+def metrics():
+    cpu = psutil.cpu_percent(interval=0.05)
+    mem = psutil.virtual_memory()
+    return jsonify({
+        "cpu": cpu,
+        "ram_mb": int(mem.used/1024/1024),
+        "ram_total_mb": int(mem.total/1024/1024)
+    })
 
-if not _has_route("/metrics"):
-    @app.get("/metrics")
-    def metrics():
-        try:
-            import psutil
-            cpu = psutil.cpu_percent(interval=0.05)
-            mem = psutil.virtual_memory()
-            return jsonify({
-                "cpu": cpu,
-                "ram_mb": int(mem.used/1024/1024),
-                "ram_total_mb": int(mem.total/1024/1024)
-            })
-        except Exception:
-            return jsonify({"cpu": None, "ram_mb": None, "ram_total_mb": None})
+@app.route("/uptime")
+def uptime():
+    seconds = int(time.time() - APP_START_TS)
+    return jsonify({
+        "uptime_seconds": seconds,
+        "started_at": datetime.utcfromtimestamp(APP_START_TS).isoformat() + "Z"
+    })
 
-if not _has_route("/favicon.ico"):
-    @app.get("/favicon.ico")
-    def favicon():
-        fn = os.path.join(_STA_DIR, "favicon.ico")
-        if os.path.isfile(fn):
-            return send_from_directory(_STA_DIR, "favicon.ico")
-        return ("", 204)
+@app.route("/api/servers")
+def api_servers():
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify([
+        {"name": "Gateway-01", "status": "online", "ping_ms": 12},
+        {"name": "Bot-Core", "status": "online", "ping_ms": 28},
+        {"name": "DB-Node", "status": "degraded", "ping_ms": 140}
+    ])
+
+DISCORD_ENABLED = os.getenv("DISCORD_ENABLED", "true").lower() == "true"
+if DISCORD_ENABLED:
+    try:
+        from modules.discord_bot import run_bot, set_flask_app
+        set_flask_app(app)
+    except Exception as e:
+        print(f"[WARN] Discord module not loaded: {e}")
+
+@socketio.on("connect")
+def on_connect():
+    pass
+
+@app.route("/start-bot")
+def start_bot_route():
+    if DISCORD_ENABLED:
+        from modules.discord_bot import run_bot, bot_running
+        if not bot_running():
+            run_bot(background=True)
+            return "Bot starting", 200
+        else:
+            return "Bot already running", 200
+    return "Discord disabled", 200
 
 @app.errorhandler(404)
 def not_found(e):
-    try:
-        return render_template("404.html"), 404
-    except TemplateNotFound:
-        return "404 Not Found", 404
+    return render_template("404.html"), 404
 
-# Matikan server dev (Windows) jika Ctrl+C ngeyel
-if not _has_route("/shutdown"):
-    @app.post("/shutdown")
-    def shutdown():
-        func = request.environ.get("werkzeug.server.shutdown")
-        if func:
-            func()
-            return "shutting down...", 200
-        return "server does not support shutdown", 501
+# ## PATCH: app-root hotfix
+# - perbaiki import discord bot (absolute package, fallback)
+# - map template & static ke dashboard
+# - tambahkan /healthz, /favicon.ico, /shutdown, dan 404 aman
 
-# =========================
-# Discord bot runner (tanpa event loop ganda)
-# =========================
-def _import_start_run():
-    """Kembalikan tuple (start_bot, run_bot) jika tersedia (boleh None)."""
-    start_bot = run_bot = None
-    # prioritas package penuh dulu
-    try:
-        from satpambot.bot.modules.discord_bot.discord_bot import start_bot as _s  # type: ignore
-        start_bot = _s
-    except Exception:
-        pass
-    try:
-        from satpambot.bot.modules.discord_bot.discord_bot import run_bot as _r  # type: ignore
-        run_bot = _r
-    except Exception:
-        pass
-    # fallback import lama
-    if start_bot is None:
+try:
+    import os as _os
+    from flask import send_from_directory as _sfd, request as _req  # type: ignore
+    from jinja2 import ChoiceLoader as _ChoiceLoader, FileSystemLoader as _FileSystemLoader, TemplateNotFound as _TemplateNotFound  # type: ignore
+
+    # 1) template & static mapping
+    _BASE_DIR = _os.path.dirname(__file__)
+    _TPL_DIR = _os.path.join(_BASE_DIR, "satpambot", "dashboard", "templates")
+    _STA_DIR = _os.path.join(_BASE_DIR, "satpambot", "dashboard", "static")
+    if _os.path.isdir(_TPL_DIR):
         try:
-            from modules.discord_bot.discord_bot import start_bot as _s2  # type: ignore
-            start_bot = _s2
+            app.jinja_loader = _ChoiceLoader([app.jinja_loader, _FileSystemLoader(_TPL_DIR)])
         except Exception:
-            pass
-    if run_bot is None:
+            app.jinja_env.loader = _ChoiceLoader([app.jinja_env.loader, _FileSystemLoader(_TPL_DIR)])
+    if _os.path.isdir(_STA_DIR) and "static_custom" not in app.view_functions:
+        app.add_url_rule("/static/<path:filename>", "static_custom", lambda filename: _sfd(_STA_DIR, filename))
+
+    # 2) favicon route (hindari 404)
+    if "favicon" not in app.view_functions:
+        @app.get("/favicon.ico")
+        def favicon():
+            fn = _os.path.join(_STA_DIR, "favicon.ico")
+            if _os.path.isfile(fn):
+                return _sfd(_STA_DIR, "favicon.ico")
+            return ("", 204)
+
+    # 3) healthz (untuk uptime check)
+    if "healthz" not in app.view_functions:
+        @app.get("/healthz")
+        def healthz():
+            return "ok", 200
+
+    # 4) safe 404 handler
+    @app.errorhandler(404)
+    def _patched_not_found(e):
         try:
-            from modules.discord_bot.discord_bot import run_bot as _r2  # type: ignore
-            run_bot = _r2
+            return render_template("404.html"), 404  # type: ignore[name-defined]
+        except _TemplateNotFound:
+            return "404 Not Found", 404
+
+    # 5) /shutdown agar mudah stop di Windows dev server
+    if "shutdown" not in app.view_functions:
+        @app.post("/shutdown")
+        def shutdown():
+            func = _req.environ.get("werkzeug.server.shutdown")
+            if func:
+                func()
+                return "shutting down...", 200
+            return "server does not support shutdown", 501
+except Exception as _e:
+    pass
+
+# Import helper bot (absolute package, fallback)
+try:
+    from satpambot.bot.modules.discord_bot import run_bot, bot_running  # type: ignore
+except Exception:  # fallback legacy import path
+    try:
+        from modules.discord_bot import run_bot, bot_running  # type: ignore
+    except Exception:
+        def run_bot(*a, **kw): raise RuntimeError("Discord module not loaded (run_bot unavailable)")
+        def bot_running(): return False
+
+# ## PATCH: app-root hotfix (templates, favicon, healthz, 404 aman, shutdown, import run_bot)
+try:
+    import os as _os
+    from flask import send_from_directory as _sfd, request as _req, render_template  # type: ignore
+    from jinja2 import ChoiceLoader as _ChoiceLoader, FileSystemLoader as _FileSystemLoader, TemplateNotFound as _TemplateNotFound  # type: ignore
+
+    # Map Jinja ke dashboard/templates
+    _BASE_DIR = _os.path.dirname(__file__)
+    _TPL_DIR = _os.path.join(_BASE_DIR, "satpambot", "dashboard", "templates")
+    _STA_DIR = _os.path.join(_BASE_DIR, "satpambot", "dashboard", "static")
+    if _os.path.isdir(_TPL_DIR):
+        try:
+            app.jinja_loader = _ChoiceLoader([app.jinja_loader, _FileSystemLoader(_TPL_DIR)])
         except Exception:
-            pass
-    return start_bot, run_bot
+            app.jinja_env.loader = _ChoiceLoader([app.jinja_env.loader, _FileSystemLoader(_TPL_DIR)])
 
-def _start_bot_now():
-    token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
-    if not token:
-        return
-    start_bot, run_bot = _import_start_run()
+    # Static (optional): arahkan /static ke dashboard/static bila belum ada
+    if _os.path.isdir(_STA_DIR) and "static_custom" not in app.view_functions:
+        app.add_url_rule("/static/<path:filename>", "static_custom", lambda filename: _sfd(_STA_DIR, filename))
 
-    # Bila start_bot coroutine → jalankan di event loop BARU (bukan asyncio.run di loop aktif)
-    if start_bot and inspect.iscoroutinefunction(start_bot):
-        loop = asyncio.new_event_loop()
+    # Favicon agar tidak 404
+    if "favicon" not in app.view_functions:
+        @app.get("/favicon.ico")
+        def favicon():
+            fn = _os.path.join(_STA_DIR, "favicon.ico")
+            if _os.path.isfile(fn):
+                return _sfd(_STA_DIR, "favicon.ico")
+            return ("", 204)
+
+    # Healthcheck
+    if "healthz" not in app.view_functions:
+        @app.get("/healthz")
+        def healthz():
+            return "ok", 200
+
+    # 404 aman (pakai template kalau ada; fallback teks jika tidak)
+    @app.errorhandler(404)
+    def _patched_not_found(e):
         try:
-            loop.run_until_complete(start_bot())
-        finally:
-            loop.close()
-        return
+            return render_template("404.html"), 404
+        except _TemplateNotFound:
+            return "404 Not Found", 404
 
-    # Bila run_bot sinkron (biasanya memanggil asyncio.run di dalamnya) → cukup panggil langsung
-    if run_bot:
-        try:
-            run_bot()
-        except TypeError:
-            try:
-                run_bot(background=True)
-            except Exception:
-                run_bot()
+    # Endpoint shutdown (POST) untuk mematikan server dev di Windows
+    if "shutdown" not in app.view_functions:
+        @app.post("/shutdown")
+        def shutdown():
+            func = _req.environ.get("werkzeug.server.shutdown")
+            if func:
+                func()
+                return "shutting down...", 200
+            return "server does not support shutdown", 501
+except Exception:
+    pass
 
-if not _has_route("/start-bot"):
-    @app.get("/start-bot")
-    def start_bot_route():
-        token = os.getenv("DISCORD_TOKEN") or os.getenv("BOT_TOKEN")
-        if not token:
-            return "Token tidak tersedia. Set DISCORD_TOKEN di .env/.env.local", 400
-        threading.Thread(target=_start_bot_now, name="DiscordBotThread", daemon=True).start()
-        return "Bot starting", 200
+# Perbaiki import run_bot dengan fallback
+try:
+    from satpambot.bot.modules.discord_bot import run_bot, bot_running  # type: ignore
+except Exception:
+    try:
+        from modules.discord_bot import run_bot, bot_running  # type: ignore
+    except Exception:
+        def run_bot(*a, **kw): raise RuntimeError("Discord module not loaded (run_bot unavailable)")
+        def bot_running(): return False
+# ## END PATCH
 
-# =========================
-# SocketIO guard (biar tak meledak bila dashboard tak pakai SocketIO)
-# =========================
-if socketio is None and SocketIO is not None:
-    # Buat instance kosong (threading) agar main.py bisa .run() lewat socketio
-    socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+
+
+try:
+    register_webui(app)
+except Exception:
+    pass
+
+ensure_healthz_route(app)

@@ -1,92 +1,99 @@
-import logging
-from typing import Optional
-
-import discord
+import typing, datetime as dt, discord
 from discord.ext import commands
 
-from satpambot.bot.modules.discord_bot.utils.perm import require_mod
-from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread
+WIB = dt.timezone(dt.timedelta(hours=7))
 
-log = logging.getLogger(__name__)
+async def _infer_member(ctx: commands.Context) -> typing.Optional[discord.Member]:
+    # coba dari mention
+    if ctx.message.mentions:
+        m = ctx.message.mentions[0]
+        if isinstance(m, discord.Member):
+            return m
+        try:
+            return await ctx.guild.fetch_member(m.id)
+        except Exception:
+            pass
+    # coba dari reply
+    try:
+        if ctx.message.reference and ctx.message.reference.message_id:
+            ref = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+            if isinstance(ref.author, discord.Member):
+                return ref.author
+            try:
+                return await ctx.guild.fetch_member(ref.author.id)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return None
 
-GREEN = 0x3BA55D
-RED   = 0xED4245
+def _now_wib():
+    return dt.datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S WIB")
 
-def _can_act(me: discord.Member, target: discord.Member) -> (bool, str):
-    if target.id == me.id:
-        return False, "Tidak bisa mem-ban diri sendiri."
-    if target.guild.owner_id == target.id:
-        return False, "Tidak bisa mem-ban **Owner** server."
-    if me.top_role <= target.top_role and not me.guild_permissions.administrator:
-        return False, "Role bot lebih rendah dari target."
-    return True, ""
-
-def _ban_embed(actor: discord.Member, target: discord.Member, reason: Optional[str], ok: bool) -> discord.Embed:
+def build_testban_embed(target: discord.abc.User, reason: typing.Optional[str] = None) -> discord.Embed:
+    # Gaya seperti screenshot: judul + deskripsi bahasa Indonesia + badge simulasi
     e = discord.Embed(
-        title="Ban Executed" if ok else "Ban Failed",
-        color=GREEN if ok else RED,
+        title="💀 Simulasi Ban oleh SatpamBot",
+        description=(f"{target.mention} terdeteksi mengirim pesan mencurigakan.\n"
+                     "(Pesan ini hanya simulasi untuk pengujian.)"),
+        color=0xF59E0B,  # amber/ornanye
     )
-    e.add_field(name="Target", value=f"{target} (`{target.id}`)", inline=False)
-    e.add_field(name="By", value=f"{actor} (`{actor.id}`)", inline=False)
-    if reason: e.add_field(name="Reason", value=reason, inline=False)
+    e.add_field(name="🟩 Simulasi testban", value=reason or "-", inline=False)
+    e.set_footer(text=f"SatpamBot • {_now_wib()}")
+    return e
+
+def build_realban_embed(target: discord.abc.User, moderator: discord.abc.User, reason: typing.Optional[str]) -> discord.Embed:
+    e = discord.Embed(
+        title="🚫 Ban oleh SatpamBot",
+        description=f"{target.mention} telah di-*ban* dari server.",
+        color=0xEF4444,  # merah
+    )
+    e.add_field(name="Moderator", value=moderator.mention, inline=True)
+    e.add_field(name="Alasan", value=reason or "-", inline=False)
+    e.set_footer(text=f"SatpamBot • {_now_wib()}")
     return e
 
 class BanCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name="ban")
-    @require_mod()
+    @commands.command(name="testban", help="Post simulasi ban (tanpa image, tidak spam).")
+    @commands.has_permissions(manage_guild=True)
     @commands.guild_only()
-    async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: Optional[str] = None):
-        me = ctx.guild.me
-        ok, why = _can_act(me, member)
-        if not ok:
-            await ctx.reply(f"❌ {why}", mention_author=False)
-            # log fail
-            th = await get_banlog_thread(ctx.guild)
-            if th:
-                await th.send(embed=_ban_embed(ctx.author, member, why, ok=False))
-            return
-        try:
-            await ctx.guild.ban(member, reason=reason or f"By {ctx.author} via command", delete_message_days=0)
-            await ctx.reply(f"✅ **{member}** diban. {('Alasan: '+reason) if reason else ''}", mention_author=False)
-            # log success
-            th = await get_banlog_thread(ctx.guild)
-            if th:
-                await th.send(embed=_ban_embed(ctx.author, member, reason, ok=True))
-        except discord.Forbidden:
-            msg = "Gagal ban: bot tidak punya izin yang cukup."
-            await ctx.reply(f"❌ {msg}", mention_author=False)
-            th = await get_banlog_thread(ctx.guild)
-            if th:
-                await th.send(embed=_ban_embed(ctx.author, member, msg, ok=False))
-        except discord.HTTPException as e:
-            msg = f"Gagal ban: {e}"
-            await ctx.reply(f"❌ {msg}", mention_author=False)
-            th = await get_banlog_thread(ctx.guild)
-            if th:
-                await th.send(embed=_ban_embed(ctx.author, member, msg, ok=False))
+    async def testban(self, ctx: commands.Context, member: typing.Optional[discord.Member] = None, *, reason: typing.Optional[str] = None):
+        if member is None:
+            member = await _infer_member(ctx) or ctx.author
+        # hapus embed simulasi sebelumnya agar tidak spam
+        async for m in ctx.channel.history(limit=50):
+            if m.author.id == ctx.me.id and m.embeds:
+                title = (m.embeds[0].title or "").strip().lower()
+                if "simulasi ban oleh satpambot" in title or "test ban" in title:
+                    try: await m.delete()
+                    except Exception: pass
+                    break
+        e = build_testban_embed(member, reason)
+        await ctx.send(embed=e)
 
-    @commands.command(name="tb", aliases=["testban"])
-    @require_mod()
+    @commands.command(name="ban", help="Ban member: !ban @user [alasan]. Juga bisa reply lalu ketik !ban.")
+    @commands.has_permissions(ban_members=True)
     @commands.guild_only()
-    async def testban(self, ctx: commands.Context, member: discord.Member):
-        me = ctx.guild.me
-        ok, why = _can_act(me, member)
-        if not ok:
-            return await ctx.reply(f"⚠️ Tidak bisa ban: {why}", mention_author=False)
-        if not (me.guild_permissions.ban_members or me.guild_permissions.administrator):
-            return await ctx.reply("⚠️ Bot tidak punya izin ban_members/administrator.", mention_author=False)
-        await ctx.reply(f"🧪 OK. Bot **dapat** memban **{member}** (simulasi).", mention_author=False)
+    async def ban(self, ctx: commands.Context, member: typing.Optional[discord.Member] = None, *, reason: typing.Optional[str] = None):
+        if member is None:
+            member = await _infer_member(ctx)
+            if member is None:
+                return await ctx.reply("Gunakan: `!ban @user [alasan]` atau **reply** pesan user lalu ketik `!ban`.", delete_after=12)
+        if member == ctx.author:
+            return await ctx.reply("Tidak bisa ban diri sendiri.", delete_after=8)
+        if ctx.guild.owner_id == member.id:
+            return await ctx.reply("Tidak bisa ban pemilik server.", delete_after=8)
+        try:
+            await member.ban(reason=reason or f"By {ctx.author}")
+        except discord.Forbidden:
+            return await ctx.reply("Bot tidak punya izin ban user ini.", delete_after=8)
+        except Exception as e:
+            return await ctx.reply(f"Gagal ban: {e}", delete_after=10)
+        e = build_realban_embed(member, ctx.author, reason)
+        await ctx.send(embed=e)
 
 async def setup(bot: commands.Bot):
-    # Remove old commands if present to avoid duplicates
-    for name in ("ban","tb","testban"):
-        try:
-            cmd = bot.get_command(name)
-            if cmd:
-                bot.remove_command(name)
-        except Exception:
-            pass
     await bot.add_cog(BanCommands(bot))
