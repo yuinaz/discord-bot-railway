@@ -11,18 +11,24 @@ def _ids(s: str):
         except: pass
     return out
 
-NAMES = {p.strip().lower() for p in (os.getenv("MOD_ROLE_NAMES","admin, moderator, mod, staff").replace(';',',')).split(',') if p.strip()}
+DEFAULT_NAMES = "admin, administrator, moderator, mod, staff"
+NAMES = {p.strip().lower() for p in (os.getenv("MOD_ROLE_NAMES", DEFAULT_NAMES).replace(';',',')).split(',') if p.strip()}
 RID   = _ids(os.getenv("MOD_ROLE_IDS",""))
 UID   = _ids(os.getenv("MOD_USER_IDS",""))
 
 def is_mod(member: discord.Member)->bool:
-    if member.guild.owner_id == member.id: return True
+    if member is None: return False
     if member.id in UID: return True
-    if member.guild_permissions.administrator or member.guild_permissions.ban_members or member.guild_permissions.manage_messages: return True
-    names={r.name.lower() for r in getattr(member,'roles',[]) if r and r.name}
-    if names & NAMES: return True
+    # roles by id
     ids={int(r.id) for r in getattr(member,'roles',[]) if r}
     if ids & RID: return True
+    # roles by name
+    names={str(getattr(r,'name','')).strip().lower() for r in getattr(member,'roles',[]) if r}
+    if names & NAMES: return True
+    # fallback to permissions
+    perms = getattr(member, 'guild_permissions', None)
+    if perms and (perms.administrator or perms.ban_members or perms.kick_members or perms.manage_messages):
+        return True
     return False
 
 def require_mod():

@@ -1,23 +1,19 @@
 services:
   - type: web
-    name: SatpamBot
+    name: satpambot-free
     env: python
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python main.py
-    healthCheckPath: /ping
+    healthCheckPath: /healthz
     autoDeploy: true
     envVars:
-      - key: MODE
-        value: both
-      - key: TZ
-        value: Asia/Jakarta
-      - key: BOT_TOKEN
-        sync: false
-      - key: LOG_CHANNEL_ID
-        sync: false
-      - key: ADMIN_USERNAME
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: FLASK_SECRET_KEY
-        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_ENV
+        value: production
+      - key: RUN_BOT
+        value: "1"
+      - key: SOCKETIO_ASYNC_MODE
+        value: threading
+      - key: DISABLE_EVENTLET
+        value: "1"

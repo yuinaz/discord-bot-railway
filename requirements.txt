@@ -20,9 +20,13 @@ idna>=3.4
 numpy>=1.23.0
 SQLAlchemy>=2.0.0
 pytz
-eventlet>=0.35.2
+# eventlet>=0.35.2  # disabled for free plan (threading mode)
 greenlet>=3.0
 opencv-python-headless>=4.10
 tzdata>=2024.1
 gunicorn>=21.2
 imagehash
+flask
+flask-socketio
+discord.py
+python-dotenv
