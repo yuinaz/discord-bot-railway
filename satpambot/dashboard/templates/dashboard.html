@@ -49,3 +49,15 @@
     </div>
   </section>
 {% endblock %}
+
+<!-- Phishing Guard Card -->
+<section class="card" style="grid-column: span 1;">
+  <header class="card-head"><h3>Phishing Guard</h3></header>
+  <div id="phishDrop" class="dropzone">Seret & lepaskan gambar di sini atau klik untuk memilih…</div>
+  <input id="phishFile" type="file" accept="image/*" hidden multiple>
+  <div id="phishUrlRow">
+    <input id="phishUrl" type="url" placeholder="Tempel URL phishing untuk ditambahkan…">
+    <button id="phishUrlBtn" type="button">Tambah URL</button>
+  </div>
+  <div id="phishResult" class="muted small"></div>
+</section>
