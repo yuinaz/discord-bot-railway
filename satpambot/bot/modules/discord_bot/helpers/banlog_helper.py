@@ -1,61 +1,113 @@
-import os, logging, discord
+from __future__ import annotations
+import logging, os
+from typing import Optional
+import discord
+
 log = logging.getLogger(__name__)
+TARGET_THREAD_NAME = "Ban Log"
 
-TARGET_CHANNEL_NAME = os.getenv("BAN_LOG_CHANNEL_NAME", os.getenv("LOG_CHANNEL_NAME","log-botphising"))
-TARGET_THREAD_NAME  = os.getenv("BAN_LOG_THREAD_NAME", "Ban Log")
-
-async def _resolve_channel(guild: discord.Guild) -> discord.TextChannel | None:
-    ch_id = 0
-    for key in ("BAN_LOG_CHANNEL_ID","LOG_CHANNEL_ID"):
-        try:
-            ch_id = int(os.getenv(key, "0") or 0)
-            if ch_id:
-                break
-        except Exception:
-            ch_id = 0
-    ch = guild.get_channel(ch_id) if ch_id else None
-    if not isinstance(ch, discord.TextChannel) and TARGET_CHANNEL_NAME:
-        ch = discord.utils.get(guild.text_channels, name=TARGET_CHANNEL_NAME)
-    if not isinstance(ch, discord.TextChannel):
-        log.warning("[banlog] TextChannel not found (id=%s, name=%s)", ch_id, TARGET_CHANNEL_NAME)
-        return None
-    perms = ch.permissions_for(guild.me)
-    if not (perms and (perms.send_messages or perms.create_public_threads)):
-        log.warning("[banlog] Bot lacks permission to log in #%s", getattr(ch, 'name', '?'))
-    return ch
-
-async def _find_existing_thread(ch: discord.TextChannel) -> discord.Thread | None:
+def _to_int(val: str) -> int:
     try:
-        for th in list(getattr(ch, 'threads', [])) or []:
-            if isinstance(th, discord.Thread) and th.name == TARGET_THREAD_NAME:
-                return th
+        return int((val or "").strip())
     except Exception:
-        pass
-    # Try archived threads
+        return 0
+
+# -------------- Resolution helpers --------------
+def _resolve_thread_host_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
+    """Return the channel where the Ban Log THREAD must live.
+    Always prefer #log-botphising (LOG_CHANNEL_ID/LOG_CHANNEL_NAME).
+    """
+    # ID wins
+    log_id = _to_int(os.getenv("LOG_CHANNEL_ID", ""))
+    if log_id:
+        ch = guild.get_channel(log_id)
+        if isinstance(ch, discord.TextChannel):
+            return ch
+    # Name (explicit)
+    for key in ("LOG_CHANNEL_NAME", ):
+        nm = (os.getenv(key, "") or "").strip()
+        if nm:
+            cand = discord.utils.get(guild.text_channels, name=nm)
+            if isinstance(cand, discord.TextChannel):
+                return cand
+    # Hard default
+    cand = discord.utils.get(guild.text_channels, name="log-botphising")
+    if isinstance(cand, discord.TextChannel):
+        return cand
+    return None
+
+def _resolve_announce_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
+    """Return the public channel to announce a successful ban (e.g. #💬︲ngobrol).
+    Priority: BAN_LOG_CHANNEL_ID > LOG_BAN_CHANNEL_ID > BAN_LOG_CHANNEL_NAME > '💬︲ngobrol'.
+    """
+    for key in ("BAN_LOG_CHANNEL_ID", "LOG_BAN_CHANNEL_ID"):
+        cid = _to_int(os.getenv(key, ""))
+        if cid:
+            ch = guild.get_channel(cid)
+            if isinstance(ch, discord.TextChannel):
+                return ch
+    nm = (os.getenv("BAN_LOG_CHANNEL_NAME","") or "").strip()
+    if nm:
+        cand = discord.utils.get(guild.text_channels, name=nm)
+        if isinstance(cand, discord.TextChannel):
+            return cand
+    # Default common name
+    for name_try in ("💬︲ngobrol", "ngobrol", "general"):
+        cand = discord.utils.get(guild.text_channels, name=name_try)
+        if isinstance(cand, discord.TextChannel):
+            return cand
+    return None
+
+# -------------- Public helpers --------------
+async def get_banlog_thread(guild: discord.Guild) -> Optional[discord.Thread]:
+    """Get or create the 'Ban Log' thread UNDER #log-botphising ONLY."""
+    host = _resolve_thread_host_channel(guild)
+    if not isinstance(host, discord.TextChannel):
+        log.warning("[banlog] host channel for thread not found in guild %s", getattr(guild, "name", "?"))
+        return None
+
+    # Search existing threads ONLY under this host
     try:
-        async for th in ch.archived_threads(limit=50):
-            if th.name == TARGET_THREAD_NAME:
+        # active
+        for th in host.threads:
+            if isinstance(th, discord.Thread) and th.name == TARGET_THREAD_NAME:
                 if th.archived:
                     try:
                         await th.edit(archived=False, locked=False)
                     except Exception:
                         pass
                 return th
+    except Exception:
+        pass
+
+    try:
+        async for th in host.archived_threads(limit=50):
+            if th.name == TARGET_THREAD_NAME:
+                try:
+                    await th.edit(archived=False, locked=False)
+                except Exception:
+                    pass
+                return th
     except Exception as e:
         log.debug("[banlog] archived_threads fetch failed: %s", e)
-    return None
 
-async def get_banlog_thread(guild: discord.Guild) -> discord.Thread | discord.TextChannel | None:
-    ch = await _resolve_channel(guild)
-    if not isinstance(ch, discord.TextChannel):
-        return None
-    th = await _find_existing_thread(ch)
-    if th:
-        return th
-    # Create a new thread if possible
+    # Create new one under the correct host
     try:
-        th = await ch.create_thread(name=TARGET_THREAD_NAME, type=discord.ChannelType.public_thread, auto_archive_duration=10080)
+        th = await host.create_thread(name=TARGET_THREAD_NAME, type=discord.ChannelType.public_thread, auto_archive_duration=10080)
         return th
     except Exception as e:
-        log.warning("[banlog] create_thread failed: %s (fallback=channel)", e)
-        return ch
+        log.warning("[banlog] create_thread failed under #%s: %s", getattr(host, "name","?"), e)
+        return None
+
+async def send_public_ban_announcement(guild: discord.Guild, embed: discord.Embed) -> bool:
+    """Send a copy of the ban embed to the public announcement channel."""
+    ch = _resolve_announce_channel(guild)
+    if not isinstance(ch, discord.TextChannel):
+        log.warning("[banlog] announce channel not found for guild %s", getattr(guild, "name", "?"))
+        return False
+    try:
+        await ch.send(embed=embed)
+        return True
+    except Exception as e:
+        log.warning("[banlog] send announcement failed in #%s: %s", getattr(ch, "name","?"), e)
+        return False

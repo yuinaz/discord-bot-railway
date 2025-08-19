@@ -1,66 +1,39 @@
+
 <!doctype html>
 <html lang="id">
-<head>
-  <meta charset="utf-8">
-  <title>Login • SatpamBot</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/css/login_modern.css?v={{ cache_bust|default(0) }}">
-  <style>
-    :root{ --bg:#0b111b; --text:#e6edf3; --panel:#ffffff; --line:#e5e7eb; --muted:#6b7280; --accent:#2563eb; }
-    #particles-js{ position:fixed; inset:0; z-index:-2; opacity:.85; pointer-events:none; }
-    #bgVideo{ position:fixed; inset:0; z-index:-3; min-width:100%; min-height:100%; width:auto; height:auto; object-fit:cover; display:none; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <div class="grid">
-        <div class="left">
-          <div class="brand">
-            <img src="/static/img/icon-user.svg" alt="Logo">
-            <h1>SatpamBot Dashboard</h1>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SatpamBot Dashboard - Login</title>
+    <link rel="stylesheet" href="/dashboard-static/css/login_modern.css">
+    <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
+  </head>
+  <body>
+    <a class="back" href="javascript:history.back()">⟵ Kembali</a>
+    <div class="login-wrap">
+      <div class="card">
+        <div class="avatar">👤</div>
+        <h1>Masuk</h1>
+        <p class="desc">Gunakan kredensial admin yang valid.</p>
+        <form method="post">
+          <div class="form-row">
+            <div class="label">👤</div>
+            <input class="input" name="username" placeholder="Username" required>
           </div>
-          <p class="tag">
-            Selamat datang kembali. Masuk untuk mengelola bot & dashboard.
-            Tampilan login ini mengikuti <b>Theme</b> dan <b>Background</b> dari Settings.
-          </p>
-          <ul class="tag" style="margin:0; padding-left:18px;">
-            <li>Background mode: <i>Image</i>, <i>Particles</i>, atau <i>Video</i></li>
-            <li>Theme: Dark/Light + preset lain & custom JSON</li>
-            <li>Warna aksen mengikuti Settings</li>
-          </ul>
-        </div>
-        <div class="right">
-          <form class="form" method="post" action="">
-            <h2>Masuk</h2>
-            <p class="sub">Gunakan kredensial admin yang valid.</p>
-            {% if error %}
-              <div class="error">{{ error }}</div>
-            {% endif %}
-            <label for="username">Username</label>
-            <input id="username" name="username" type="text" placeholder="username" autocomplete="username" required>
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required>
-            <div class="row">
-              <label class="remember">
-                <input type="checkbox" name="remember" value="1">
-                <span>Ingat saya</span>
-              </label>
-              <a href="#" style="color:#334155; font-size:12px; text-decoration:none" onclick="return false">Lupa password?</a>
-            </div>
-            {% if next_url %}
-              <input type="hidden" name="next" value="{{ next_url }}">
-            {% endif %}
+          <div class="form-row">
+            <div class="label">🔒</div>
+            <input class="input" type="password" name="password" placeholder="Password" required>
+          </div>
+          <div class="actions">
+            <label><input type="checkbox" name="remember"> Ingat saya</label>
+            <a class="link" href="#">Lupa password?</a>
+          </div>
+          <div class="actions" style="justify-content:center;margin-top:12px">
             <button class="btn" type="submit">Login</button>
-            <p class="note">Dengan masuk, Anda menyetujui ketentuan yang berlaku.</p>
-          </form>
-        </div>
+          </div>
+        </form>
+        <div class="note">Tampilan login mengikuti <b>Theme</b> dan <b>Background</b> dari Settings.</div>
       </div>
     </div>
-  </div>
-  <div id="particles-js"></div>
-  <video id="bgVideo" autoplay muted loop playsinline></video>
-  <script src="/static/js/particles_login.js?v={{ cache_bust|default(0) }}"></script>
-  <script src="/dashboard-static/ui_theme_bridge.js"></script>
-</body>
+  </body>
 </html>

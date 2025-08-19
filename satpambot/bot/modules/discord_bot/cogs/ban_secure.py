@@ -4,7 +4,7 @@ from typing import Optional
 import discord
 from discord.ext import commands
 from satpambot.bot.modules.discord_bot.utils.perm import require_mod
-from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread
+from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread, send_public_ban_announcement
 
 log = logging.getLogger(__name__)
 GREEN = 0x3BA55D

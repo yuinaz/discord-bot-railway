@@ -20,7 +20,19 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents, allowed_mentions=allo
 @bot.event
 async def on_ready():
     import time
+    try:
+        from satpambot.bot.modules.discord_bot.helpers import log_utils
+    except Exception:
+        log_utils=None  # type: ignore
+    
+    import time
     if not getattr(bot, 'start_time', None): bot.start_time = time.time()
+    try:
+        if log_utils:
+            for g in list(getattr(bot, 'guilds', []) or []):
+                log_utils.log_startup_status(bot, g)
+    except Exception:
+        pass
     try:
         log.info("✅ Bot login as %s (%s)", bot.user, bot.user.id if bot.user else "?")
     except Exception:
