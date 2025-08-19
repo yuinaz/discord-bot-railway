@@ -1,78 +1,43 @@
-# Robust WSGI entrypoint for Render: expose `app`
-import logging, os
+# WSGI entry for Render + optional direct runner.
+import os
 from importlib import import_module
 
-# Import helpers (no-op fallbacks if missing)
+def _noop(*a, **k): ...
 try:
     from satpambot.dashboard.healthz_quiet import silence_healthz_logs, ensure_healthz_route
 except Exception:
-    def silence_healthz_logs(*args, **kwargs): pass
+    silence_healthz_logs = _noop
     def ensure_healthz_route(app): pass
 
-try:
-    from satpambot.dashboard.webui import register_webui as _register_webui_bp
-except Exception:
-    def _register_webui_bp(app): pass
-
-# Try to import the real dashboard app defined by project
-def _load_app():
-    # Preferred location
-    candidates = [
-        "satpambot.dashboard.app_dashboard",
-        "app_dashboard",  # fallback if app_dashboard.py is at project root
-    ]
-    for modname in candidates:
+def _load_real_app():
+    for name in ("satpambot.dashboard.app_dashboard", "app_dashboard"):
         try:
-            mod = import_module(modname)
+            mod = import_module(name)
+            app = getattr(mod, "app", None) or (getattr(mod, "create_app", None) and mod.create_app())
+            if app: return app
         except Exception:
             continue
-        # common names: app / create_app()
-        app = getattr(mod, "app", None)
-        if app is not None:
-            return app
-
-        create_app = getattr(mod, "create_app", None)
-        if create_app is not None:
-            try:
-                app = create_app()
-                if app is not None:
-                    return app
-            except Exception:
-                pass
-    # Last resort minimal Flask app (should not be used in normal deploys)
     from flask import Flask
-    _app = Flask(__name__)
-    @_app.get("/")
-    def _root():
-        return "OK", 200
-    return _app
+    app = Flask(__name__)
+    @app.get("/")
+    def _root(): return "OK", 200
+    return app
 
-app = _load_app()
+app = _load_real_app()
 
-# Quiet noisy access logs AFTER we successfully have an app
+try: silence_healthz_logs()
+except Exception: pass
+try: ensure_healthz_route(app)
+except Exception: pass
+
+# Register builtin dashboard blueprint (idempotent, serves /dashboard and /api/* only)
 try:
-    silence_healthz_logs()
+    from satpambot.dashboard.webui import register_webui_builtin
+    register_webui_builtin(app)
 except Exception:
     pass
 
-# Ensure /healthz exists (idempotent)
-try:
-    ensure_healthz_route(app)
-except Exception:
-    pass
-
-# Only register our lightweight dashboard blueprint if "/" is not already handled.
-def _has_root_route(_app):
-    try:
-        for r in _app.url_map.iter_rules():
-            if r.rule == "/":
-                return True
-    except Exception:
-        pass
-    return False
-
-try:
-    if not _has_root_route(app):
-        _register_webui_bp(app)
-except Exception:
-    pass
+if __name__ == "__main__":
+    # Allow running: python app.py (Render will set $PORT)
+    port = int(os.environ.get("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port, debug=False)
