@@ -1,26 +1,51 @@
+
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
-<div class="kpi-grid" id="kpiGrid">
-  <div class="kpi"><div class="kpi-title">Online</div><div class="kpi-value" id="onlineCount">--</div><canvas id="sp1"></canvas></div>
-  <div class="kpi"><div class="kpi-title">Member</div><div class="kpi-value" id="memberCount">--</div><canvas id="sp2"></canvas></div>
-  <div class="kpi"><div class="kpi-title">Channels</div><div class="kpi-value" id="channelCount">--</div><canvas id="sp3"></canvas></div>
-  <div class="kpi"><div class="kpi-title">Threads</div><div class="kpi-value" id="threadCount">--</div><canvas id="sp4"></canvas></div>
-</div>
+  <section class="kpi-row">
+    <div class="kpi"><div class="label">Online</div><div class="value" id="kpi-online-big">--</div><canvas id="sp1"></canvas></div>
+    <div class="kpi"><div class="label">Members</div><div class="value" id="kpi-members-big">--</div><canvas id="sp2"></canvas></div>
+    <div class="kpi"><div class="label">Channels</div><div class="value" id="kpi-channels">--</div><canvas id="sp3"></canvas></div>
+    <div class="kpi"><div class="label">Threads</div><div class="value" id="kpi-threads">--</div><canvas id="sp4"></canvas></div>
+  </section>
 
-<div class="grid">
-  <div class="card">
-    <div class="card-title">Status Servers</div>
-    <table class="table" id="srvTable">
-      <thead><tr><th>Nama</th><th>Status</th><th>Ping</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-  <div class="card">
-    <div class="card-title">Activity</div>
-    <div id="activity">Gagal memuat data.</div>
-  </div>
-</div>
-<script defer src="/dashboard-static/js/mini_monitor.js"></script>
+  <section class="grid">
+    <div class="left-col">
+      <div class="panel">
+        <div class="hd"><strong>Recent Activity</strong><span class="badge">Live</span></div>
+        <div class="bd"><canvas id="recentChart" class="spark"></canvas></div>
+      </div>
+      <div class="panel" style="margin-top:18px">
+        <div class="hd"><strong>Changes</strong></div>
+        <div class="bd">
+          <table class="table" id="changesTbl">
+            <thead><tr><th>#</th><th>By</th><th>At</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="right-col">
+      <div class="panel">
+        <div class="hd"><strong>Servers</strong> <span class="badge" id="apiPing">...</span></div>
+        <div class="bd">
+          <table class="table" id="serversTbl">
+            <thead><tr><th>Nama</th><th>Status</th><th>Ping</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="hd"><strong>Today note</strong></div>
+        <div class="bd"><div contenteditable="true" id="note" style="min-height:90px;background:#0a1836;border:1px solid #1a2a55;border-radius:12px;padding:10px">Tulis catatan…</div></div>
+      </div>
+      <div class="panel">
+        <div class="hd"><strong>My files</strong></div>
+        <div class="bd">
+          <input type="file" id="quickUpload" />
+          <div id="uploadHint" class="badge" style="margin-left:8px">Upload → /uploads/</div>
+        </div>
+      </div>
+    </div>
+  </section>
 {% endblock %}

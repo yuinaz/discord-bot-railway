@@ -1,23 +1,46 @@
+
 <!doctype html>
 <html lang="id">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{% block title %}Dashboard{% endblock %}</title>
-  <link rel="stylesheet" href="/dashboard-static/css/dashboard.css">
-  <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
-</head>
-<body class="dash">
-  <aside class="sidebar">
-    <div class="brand">🛡️ SatpamBot</div>
-    <nav>
-      <a href="/dashboard">Dashboard</a>
-      <a href="/dashboard/settings">Settings</a>
-      <a href="/dashboard/security">Security</a>
-      <a href="/logout">Logout</a>
-    </nav>
-    <a class="back" href="javascript:history.back()">⟵ Kembali</a>
-  </aside>
-  <main class="content">
-    {% block content %}{% endblock %}
-  </main>
-</body></html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}Dashboard{% endblock %}</title>
+    <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css">
+    <script defer src="/dashboard-static/js/neo_dashboard.js"></script>
+    <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="rail">
+        <div class="logo">🛡️</div>
+        <a class="icon active" title="Dashboard" href="/dashboard">🏠</a>
+        <a class="icon" title="Security" href="/dashboard/security">🛡️</a>
+        <a class="icon" title="Settings" href="/dashboard/settings">⚙️</a>
+        <a class="icon" title="Logout" href="/logout">⏻</a>
+      </div>
+      <aside class="sidebar">
+        <div class="brand"><div class="avatar">🛡️</div> SatpamBot</div>
+        <nav class="menu">
+          <a class="{% if request.path.startswith('/dashboard') and request.path == '/dashboard' %}active{% endif %}" href="/dashboard">Dashboard</a>
+          <a class="{% if request.path.startswith('/dashboard/security') %}active{% endif %}" href="/dashboard/security">Security</a>
+          <a class="{% if request.path.startswith('/dashboard/settings') %}active{% endif %}" href="/dashboard/settings">Settings</a>
+          <small>Other</small>
+          <a href="/logout">Logout</a>
+        </nav>
+        <a class="back" href="javascript:history.back()">⟵ Kembali</a>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div class="search">🔎 <span id="top-text">Make Things Simple !</span></div>
+          <div class="top-actions">
+            <span class="badge">Online <span id="kpi-online">--</span></span>
+            <span class="badge">Members <span id="kpi-members">--</span></span>
+            <div class="avatar" style="width:34px;height:34px;border-radius:999px;background:#1a3f95;display:grid;place-items:center;">👤</div>
+          </div>
+        </div>
+        {% block content %}{% endblock %}
+        <div class="footer">SatpamBot Dashboard • Neo Aurora+ skin</div>
+      </main>
+    </div>
+  </body>
+</html>
