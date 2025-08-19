@@ -138,3 +138,43 @@ async def upsert_status_embed(bot: discord.Client, guild: discord.Guild):
     ch = await _find_channel_by_id_or_name(bot, guild)
     if ch:
         await upsert_status_embed_in_channel(bot, ch)
+
+
+def log_startup_status(bot: discord.Client, guild: discord.Guild) -> None:
+    """Print INFO logs showing how status/log channel is resolved (for diagnostics)."""
+    raw_status_id = os.getenv("STATUS_CHANNEL_ID", "")
+    raw_log_id    = os.getenv("LOG_CHANNEL_ID", "")
+    raw_status_nm = os.getenv("STATUS_CHANNEL_NAME", "")
+    raw_log_nm    = os.getenv("LOG_CHANNEL_NAME", "")
+    def _to_int(x: str) -> int:
+        try:
+            return int(x.strip())
+        except Exception:
+            return 0
+    sid = _to_int(raw_status_id)
+    lid = _to_int(raw_log_id)
+    log.info("[status] LOG_CHANNEL_ID_RAW='%s' parsed=%s LOG_CHANNEL_NAME='%s'",
+             raw_log_id or raw_status_id, lid or sid, raw_log_nm or raw_status_nm)
+
+    # Resolve channel using same logic as runtime
+    ch = None
+    if sid or lid:
+        ch = guild.get_channel(sid or lid)
+    if not isinstance(ch, discord.TextChannel):
+        # fallback names
+        names = [raw_status_nm, raw_log_nm, "log-botphising", "general"]
+        for nm in names:
+            nm = (nm or "").strip()
+            if not nm:
+                continue
+            cand = discord.utils.get(guild.text_channels, name=nm)
+            if isinstance(cand, discord.TextChannel):
+                ch = cand
+                break
+    if isinstance(ch, discord.TextChannel):
+        log.info("[status] using log channel: #%s (id=%s) in guild='%s' (id=%s)",
+                 getattr(ch, "name", "?"), getattr(ch, "id", "?"),
+                 getattr(guild, "name", "?"), getattr(guild, "id", "?"))
+    else:
+        log.warning("[status] log channel not found in guild='%s' (id=%s)",
+                    getattr(guild, "name", "?"), getattr(guild, "id", "?"))

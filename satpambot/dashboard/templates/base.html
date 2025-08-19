@@ -1,47 +1,25 @@
+
 <!doctype html>
-<html lang="en" data-theme="{{ theme|default('dark') }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SatpamBot</title>
-  <link rel="icon" href="/static/img/icon-user.svg">
-  <link rel="stylesheet" href="/static/css/dashboard.css?v={{ cache_bust }}">
-</head>
-<body class="{{ theme }}">
-  <div id="app-shell">
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}Dashboard{% endblock %}</title>
+    <link rel="stylesheet" href="/dashboard-static/css/dashboard.css">
+    <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
+  </head>
+  <body class="dash">
     <aside class="sidebar">
       <div class="brand">🛡️ SatpamBot</div>
-      <nav class="menu">
+      <nav>
         <a href="/dashboard">Dashboard</a>
+        <a href="/settings">Settings</a>
         <a href="/logout">Logout</a>
       </nav>
+      <a class="back" href="javascript:history.back()">⟵ Kembali</a>
     </aside>
     <main class="content">
-      <header class="topbar">
-        <div>Dashboard</div>
-        <div class="spacer"></div>
-        <div class="user">{{ session.get('username','') }}</div>
-      </header>
-
-      <div id="mini-monitor" class="card" style="margin-bottom:1rem;">
-        <div class="card-body">
-          <div class="row between center">
-            <div>
-              <div style="font-weight:600;">Mini Monitor</div>
-              <div id="mm-uptime" style="opacity:.8;font-size:.9rem;">Uptime: --</div>
-            </div>
-            <div style="text-align:right;">
-              <div id="mm-cpu" style="font-weight:600;">CPU: --%</div>
-              <div id="mm-ram" style="opacity:.8;">RAM: -- MB</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {% block content %}{% endblock %}
     </main>
-  </div>
-
-  <script src="/static/js/mini_monitor.js?v={{ cache_bust }}"></script>
-</body>
+  </body>
 </html>

@@ -166,3 +166,69 @@ def login_post():
         session["auth"] = True
         return redirect(url_for("root"))
     return "Invalid credentials", 401
+
+
+
+from flask import request, jsonify, send_from_directory
+import os, json, time
+UPLOAD_DIR = DATA_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+UI_CFG = DATA_DIR / "ui_config.json"
+
+def _load_ui():
+    if UI_CFG.exists():
+        try:
+            return json.loads(UI_CFG.read_text('utf-8'))
+        except Exception:
+            return {}
+    return {}
+
+def _save_ui(d):
+    UI_CFG.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding='utf-8')
+
+@app.get("/api/ui-config")
+def api_ui_get():
+    return jsonify(_load_ui())
+
+@app.post("/api/ui-config")
+def api_ui_set():
+    d = _load_ui()
+    body = request.get_json(silent=True) or {}
+    d.update({k:v for k,v in body.items() if k in ("theme","accent_color","background_mode","background_url","apply_to_login")})
+    _save_ui(d)
+    return jsonify({"ok":True, "cfg": d})
+
+@app.post("/api/upload/background")
+def api_upload_bg():
+    f = request.files.get('file')
+    if not f: return jsonify({"ok":False,"error":"no file"}), 400
+    name = f"bg_{int(time.time())}_{f.filename.replace(' ','_')}"
+    path = UPLOAD_DIR / name
+    f.save(str(path))
+    url = f"/uploads/{name}"
+    d = _load_ui(); d["background_url"] = url
+    _save_ui(d)
+    return jsonify({"ok":True,"url":url})
+
+@app.get("/uploads/<path:filename>")
+def uploaded_files(filename):
+    return send_from_directory(str(UPLOAD_DIR), filename)
+
+@app.get("/api/metrics")
+def api_metrics():
+    # lightweight metrics (no psutil hard dependency)
+    try:
+        import psutil, os
+        mem = psutil.Process(os.getpid()).memory_info().rss/1024/1024
+        cpu = psutil.cpu_percent(interval=0.05)
+    except Exception:
+        mem, cpu = 0, 0
+    start = getattr(app, "start_ts", None) or int(time.time())
+    if not getattr(app, "start_ts", None):
+        app.start_ts = start
+    up = int(time.time()-start)
+    return jsonify({"uptime": up, "cpu": cpu, "mem_mb": mem, "servers":[
+        {"name":"Local Web (127.0.0.1:8080)","status":"DOWN","ping_ms":1},
+        {"name":"Discord API","status":"UP","ping_ms":5},
+    ]})
