@@ -1,19 +1,18 @@
-
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <h1>Dashboard</h1>
-<div class="grid grid-4" id="top-cards">
-  <div class="card" id="card-views"><div class="kpi"><div class="kpi-title">Total Messages</div><div class="kpi-value" id="kpi-total">--</div><canvas data-spark="total"></canvas></div></div>
-  <div class="card"><div class="kpi"><div class="kpi-title">Avg Latency (ms)</div><div class="kpi-value" id="kpi-lat">--</div><canvas data-spark="lat"></canvas></div></div>
-  <div class="card"><div class="kpi"><div class="kpi-title">Uptime</div><div class="kpi-value" id="kpi-up">--</div><canvas data-spark="up"></canvas></div></div>
-  <div class="card"><div class="kpi"><div class="kpi-title">Guilds</div><div class="kpi-value" id="kpi-g">--</div><canvas data-spark="g"></canvas></div></div>
+<div class="kpi-grid" id="kpiGrid">
+  <div class="kpi"><div class="kpi-title">Online</div><div class="kpi-value" id="onlineCount">--</div><canvas id="sp1"></canvas></div>
+  <div class="kpi"><div class="kpi-title">Member</div><div class="kpi-value" id="memberCount">--</div><canvas id="sp2"></canvas></div>
+  <div class="kpi"><div class="kpi-title">Channels</div><div class="kpi-value" id="channelCount">--</div><canvas id="sp3"></canvas></div>
+  <div class="kpi"><div class="kpi-title">Threads</div><div class="kpi-value" id="threadCount">--</div><canvas id="sp4"></canvas></div>
 </div>
 
-<div class="grid grid-2">
+<div class="grid">
   <div class="card">
     <div class="card-title">Status Servers</div>
-    <table class="table" id="tbl-servers">
+    <table class="table" id="srvTable">
       <thead><tr><th>Nama</th><th>Status</th><th>Ping</th></tr></thead>
       <tbody></tbody>
     </table>
@@ -23,5 +22,5 @@
     <div id="activity">Gagal memuat data.</div>
   </div>
 </div>
-<script src="/dashboard-static/js/mini_monitor.js?v=1"></script>
+<script defer src="/dashboard-static/js/mini_monitor.js"></script>
 {% endblock %}

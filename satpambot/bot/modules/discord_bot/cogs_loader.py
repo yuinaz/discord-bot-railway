@@ -45,3 +45,8 @@ async def load_all(bot):
 
 async def load_cogs(bot):
     return await load_all(bot)
+# ensure anti_image_phish_guard is loadable (unless disabled)
+try:
+    from satpambot.bot.modules.discord_bot.cogs import anti_image_phish_guard  # noqa: F401
+except Exception:
+    pass

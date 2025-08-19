@@ -50,3 +50,10 @@ async def start_bot():
     if not token:
         raise RuntimeError("ENV DISCORD_TOKEN / BOT_TOKEN tidak diset")
     await bot.start(token)
+
+# Bridge bot -> dashboard
+try:
+    from satpambot.dashboard.discord_bridge import set_bot as _dash_set_bot
+    _dash_set_bot(bot)
+except Exception:
+    pass
