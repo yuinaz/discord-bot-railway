@@ -1,89 +1,65 @@
-
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
 {% block content %}
 <h1>Settings</h1>
 <form id="uiForm" class="form">
-  <div class="grid grid-2">
-    <div class="card">
-      <label>Logo URL</label>
-      <div class="row">
-        <input id="logo_url" placeholder="https://.../logo.png">
-        <button type="button" class="btn" id="upload_logo_btn">Browse</button>
-        <input type="file" id="logo_file" style="display:none" accept="image/*">
-      </div>
-
+  <div class="grid two">
+    <div class="card"><div class="card-title">Logo</div>
+      <input id="logoUrl" placeholder="https://.../logo.png">
+      <input id="logoFile" type="file" accept="image/*">
+      <button class="btn" id="btnLogoUp" type="button">Upload</button>
+    </div>
+    <div class="card"><div class="card-title">Theme & Background</div>
+      <label>Accent Color</label>
+      <input id="accentColor" placeholder="#2563eb" value="#2563eb">
       <label>Theme</label>
       <select id="theme">
         <option>Dark</option><option>Light</option><option>Nord</option><option>Dracula</option><option>Ocean</option><option>Forest</option>
       </select>
-
-      <label>Background URL</label>
-      <div class="row">
-        <input id="bg_url" placeholder="https://.../background.jpg">
-        <button type="button" class="btn" id="upload_bg_btn">Browse</button>
-        <input type="file" id="bg_file" style="display:none" accept="image/*,video/*">
-      </div>
-
-      <div class="row">
-        <button class="btn" type="submit">Simpan</button>
-        <a class="btn ghost" href="javascript:history.back()">Kembali</a>
-      </div>
-    </div>
-
-    <div class="card">
-      <label>Accent Color</label>
-      <input id="accent" value="#2563eb">
-
       <label>Background Mode</label>
-      <select id="mode"><option>Image</option><option>Video</option><option>Particles</option></select>
-
-      <label><input type="checkbox" id="apply_login"> Terapkan theme & background ke halaman Login</label>
+      <select id="bgMode"><option>Image</option><option>Video</option></select>
+      <label>Background URL</label>
+      <input id="bgUrl" placeholder="https://.../background.jpg">
+      <input id="bgFile" type="file" accept="image/*,video/*">
+      <button class="btn" id="btnBgUp" type="button">Upload</button>
     </div>
   </div>
+  <button class="btn" type="submit">Simpan</button>
+  <a class="btn ghost" href="/dashboard">Kembali</a>
 </form>
-
 <script>
-(async function(){
-  // load cfg
-  const res = await fetch('/api/ui-config', {credentials:'include'}); 
-  const cfg = res.ok ? await res.json(): {};
-  document.getElementById('logo_url').value = cfg.logo_url || '';
-  document.getElementById('bg_url').value = cfg.background_url || '';
-  document.getElementById('theme').value = (cfg.theme||'Dark').replace(/\b\w/g,s=>s.toUpperCase());
-  document.getElementById('accent').value = cfg.accent_color || '#2563eb';
-  document.getElementById('mode').value = (cfg.background_mode||'Image').replace(/\b\w/g,s=>s.toUpperCase());
-  document.getElementById('apply_login').checked = !!cfg.apply_to_login;
-
-  // uploads
-  const pickUpload = (btnId, fileId, targetInputId)=>{
-    const btn = document.getElementById(btnId);
-    const file = document.getElementById(fileId);
-    btn.onclick = ()=> file.click();
-    file.onchange = async ()=>{
-      const f = file.files[0]; if(!f) return;
-      const fd = new FormData(); fd.append('file', f);
-      const r = await fetch('/api/upload/background', {method:'POST', body: fd});
-      const j = await r.json(); if(j.ok && j.url){ document.getElementById(targetInputId).value = j.url; }
-    };
+async function upload(file){
+  const fd=new FormData(); fd.append('file', file);
+  const r=await fetch('/api/upload/background',{method:'POST',body:fd});
+  const j=await r.json(); if(j.ok) return j.url; alert(j.error||'Upload gagal'); return null;
+}
+async function init(){
+  const res=await fetch('/api/ui-config'); const cfg=await res.json();
+  document.getElementById('accentColor').value = cfg.accent_color||'#2563eb';
+  document.getElementById('theme').value = (cfg.theme||'Dark')[0].toUpperCase()+ (cfg.theme||'Dark').slice(1);
+  document.getElementById('bgMode').value = (cfg.background_mode||'Image')[0].toUpperCase()+ (cfg.background_mode||'Image').slice(1);
+  document.getElementById('bgUrl').value = cfg.background_url||'';
+}
+document.getElementById('btnBgUp').onclick = async ()=>{
+  const f=document.getElementById('bgFile').files[0]; if(!f) return;
+  const url = await upload(f); if(url) document.getElementById('bgUrl').value=url;
+};
+document.getElementById('btnLogoUp').onclick = async ()=>{
+  const f=document.getElementById('logoFile').files[0]; if(!f) return;
+  const url = await upload(f); if(url) document.getElementById('logoUrl').value=url;
+};
+document.getElementById('uiForm').onsubmit = async (e)=>{
+  e.preventDefault();
+  const body={
+    accent_color: document.getElementById('accentColor').value,
+    theme: document.getElementById('theme').value.toLowerCase(),
+    background_mode: document.getElementById('bgMode').value.toLowerCase(),
+    background_url: document.getElementById('bgUrl').value,
+    logo_url: document.getElementById('logoUrl').value
   };
-  pickUpload('upload_logo_btn','logo_file','logo_url');
-  pickUpload('upload_bg_btn','bg_file','bg_url');
-
-  // save
-  document.getElementById('uiForm').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const body = {
-      logo_url: document.getElementById('logo_url').value.trim(),
-      background_url: document.getElementById('bg_url').value.trim(),
-      theme: document.getElementById('theme').value.toLowerCase(),
-      accent_color: document.getElementById('accent').value.trim(),
-      background_mode: document.getElementById('mode').value.toLowerCase(),
-      apply_to_login: document.getElementById('apply_login').checked
-    };
-    const r = await fetch('/api/ui-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    if(r.ok){ alert('Tersimpan.'); }
-  });
-})();
+  const r=await fetch('/api/ui-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if((await r.json()).ok){location.href='/dashboard';}
+};
+init();
 </script>
 {% endblock %}

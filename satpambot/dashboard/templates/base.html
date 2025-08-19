@@ -1,25 +1,23 @@
-
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>{% block title %}Dashboard{% endblock %}</title>
-    <link rel="stylesheet" href="/dashboard-static/css/dashboard.css">
-    <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
-  </head>
-  <body class="dash">
-    <aside class="sidebar">
-      <div class="brand">🛡️ SatpamBot</div>
-      <nav>
-        <a href="/dashboard">Dashboard</a>
-        <a href="/dashboard/settings">Settings</a>
-        <a href="/logout">Logout</a>
-      </nav>
-      <a class="back" href="javascript:history.back()">⟵ Kembali</a>
-    </aside>
-    <main class="content">
-      {% block content %}{% endblock %}
-    </main>
-  </body>
-</html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/dashboard-static/css/dashboard.css">
+  <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
+</head>
+<body class="dash">
+  <aside class="sidebar">
+    <div class="brand">🛡️ SatpamBot</div>
+    <nav>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard/settings">Settings</a>
+      <a href="/dashboard/security">Security</a>
+      <a href="/logout">Logout</a>
+    </nav>
+    <a class="back" href="javascript:history.back()">⟵ Kembali</a>
+  </aside>
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</body></html>

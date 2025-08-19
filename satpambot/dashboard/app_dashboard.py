@@ -312,3 +312,165 @@ def api_metrics():
     except Exception:
         servers.append({"name":"Discord API","status":"DOWN","ping_ms":None})
     return jsonify({"uptime":int(time.time()-start),"cpu":cpu,"mem_mb":mem,"servers":servers,"series":series,"guilds":1,"latency_ms":ping_ms,"total_msgs":0})
+
+
+
+from flask import Response
+from .discord_bridge import get_stats
+import time, json, io
+from PIL import Image
+try:
+    import imagehash
+except Exception:
+    imagehash = None
+
+PHISH_IMG_DB = DATA_DIR / "phish_image_signatures.json"
+PHISH_URL_DB = DATA_DIR / "phish_url_hashes.json"
+
+def _load_json(p):
+    if p.exists():
+        try:
+            return json.loads(p.read_text('utf-8'))
+        except Exception:
+            return []
+    return []
+
+def _save_json(p, data):
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+
+@app.get("/api/discord/stats")
+def api_discord_stats():
+    return jsonify(get_stats())
+
+@app.get("/api/discord/stream")
+def api_discord_stream():
+    def gen():
+        while True:
+            data = json.dumps(get_stats())
+            yield f"data: {data}\n\n"
+            time.sleep(5)
+    return Response(gen(), mimetype="text/event-stream")
+
+@app.post("/api/phish/images")
+def api_phish_images():
+    if imagehash is None:
+        return jsonify({"ok": False, "error":"imagehash not installed"}), 500
+    sigs = set(_load_json(PHISH_IMG_DB))
+    files = list(request.files.values())
+    added = []
+    for f in files:
+        try:
+            im = Image.open(io.BytesIO(f.read())).convert("RGB")
+            ph = str(imagehash.phash(im))
+            if ph not in sigs:
+                sigs.add(ph); added.append(ph)
+        except Exception as e:
+            pass
+    _save_json(PHISH_IMG_DB, sorted(list(sigs)))
+    return jsonify({"ok": True, "added": added, "total": len(sigs)})
+
+@app.get("/api/phish/images")
+def api_phish_images_list():
+    return jsonify({"ok": True, "signatures": _load_json(PHISH_IMG_DB)})
+
+def _canon_url(u: str) -> str:
+    try:
+        from urllib.parse import urlparse, urlunparse
+        up = urlparse(u.strip())
+        host = (up.hostname or "").lower()
+        path = (up.path or "/").rstrip("/") or "/"
+        query = ("?" + up.query) if up.query else ""
+        return f"{host}{path}{query}"
+    except Exception:
+        return u.strip().lower()
+
+@app.post("/api/phish/urls")
+def api_phish_urls():
+    body = request.get_json(silent=True) or {}
+    urls = body.get("urls") or []
+    if isinstance(urls, str): urls = [urls]
+    data = _load_json(PHISH_URL_DB)
+    known = set([d.get("canon") for d in data if isinstance(d, dict)])
+    added = []
+    import hashlib
+    for u in urls:
+        c = _canon_url(u)
+        if c and c not in known:
+            h = hashlib.sha256(c.encode("utf-8")).hexdigest()
+            rec = {"canon": c, "sha256": h}
+            data.append(rec); known.add(c); added.append(rec)
+    _save_json(PHISH_URL_DB, data)
+    return jsonify({"ok": True, "added": added, "total": len(data)})
+
+@app.get("/api/phish/urls")
+def api_phish_urls_list():
+    return jsonify({"ok": True, "urls": _load_json(PHISH_URL_DB)})
+
+@app.get("/dashboard/security")
+def dash_security():
+    return render_template("security.html")
+
+
+
+# ## PHISH_JSON_WIRE_MARKER
+from flask import request, jsonify
+import os, json
+from pathlib import Path
+
+PHISH_IMG_DB = os.getenv("PHISH_IMG_DB") or "data/phish_phash.json"
+PHISH_CFG_DB = os.getenv("PHISH_CONFIG_PATH") or "data/phish_config.json"
+
+def _json_read(path, default):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+def _json_write(path, data):
+    p = Path(path); p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+@app.get("/api/phish/config")
+def api_phish_cfg_get():
+    return jsonify(_json_read(PHISH_CFG_DB, {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}))
+
+@app.post("/api/phish/config")
+def api_phish_cfg_post():
+    d = _json_read(PHISH_CFG_DB, {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"})
+    body = request.get_json(silent=True) or {}
+    for k in ("autoban","threshold","log_thread_name"):
+        if k in body: d[k] = body[k]
+    _json_write(PHISH_CFG_DB, d)
+    return jsonify({"ok": True, "cfg": d})
+
+@app.get("/api/phish/images")
+def api_phish_images_get():
+    obj = _json_read(PHISH_IMG_DB, {"phash": []})
+    if isinstance(obj, list):
+        obj = {"phash": obj}
+    return jsonify(obj)
+
+@app.post("/api/phish/images")
+def api_phish_images_post():
+    # accept uploaded image -> compute phash and append
+    f = request.files.get('file')
+    if not f:
+        return jsonify({"ok": False, "error": "no file"}), 400
+    b = f.read()
+    try:
+        from PIL import Image
+        import imagehash, io as _io
+        im = Image.open(_io.BytesIO(b)).convert("L").resize((32, 32))
+        h = int(str(imagehash.phash(im)), 16)
+    except Exception:
+        return jsonify({"ok": False, "error": "hash failed"}), 500
+    obj = _json_read(PHISH_IMG_DB, {"phash": []})
+    if isinstance(obj, list):
+        obj = {"phash": obj}
+    arr = obj.get("phash", [])
+    arr.append(f"0x{h:x}")
+    obj["phash"] = arr
+    _json_write(PHISH_IMG_DB, obj)
+    return jsonify({"ok": True, "hash": f"0x{h:x}", "total": len(arr)})
