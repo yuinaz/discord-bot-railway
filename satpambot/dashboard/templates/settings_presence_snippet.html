@@ -1,0 +1,76 @@
+
+<!-- Presence Control (Mee6-like) -->
+<div class="card" style="margin-top:18px;padding:16px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div style="font-weight:700">Presence & Activity</div>
+    <span id="presence-status" style="margin-left:auto;font-size:12px;opacity:.75">—</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+    <label>Mode
+      <select id="pr-mode">
+        <option value="auto">Auto (dari bot)</option>
+        <option value="manual">Manual (pakai setelan di bawah)</option>
+      </select>
+    </label>
+    <label>Status
+      <select id="pr-status">
+        <option value="online">Online</option>
+        <option value="idle">Idle</option>
+        <option value="dnd">Do Not Disturb</option>
+        <option value="invisible">Invisible</option>
+      </select>
+    </label>
+    <label>Activity Type
+      <select id="pr-type">
+        <option value="playing">Playing</option>
+        <option value="listening">Listening</option>
+        <option value="watching">Watching</option>
+        <option value="competing">Competing</option>
+        <option value="streaming">Streaming (butuh URL)</option>
+      </select>
+    </label>
+    <label>Text
+      <input id="pr-text" placeholder="/help atau nama status">
+    </label>
+    <label>Stream URL
+      <input id="pr-url" placeholder="https://twitch.tv/xxx (opsional)">
+    </label>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button id="pr-save" class="ghostbtn">Save</button>
+    <button id="pr-reset" class="ghostbtn" title="Kembalikan ke Auto">Reset</button>
+  </div>
+</div>
+
+<script>
+(async function(){
+  async function load(){
+    const r = await fetch('/api/presence'); 
+    const d = r.ok ? await r.json() : {};
+    document.getElementById('pr-mode').value = d.mode || 'auto';
+    document.getElementById('pr-status').value = d.status || 'online';
+    document.getElementById('pr-type').value = d.type || 'playing';
+    document.getElementById('pr-text').value = d.text || '';
+    document.getElementById('pr-url').value = d.url || '';
+    document.getElementById('presence-status').textContent = d.mode==='manual' ? 'Manual active' : 'Auto';
+  }
+  async function save(body){
+    const r = await fetch('/api/presence', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    if(r.ok){ document.getElementById('presence-status').textContent = body.mode==='manual'?'Manual active':'Auto'; }
+  }
+  document.getElementById('pr-save').addEventListener('click', async ()=>{
+    const body = {
+      mode: document.getElementById('pr-mode').value,
+      status: document.getElementById('pr-status').value,
+      type: document.getElementById('pr-type').value,
+      text: document.getElementById('pr-text').value,
+      url: document.getElementById('pr-url').value
+    };
+    await save(body);
+  });
+  document.getElementById('pr-reset').addEventListener('click', async ()=>{
+    await save({mode:'auto'}); await load();
+  });
+  load();
+})();
+</script>

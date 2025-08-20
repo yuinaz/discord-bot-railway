@@ -2,30 +2,41 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SatpamBot - Login</title>
+
+  <!-- stylesheet asli -->
   <link rel="stylesheet" href="/dashboard-static/css/login_modern.css">
+
+  <!-- tambahan: theme helper untuk login (tidak mengubah layout) -->
+  <link rel="stylesheet" href="/dashboard-static/css/login_theme.css">
+
+  <!-- bridge (opsional, tidak wajib untuk login, boleh tetap) -->
   <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
 </head>
 <body>
   <div class="login-centre">
     <div class="card-wrap">
       <div class="avatar">👤</div>
-      <div class="card">
+      <!-- id="login-card" agar efek glass apply otomatis -->
+      <div class="card" id="login-card">
         <div class="title">Masuk</div>
         <p class="desc">Gunakan kredensial admin yang valid.</p>
         <form method="post" id="loginForm">
           <div class="form-row">
             <div class="icon">👤</div>
-            <input class="input" name="username" placeholder="Username" required>
+            <input class="input login-input" name="username" placeholder="Username" required>
           </div>
           <div class="form-row">
             <div class="icon">🔒</div>
-            <input class="input" type="password" name="password" placeholder="Password" required>
+            <input class="input login-input" type="password" name="password" placeholder="Password" required>
           </div>
         </form>
         <div class="dock">
-          <button type="submit" form="loginForm">LOGIN</button>
+          <button class="login-primary" type="submit" form="loginForm">LOGIN</button>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Terapkan theme & background untuk login (Particles 60fps / Image), aktif bila apply_login=true -->
+  <script src="/dashboard-static/js/login_apply_theme.js"></script>
 </body></html>

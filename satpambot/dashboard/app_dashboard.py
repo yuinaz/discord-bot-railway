@@ -80,7 +80,7 @@ def create_app() -> Flask:
     )
     app.register_blueprint(static_bp)
 
-    # Optional: serve NextJS static export if exists at data/next_build
+    # (Opsional) NextJS static export di data/next_build
     try:
         NEXT_DIR = DATA_DIR / "next_build"
         if NEXT_DIR.exists():
@@ -88,6 +88,13 @@ def create_app() -> Flask:
                                 static_folder=str(NEXT_DIR),
                                 static_url_path="/next")
             app.register_blueprint(next_bp)
+    except Exception:
+        pass
+
+    # ===== Blueprint Presence (kalau ada modulnya) =====
+    try:
+        from .presence_api import bp as presence_bp  # type: ignore
+        app.register_blueprint(presence_bp)
     except Exception:
         pass
 
@@ -102,7 +109,7 @@ def create_app() -> Flask:
 
     @app.post("/login")
     def login_submit():
-        # jika ingin session gate, tambahkan di sini
+        # TODO: auth gate jika dibutuhkan
         return redirect("/dashboard")
 
     @app.get("/dashboard")
@@ -126,31 +133,56 @@ def create_app() -> Flask:
     def uploads(filename: str):
         return send_from_directory(str(UPLOADS_DIR), filename, as_attachment=False)
 
-    # ===== UI Config (KANONIK) =====
-    @app.get("/api/ui-config")
-    def ui_cfg_get():
-        cfg = _load_json(UI_CFG_PATH, {
-            "theme": "neo",
+    # ===== UI Config (kanonik + alias kunci agar frontend kompatibel) =====
+    def _canonical_cfg():
+        return {
+            "theme": "dark",
             "accent_color": "#2563eb",
             "background_mode": "",
             "background_url": "",
             "apply_to_login": True,
             "logo_url": "",
-        })
-        return jsonify(cfg)
+        }
+
+    @app.get("/api/ui-config")
+    def ui_cfg_get():
+        cfg = _load_json(UI_CFG_PATH, _canonical_cfg())
+        # alias agar JS lama/baru kompatibel
+        resp = {
+            **cfg,
+            "accent": cfg.get("accent_color"),
+            "bg_mode": cfg.get("background_mode"),
+            "bg_url": cfg.get("background_url"),
+            "apply_login": cfg.get("apply_to_login"),
+        }
+        return jsonify(resp)
 
     @app.post("/api/ui-config")
     def ui_cfg_set():
         body = request.get_json(silent=True) or {}
-        cfg = _load_json(UI_CFG_PATH, {
-            "theme": "neo", "accent_color": "#2563eb",
-            "background_mode": "", "background_url": "",
-            "apply_to_login": True, "logo_url": ""
-        })
-        for k in ("theme","accent_color","background_mode","background_url","apply_to_login","logo_url"):
-            if k in body: cfg[k] = body[k]
+        cfg = _load_json(UI_CFG_PATH, _canonical_cfg())
+
+        # terima kedua versi kunci
+        if "theme" in body: cfg["theme"] = body["theme"]
+        if "accent" in body: cfg["accent_color"] = body["accent"]
+        if "accent_color" in body: cfg["accent_color"] = body["accent_color"]
+        if "bg_mode" in body: cfg["background_mode"] = body["bg_mode"]
+        if "background_mode" in body: cfg["background_mode"] = body["background_mode"]
+        if "bg_url" in body: cfg["background_url"] = body["bg_url"]
+        if "background_url" in body: cfg["background_url"] = body["background_url"]
+        if "apply_login" in body: cfg["apply_to_login"] = bool(body["apply_login"])
+        if "apply_to_login" in body: cfg["apply_to_login"] = bool(body["apply_to_login"])
+        if "logo_url" in body: cfg["logo_url"] = body["logo_url"]
+
         _save_json(UI_CFG_PATH, cfg)
-        return jsonify({"ok": True, "config": cfg})
+        resp = {
+            **cfg,
+            "accent": cfg.get("accent_color"),
+            "bg_mode": cfg.get("background_mode"),
+            "bg_url": cfg.get("background_url"),
+            "apply_login": cfg.get("apply_to_login"),
+        }
+        return jsonify({"ok": True, "config": resp})
 
     @app.post("/api/upload/background")
     def upload_background():
@@ -162,7 +194,7 @@ def create_app() -> Flask:
         f.save(dst)
         url = f"/uploads/{safe}"
         # auto apply to config
-        cfg = _load_json(UI_CFG_PATH, {"background_mode":"image"})
+        cfg = _load_json(UI_CFG_PATH, _canonical_cfg())
         cfg["background_mode"] = cfg.get("background_mode") or "image"
         cfg["background_url"] = url
         _save_json(UI_CFG_PATH, cfg)
@@ -184,7 +216,7 @@ def create_app() -> Flask:
         WHITELIST_PATH.write_text("\n".join(str(x).strip() for x in items), encoding="utf-8")
         return jsonify(ok=True, count=len(items))
 
-    # ===== Phishing (KANONIK) =====
+    # ===== Phishing =====
     @app.get("/api/phish/config")
     def phish_cfg_get():
         cfg = _load_json(PHISH_CFG, {"autoban": False, "threshold": 8, "urls": []})
@@ -303,7 +335,6 @@ def create_app() -> Flask:
     # Health & Uptime
     _ensure_health_uptime(app)
 
-    # Log route-map sekali saat start
     try:
         app.logger.info("Route map: %s", [str(r.rule) for r in app.url_map.iter_rules()])
     except Exception:
