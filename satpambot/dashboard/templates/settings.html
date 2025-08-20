@@ -1,65 +1,47 @@
 {% extends "base.html" %}
 {% block title %}Settings{% endblock %}
 {% block content %}
-<h1>Settings</h1>
-<form id="uiForm" class="form">
-  <div class="grid two">
-    <div class="card"><div class="card-title">Logo</div>
-      <input id="logoUrl" placeholder="https://.../logo.png">
-      <input id="logoFile" type="file" accept="image/*">
-      <button class="btn" id="btnLogoUp" type="button">Upload</button>
-    </div>
-    <div class="card"><div class="card-title">Theme & Background</div>
-      <label>Accent Color</label>
-      <input id="accentColor" placeholder="#2563eb" value="#2563eb">
-      <label>Theme</label>
-      <select id="theme">
-        <option>Dark</option><option>Light</option><option>Nord</option><option>Dracula</option><option>Ocean</option><option>Forest</option>
-      </select>
-      <label>Background Mode</label>
-      <select id="bgMode"><option>Image</option><option>Video</option></select>
-      <label>Background URL</label>
-      <input id="bgUrl" placeholder="https://.../background.jpg">
-      <input id="bgFile" type="file" accept="image/*,video/*">
-      <button class="btn" id="btnBgUp" type="button">Upload</button>
-    </div>
+<section class="card">
+  <h3>Appearance</h3>
+  <label>Accent Color <input id="accent" placeholder="#2563eb"></label>
+  <label>Background Mode
+    <select id="bgmode">
+      <option value="">None</option>
+      <option value="image">Image</option>
+      <option value="video">Video</option>
+    </select>
+  </label>
+  <label>Background URL <input id="bgurl" placeholder="/uploads/your-bg.jpg"></label>
+  <div>
+    <input type="file" id="bgfile">
+    <button id="uploadBg">Upload</button>
   </div>
-  <button class="btn" type="submit">Simpan</button>
-  <a class="btn ghost" href="/dashboard">Kembali</a>
-</form>
+  <button id="saveUi">Save</button>
+  <span id="saveStatus" class="muted"></span>
+</section>
 <script>
-async function upload(file){
-  const fd=new FormData(); fd.append('file', file);
-  const r=await fetch('/api/upload/background',{method:'POST',body:fd});
-  const j=await r.json(); if(j.ok) return j.url; alert(j.error||'Upload gagal'); return null;
-}
-async function init(){
-  const res=await fetch('/api/ui-config'); const cfg=await res.json();
-  document.getElementById('accentColor').value = cfg.accent_color||'#2563eb';
-  document.getElementById('theme').value = (cfg.theme||'Dark')[0].toUpperCase()+ (cfg.theme||'Dark').slice(1);
-  document.getElementById('bgMode').value = (cfg.background_mode||'Image')[0].toUpperCase()+ (cfg.background_mode||'Image').slice(1);
-  document.getElementById('bgUrl').value = cfg.background_url||'';
-}
-document.getElementById('btnBgUp').onclick = async ()=>{
-  const f=document.getElementById('bgFile').files[0]; if(!f) return;
-  const url = await upload(f); if(url) document.getElementById('bgUrl').value=url;
+(async () => {
+  const cfg = await (await fetch('/api/ui-config')).json();
+  if(cfg.accent_color) document.getElementById('accent').value = cfg.accent_color;
+  if(cfg.background_mode) document.getElementById('bgmode').value = cfg.background_mode;
+  if(cfg.background_url) document.getElementById('bgurl').value = cfg.background_url;
+})();
+
+document.getElementById('uploadBg').onclick = async () => {
+  const f = document.getElementById('bgfile').files[0];
+  if(!f){ alert('Pilih file dulu'); return; }
+  const fd = new FormData(); fd.append('file', f);
+  const res = await fetch('/api/upload/background', {method:'POST', body: fd});
+  const js = await res.json();
+  document.getElementById('bgurl').value = js.url || '';
 };
-document.getElementById('btnLogoUp').onclick = async ()=>{
-  const f=document.getElementById('logoFile').files[0]; if(!f) return;
-  const url = await upload(f); if(url) document.getElementById('logoUrl').value=url;
+
+document.getElementById('saveUi').onclick = async () => {
+  const body = {accent_color: document.getElementById('accent').value,
+                background_mode: document.getElementById('bgmode').value,
+                background_url: document.getElementById('bgurl').value};
+  const res = await fetch('/api/ui-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  document.getElementById('saveStatus').textContent = (await res.json()).ok ? 'Saved' : 'Failed';
 };
-document.getElementById('uiForm').onsubmit = async (e)=>{
-  e.preventDefault();
-  const body={
-    accent_color: document.getElementById('accentColor').value,
-    theme: document.getElementById('theme').value.toLowerCase(),
-    background_mode: document.getElementById('bgMode').value.toLowerCase(),
-    background_url: document.getElementById('bgUrl').value,
-    logo_url: document.getElementById('logoUrl').value
-  };
-  const r=await fetch('/api/ui-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if((await r.json()).ok){location.href='/dashboard';}
-};
-init();
 </script>
 {% endblock %}
