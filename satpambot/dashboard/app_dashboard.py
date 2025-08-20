@@ -1,476 +1,315 @@
 from __future__ import annotations
-import os, json, time
+import io, os, json, time
 from pathlib import Path
-from dotenv import load_dotenv
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, jsonify
-from flask_socketio import SocketIO
-
-load_dotenv()
-
-MOD_DIR = Path(__file__).resolve().parent
-DASH_DIR = MOD_DIR
-DATA_DIR = Path("data"); DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-app = Flask(
-    __name__,
-    template_folder=str(DASH_DIR / "templates"),
-    static_folder=str(DASH_DIR / "static"),
-    static_url_path="/static",
+from typing import Any, Dict, Iterable
+from flask import (
+    Flask, jsonify, request, render_template, redirect, url_for,
+    send_from_directory, Response, Blueprint
 )
-app.secret_key = os.getenv("FLASK_SECRET", "satpambot-secret")
-socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
-# Extend Jinja loader to include other template roots (root /templates & editor/templates)
-from jinja2 import ChoiceLoader, FileSystemLoader
-try:
-    extra_loaders = [
-        FileSystemLoader(str((Path(__file__).resolve().parents[2] / "bot" / "modules" / "editor" / "templates"))),
-        FileSystemLoader(str(Path().resolve() / "templates")),
-    ]
-    app.jinja_loader = ChoiceLoader([app.jinja_loader, *extra_loaders])
-except Exception:
-    pass
 
-
-@app.route("/static/<path:filename>")
-def _static(filename):
-    return send_from_directory(app.static_folder, filename)
-
-@app.get("/healthz")
-def healthz():
-    return jsonify(ok=True, status="alive")
-
-@app.get("/")
-def root():
-    # Dashboard home: jika belum login → ke /login, kalau sudah → render dashboard.html
-    try:
-        if not session.get("auth"):
-            return redirect(url_for("login_page"))
-    except Exception:
-        pass
-    return render_template("dashboard.html")
-
-def _admin_creds():
-    user = os.getenv("ADMIN_USERNAME") or os.getenv("ADMIN_USER") or os.getenv("ADMIN") or "admin"
-    pwd  = os.getenv("ADMIN_PASSWORD") or os.getenv("ADMIN_PASS") or os.getenv("PASSWORD") or ""
-    return user, pwd
-
-@app.context_processor
-def inject_theme_path():
-    theme = None
-    try:
-        theme = session.get("theme_css")
-    except Exception:
-        pass
-    if not theme:
-        theme = "/static/themes/dark.css"
-    return {"theme_path": theme}
-
+# ========= Paths & config =========
+DATA_DIR = Path("data"); DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOADS_DIR = DATA_DIR / "uploads"; UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 UI_CFG_PATH = DATA_DIR / "ui_config.json"
-def _ui_cfg_load():
-    try: return json.load(open(UI_CFG_PATH, "r", encoding="utf-8"))
-    except Exception: return {}
-def _ui_cfg_save(cfg: dict):
-    UI_CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    json.dump(cfg, open(UI_CFG_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+WHITELIST_PATH = DATA_DIR / "whitelist.txt"
+PHISH_IMG_DB = Path(os.getenv("PHISH_IMG_DB", DATA_DIR / "phish_phash.json"))
+PHISH_CFG = Path(os.getenv("PHISH_CONFIG_PATH", DATA_DIR / "phish_config.json"))
 
-@app.context_processor
-def inject_login_ui():
-    cfg = _ui_cfg_load()
-    return {
-        "login_logo": cfg.get("login_logo") or "/static/img/login-user.svg",
-        "login_bg": cfg.get("login_bg") or "linear-gradient(120deg,#f093fb 0%,#f5576c 100%)",
-        "login_particles": bool(cfg.get("login_particles", True)),
-    }
-
-@app.get("/api/ui-config")
-def api_ui_cfg_get():
-    return _ui_cfg_load()
-
-@app.post("/api/ui-config")
-def api_ui_cfg_post():
-    data = request.get_json(silent=True) or {}
-    cfg = _ui_cfg_load()
-    if "login_logo" in data: cfg["login_logo"] = str(data["login_logo"]).strip()
-    if "login_bg" in data:   cfg["login_bg"]   = str(data["login_bg"]).strip()
-    if "login_particles" in data: cfg["login_particles"] = bool(data["login_particles"])
-    _ui_cfg_save(cfg); return {"ok": True, **cfg}
-
-WL_PATH = DATA_DIR / "whitelist_domains.json"
-def _wl_load():
-    try: return json.load(open(WL_PATH, "r", encoding="utf-8"))
-    except Exception: return []
-def _wl_save(domains):
-    WL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    norm = sorted({(d or "").strip().lower() for d in (domains or []) if (d or "").strip()})
-    json.dump(norm, open(WL_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-    return norm
-
-@app.get("/api/whitelist")
-def api_whitelist_get():
-    return {"domains": _wl_load()}
-
-@app.post("/api/whitelist")
-def api_whitelist_post():
-    data = request.get_json(silent=True) or {}
-    if "text" in data and isinstance(data["text"], str):
-        return {"ok": True, "domains": _wl_save([ln.strip() for ln in data["text"].splitlines()])}
-    if "domains" in data and isinstance(data["domains"], list):
-        return {"ok": True, "domains": _wl_save(data["domains"])}
-    return {"ok": False, "error": "invalid payload"}, 400
-
-PHISH_CONFIG_PATH = DATA_DIR / "phish_config.json"
-def _cfg_load():
-    try: return json.load(open(PHISH_CONFIG_PATH, "r", encoding="utf-8"))
-    except Exception: return {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}
-def _cfg_save(cfg: dict):
-    PHISH_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    json.dump(cfg, open(PHISH_CONFIG_PATH, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-
-@app.get("/api/phish-config")
-def api_phish_cfg_get():
-    return _cfg_load()
-
-@app.post("/api/phish-config")
-def api_phish_cfg_post():
-    data = request.get_json(silent=True) or {}
-    cfg = _cfg_load()
-    if "autoban" in data: cfg["autoban"] = bool(data["autoban"])
-    if "threshold" in data:
-        try: cfg["threshold"] = max(1, min(16, int(data["threshold"])))
-        except Exception: pass
-    if "log_thread_name" in data:
-        cfg["log_thread_name"] = (str(data["log_thread_name"]).strip() or "Ban Log")
-    _cfg_save(cfg); return {"ok": True, **cfg}
-
-RECENT_BANS_PATH = DATA_DIR / "recent_bans.json"
-def _recent_bans_load():
-    try: return json.load(open(RECENT_BANS_PATH, "r", encoding="utf-8"))
-    except Exception: return {"items": []}
-
-@app.get("/api/recent-bans")
-def api_recent_bans():
-    data = _recent_bans_load()
-    items = sorted(data.get("items", []), key=lambda x: x.get("ts", 0), reverse=True)[:50]
-    return {"items": items, "ts": int(time.time())}
-
-@app.get("/login")
-def login_page():
-    return render_template("login.html")
-
-@app.post("/login")
-def login_post():
-    u = request.form.get("username", "")
-    p = request.form.get("password", "")
-    admin_u, admin_p = _admin_creds()
-    if u == admin_u and p == admin_p:
-        session["auth"] = True
-        return redirect(url_for("root"))
-    return "Invalid credentials", 401
-
-
-
-from flask import request, jsonify, send_from_directory
-import os, json, time
-UPLOAD_DIR = DATA_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-UI_CFG = DATA_DIR / "ui_config.json"
-
-def _load_ui():
-    if UI_CFG.exists():
-        try:
-            return json.loads(UI_CFG.read_text('utf-8'))
-        except Exception:
-            return {}
-    return {}
-
-def _save_ui(d):
-    UI_CFG.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding='utf-8')
-
-@app.get("/api/ui-config")
-def api_ui_get():
-    return jsonify(_load_ui())
-
-@app.post("/api/ui-config")
-def api_ui_set():
-    d = _load_ui()
-    body = request.get_json(silent=True) or {}
-    d.update({k:v for k,v in body.items() if k in ("theme","accent_color","background_mode","background_url","apply_to_login")})
-    _save_ui(d)
-    return jsonify({"ok":True, "cfg": d})
-
-@app.post("/api/upload/background")
-def api_upload_bg():
-    f = request.files.get('file')
-    if not f: return jsonify({"ok":False,"error":"no file"}), 400
-    name = f"bg_{int(time.time())}_{f.filename.replace(' ','_')}"
-    path = UPLOAD_DIR / name
-    f.save(str(path))
-    url = f"/uploads/{name}"
-    d = _load_ui(); d["background_url"] = url
-    _save_ui(d)
-    return jsonify({"ok":True,"url":url})
-
-@app.get("/uploads/<path:filename>")
-def uploaded_files(filename):
-    return send_from_directory(str(UPLOAD_DIR), filename)
-
-@app.get("/api/metrics")
-def api_metrics():
-    # lightweight metrics (no psutil hard dependency)
+# ========= JSON helpers =========
+def _load_json(path: Path, default: Any) -> Any:
     try:
-        import psutil, os
-        mem = psutil.Process(os.getpid()).memory_info().rss/1024/1024
-        cpu = psutil.cpu_percent(interval=0.05)
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
-        mem, cpu = 0, 0
-    start = getattr(app, "start_ts", None) or int(time.time())
-    if not getattr(app, "start_ts", None):
-        app.start_ts = start
-    up = int(time.time()-start)
-    return jsonify({"uptime": up, "cpu": cpu, "mem_mb": mem, "servers":[
-        {"name":"Local Web (127.0.0.1:8080)","status":"DOWN","ping_ms":1},
-        {"name":"Discord API","status":"UP","ping_ms":5},
-    ]})
+        pass
+    return default
 
-
-
-from flask import render_template, redirect, url_for, request, jsonify, send_from_directory
-import time, os, json
-from pathlib import Path
-
-UPLOAD_DIR = DATA_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-UI_CFG = DATA_DIR / "ui_config.json"
-
-def _load_ui():
+def _save_json(path: Path, obj: Any) -> None:
     try:
-        return json.loads(UI_CFG.read_text('utf-8')) if UI_CFG.exists() else {}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
-        return {}
-def _save_ui(d):
-    UI_CFG.write_text(json.dumps(d, ensure_ascii=False, indent=2), encoding='utf-8')
+        pass
 
-@app.get("/dashboard")
-def dash_home():
-    return render_template("dashboard.html")
-
-@app.get("/dashboard/settings")
-def dash_settings():
-    return render_template("settings.html")
-
-@app.get("/settings")
-def alias_settings():
-    return redirect(url_for('dash_settings'))
-
-@app.get("/dashboard-static/<path:filename>")
-def dash_static(filename):
-    return send_from_directory(str(Path(__file__).parent / "static"), filename)
-
-@app.get("/api/ui-config")
-def api_ui_get():
-    return jsonify(_load_ui())
-
-@app.post("/api/ui-config")
-def api_ui_set():
-    d = _load_ui()
-    body = request.get_json(silent=True) or {}
-    for k in ("logo_url","theme","accent_color","background_mode","background_url","apply_to_login"):
-        if k in body: d[k] = body[k]
-    _save_ui(d); return jsonify({"ok":True,"cfg":d})
-
-@app.post("/api/upload/background")
-def api_upload_bg():
-    f = request.files.get('file')
-    if not f: return jsonify({"ok":False,"error":"no file"}), 400
-    name = f"bg_{int(time.time())}_{f.filename.replace(' ','_')}"
-    path = UPLOAD_DIR / name; f.save(str(path))
-    url = f"/uploads/{name}"
-    d = _load_ui(); d["background_url"] = url; _save_ui(d)
-    return jsonify({"ok":True,"url":url})
-
-@app.get("/uploads/<path:filename>")
-def uploaded_files(filename): return send_from_directory(str(UPLOAD_DIR), filename)
-
-@app.get("/api/metrics")
-def api_metrics():
-    series = {"total":[1,2,3,4,6,8,9,11,13,14], "lat":[110,90,120,80,70,95,88,92,86,90], "up":[1,1,1,1,1,1,1,1,1,1], "g":[1,1,1,1,1,1,1,1,1,1]}
+# ========= Health/Uptime =========
+def _ensure_health_uptime(app: Flask):
     try:
-        import psutil, os as _os
-        mem = psutil.Process(_os.getpid()).memory_info().rss/1024/1024
-        cpu = psutil.cpu_percent(interval=0.05)
+        from .healthz_quiet import silence_healthz_logs, ensure_healthz_route, ensure_uptime_route
+        silence_healthz_logs(); ensure_healthz_route(app); ensure_uptime_route(app)
     except Exception:
-        mem, cpu = 0, 0
-    start = int(getattr(app, 'start_ts', time.time())); 
-    if not getattr(app, 'start_ts', None): app.start_ts = start
-    servers=[{"name":"Local Web (127.0.0.1:8080)","status":"DOWN","ping_ms":1}]
-    ping_ms = None
+        start = time.time()
+        @app.get("/healthz")
+        def _healthz(): return jsonify(ok=True)
+        @app.get("/uptime")
+        def _uptime():  return jsonify(ok=True, uptime_sec=int(time.time()-start))
+
+# ========= Discord bridge (fallback aman) =========
+def _bridge_stats() -> Dict[str, Any]:
     try:
-        import requests
-        t0=time.time(); requests.get("https://discord.com/api/v10/gateway", timeout=2)
-        ping_ms=int((time.time()-t0)*1000); servers.append({"name":"Discord API","status":"UP","ping_ms":ping_ms})
+        from .discord_bridge import get_stats  # type: ignore
+        return get_stats() or {}
     except Exception:
-        servers.append({"name":"Discord API","status":"DOWN","ping_ms":None})
-    return jsonify({"uptime":int(time.time()-start),"cpu":cpu,"mem_mb":mem,"servers":servers,"series":series,"guilds":1,"latency_ms":ping_ms,"total_msgs":0})
+        return {
+            "guilds": 0, "members": 0, "online": 0,
+            "channels": 0, "threads": 0, "latency_ms": None,
+        }
 
-
-
-from flask import Response
-from .discord_bridge import get_stats
-import time, json, io
-from PIL import Image
-try:
-    import imagehash
-except Exception:
-    imagehash = None
-
-PHISH_IMG_DB = DATA_DIR / "phish_image_signatures.json"
-PHISH_URL_DB = DATA_DIR / "phish_url_hashes.json"
-
-def _load_json(p):
-    if p.exists():
-        try:
-            return json.loads(p.read_text('utf-8'))
-        except Exception:
-            return []
-    return []
-
-def _save_json(p, data):
-    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
-
-@app.get("/api/discord/stats")
-def api_discord_stats():
-    return jsonify(get_stats())
-
-@app.get("/api/discord/stream")
-def api_discord_stream():
-    def gen():
+def _bridge_events() -> Iterable[Dict[str, Any]]:
+    try:
+        from .discord_bridge import iter_stats  # type: ignore
+        for ev in iter_stats():
+            yield ev
+    except Exception:
         while True:
-            data = json.dumps(get_stats())
-            yield f"data: {data}\n\n"
-            time.sleep(5)
-    return Response(gen(), mimetype="text/event-stream")
+            yield _bridge_stats()
+            time.sleep(3)
 
-@app.post("/api/phish/images")
-def api_phish_images():
-    if imagehash is None:
-        return jsonify({"ok": False, "error":"imagehash not installed"}), 500
-    sigs = set(_load_json(PHISH_IMG_DB))
-    files = list(request.files.values())
-    added = []
-    for f in files:
+# ========= App factory =========
+def create_app() -> Flask:
+    app = Flask(
+        "satpambot_dashboard",
+        template_folder=str(Path(__file__).with_name("templates")),
+        static_folder=None,
+    )
+
+    # Static dashboard assets → /dashboard-static/*
+    static_bp = Blueprint(
+        "dashboard_static", __name__,
+        static_folder=str(Path(__file__).with_name("static")),
+        static_url_path="/dashboard-static"
+    )
+    app.register_blueprint(static_bp)
+
+    # Optional: serve NextJS static export if exists at data/next_build
+    try:
+        NEXT_DIR = DATA_DIR / "next_build"
+        if NEXT_DIR.exists():
+            next_bp = Blueprint("next_export", __name__,
+                                static_folder=str(NEXT_DIR),
+                                static_url_path="/next")
+            app.register_blueprint(next_bp)
+    except Exception:
+        pass
+
+    # ===== Pages =====
+    @app.get("/")
+    def root():
+        return redirect("/login")
+
+    @app.get("/login")
+    def login_page():
+        return render_template("login.html")
+
+    @app.post("/login")
+    def login_submit():
+        # jika ingin session gate, tambahkan di sini
+        return redirect("/dashboard")
+
+    @app.get("/dashboard")
+    def dashboard_page():
+        return render_template("dashboard.html")
+
+    @app.get("/dashboard/settings")
+    def settings_page():
+        return render_template("settings.html")
+
+    @app.get("/settings")
+    def settings_alias():
+        return redirect("/dashboard/settings")
+
+    @app.get("/dashboard/security")
+    def security_page():
+        return render_template("security.html")
+
+    # ===== Static uploads =====
+    @app.get("/uploads/<path:filename>")
+    def uploads(filename: str):
+        return send_from_directory(str(UPLOADS_DIR), filename, as_attachment=False)
+
+    # ===== UI Config (KANONIK) =====
+    @app.get("/api/ui-config")
+    def ui_cfg_get():
+        cfg = _load_json(UI_CFG_PATH, {
+            "theme": "neo",
+            "accent_color": "#2563eb",
+            "background_mode": "",
+            "background_url": "",
+            "apply_to_login": True,
+            "logo_url": "",
+        })
+        return jsonify(cfg)
+
+    @app.post("/api/ui-config")
+    def ui_cfg_set():
+        body = request.get_json(silent=True) or {}
+        cfg = _load_json(UI_CFG_PATH, {
+            "theme": "neo", "accent_color": "#2563eb",
+            "background_mode": "", "background_url": "",
+            "apply_to_login": True, "logo_url": ""
+        })
+        for k in ("theme","accent_color","background_mode","background_url","apply_to_login","logo_url"):
+            if k in body: cfg[k] = body[k]
+        _save_json(UI_CFG_PATH, cfg)
+        return jsonify({"ok": True, "config": cfg})
+
+    @app.post("/api/upload/background")
+    def upload_background():
+        f = request.files.get("file")
+        if not f: return jsonify(ok=False, error="no file"), 400
+        name = f.filename or f"bg_{int(time.time())}.bin"
+        safe = name.replace("\\", "_").replace("/", "_")
+        dst = UPLOADS_DIR / safe
+        f.save(dst)
+        url = f"/uploads/{safe}"
+        # auto apply to config
+        cfg = _load_json(UI_CFG_PATH, {"background_mode":"image"})
+        cfg["background_mode"] = cfg.get("background_mode") or "image"
+        cfg["background_url"] = url
+        _save_json(UI_CFG_PATH, cfg)
+        return jsonify(ok=True, url=url)
+
+    # ===== Whitelist =====
+    @app.get("/api/whitelist")
+    def whitelist_get():
+        if not WHITELIST_PATH.exists():
+            return jsonify({"whitelist": []})
+        lines = [x.strip() for x in WHITELIST_PATH.read_text(encoding="utf-8").splitlines() if x.strip()]
+        return jsonify({"whitelist": lines})
+
+    @app.post("/api/whitelist")
+    def whitelist_set():
+        body = request.get_json(silent=True) or {}
+        items = body.get("whitelist") or body.get("items") or []
+        if not isinstance(items, list): return jsonify(ok=False, error="invalid list"), 400
+        WHITELIST_PATH.write_text("\n".join(str(x).strip() for x in items), encoding="utf-8")
+        return jsonify(ok=True, count=len(items))
+
+    # ===== Phishing (KANONIK) =====
+    @app.get("/api/phish/config")
+    def phish_cfg_get():
+        cfg = _load_json(PHISH_CFG, {"autoban": False, "threshold": 8, "urls": []})
+        return jsonify(cfg)
+
+    @app.post("/api/phish/config")
+    def phish_cfg_set():
+        body = request.get_json(silent=True) or {}
+        cfg = _load_json(PHISH_CFG, {"autoban": False, "threshold": 8, "urls": []})
+        for k in ("autoban","threshold","urls"):
+            if k in body: cfg[k] = body[k]
+        _save_json(PHISH_CFG, cfg)
+        return jsonify(ok=True, cfg=cfg)
+
+    @app.get("/api/phish/images")
+    def phish_images_get():
+        db = _load_json(PHISH_IMG_DB, {"phash": []})
+        if isinstance(db, list):  # compat lama
+            db = {"phash": db}
+        return jsonify(db)
+
+    @app.post("/api/phish/images")
+    def phish_images_add():
+        # dukung multipart upload file ATAU JSON {"phash":[...]}
+        if request.files:
+            from PIL import Image
+            try:
+                import imagehash  # optional
+            except Exception:
+                imagehash = None
+
+            db = _load_json(PHISH_IMG_DB, {"phash": []})
+            existing = set(str(x) for x in db.get("phash", []))
+            added = []
+            for key in request.files:
+                try:
+                    im = Image.open(request.files[key].stream).convert("RGB")
+                    if imagehash:
+                        h = str(imagehash.phash(im))
+                    else:
+                        # fallback hash sederhana (bukan phash asli)
+                        px = list(im.resize((8,8)).getdata())
+                        avg = sum(sum(p) for p in px) / (len(px)*3)
+                        bits = "".join("1" if sum(p) >= avg*3 else "0" for p in px)
+                        h = hex(int(bits, 2))[2:]
+                    if h not in existing:
+                        existing.add(h); added.append(h)
+                except Exception:
+                    continue
+            db["phash"] = list(existing)
+            _save_json(PHISH_IMG_DB, db)
+            return jsonify(ok=True, added=added, total=len(existing))
+
+        body = request.get_json(silent=True) or {}
+        arr = body.get("phash") or []
+        if not isinstance(arr, list): return jsonify(ok=False, error="invalid phash list"), 400
+        db = _load_json(PHISH_IMG_DB, {"phash": []})
+        existing = set(str(x) for x in db.get("phash", []))
+        for h in arr:
+            existing.add(str(h))
+        db["phash"] = list(existing)
+        _save_json(PHISH_IMG_DB, db)
+        return jsonify(ok=True, total=len(existing))
+
+    @app.get("/api/phish/urls")
+    def phish_urls_get():
+        cfg = _load_json(PHISH_CFG, {"urls": []})
+        return jsonify({"urls": cfg.get("urls", [])})
+
+    @app.post("/api/phish/urls")
+    def phish_urls_add():
+        body = request.get_json(silent=True) or {}
+        urls = body.get("urls") or []
+        if not isinstance(urls, list): return jsonify(ok=False, error="invalid urls"), 400
+        cfg = _load_json(PHISH_CFG, {"urls": []})
+        cur = set(cfg.get("urls", []))
+        for u in urls: cur.add(str(u).strip())
+        cfg["urls"] = sorted(cur)
+        _save_json(PHISH_CFG, cfg)
+        return jsonify(ok=True, total=len(cfg["urls"]))
+
+    # ===== Metrics =====
+    @app.get("/api/metrics")
+    def metrics():
+        out = {"ok": True, "ts": int(time.time())}
         try:
-            im = Image.open(io.BytesIO(f.read())).convert("RGB")
-            ph = str(imagehash.phash(im))
-            if ph not in sigs:
-                sigs.add(ph); added.append(ph)
-        except Exception as e:
+            import psutil
+            p = psutil.Process()
+            out["process"] = {
+                "cpu_percent": psutil.cpu_percent(interval=0.05),
+                "mem_rss": p.memory_info().rss,
+                "threads": p.num_threads(),
+            }
+        except Exception:
             pass
-    _save_json(PHISH_IMG_DB, sorted(list(sigs)))
-    return jsonify({"ok": True, "added": added, "total": len(sigs)})
+        s = _bridge_stats()
+        out["discord"] = {
+            "guilds": s.get("guilds"), "members": s.get("members"),
+            "online": s.get("online"), "channels": s.get("channels"),
+            "threads": s.get("threads"), "latency_ms": s.get("latency_ms"),
+        }
+        return jsonify(out)
 
-@app.get("/api/phish/images")
-def api_phish_images_list():
-    return jsonify({"ok": True, "signatures": _load_json(PHISH_IMG_DB)})
+    # ===== Discord SSE =====
+    @app.get("/api/discord/stats")
+    def discord_stats_once():
+        return jsonify(_bridge_stats())
 
-def _canon_url(u: str) -> str:
+    @app.get("/api/discord/stream")
+    def discord_stats_stream():
+        def gen():
+            for item in _bridge_events():
+                yield f"data: {json.dumps(item)}\n\n"
+        return Response(gen(), mimetype="text/event-stream")
+
+    # Health & Uptime
+    _ensure_health_uptime(app)
+
+    # Log route-map sekali saat start
     try:
-        from urllib.parse import urlparse, urlunparse
-        up = urlparse(u.strip())
-        host = (up.hostname or "").lower()
-        path = (up.path or "/").rstrip("/") or "/"
-        query = ("?" + up.query) if up.query else ""
-        return f"{host}{path}{query}"
+        app.logger.info("Route map: %s", [str(r.rule) for r in app.url_map.iter_rules()])
     except Exception:
-        return u.strip().lower()
+        pass
 
-@app.post("/api/phish/urls")
-def api_phish_urls():
-    body = request.get_json(silent=True) or {}
-    urls = body.get("urls") or []
-    if isinstance(urls, str): urls = [urls]
-    data = _load_json(PHISH_URL_DB)
-    known = set([d.get("canon") for d in data if isinstance(d, dict)])
-    added = []
-    import hashlib
-    for u in urls:
-        c = _canon_url(u)
-        if c and c not in known:
-            h = hashlib.sha256(c.encode("utf-8")).hexdigest()
-            rec = {"canon": c, "sha256": h}
-            data.append(rec); known.add(c); added.append(rec)
-    _save_json(PHISH_URL_DB, data)
-    return jsonify({"ok": True, "added": added, "total": len(data)})
+    return app
 
-@app.get("/api/phish/urls")
-def api_phish_urls_list():
-    return jsonify({"ok": True, "urls": _load_json(PHISH_URL_DB)})
-
-@app.get("/dashboard/security")
-def dash_security():
-    return render_template("security.html")
-
-
-
-# ## PHISH_JSON_WIRE_MARKER
-from flask import request, jsonify
-import os, json
-from pathlib import Path
-
-PHISH_IMG_DB = os.getenv("PHISH_IMG_DB") or "data/phish_phash.json"
-PHISH_CFG_DB = os.getenv("PHISH_CONFIG_PATH") or "data/phish_config.json"
-
-def _json_read(path, default):
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return default
-
-def _json_write(path, data):
-    p = Path(path); p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-@app.get("/api/phish/config")
-def api_phish_cfg_get():
-    return jsonify(_json_read(PHISH_CFG_DB, {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"}))
-
-@app.post("/api/phish/config")
-def api_phish_cfg_post():
-    d = _json_read(PHISH_CFG_DB, {"autoban": False, "threshold": 8, "log_thread_name": "Ban Log"})
-    body = request.get_json(silent=True) or {}
-    for k in ("autoban","threshold","log_thread_name"):
-        if k in body: d[k] = body[k]
-    _json_write(PHISH_CFG_DB, d)
-    return jsonify({"ok": True, "cfg": d})
-
-@app.get("/api/phish/images")
-def api_phish_images_get():
-    obj = _json_read(PHISH_IMG_DB, {"phash": []})
-    if isinstance(obj, list):
-        obj = {"phash": obj}
-    return jsonify(obj)
-
-@app.post("/api/phish/images")
-def api_phish_images_post():
-    # accept uploaded image -> compute phash and append
-    f = request.files.get('file')
-    if not f:
-        return jsonify({"ok": False, "error": "no file"}), 400
-    b = f.read()
-    try:
-        from PIL import Image
-        import imagehash, io as _io
-        im = Image.open(_io.BytesIO(b)).convert("L").resize((32, 32))
-        h = int(str(imagehash.phash(im)), 16)
-    except Exception:
-        return jsonify({"ok": False, "error": "hash failed"}), 500
-    obj = _json_read(PHISH_IMG_DB, {"phash": []})
-    if isinstance(obj, list):
-        obj = {"phash": obj}
-    arr = obj.get("phash", [])
-    arr.append(f"0x{h:x}")
-    obj["phash"] = arr
-    _json_write(PHISH_IMG_DB, obj)
-    return jsonify({"ok": True, "hash": f"0x{h:x}", "total": len(arr)})
+# WSGI export
+app = create_app()
