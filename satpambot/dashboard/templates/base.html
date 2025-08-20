@@ -1,73 +1,38 @@
 {% set active = active or "" %}
 <!doctype html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title or "SatpamBot" }}</title>
   <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css">
-  <script defer src="/dashboard-static/js/ui_theme_bridge.js"></script>
-  <style>
-    /* --- PATCH: unified sidebar & collapse --- */
-    .sb {width: 260px; background: var(--sb-bg,#0b1220); color: #cfe6ff; position: fixed; inset: 0 auto 0 0; display:flex; flex-direction:column; gap:.25rem; border-right:1px solid rgba(255,255,255,.06); transition: width .2s ease;}
-    .sb--collapsed{width:72px;}
-    .sb .brand{display:flex; align-items:center; gap:.6rem; padding:16px 14px; font-weight:700; letter-spacing:.2px}
-    .sb .brand svg{width:24px;height:24px;flex:none}
-    .sbnav{display:flex; flex-direction:column; gap:4px; padding:6px}
-    .sb a{color:inherit; text-decoration:none; border-radius:12px; padding:12px; display:flex; align-items:center; gap:12px; opacity:.85}
-    .sb a:hover{opacity:1; background:rgba(255,255,255,.06)}
-    .sb a.active{background:linear-gradient(90deg, rgba(37,99,235,.25), rgba(37,99,235,.05)); opacity:1; box-shadow:inset 0 0 0 1px rgba(37,99,235,.35)}
-    .sb .icon{width:22px;height:22px; display:inline-grid; place-items:center; flex:none; border-radius:8px; background:rgba(255,255,255,.08)}
-    .sb .txt{white-space:nowrap}
-    .sb--collapsed .txt{display:none}
-    .sb .sp{margin:8px 8px 4px; padding:8px 10px; font-size:12px; text-transform:uppercase; opacity:.6}
-    .sb .backbtn{margin:10px; display:flex; align-items:center; gap:10px; justify-content:center; border:1px solid rgba(255,255,255,.1)}
-    .sb--collapsed .brand .txt{display:none}
-    .content{margin-left:260px; min-height:100vh; background:var(--bg-grad, radial-gradient(1200px 800px at 20% -10%, rgba(59,130,246,.20), transparent), radial-gradient(1000px 600px at 110% 10%, rgba(16,185,129,.12), transparent));}
-    .sb--collapsed ~ .content{margin-left:72px}
-    .topbar{position:sticky; top:0; backdrop-filter: blur(10px); background:rgba(11,18,32,.7); border-bottom:1px solid rgba(255,255,255,.06); padding:10px 16px; display:flex; gap:12px; align-items:center; z-index:2}
-    .ghostbtn{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); padding:8px 12px; border-radius:12px; color:#e5f1ff;}
-    .grid{display:grid; gap:16px}
-    @media (max-width: 960px){ .sb{position:fixed; z-index:5} }
-  </style>
 </head>
 <body>
-  <aside id="sb" class="sb">
+<div class="layout">
+  <aside class="sidebar">
     <div class="brand">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l7 4v5c0 5-3.5 9-7 11-3.5-2-7-6-7-11V6l7-4z" stroke="currentColor" stroke-width="1.5"/></svg>
-      <div class="txt">SatpamBot</div>
-      <button id="sbToggle" class="ghostbtn" style="margin-left:auto" title="Collapse">≡</button>
+      <img src="/dashboard-static/logo.svg" alt="" width="22" height="22" style="opacity:.9">
+      <span>SatpamBot</span>
     </div>
-    <nav class="sbnav">
-      <a href="/dashboard" class="{{ 'active' if active=='dashboard' else '' }}"><span class="icon">🏠</span><span class="txt">Dashboard</span></a>
-      <a href="/dashboard/security" class="{{ 'active' if active=='security' else '' }}"><span class="icon">🛡️</span><span class="txt">Security</span></a>
-      <a href="/dashboard/settings" class="{{ 'active' if active=='settings' else '' }}"><span class="icon">⚙️</span><span class="txt">Settings</span></a>
-      <div class="sp">Other</div>
-      <a href="/logout"><span class="icon">📄</span><span class="txt">Logout</span></a>
+    <nav class="nav">
+      <a class="item {{ 'active' if active=='dashboard' }}" href="/dashboard"><span class="text">Dashboard</span></a>
+      <a class="item {{ 'active' if active=='security' }}" href="/dashboard/security"><span class="text">Security</span></a>
+      <a class="item {{ 'active' if active=='settings' }}" href="/dashboard/settings"><span class="text">Settings</span></a>
+      <div class="section">OTHER</div>
+      <a class="item" href="/logout"><span class="text">Logout</span></a>
+      <a class="item" href="javascript:history.back()"><span class="text">← Kembali</span></a>
     </nav>
-    <a class="backbtn" href="javascript:history.back()"><span class="icon">⬅️</span><span class="txt">Kembali</span></a>
   </aside>
-
-  <main class="content">
+  <main class="main">
     <div class="topbar">
-      <button id="sbToggle2" class="ghostbtn">☰</button>
-      <div style="font-weight:600">{{ header or title or 'Dashboard' }}</div>
-      <div style="margin-left:auto" id="live-indicator" title="Discord Live">●</div>
+      <div id="sidebar-toggle" class="toggle" title="Collapse"></div>
+      <div style="font-weight:700">{{ header or "Dashboard" }}</div>
     </div>
-    <div style="padding:18px">
+    <div class="container">
       {% block body %}{% endblock %}
     </div>
   </main>
-
-  <script>
-    (function(){
-      const sb = document.getElementById('sb');
-      const saved = localStorage.getItem('sb-collapsed');
-      if(saved==='1') sb.classList.add('sb--collapsed');
-      const t = ()=>{ sb.classList.toggle('sb--collapsed'); localStorage.setItem('sb-collapsed', sb.classList.contains('sb--collapsed')?'1':'0'); };
-      document.getElementById('sbToggle')?.addEventListener('click', t);
-      document.getElementById('sbToggle2')?.addEventListener('click', t);
-    })();
-  </script>
+</div>
+<script src="/dashboard-static/js/sidebar_toggle.js"></script>
+<script src="/dashboard-static/js/ui_theme_bridge.js"></script>
 </body>
 </html>

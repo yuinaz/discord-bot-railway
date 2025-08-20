@@ -4,39 +4,23 @@
 <h2 style="margin:0 0 14px 0">Dashboard</h2>
 
 <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-  <div class="card" style="padding:16px"><div class="k">Guilds</div><div id="stat-guilds" class="v">--</div></div>
-  <div class="card" style="padding:16px"><div class="k">Members</div><div id="stat-members" class="v">--</div></div>
-  <div class="card" style="padding:16px"><div class="k">Online</div><div id="stat-online" class="v">--</div></div>
-  <div class="card" style="padding:16px"><div class="k">Channels</div><div id="stat-channels" class="v">--</div></div>
-  <div class="card" style="padding:16px"><div class="k">Threads</div><div id="stat-threads" class="v">--</div></div>
-  <div class="card" style="padding:16px">
-    <div class="k">Latency</div>
-    <canvas id="spark-ping" style="width:100%;height:42px;display:block"></canvas>
-  </div>
+  <div class="card"><div class="body"><div class="label">Guilds</div><div id="stat-guilds">0</div></div></div>
+  <div class="card"><div class="body"><div class="label">Members</div><div id="stat-members">0</div></div></div>
+  <div class="card"><div class="body"><div class="label">Online</div><div id="stat-online">0</div></div></div>
+  <div class="card"><div class="body"><div class="label">Channels</div><div id="stat-channels">0</div></div></div>
+  <div class="card"><div class="body"><div class="label">Threads</div><div id="stat-threads">0</div></div></div>
+  <div class="card"><div class="body"><div class="label">Latency</div><canvas id="spark-ping" style="width:100%;height:40px"></canvas></div></div>
 </div>
 
-<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:18px;">
-  <div class="card" style="padding:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <div style="font-weight:600">CPU %</div>
-    </div>
-    <canvas id="spark-cpu" style="width:100%;height:120px;display:block"></canvas>
-  </div>
-  <div class="card" style="padding:16px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <div style="font-weight:600">RAM (MB)</div>
-    </div>
-    <canvas id="spark-ram" style="width:100%;height:120px;display:block"></canvas>
-  </div>
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:16px;">
+  <div class="card"><div class="body"><div class="label">CPU %</div><canvas id="spark-cpu" style="width:100%;height:120px"></canvas></div></div>
+  <div class="card"><div class="body"><div class="label">RAM (MB)</div><canvas id="spark-ram" style="width:100%;height:120px"></canvas></div></div>
 </div>
 
-<div class="card" style="margin-top:18px; padding:16px;">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-    <div style="font-weight:600">Recent Activity</div>
-    <span id="ra-live" style="margin-left:auto;font-size:12px;border:1px solid rgba(255,255,255,.2);padding:4px 8px;border-radius:999px;opacity:.75">Live</span>
-  </div>
-  <canvas id="recent-activity" style="width:100%;height:140px;display:block"></canvas>
-</div>
+<div class="card" style="margin-top:16px"><div class="body">
+  <div style="display:flex;align-items:center"><div class="label" style="flex:1">Recent Activity</div><span style="font-size:12px;opacity:.7">Live</span></div>
+  <canvas id="recent-activity" style="width:100%;height:140px"></canvas>
+</div></div>
 
 <script type="module" src="/dashboard-static/js/neo_dashboard_live.js"></script>
 {% endblock %}
