@@ -1,0 +1,71 @@
+diff --git a/scripts/build_render.sh b/scripts/build_render.sh
+new file mode 100755
+index 0000000..1111111
+--- /dev/null
++++ b/scripts/build_render.sh
+@@ -0,0 +1,43 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++# ===== Render cached build for Python =====
++# - Uses pip cache between deploys (Render Build Cache)
++# - Skips reinstall when requirements.txt hash is unchanged
++
++CACHE_DIR=".pip-cache"
++REQ_HASH_FILE=".render-requirements.hash"
++
++echo "==> Python $(python --version 2>&1)"
++python -m pip install -U pip wheel >/dev/null
++
++if [[ ! -f requirements.txt ]]; then
++  echo "ERROR: requirements.txt not found at project root"
++  exit 1
++fi
++
++# compute hash of requirements.txt
++REQ_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
++
++if [[ -f "${REQ_HASH_FILE}" ]] && [[ "$(cat "${REQ_HASH_FILE}")" == "${REQ_HASH}" ]]; then
++  echo "==> requirements.txt unchanged, SKIP pip install (using cache)."
++  # still ensure cache dir exists for future builds
++  mkdir -p "${CACHE_DIR}"
++else
++  echo "==> requirements.txt changed/new, installing dependencies (cached)..."
++  python -m pip install --cache-dir "${CACHE_DIR}" -r requirements.txt
++  echo "${REQ_HASH}" > "${REQ_HASH_FILE}"
++fi
++
++# do not fail build on optional dependency warnings
++python -m pip check || true
++echo "==> Build finished (cached)."
++
+diff --git a/.gitignore b/.gitignore
+index 2222222..3333333 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,7 @@
++# --- Render build cache ---
++.pip-cache/
++.render-requirements.hash
++
+diff --git a/render.yaml b/render.yaml
+index 4444444..5555555 100644
+--- a/render.yaml
++++ b/render.yaml
+@@ -1,12 +1,17 @@
+ services:
+   - type: web
+     name: satpambot
+     env: python
+-    buildCommand: |
+-      pip install -r requirements.txt
++    buildCommand: |
++      chmod +x scripts/build_render.sh
++      ./scripts/build_render.sh
+     startCommand: python main.py
+     healthCheckPath: /healthz
+-    autoDeploy: true
++    autoDeploy: false
+     envVars:
+       - key: PYTHON_VERSION
+         value: 3.11

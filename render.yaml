@@ -2,18 +2,12 @@ services:
   - type: web
     name: satpambot-free
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      chmod +x scripts/build_render.sh
+      ./scripts/build_render.sh
     startCommand: python main.py
     healthCheckPath: /healthz
-    autoDeploy: true
+    autoDeploy: false
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
-      - key: FLASK_ENV
-        value: production
-      - key: RUN_BOT
-        value: "1"
-      - key: SOCKETIO_ASYNC_MODE
-        value: threading
-      - key: DISABLE_EVENTLET
-        value: "1"
+        value: 3.11
