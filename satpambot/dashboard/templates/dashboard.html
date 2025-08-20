@@ -1,63 +1,42 @@
-
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
-{% block content %}
-  <section class="kpi-row">
-    <div class="kpi"><div class="label">Online</div><div class="value" id="kpi-online-big">--</div><canvas id="sp1"></canvas></div>
-    <div class="kpi"><div class="label">Members</div><div class="value" id="kpi-members-big">--</div><canvas id="sp2"></canvas></div>
-    <div class="kpi"><div class="label">Channels</div><div class="value" id="kpi-channels">--</div><canvas id="sp3"></canvas></div>
-    <div class="kpi"><div class="label">Threads</div><div class="value" id="kpi-threads">--</div><canvas id="sp4"></canvas></div>
-  </section>
+{% set active="dashboard" %}
+{% block body %}
+<h2 style="margin:0 0 14px 0">Dashboard</h2>
 
-  <section class="grid">
-    <div class="left-col">
-      <div class="panel">
-        <div class="hd"><strong>Recent Activity</strong><span class="badge">Live</span></div>
-        <div class="bd"><canvas id="recentChart" class="spark"></canvas></div>
-      </div>
-      <div class="panel" style="margin-top:18px">
-        <div class="hd"><strong>Changes</strong></div>
-        <div class="bd">
-          <table class="table" id="changesTbl">
-            <thead><tr><th>#</th><th>By</th><th>At</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <div class="right-col">
-      <div class="panel">
-        <div class="hd"><strong>Servers</strong> <span class="badge" id="apiPing">...</span></div>
-        <div class="bd">
-          <table class="table" id="serversTbl">
-            <thead><tr><th>Nama</th><th>Status</th><th>Ping</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="hd"><strong>Today note</strong></div>
-        <div class="bd"><div contenteditable="true" id="note" style="min-height:90px;background:#0a1836;border:1px solid #1a2a55;border-radius:12px;padding:10px">Tulis catatan…</div></div>
-      </div>
-      <div class="panel">
-        <div class="hd"><strong>My files</strong></div>
-        <div class="bd">
-          <input type="file" id="quickUpload" />
-          <div id="uploadHint" class="badge" style="margin-left:8px">Upload → /uploads/</div>
-        </div>
-      </div>
-    </div>
-  </section>
-{% endblock %}
-
-<!-- Phishing Guard Card -->
-<section class="card" style="grid-column: span 1;">
-  <header class="card-head"><h3>Phishing Guard</h3></header>
-  <div id="phishDrop" class="dropzone">Seret & lepaskan gambar di sini atau klik untuk memilih…</div>
-  <input id="phishFile" type="file" accept="image/*" hidden multiple>
-  <div id="phishUrlRow">
-    <input id="phishUrl" type="url" placeholder="Tempel URL phishing untuk ditambahkan…">
-    <button id="phishUrlBtn" type="button">Tambah URL</button>
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+  <div class="card" style="padding:16px"><div class="k">Guilds</div><div id="stat-guilds" class="v">--</div></div>
+  <div class="card" style="padding:16px"><div class="k">Members</div><div id="stat-members" class="v">--</div></div>
+  <div class="card" style="padding:16px"><div class="k">Online</div><div id="stat-online" class="v">--</div></div>
+  <div class="card" style="padding:16px"><div class="k">Channels</div><div id="stat-channels" class="v">--</div></div>
+  <div class="card" style="padding:16px"><div class="k">Threads</div><div id="stat-threads" class="v">--</div></div>
+  <div class="card" style="padding:16px">
+    <div class="k">Latency</div>
+    <canvas id="spark-ping" style="width:100%;height:42px;display:block"></canvas>
   </div>
-  <div id="phishResult" class="muted small"></div>
-</section>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:18px;">
+  <div class="card" style="padding:16px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-weight:600">CPU %</div>
+    </div>
+    <canvas id="spark-cpu" style="width:100%;height:120px;display:block"></canvas>
+  </div>
+  <div class="card" style="padding:16px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-weight:600">RAM (MB)</div>
+    </div>
+    <canvas id="spark-ram" style="width:100%;height:120px;display:block"></canvas>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px; padding:16px;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <div style="font-weight:600">Recent Activity</div>
+    <span id="ra-live" style="margin-left:auto;font-size:12px;border:1px solid rgba(255,255,255,.2);padding:4px 8px;border-radius:999px;opacity:.75">Live</span>
+  </div>
+  <canvas id="recent-activity" style="width:100%;height:140px;display:block"></canvas>
+</div>
+
+<script type="module" src="/dashboard-static/js/neo_dashboard_live.js"></script>
+{% endblock %}
