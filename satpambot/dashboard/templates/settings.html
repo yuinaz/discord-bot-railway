@@ -1,76 +1,74 @@
-{% extends "base.html" %}
-{% set active="settings" %}
-{% block body %}
-<h2 style="margin:0 0 14px 0">Settings</h2>
 
-<div class="card">
-  <div class="body">
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
-      <div>
-        <label class="label">Theme</label>
-        <select class="select" data-ui="theme" id="ui-theme">
-          <option>Dark</option>
-          <option>Light</option>
-          <option>Ocean</option>
-          <option>Nord</option>
-        </select>
+{% extends "base.html" %}
+{% block content %}
+<div class="section">
+  <h2 class="title">Settings</h2>
+  <div class="card p-4">
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Theme</label>
+        <select id="theme" class="input"></select>
+        <small class="hint">Termasuk custom dari <code>data/themes/*.json</code></small>
       </div>
-      <div>
-        <label class="label">Accent Color</label>
-        <input class="input" data-ui="accent" id="ui-accent" placeholder="#2563eb">
+
+      <div class="form-group">
+        <label>Accent Color</label>
+        <input id="accent" class="input" placeholder="#2563eb">
       </div>
-      <div>
-        <label class="label">Background Mode</label>
-        <select class="select" data-ui="bgmode" id="ui-bgmode">
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Background Mode</label>
+        <select id="bg_mode" class="input">
           <option>None</option>
           <option>Image</option>
           <option>Particles</option>
+          <option>Video</option>
         </select>
       </div>
-      <div>
-        <label class="label">Background URL</label>
-        <input class="input" data-ui="bgurl" id="ui-bgurl" placeholder="/uploads/bg.jpg">
-      </div>
-      <div>
-        <label class="label">Apply to Login</label>
-        <input type="checkbox" data-ui="applylogin" id="ui-apply-login">
+
+      <div class="form-group">
+        <label>Apply to Login</label>
+        <input id="apply_login" type="checkbox">
       </div>
     </div>
-    <div style="margin-top:14px; display:flex; gap:10px">
-      <button class="btn" id="ui-save">Save</button>
-      <button class="btn ghost" id="ui-preview">Preview</button>
+
+    <hr>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Background URL</label>
+        <div class="input-row">
+          <input id="bg_url" class="input" placeholder="/uploads/bg.jpg">
+          <button id="set_bg_url" class="btn">Apply URL</button>
+        </div>
+        <div class="input-row mt-1">
+          <input id="bg_file" type="file" accept="image/*">
+          <button id="upload_bg" class="btn">Upload Background</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Logo URL</label>
+        <div class="input-row">
+          <input id="logo_url" class="input" placeholder="/uploads/logo.png">
+          <button id="set_logo_url" class="btn">Apply URL</button>
+        </div>
+        <div class="input-row mt-1">
+          <input id="logo_file" type="file" accept="image/*">
+          <button id="upload_logo" class="btn">Upload Logo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions mt-2">
+      <button id="save" class="btn primary">Save</button>
+      <button id="preview" class="btn">Preview</button>
     </div>
   </div>
 </div>
 
-<script>
-(async function(){
-  async function save(payload){
-    // Simpan ke backend jika tersedia
-    try{
-      const r = await fetch('/api/ui-config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-      if(r.ok) return;
-    }catch(e){}
-    // Fallback localStorage
-    localStorage.setItem('neo.ui', JSON.stringify(payload));
-  }
-  function collect(){
-    return {
-      theme: document.getElementById('ui-theme').value,
-      accent: document.getElementById('ui-accent').value,
-      bg_mode: document.getElementById('ui-bgmode').value,
-      bg_url: document.getElementById('ui-bgurl').value,
-      apply_login: document.getElementById('ui-apply-login').checked
-    };
-  }
-  function apply(cfg){
-    document.documentElement.setAttribute('data-theme', (cfg.theme||'dark').toLowerCase());
-    if(cfg.accent) document.documentElement.style.setProperty('--acc', cfg.accent);
-  }
-  document.getElementById('ui-save').addEventListener('click', async ()=>{
-    const cfg = collect(); await save(cfg); apply(cfg);
-  });
-  document.getElementById('ui-preview').addEventListener('click', ()=>{ apply(collect()); });
-})();
-</script>
+<script defer src="/dashboard-static/js/settings_ui.js"></script>
 {% endblock %}
