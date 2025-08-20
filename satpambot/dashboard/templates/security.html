@@ -1,40 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Security{% endblock %}
 {% block content %}
-<h1>Security</h1>
-<div class="grid two">
-  <div class="card">
-    <div class="card-title">Drag & Drop Gambar (pHash)</div>
-    <div id="drop" class="dropzone">Letakkan gambar di sini atau klik untuk memilih.</div>
-    <ul id="sigList"></ul>
+<section class="card">
+  <h3>Phishing Guard</h3>
+  <div id="dropzone" class="dropzone">Drag & drop gambar di sini atau klik untuk pilih file</div>
+  <div class="urladd">
+    <input id="phishUrl" placeholder="https://contoh-phish.com">
+    <button id="addUrl">Tambah URL</button>
+    <span id="phishStatus" class="muted"></span>
   </div>
-  <div class="card">
-    <div class="card-title">Tambahkan URL Phishing</div>
-    <form id="urlForm">
-      <input id="urlIn" placeholder="https://phishing.example/..." required>
-      <button class="btn" type="submit">Tambah</button>
-    </form>
-    <ul id="urlList"></ul>
-  </div>
-</div>
-<script>
-async function refresh(){
-  let r=await fetch('/api/phish/images'); let j=await r.json();
-  const ul=document.getElementById('sigList'); ul.innerHTML=''; (j.phash||[]).forEach(x=>{const li=document.createElement('li'); li.textContent=x; ul.appendChild(li);} );
-  r=await fetch('/api/phish/urls'); j=await r.json(); const uu=document.getElementById('urlList'); uu.innerHTML=''; (j.urls||[]).forEach(x=>{const li=document.createElement('li'); li.textContent=x; uu.appendChild(li);} );
-}
-function upFiles(files){
-  [...files].forEach(async f=>{
-    const fd=new FormData(); fd.append('file', f);
-    const r=await fetch('/api/phish/images',{method:'POST',body:fd}); await r.json(); refresh();
-  });
-}
-const drop=document.getElementById('drop');
-drop.onclick = ()=>{ const i=document.createElement('input'); i.type='file'; i.accept='image/*'; i.onchange=()=> upFiles(i.files); i.click(); };
-drop.ondragover = e=>{e.preventDefault(); drop.classList.add('hover');};
-drop.ondragleave = e=>{drop.classList.remove('hover');};
-drop.ondrop = e=>{e.preventDefault(); drop.classList.remove('hover'); upFiles(e.dataTransfer.files);};
-document.getElementById('urlForm').onsubmit = async e=>{e.preventDefault(); const u=document.getElementById('urlIn').value; await fetch('/api/phish/urls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})}); document.getElementById('urlIn').value=''; refresh(); };
-refresh();
-</script>
+</section>
 {% endblock %}
