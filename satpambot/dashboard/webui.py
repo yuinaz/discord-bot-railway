@@ -253,5 +253,41 @@ def register_webui_builtin(app):
             # Alias supaya tautan ke /dashboard/logout tetap valid
             return redirect("/logout", code=302)
 
+    # ---------- Favicon (aman, dengan fallback) ----------
+    if not _has_ep(app, "favicon_ico"):
+        @app.get("/favicon.ico")
+        def favicon_ico():
+            # 1) kalau ada file fisik favicon.ico di static, pakai itu
+            f = _STATIC_DIR / "favicon.ico"
+            if f.exists():
+                return send_from_directory(
+                    str(_STATIC_DIR), "favicon.ico",
+                    conditional=True, mimetype="image/x-icon"
+                )
+
+            # 2) kalau ada logo.svg, pakai sebagai fallback favicon (SVG)
+            fsvg = _STATIC_DIR / "logo.svg"
+            if fsvg.exists():
+                return send_from_directory(
+                    str(_STATIC_DIR), "logo.svg",
+                    conditional=True, mimetype="image/svg+xml"
+                )
+
+            # 3) fallback terakhir: favicon ICO kecil inline (status 200)
+            from flask import Response
+            import base64
+            # ICO 16x16 sederhana
+            ico_b64 = (
+                "AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAGAAAAAAAQAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD/"
+                "//8A////AP///wD///8A////AP///wD///8A////AP///wAAAAA="
+            )
+            data = base64.b64decode(ico_b64)
+            return Response(
+                data, mimetype="image/x-icon",
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
+
 
 __all__ = ["register_webui_builtin"]
