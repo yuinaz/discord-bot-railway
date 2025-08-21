@@ -1,6 +1,11 @@
 {% extends 'base.html' %}
 {% block title %}Logout{% endblock %}
 {% block content %}
-<h2>Anda telah logout.</h2>
-    <p>Mengarahkan ke halaman login...</p>
+  <div class="card">
+    <h2>Anda telah logout.</h2>
+    <p class="muted">Mengarahkan ke halaman login…</p>
+  </div>
+  <script>
+    setTimeout(function(){ location.href = "/dashboard/login"; }, 1200);
+  </script>
 {% endblock %}

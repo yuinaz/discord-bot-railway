@@ -232,5 +232,26 @@ def register_webui_builtin(app):
             f.save(dst)
             return jsonify({"ok": True, "saved": str(dst)})
 
+    # ---------- Logout pages (additive, tidak mengganggu config lain) ----------
+    if not _has_ep(app, "logout_page"):
+        @app.get("/logout")
+        def logout_page():
+            # Coba render override tema terlebih dahulu, lalu fallback ke templates/logout.html
+            try:
+                return _render_themed(app, "logout.html")
+            except Exception:
+                # Fallback sangat sederhana, tetap mengarahkan ke login
+                return Response(
+                    "<h1>Anda telah logout.</h1>"
+                    "<script>setTimeout(()=>location.href='/dashboard/login',1000)</script>",
+                    mimetype="text/html; charset=utf-8"
+                )
+
+    if not _has_ep(app, "dashboard_logout"):
+        @app.get("/dashboard/logout")
+        def dashboard_logout():
+            # Alias supaya tautan ke /dashboard/logout tetap valid
+            return redirect("/logout", code=302)
+
 
 __all__ = ["register_webui_builtin"]
