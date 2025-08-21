@@ -144,6 +144,14 @@ async def on_ready():
             await announce_status(g, bot)
     except Exception as e:
         logging.warning("[status] announce_status error: %s", e)
+    # start live stats publisher once
+    global _live_stats_task
+    try:
+        if _live_stats_task is None or _live_stats_task.done():
+            _live_stats_task = bot.loop.create_task(_publish_live_stats_loop())
+    except Exception as e:
+        logging.debug("[live] task start failed: %s", e)
+
 
     logging.info(f"✅ Bot berhasil login sebagai {bot.user} (ID: {bot.user.id})")
     logging.info(f"🌐 Mode: {FLASK_ENV}")
@@ -204,6 +212,67 @@ async def start_bot():
     if not token:
         raise RuntimeError('BOT_TOKEN/DISCORD_TOKEN is not set')
     await bot.start(token)
+
+
+# ---- Live Stats Publisher (non-intrusive) ----
+_live_stats_task = None
+async def _publish_live_stats_loop():
+    import asyncio, os, logging
+    try:
+        from satpambot.dashboard.presence_store import set_stats  # lightweight in-process
+    except Exception as e:
+        logging.debug("[live] presence_store unavailable: %s", e)
+        return
+    interval = int(os.getenv("LIVE_STATS_INTERVAL","5"))
+    while True:
+        try:
+            g_count = len(bot.guilds)
+            try:
+                m_count = sum((g.member_count or 0) for g in bot.guilds)
+            except Exception:
+                # fallback: len members (may require privileged intents)
+                m_count = 0
+                for g in bot.guilds:
+                    try:
+                        m_count += len(getattr(g, "members", []) or [])
+                    except Exception:
+                        pass
+            # channels (text+voice+category)
+            ch_count = 0
+            for g in bot.guilds:
+                try:
+                    ch_count += len(getattr(g, "channels", []) or [])
+                except Exception:
+                    pass
+            # threads (best-effort)
+            th_count = 0
+            for g in bot.guilds:
+                try:
+                    th_count += len(getattr(g, "threads", []) or [])
+                except Exception:
+                    pass
+            # online (best-effort if presence intent enabled)
+            online = 0
+            for g in bot.guilds:
+                try:
+                    for m in getattr(g, "members", []) or []:
+                        st = str(getattr(m, "status", "offline"))
+                        if st and st.lower() != "offline":
+                            online += 1
+                except Exception:
+                    pass
+            lat_ms = int(getattr(bot, "latency", 0) * 1000)
+            set_stats({
+                "guilds": g_count,
+                "members": m_count,
+                "channels": ch_count,
+                "threads": th_count,
+                "online": online,
+                "latency_ms": lat_ms
+            })
+        except Exception as e:
+            logging.debug("[live] publish failed: %s", e)
+        await asyncio.sleep(max(1, interval))
 
 def run_bot():
     asyncio.run(start_bot())

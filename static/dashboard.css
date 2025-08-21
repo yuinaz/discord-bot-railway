@@ -1,2 +1,0 @@
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
-.label{opacity:.7;font-size:.9rem;margin-top:4px}

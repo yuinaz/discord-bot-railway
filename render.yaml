@@ -1,13 +1,30 @@
 services:
   - type: web
-    name: satpambot-free
+    name: satpambot
     env: python
-    buildCommand: |
-      chmod +x scripts/build_render.sh
-      ./scripts/build_render.sh
-    startCommand: python main.py
+    plan: free
+    region: singapore            # ganti bila perlu
+    autoDeploy: true
     healthCheckPath: /healthz
-    autoDeploy: false
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11
+        value: 3.11.9
+      - key: PORT
+        value: 10000
+      - key: TZ
+        value: Asia/Jakarta
+      - key: RUN_BOT           # bot jalan di thread background
+        value: "1"
+      - key: DISABLE_EVENTLET  # hindari eventlet pada Flask-SocketIO (sumber klasik stuck)
+        value: "1"
+      - key: SOCKETIO_ASYNC_MODE
+        value: threading
+      # ----- tambahkan env lainmu di bawah ini (token dsb) -----
+      # - key: DISCORD_TOKEN
+      #   sync: false
+      # - key: LOG_CHANNEL_ID
+      #   value: "1400375184048787566"
+
+    buildCommand: |
+      if [ -f scripts/build_render.sh ]; then bash scripts/build_render.sh; else pip install -r requirements.txt; fi
+    startCommand: python main.py
