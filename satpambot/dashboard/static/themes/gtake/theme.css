@@ -1,0 +1,9 @@
+/* fallback theme; ganti dengan CSS finalmu kapan saja */
+:root { --accent:#7aa2ff; --bg:#0b1020; --fg:#e5e7eb; }
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans","Apple Color Emoji","Segoe UI Emoji";}
+/* card look */
+.card{background:rgba(20,26,46,.8);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.3);padding:16px}
+/* input */
+input,button{border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:var(--fg);padding:10px 12px}
+button{background:linear-gradient(90deg,#304ffe,#7aa2ff);border:0;color:#fff}

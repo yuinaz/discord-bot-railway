@@ -1,43 +1,59 @@
-
-# main.py — single-process runner (Render free plan friendly)
+# main.py — ENTRY SERVICE (run Flask + start bot bg)
 from __future__ import annotations
-import os, logging, threading, asyncio, time
+import logging, os, threading, asyncio
+from werkzeug.serving import WSGIRequestHandler
 
-logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
-                    format="%(asctime)s [%(levelname)s] %(message)s")
-log = logging.getLogger("main")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+log = logging.getLogger("entry.main")
 
-# Threading-only (Render free plan); no eventlet/gevent
-os.environ.setdefault("SOCKETIO_ASYNC_MODE", os.getenv("SOCKETIO_ASYNC_MODE", "threading"))
-os.environ.setdefault("DISABLE_EVENTLET", os.getenv("DISABLE_EVENTLET", "1"))
+try:
+    from app import create_app
+    app = create_app()
+    log.info("[web] Flask app created via create_app()")
+except Exception:
+    from flask import Flask
+    app = Flask("satpambot_dashboard_fallback")
+    @app.get("/healthz")
+    def _healthz(): return "OK", 200
+    @app.get("/")
+    def _root(): return "SatpamBot dashboard fallback", 200
+    @app.get("/uptime")
+    def _uptime(): return "OK", 200
+    log.warning("[app] fallback Flask app created")
 
-# Resolve Flask app from app.py
-from app import app as flask_app, create_app as _create_app
+def _run_asyncmaybe(fn):
+    if asyncio.iscoroutinefunction(fn):
+        asyncio.run(fn())
+    else:
+        fn()
 
-app = flask_app or (_create_app() if callable(_create_app) else None)
-if app is None:
-    raise RuntimeError("Failed to resolve Flask app (app is None)")
+def start_bot_background():
+    def _target():
+        try:
+            from satpambot.bot.main import start_bot as _start
+        except Exception:
+            try:
+                from satpambot.bot.main import main as _start
+            except Exception:
+                log.warning("Bot not started: start function not found in satpambot.bot.main")
+                return
+        try:
+            log.info("🤖 Bot started in background thread using satpambot.bot.main.%s", _start.__name__)
+            _run_asyncmaybe(_start)
+        except Exception:
+            log.exception("Bot thread crashed")
+    threading.Thread(target=_target, name="satpambot-bg", daemon=True).start()
 
-# Start time after app exists (fix AttributeError)
-app.config["START_TIME"] = time.time()
+if os.getenv("DISABLE_BOT_RUN", "0") != "1":
+    start_bot_background()
 
-def _bot_runner():
-    try:
-        from satpambot.bot.modules.discord_bot.shim_runner import start_bot
-    except Exception as e:
-        log.error("Bot runner not found: %s", e); return
-    try:
-        asyncio.run(start_bot())
-    except Exception as e:
-        log.error("Bot exited with error: %s", e)
-
-RUN_BOT = os.getenv("RUN_BOT", "1").lower() in ("1","true","yes","on")
-HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "10000"))
+class _HealthzFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/healthz" not in str(getattr(record, "msg", ""))
+logging.getLogger("werkzeug").addFilter(_HealthzFilter())
 
 if __name__ == "__main__":
-    if RUN_BOT:
-        threading.Thread(target=_bot_runner, name="DiscordBotThread", daemon=True).start()
-        log.info("🤖 Bot started in background thread.")
-    log.info("🌐 Serving web on %s:%s", HOST, PORT)
-    app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
+    port = int(os.getenv("PORT", "10000"))
+    log.info("🌐 Serving web on 0.0.0.0:%s", port)
+    WSGIRequestHandler.protocol_version = "HTTP/1.1"
+    app.run(host="0.0.0.0", port=port, debug=False)

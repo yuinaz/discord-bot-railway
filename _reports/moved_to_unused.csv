@@ -1,0 +1,5 @@
+rel,reason
+satpambot\dashboard\static\js\mini_monitor.js,"Duplicate of mini_monitor.js, kept dashboard\static\js\mini_monitor.js"
+satpambot\dashboard\static\js\neo_dashboard_live.js,"Duplicate of neo_dashboard_live.js, kept dashboard\static\js\neo_dashboard_live.js"
+satpambot\dashboard\static\js\phish_drop.js,"Duplicate of phish_drop.js, kept dashboard\static\js\phish_drop.js"
+satpambot\dashboard\static\js\settings_ui.js,"Duplicate of settings_ui.js, kept dashboard\static\js\settings_ui.js"

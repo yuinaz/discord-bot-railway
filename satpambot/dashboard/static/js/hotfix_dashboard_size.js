@@ -1,1 +1,5 @@
-(function(){const a=()=>{document.querySelectorAll('canvas').forEach(c=>{c.style.width='100%';if(!c.style.height)c.style.height='220px';});};a();try{new ResizeObserver(a).observe(document.body);}catch(e){window.addEventListener('resize',a);}})();
+(function(){ try{
+  function resize(){ document.documentElement.style.setProperty('--vh', (window.innerHeight*0.01)+'px'); }
+  window.addEventListener('resize', resize); resize();
+  console.log('[hotfix_dashboard_size] applied');
+} catch(e){} })();

@@ -1,0 +1,69 @@
+
+/* Neo Aurora Plus — dark, higher contrast */
+:root{
+  --bg: #0d1420;
+  --bg-soft: #121a28;
+  --card: #0f1a2a;
+  --card-2: #132033;
+  --text: #e6edf3;
+  --muted: #9bb0c7;
+  --acc: #2563eb;
+  --ring: rgba(37,99,235,.45);
+  --success:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+  --radius: 14px;
+}
+
+/* theme switch hook */
+html[data-theme="light"]{
+  --bg:#eef2f7; --bg-soft:#f2f5fa; --card:#ffffff; --card-2:#f6f8fc; --text:#0f172a; --muted:#334155;
+}
+html[data-theme="ocean"]{
+  --acc:#00a9ff;
+}
+html[data-theme="nord"]{
+  --acc:#81a1c1;
+}
+
+body{ background: radial-gradient(1200px 800px at 10% -10%, #1d2b47 0%, transparent 60%), var(--bg); color: var(--text); }
+hr{ border-color: rgba(255,255,255,.06); }
+
+/* Layout */
+.layout{ display:flex; min-height:100vh; }
+.sidebar{ width: 240px; background: linear-gradient(180deg, #0b1220, #0a1324); border-right: 1px solid rgba(255,255,255,.06); position:sticky; top:0; height:100vh; }
+.sidebar.collapsed{ width: 72px; }
+.sidebar .brand{ display:flex; align-items:center; gap:10px; padding:16px; font-weight:700; opacity:.95; }
+.sidebar .nav{ padding: 8px 8px 16px 8px; }
+.sidebar .nav .item{ display:flex; align-items:center; gap:12px; padding:10px 12px; margin:6px 4px; border-radius:12px; color:var(--text); text-decoration:none; background:transparent; border:1px solid transparent; }
+.sidebar .nav .item:hover{ background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.06); }
+.sidebar .nav .item.active{ background: rgba(37,99,235,.12); border-color: var(--ring); box-shadow: 0 0 0 2px rgba(37,99,235,.12) inset; }
+.sidebar.collapsed .nav .item span.text{ display:none; }
+.sidebar .section{ font-size:11px; letter-spacing:.08em; color:var(--muted); padding:10px 16px 0; opacity:.75; }
+
+.main{ flex:1; }
+.topbar{ display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,.06); background: rgba(6,12,24,.55); backdrop-filter: blur(6px); position:sticky; top:0; z-index:5}
+.topbar .toggle{ width:36px; height:36px; border-radius:12px; background: rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); display:grid; place-items:center; cursor:pointer; }
+.container{ padding:18px 22px; }
+
+/* Cards */
+.card{ background: var(--card); border:1px solid rgba(255,255,255,.06); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.card .title{ font-weight:700; padding:14px 16px 0; }
+.card .body{ padding:16px; }
+
+/* Form controls */
+.input, .select, .textarea{
+  width:100%; background: var(--bg-soft); color: var(--text);
+  border:1px solid rgba(255,255,255,.12); border-radius: 12px;
+  padding:10px 12px; outline:none;
+}
+.input::placeholder, .textarea::placeholder{ color: rgba(255,255,255,.45); }
+.input:focus, .select:focus, .textarea:focus{ border-color: var(--acc); box-shadow: 0 0 0 3px var(--ring); }
+.label{ display:block; margin:10px 2px 6px; color: var(--muted); font-size: 13px; }
+.btn{ background: linear-gradient(90deg, var(--acc), #5b9aff); border:none; color:#fff; padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600; }
+.btn.ghost{ background: transparent; border:1px solid rgba(255,255,255,.12); color:var(--text); }
+.grid{ display:grid; gap:12px; }
+
+/* Canvases */
+canvas{ background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border-radius: 12px; border:1px solid rgba(255,255,255,.06); }
+
+/* Hide duplicate sidebars if existed */
+.old-sidebar, .secondary-sidebar{ display:none !important; }
