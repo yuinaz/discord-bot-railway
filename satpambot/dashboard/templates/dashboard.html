@@ -1,1 +1,42 @@
-<!doctype html><title>Dashboard</title>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard - SatpamBot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="/dashboard-static/themes/gtake/theme.css" rel="stylesheet">
+  <link href="/dashboard-static/css/neo_aurora_plus.css" rel="stylesheet">
+  <script src="/dashboard-static/js/neo_dashboard_live.js" defer></script>
+</head>
+<body class="neo-bg">
+  <header class="topbar">
+    <div class="brand">
+      <img src="/dashboard-static/logo.svg" alt="logo" class="logo">
+      <span>SatpamBot</span>
+    </div>
+    <nav class="topnav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard/security">Security</a>
+      <a href="/dashboard/settings">Settings</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1 class="page-title">Dashboard</h1>
+
+    <section class="grid stats" id="stats">
+      <div class="card stat"><div class="label">Guilds</div><div class="value" data-k="guilds">0</div></div>
+      <div class="card stat"><div class="label">Members</div><div class="value" data-k="members">0</div></div>
+      <div class="card stat"><div class="label">Online</div><div class="value" data-k="online">0</div></div>
+      <div class="card stat"><div class="label">Channels</div><div class="value" data-k="channels">0</div></div>
+      <div class="card stat"><div class="label">Threads</div><div class="value" data-k="threads">0</div></div>
+      <div class="card stat"><div class="label">Latency</div><div class="value"><span data-k="latency_ms">0</span> ms</div></div>
+    </section>
+
+    <section class="card mt">
+      <h2>Status</h2>
+      <p>Terakhir update: <span id="lastUpdated">-</span></p>
+    </section>
+  </main>
+</body>
+</html>

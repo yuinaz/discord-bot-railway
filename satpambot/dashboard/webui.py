@@ -100,3 +100,38 @@ def register_webui_builtin(app):
         _log.addFilter(_NoPing()); _log._sb_hide_ping_ui = True
 
 __all__ = ["register_webui_builtin"]
+
+
+# <<< SB_JINJA_BRIDGE >>>
+try:
+    from jinja2 import ChoiceLoader, FileSystemLoader
+    from pathlib import Path as _P
+    _SB_TEMPL_DIR = _P(__file__).resolve().parent / "templates"
+
+    def _sb_attach_jinja_loader(app):
+        try:
+            loader_now = getattr(app, "jinja_loader", None)
+            add_loader = FileSystemLoader(str(_SB_TEMPL_DIR))
+            if loader_now and isinstance(loader_now, ChoiceLoader):
+                paths=[]
+                for L in loader_now.loaders:
+                    p=getattr(L,"searchpath",None)
+                    if isinstance(p,(list,tuple)):
+                        paths += list(map(str,p))
+                if str(_SB_TEMPL_DIR) not in paths:
+                    app.jinja_loader = ChoiceLoader(list(loader_now.loaders)+[add_loader])
+            else:
+                app.jinja_loader = ChoiceLoader([loader_now, add_loader] if loader_now else [add_loader])
+        except Exception:
+            pass
+
+    if 'register_webui_builtin' in globals():
+        _old = register_webui_builtin
+        def register_webui_builtin(app):
+            _old(app)
+            _sb_attach_jinja_loader(app)
+    else:
+        def register_webui_builtin(app):
+            _sb_attach_jinja_loader(app)
+except Exception:
+    pass
