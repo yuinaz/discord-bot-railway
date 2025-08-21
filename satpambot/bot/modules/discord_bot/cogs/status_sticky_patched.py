@@ -98,10 +98,39 @@ class StatusStickyPatched(commands.Cog):
                 for g in self.bot.guilds:
                     _c = discord.utils.get(g.text_channels, name=name)
                     if _c: ch=_c; break
-            if not ch:
-                log.warning("[status] channel not found"); return
-            await _post_or_edit_status(self.bot, ch)
-        except Exception as e:
+            
+if not ch:
+    # Try LOG_CHANNEL_ID as fallback
+    _log_id = os.getenv("LOG_CHANNEL_ID")
+    if _log_id:
+        try:
+            _log_id_int = int(_log_id)
+            ch = self.bot.get_channel(_log_id_int)
+        except Exception:
+            ch = None
+if not ch:
+    # Try common names
+    names = [os.getenv("LOG_CHANNEL_NAME", "log-botphising"), "bot-log", "log", "logs"]
+    for g in self.bot.guilds:
+        for nm in names:
+            _c = discord.utils.get(g.text_channels, name=nm)
+            if _c:
+                ch = _c
+                break
+        if ch: break
+if not ch:
+    # Last resort: first text channel we can send to
+    for g in self.bot.guilds:
+        for _c in g.text_channels:
+            p = _c.permissions_for(g.me)
+            if p.send_messages and p.embed_links:
+                ch = _c; break
+        if ch: break
+if not ch:
+    log.warning("[status] channel not found (tried STATUS_CHANNEL_ID, LOG_CHANNEL_ID, names)")
+    return
+await _post_or_edit_status(self.bot, ch)
+except Exception as e:
             log.exception("[status] update failed: %s", e)
 
 async def setup(bot):
