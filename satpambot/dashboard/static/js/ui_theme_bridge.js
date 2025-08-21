@@ -1,8 +1,9 @@
+// Aman kalau sudah ada; file ini hanya memastikan theme.css terpasang
 (function(){
   try{
-    var l=document.createElement('link'); l.rel='stylesheet';
-    l.href='/dashboard-static/themes/gtake/theme.css';
-    document.head.appendChild(l);
+    if(!document.querySelector('link[href*="themes/gtake/theme.css"]')){
+      var l=document.createElement('link'); l.rel='stylesheet';
+      l.href='/dashboard-static/themes/gtake/theme.css'; document.head.appendChild(l);
+    }
   }catch(e){}
-  console.log('[ui_theme_bridge] ready');
 })();

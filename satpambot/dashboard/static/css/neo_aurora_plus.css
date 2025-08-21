@@ -1,1 +1,35 @@
-@import "/dashboard-static/themes/gtake/theme.css";
+/* Background malam + kartu glass ala mockup */
+:root{
+  --bg:#0b0f1a; --panel:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.10); --text:#e6e8ee; --muted:#98a2b3;
+  --accent1:#4f67ff; --accent2:#7aa2ff; --radius:16px;
+  --shadow:0 20px 60px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body.neo-bg{
+  margin:0; color:var(--text);
+  background: radial-gradient(1100px 700px at 10% 10%, rgba(79,103,255,.22), transparent),
+              radial-gradient(1000px 600px at 90% 80%, rgba(122,162,255,.18), transparent),
+              #0b0f1a;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 18px; position:sticky; top:0; backdrop-filter:saturate(150%) blur(10px);
+  background:rgba(8,13,24,.55); border-bottom:1px solid rgba(255,255,255,.06);
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:700}
+.logo{width:22px; height:22px}
+.topnav a{color:#cfd6ff; text-decoration:none; margin-left:14px}
+.container{max-width:1200px; margin:20px auto; padding:0 16px}
+.page-title{margin:8px 0 16px}
+
+.grid.stats{display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.08));
+  border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px;
+}
+.stat .label{color:var(--muted); font-size:13px}
+.stat .value{font-size:28px; font-weight:800; margin-top:6px}
+.mt{margin-top:18px}

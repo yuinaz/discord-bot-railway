@@ -1,26 +1,42 @@
-{% extends "base.html" %}
-{% set active="dashboard" %}
-{% block body %}
-<h2 style="margin:0 0 14px 0">Dashboard</h2>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard - SatpamBot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="/dashboard-static/themes/gtake/theme.css" rel="stylesheet">
+  <link href="/dashboard-static/css/neo_aurora_plus.css" rel="stylesheet">
+  <script src="/dashboard-static/js/neo_dashboard_live.js" defer></script>
+</head>
+<body class="neo-bg">
+  <header class="topbar">
+    <div class="brand">
+      <img src="/dashboard-static/logo.svg" alt="logo" class="logo">
+      <span>SatpamBot</span>
+    </div>
+    <nav class="topnav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard/security">Security</a>
+      <a href="/dashboard/settings">Settings</a>
+    </nav>
+  </header>
 
-<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-  <div class="card"><div class="body"><div class="label">Guilds</div><div id="stat-guilds">0</div></div></div>
-  <div class="card"><div class="body"><div class="label">Members</div><div id="stat-members">0</div></div></div>
-  <div class="card"><div class="body"><div class="label">Online</div><div id="stat-online">0</div></div></div>
-  <div class="card"><div class="body"><div class="label">Channels</div><div id="stat-channels">0</div></div></div>
-  <div class="card"><div class="body"><div class="label">Threads</div><div id="stat-threads">0</div></div></div>
-  <div class="card"><div class="body"><div class="label">Latency</div><canvas id="spark-ping" style="width:100%;height:40px"></canvas></div></div>
-</div>
+  <main class="container">
+    <h1 class="page-title">Dashboard</h1>
 
-<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:16px;">
-  <div class="card"><div class="body"><div class="label">CPU %</div><canvas id="spark-cpu" style="width:100%;height:120px"></canvas></div></div>
-  <div class="card"><div class="body"><div class="label">RAM (MB)</div><canvas id="spark-ram" style="width:100%;height:120px"></canvas></div></div>
-</div>
+    <section class="grid stats" id="stats">
+      <div class="card stat"><div class="label">Guilds</div><div class="value" data-k="guilds">0</div></div>
+      <div class="card stat"><div class="label">Members</div><div class="value" data-k="members">0</div></div>
+      <div class="card stat"><div class="label">Online</div><div class="value" data-k="online">0</div></div>
+      <div class="card stat"><div class="label">Channels</div><div class="value" data-k="channels">0</div></div>
+      <div class="card stat"><div class="label">Threads</div><div class="value" data-k="threads">0</div></div>
+      <div class="card stat"><div class="label">Latency</div><div class="value"><span data-k="latency_ms">0</span> ms</div></div>
+    </section>
 
-<div class="card" style="margin-top:16px"><div class="body">
-  <div style="display:flex;align-items:center"><div class="label" style="flex:1">Recent Activity</div><span style="font-size:12px;opacity:.7">Live</span></div>
-  <canvas id="recent-activity" style="width:100%;height:140px"></canvas>
-</div></div>
-
-<script type="module" src="/dashboard-static/js/neo_dashboard_live.js"></script>
-{% endblock %}
+    <section class="card mt">
+      <h2>Status</h2>
+      <p>Terakhir update: <span id="lastUpdated">-</span></p>
+    </section>
+  </main>
+</body>
+</html>
