@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True  # required for some moderation checks
+intents.presences = True
 intents.message_content = True  # ensure enabled in Discord Dev Portal
 
 PREFIX = os.getenv("COMMAND_PREFIX", "!")
