@@ -1,0 +1,16 @@
+.drop{
+  border:2px dashed rgba(255,255,255,.28);
+  border-radius:16px;
+  min-height:140px;
+  display:grid;
+  place-items:center;
+  text-align:center;
+  padding:16px;
+  cursor:pointer;
+  background:rgba(255,255,255,.05);
+}
+.drop.dragover{
+  background:rgba(88,130,255,.15);
+  border-color:#98a2ff;
+}
+.small{font-size:13px}.muted{color:#98a2b3}.mt{margin-top:16px}
