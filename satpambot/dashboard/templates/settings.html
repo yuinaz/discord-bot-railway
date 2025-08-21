@@ -1,74 +1,88 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Settings - SatpamBot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="/dashboard-static/themes/gtake/theme.css" rel="stylesheet">
+  <link href="/dashboard-static/css/neo_aurora_plus.css" rel="stylesheet">
+</head>
+<body class="neo-bg">
+  <header class="topbar">
+    <div class="brand"><img src="/dashboard-static/logo.svg" class="logo" alt=""> <span>SatpamBot</span></div>
+    <nav class="topnav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard/security">Security</a>
+      <a href="/dashboard/settings" class="active">Settings</a>
+    </nav>
+  </header>
 
-{% extends "base.html" %}
-{% block content %}
-<div class="section">
-  <h2 class="title">Settings</h2>
-  <div class="card p-4">
+  <main class="container">
+    <h1 class="page-title">Settings</h1>
 
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Theme</label>
-        <select id="theme" class="input"></select>
-        <small class="hint">Termasuk custom dari <code>data/themes/*.json</code></small>
+    <section class="card">
+      <form id="uiForm" class="grid" style="grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:16px">
+        <label>Theme
+          <select name="theme">
+            <option value="gtake">gtake</option>
+            <option value="dark">dark</option>
+          </select>
+        </label>
+        <label>Accent
+          <select name="accent">
+            <option value="blue">blue</option>
+            <option value="violet">violet</option>
+            <option value="teal">teal</option>
+          </select>
+        </label>
+        <label>Background Mode
+          <select name="bg_mode">
+            <option value="gradient">gradient</option>
+            <option value="image">image</option>
+            <option value="solid">solid</option>
+          </select>
+        </label>
+        <label>Background URL
+          <input type="text" name="bg_url" placeholder="https://...">
+        </label>
+        <label>Logo URL
+          <input type="text" name="logo_url" placeholder="/dashboard-static/logo.svg">
+        </label>
+        <label style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" name="apply_login" value="1"> Terapkan tema ke halaman login
+        </label>
+      </form>
+      <div class="mt">
+        <button id="btnSave">Simpan</button>
+        <span id="saveMsg" class="muted small"></span>
       </div>
+    </section>
+  </main>
 
-      <div class="form-group">
-        <label>Accent Color</label>
-        <input id="accent" class="input" placeholder="#2563eb">
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Background Mode</label>
-        <select id="bg_mode" class="input">
-          <option>None</option>
-          <option>Image</option>
-          <option>Particles</option>
-          <option>Video</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Apply to Login</label>
-        <input id="apply_login" type="checkbox">
-      </div>
-    </div>
-
-    <hr>
-
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Background URL</label>
-        <div class="input-row">
-          <input id="bg_url" class="input" placeholder="/uploads/bg.jpg">
-          <button id="set_bg_url" class="btn">Apply URL</button>
-        </div>
-        <div class="input-row mt-1">
-          <input id="bg_file" type="file" accept="image/*">
-          <button id="upload_bg" class="btn">Upload Background</button>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Logo URL</label>
-        <div class="input-row">
-          <input id="logo_url" class="input" placeholder="/uploads/logo.png">
-          <button id="set_logo_url" class="btn">Apply URL</button>
-        </div>
-        <div class="input-row mt-1">
-          <input id="logo_file" type="file" accept="image/*">
-          <button id="upload_logo" class="btn">Upload Logo</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="actions mt-2">
-      <button id="save" class="btn primary">Save</button>
-      <button id="preview" class="btn">Preview</button>
-    </div>
-  </div>
-</div>
-
-<script defer src="/dashboard-static/js/settings_ui.js"></script>
-{% endblock %}
+  <script>
+  async function loadCfg(){
+    const r = await fetch('/api/ui-config'); if(!r.ok) return;
+    const d = await r.json();
+    const f = document.getElementById('uiForm');
+    for (const [k,v] of Object.entries(d)){
+      const el = f.elements[k]; if(!el) continue;
+      if (el.type === 'checkbox') el.checked = !!v;
+      else el.value = v ?? '';
+    }
+  }
+  async function saveCfg(){
+    const f = document.getElementById('uiForm'); const d = {};
+    for (const el of f.elements){
+      if (!el.name) continue;
+      d[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    const r = await fetch('/api/ui-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(d)});
+    const m = document.getElementById('saveMsg');
+    if (r.ok) { m.textContent = 'Tersimpan.'; setTimeout(()=>m.textContent='',1500); }
+    else { m.textContent = 'Gagal menyimpan.'; }
+  }
+  document.getElementById('btnSave').addEventListener('click', saveCfg);
+  loadCfg();
+  </script>
+</body>
+</html>
