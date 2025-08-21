@@ -26,9 +26,16 @@
 
   <main class="main">
     <header class="toprow">
-      <div class="crumbs"><span>Home</span> <span class="sep">/</span> <span class="muted">Dashboard</span> <span class="sep">/</span> <span id="today"></span></div>
-      <div class="toptools"><button class="pill" id="btnNewTask">New task</button></div>
-    </header>
+	  <div class="crumbs">
+       <span>Home</span> <span class="sep">/</span> <span class="muted">Dashboard</span> <span class="sep">/</span> <span id="today"></span>
+      </div>
+	  <div class="toptools">
+		<button class="pill sm" type="button" onclick="history.back()">Back</button>
+		<a class="pill sm" href="/dashboard">Home</a>
+		<a class="pill sm" href="/dashboard/settings">Settings</a>
+		<a class="pill sm" href="/dashboard/login">Logout</a>
+	  </div>
+	</header>
 
     <section class="layout">
       <div class="col-main">

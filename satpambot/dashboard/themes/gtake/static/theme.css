@@ -1,1 +1,11 @@
 @import url("/dashboard-static/css/neo_aurora_plus.css");@import url("/dashboard-static/css/login_exact.css");
+/* Quick-action pills (header/login) */
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 12px;border-radius:999px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18);
+  text-decoration:none;color:#e6e8ee;font-weight:600;
+}
+.pill.sm{ padding:6px 10px; font-size:12px; }
+.pill:hover{ background:rgba(255,255,255,.14); }
