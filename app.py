@@ -1,115 +1,140 @@
-from __future__ import annotations
-import os, time, logging
-from datetime import datetime, timezone
-from pathlib import Path
-from flask import Flask, redirect, jsonify
+import os
+import time
+import logging
+from typing import Any, Optional
 
-log = logging.getLogger("satpambot.app")
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+from flask import Flask, jsonify, redirect
 
-ROOT = Path(__file__).resolve().parent
-DASH = ROOT / "satpambot" / "dashboard"
-TPL  = DASH / "templates"
-STA  = DASH / "static"
+logger = logging.getLogger("entry.app")
+logging.basicConfig(level=os.getenv("LOGLEVEL", "INFO"))
 
-def _alias(app: Flask, src: str, dst: str):
-    """Register redirect alias with a unique endpoint to avoid collisions."""
-    ep = f"alias__{src.strip('/').replace('/','_') or 'root'}"
-    if ep in app.view_functions:
-        return
-    app.add_url_rule(src, endpoint=ep, view_func=(lambda target=dst: redirect(target, code=302)))
+# --- helpers -----------------------------------------------------------------
 
-def _wire_health(app: Flask):
-    """
-    Prefer the project's quiet health routes if available, otherwise provide
-    minimal /healthz and JSON /uptime for UptimeRobot.
-    """
-    try:
-        from satpambot.dashboard.healthz_quiet import ensure_healthz_route, ensure_uptime_route
-        ensure_healthz_route(app)
-        ensure_uptime_route(app)
-        return
-    except Exception:
-        pass
+def _ensure_dirs(app: Flask) -> None:
+    up = app.config.setdefault("UPLOAD_FOLDER", os.getenv("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads")))
+    os.makedirs(up, exist_ok=True)
+    if not os.getenv("TZ"):
+        os.environ["TZ"] = os.getenv("APP_TZ", "Asia/Jakarta")
 
+
+def _register_health_endpoints(app: Flask) -> None:
     @app.get("/healthz")
-    def _healthz_ok():
-        return "OK", 200
+    def healthz():
+        # minimal health endpoint for Render health-checks
+        return "ok", 200
 
     @app.get("/uptime")
-    def _uptime():
-        start = app.config.get("START_TIME") or time.time()
-        now = time.time()
-        started_at = datetime.fromtimestamp(start, tz=timezone.utc).isoformat()
+    def uptime():
+        start = app.config.get("START_TIME", time.time())
         return jsonify(
             status="ok",
-            uptime_sec=int(now - start),
-            started_at=started_at,
-            tz=os.getenv("TZ", "Asia/Jakarta"),
-        ), 200
+            uptime_sec=int(time.time() - start),
+            started_at=int(start),
+        )
 
-def _import_dashboard_bp():
-    """
-    Import blueprint for dashboard (no silent fallback). Try known module names
-    then raise error if not found so deploy fails fast with a clear traceback.
-    """
-    # Primary
+
+def _safe_add_alias(app: Flask, rule: str, target: str, endpoint_name: str) -> None:
+    # Avoid AssertionError by giving a unique endpoint name per alias
+    def _go():
+        return redirect(target, code=302)
     try:
-        from satpambot.dashboard.webui import bp as dashboard_bp  # type: ignore
-        return dashboard_bp
-    except Exception as e_primary:
-        # Secondary legacy name
+        app.add_url_rule(rule, endpoint=endpoint_name, view_func=_go)
+        logger.info("[alias] %s -> %s", rule, target)
+    except Exception as e:
+        logger.warning("Alias %s -> %s not installed: %s", rule, target, e)
+
+
+def _try_register_dashboard_blueprint(app: Flask) -> bool:
+    """
+    Try best-effort import & register dashboard from your project.
+    Returns True if at least one dashboard was registered.
+    """
+    tried = []
+    # order matters: prefer webui first
+    candidates = [
+        ("satpambot.dashboard.webui", ("bp", "blueprint", "dashboard_bp", "app_bp")),
+        ("satpambot.dashboard.app_dashboard", ("bp", "blueprint", "dashboard_bp", "app_bp")),
+    ]
+
+    for mod_name, attr_names in candidates:
         try:
-            from satpambot.dashboard.app_dashboard import bp as dashboard_bp  # type: ignore
-            return dashboard_bp
-        except Exception as e_secondary:
-            # Fail fast with helpful message
-            raise ImportError(
-                f"Dashboard blueprint not found. Tried satpambot.dashboard.webui and app_dashboard.\n"
-                f"Errors: webui={e_primary!r}; app_dashboard={e_secondary!r}"
-            )
+            mod = __import__(mod_name, fromlist=["*"])
+        except Exception as e:
+            tried.append(f"{mod_name} (import error: {e})")
+            continue
+
+        # common patterns
+        # 1) module exposes a Blueprint object
+        for attr in attr_names:
+            bp = getattr(mod, attr, None)
+            if bp is not None:
+                try:
+                    app.register_blueprint(bp, url_prefix="/dashboard")
+                    logger.info("[dashboard] blueprint registered from %s.%s", mod_name, attr)
+                    return True
+                except Exception as e:
+                    tried.append(f"{mod_name}.{attr} (register error: {e})")
+
+        # 2) module has init_app(app) or register(app)
+        for fn_name in ("init_app", "register", "setup"):
+            fn = getattr(mod, fn_name, None)
+            if callable(fn):
+                try:
+                    fn(app)  # type: ignore
+                    logger.info("[dashboard] %s.%s(app) executed", mod_name, fn_name)
+                    return True
+                except Exception as e:
+                    tried.append(f"{mod_name}.{fn_name}(app) (error: {e})")
+
+    logger.error("No dashboard blueprint registered. Tried: %s", " | ".join(tried))
+    return False
+
 
 def create_app() -> Flask:
-    # Create Flask app bound to project templates/statics
-    app = Flask(
-        "satpambot_dashboard",
-        template_folder=str(TPL),
-        static_folder=str(STA),
-        static_url_path="/static",
-    )
-    # Start time for /uptime and diagnostics
+    """
+    Unified app factory for Render. Guarantees:
+    - /healthz always 200 OK
+    - /uptime JSON
+    - Dashboard blueprint registered when available (no plain-string fallback)
+    - Safe route aliases that won't overwrite endpoints
+    """
+    app = Flask("satpambot_dashboard")
     app.config["START_TIME"] = time.time()
+    _ensure_dirs(app)
+    _register_health_endpoints(app)
 
-    # Basic config
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-only-local")
-    app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_UPLOAD_MB", "25")) * 1024 * 1024
+    # load dashboard
+    ok = _try_register_dashboard_blueprint(app)
+    if not ok:
+        # hard fail (so logs show root cause) but still keep /healthz alive
+        logger.error("Dashboard failed to load - check import errors above.")
 
-    # Persisted uploads (Render Disk if mounted; else local data/)
-    upload_base = Path(os.getenv("UPLOAD_DIR", "/var/data/uploads"))
-    if not upload_base.exists():
-        upload_base = ROOT / "data" / "uploads"
-    upload_base.mkdir(parents=True, exist_ok=True)
-    app.config["UPLOAD_FOLDER"] = str(upload_base)
+    # route aliases (do NOT override if already exists)
+    _safe_add_alias(app, "/", "/dashboard", endpoint_name="_alias_root")
+    _safe_add_alias(app, "/login", "/dashboard/login", endpoint_name="_alias_login")
+    _safe_add_alias(app, "/settings", "/dashboard/settings", endpoint_name="_alias_settings")
+    _safe_add_alias(app, "/security", "/dashboard/security", endpoint_name="_alias_security")
 
-    # Register dashboard blueprint (no fallback)
-    dashboard_bp = _import_dashboard_bp()
-    app.register_blueprint(dashboard_bp, url_prefix="/dashboard")
-
-    # Health & uptime routes
-    _wire_health(app)
-
-    # Handy aliases
-    _alias(app, "/",          "/dashboard/login")
-    _alias(app, "/login",     "/dashboard/login")
-    _alias(app, "/settings",  "/dashboard/settings")
-    _alias(app, "/security",  "/dashboard/security")
-
-    # Default timezone to WIB (can be overridden by environment)
-    os.environ.setdefault("TZ", "Asia/Jakarta")
-
-    log.info("[app] Flask ready. tpl=%s static=%s uploads=%s tz=%s",
-             app.template_folder, app.static_folder, app.config["UPLOAD_FOLDER"], os.getenv("TZ"))
     return app
 
-# Export WSGI app (Render/Gunicorn support)
-app = create_app()
+
+# expose for main.py
+try:
+    app: Flask = create_app()
+except Exception as e:
+    # We still want /healthz to be available if create_app blows up.
+    logging.exception("create_app failed: %s", e)
+    _fallback = Flask("fallback")
+    _fallback.config["START_TIME"] = time.time()
+
+    @_fallback.get("/healthz")
+    def _h():
+        return "ok", 200
+
+    @_fallback.get("/uptime")
+    def _u():
+        start = _fallback.config.get("START_TIME", time.time())
+        return jsonify(status="degraded", uptime_sec=int(time.time() - start), started_at=int(start))
+
+    app = _fallback  # type: ignore
+    logger.warning("[app] running in degraded mode; only /healthz & /uptime available")

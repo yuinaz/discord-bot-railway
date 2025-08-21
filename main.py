@@ -1,64 +1,63 @@
-import os, logging, threading, asyncio, inspect, time
-from app import app  # ensures create_app() executed and /healthz is ready
+import os
+import time
+import logging
+import importlib
+import threading
 
-log = logging.getLogger("satpambot.main")
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+from werkzeug.serving import is_running_from_reloader
 
-def _probe_and_run_bot():
-    """Try a sequence of common bot starters to maximize compatibility."""
-    tried = []
+logging.basicConfig(level=os.getenv("LOGLEVEL", "INFO"))
+log = logging.getLogger("entry.main")
 
-    def attempt(modpath, attr=None):
-        tried.append(f"{modpath}{'.'+attr if attr else ''}")
-        try:
-            mod = __import__(modpath, fromlist=['*'])
-            fn = None
-            if attr:
-                fn = getattr(mod, attr, None)
-            else:
-                for name in ("start_bot_background","start_bot","run_bot","run","main"):
-                    if hasattr(mod, name) and callable(getattr(mod, name)):
-                        fn = getattr(mod, name)
-                        break
-            if not fn:
-                return False
-            log.info("🤖 Starting bot via %s.%s", modpath, fn.__name__)
-            if inspect.iscoroutinefunction(fn):
-                asyncio.run(fn())
-            else:
-                fn()
-            return True
-        except Exception as e:
-            log.warning("Bot starter failed for %s: %s", f"{modpath}.{attr or ''}", e)
-            return False
+# Create Flask app first so Render health-check can succeed
+try:
+    from app import create_app
+    flask_app = create_app()
+    log.info("[web] Flask app created via create_app()")
+except Exception as e:
+    log.warning("create_app() failed (%s), try importing fallback 'app' variable", e)
+    from app import app as flask_app  # type: ignore
+    log.info("[web] Flask app imported as 'app'")
 
-    # 1) satpambot.bot.main (generic then attribute-specific)
-    if attempt("satpambot.bot.main"):
-        return
-    for attr in ("start_bot_background","start_bot","run_bot","run","main"):
-        if attempt("satpambot.bot.main", attr):
-            return
+PORT = int(os.getenv("PORT", "10000"))
+HOST = os.getenv("HOST", "0.0.0.0")
 
-    # 2) known shim
-    if attempt("satpambot.bot.modules.discord_bot.shim_runner", "start_bot_background"):
-        return
-
-    log.error("Bot not started; tried: %s", ", ".join(tried))
 
 def _start_bot_background():
-    if os.getenv("RUN_BOT", "1").lower() in ("0","false","no"):
-        log.info("RUN_BOT disabled; bot will not start.")
+    if os.getenv("RUN_BOT", "1") in ("0", "false", "False", "no", "NO"):
+        log.info("[bot] RUN_BOT disabled; web-only mode")
         return
-    delay = float(os.getenv("BOT_START_DELAY_SEC", "1.5"))
-    def runner():
-        # Short delay lets Flask bind the port so Render health check passes fast
-        time.sleep(delay)
-        _probe_and_run_bot()
-    t = threading.Thread(target=runner, name="discord-bot", daemon=True)
-    t.start()
-    log.info("🤖 Bot thread launched (delay=%.1fs)", delay)
+
+    starters = [
+        ("satpambot.bot.main", "start_bot_background"),
+        ("satpambot.bot.main", "start_bot"),
+        ("satpambot.bot.main", "run_bot"),
+        ("satpambot.bot.main", "run"),
+        ("satpambot.bot.main", "main"),
+        ("satpambot.bot.modules.discord_bot.shim_runner", "start_bot_background"),
+    ]
+    last_err = None
+    for mod_name, fn_name in starters:
+        try:
+            mod = importlib.import_module(mod_name)
+            fn = getattr(mod, fn_name, None)
+            if callable(fn):
+                t = threading.Thread(target=fn, name="DiscordBot", daemon=True)
+                t.start()
+                log.info("🤖 Bot started in background thread using %s.%s", mod_name, fn_name)
+                return
+            else:
+                last_err = f"{mod_name}.{fn_name} not callable/exists"
+        except Exception as e:
+            last_err = f"{mod_name}.{fn_name} -> {e}"
+
+    log.warning("[bot] Not started: %s", last_err or "no starter found")
+
 
 if __name__ == "__main__":
-    _start_bot_background()
-    port = int(os.getenv("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port)
+    # delay bot start a bit to ensure port is bound early for health-checks
+    delay = float(os.getenv("BOT_START_DELAY_SEC", "1.5"))
+    threading.Timer(delay, _start_bot_background).start()
+    log.info("🌐 Serving web on %s:%s", HOST, PORT)
+    # Do not double-run the bot thread under reloader in dev
+    flask_app.run(host=HOST, port=PORT, debug=False, use_reloader=False)
