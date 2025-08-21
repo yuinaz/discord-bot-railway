@@ -4,17 +4,16 @@
   <meta charset="utf-8">
   <title>Security - SatpamBot</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="/dashboard-static/themes/gtake/theme.css" rel="stylesheet">
   <link href="/dashboard-static/css/neo_aurora_plus.css" rel="stylesheet">
   <link href="/dashboard-static/css/security.css" rel="stylesheet">
   <script src="/dashboard-static/js/security_dragdrop.js" defer></script>
 </head>
 <body class="neo-bg">
   <header class="topbar">
-    <div class="brand"><img src="/dashboard-static/logo.svg" class="logo" alt=""> <span>SatpamBot</span></div>
+    <div class="brand"><img src="/dashboard-static/logo.svg" class="logo" alt=""><span>SatpamBot</span></div>
     <nav class="topnav">
       <a href="/dashboard">Dashboard</a>
-      <a href="/dashboard/security" class="active">Security</a>
+      <a class="active" href="/dashboard/security">Security</a>
       <a href="/dashboard/settings">Settings</a>
     </nav>
   </header>
@@ -22,26 +21,26 @@
   <main class="container">
     <h1 class="page-title">Security</h1>
 
-    <section class="grid stats">
-      <div class="card">
-        <h2>Phish Signatures (pHash)</h2>
-        <p>Total signature: <strong id="phashCount">-</strong></p>
+    <section class="card">
+      <h2>Phish Image pHash</h2>
+      <p class="muted small">Total pHash: <b id="phashCount">0</b></p>
+      <pre id="phashPreview" class="muted small" style="max-height:180px;overflow:auto"></pre>
+      <div class="mt">
         <button id="btnRefresh">Refresh</button>
         <button id="btnExport">Export JSON</button>
-        <pre id="phashPreview" class="mt" style="max-height:220px;overflow:auto"></pre>
       </div>
+    </section>
 
-      <div class="card">
-        <h2>Import / Upload (Drag & Drop)</h2>
-        <form id="uploadForm" action="/dashboard/security/upload" method="post" enctype="multipart/form-data">
-          <div id="dropZone" class="drop">
-            <p>Tarik & letakkan file di sini, atau klik untuk memilih.</p>
-            <input id="fileInput" type="file" name="file" hidden>
-          </div>
-        </form>
-        <div id="uploadLog" class="mt small muted"></div>
-        <p class="muted small mt">Catatan: file disimpan ke <code>data/uploads/security/</code>. Proses integrasi/merge signature tetap mengikuti pipeline backend kamu.</p>
+    <section class="card mt">
+      <h2>Upload Gambar Phishing</h2>
+      <div id="dropZone" class="drop">
+        <div>
+          <p>Tarik & jatuhkan gambar di sini</p>
+          <p class="muted small">atau klik untuk memilih file</p>
+        </div>
+        <input id="fileInput" type="file" accept="image/*" hidden multiple>
       </div>
+      <div id="uploadLog" class="mt small muted"></div>
     </section>
   </main>
 </body>
