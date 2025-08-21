@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard - SatpamBot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="/dashboard-theme/{{ theme }}/theme.css" rel="stylesheet">
+  <script src="/dashboard-static/js/neo_dashboard_live.js" defer></script>
+</head>
+<body class="neo-bg">
+  <aside class="sb">
+    <div class="sb-brand"><img src="/dashboard-static/logo.svg" class="logo"><span class="brand">G.TAKE</span></div>
+    <nav class="sb-nav">
+      <a class="item active" href="/dashboard"><i class="dot"></i><span>Dashboard</span></a>
+      <a class="item" href="#"><i class="dot"></i><span>Tasks</span></a>
+      <a class="item" href="#"><i class="dot"></i><span>Messages</span></a>
+      <a class="item" href="#"><i class="dot"></i><span>Activity</span></a>
+      <a class="item" href="#"><i class="dot"></i><span>Calendar</span></a>
+      <a class="item" href="#"><i class="dot"></i><span>Options</span></a>
+    </nav>
+    <div class="sb-bottom">
+      <a class="item" href="/dashboard/settings"><i class="dot"></i><span>Settings</span></a>
+      <a class="item" href="/dashboard/login"><i class="dot"></i><span>Logout</span></a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="toprow">
+      <div class="crumbs"><span>Home</span> <span class="sep">/</span> <span class="muted">Dashboard</span> <span class="sep">/</span> <span id="today"></span></div>
+      <div class="toptools"><button class="pill" id="btnNewTask">New task</button></div>
+    </header>
+
+    <section class="layout">
+      <div class="col-main">
+        <div class="card list">
+          <h2 class="list-title">Make Things Simple !</h2>
+          <div class="filters">
+            <button class="chip on">To do</button><button class="chip">Work</button>
+            <button class="chip">High priority</button><button class="chip more">⋯</button>
+          </div>
+
+          <!-- contoh satu task -->
+          <article class="task">
+            <div class="meta"><span class="badge today">Today</span>
+              <div class="when muted"><span>08:00 AM</span> — <span>10:00 AM</span></div>
+            </div>
+            <div class="content">
+              <h3>Design System</h3>
+              <p class="muted">Description: create a responsive design system…</p>
+              <div class="meta2">
+                <span class="muted small">Participants:</span>
+                <span class="pill sm">Design</span><span class="pill sm">Marketing</span><span class="pill sm">Dev</span>
+                <span class="muted small right">Progress:</span>
+                <div class="progress"><i style="width:70%"></i><span>70%</span></div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <aside class="col-side">
+        <div class="card note">
+          <h4>Today note</h4>
+          <p class="muted">Going to the company and planning meetings for the week ahead.</p>
+          <div class="row"><span class="muted small">20 min ago</span><div class="spacer"></div><button class="pill sm">I'm going</button></div>
+        </div>
+
+        <div class="card files">
+          <h4>My files</h4>
+          <div id="dashDrop" class="drop">
+            <p>Drag & drop gambar phish di sini<br><span class="muted small">atau klik untuk memilih</span></p>
+            <input id="dashPick" type="file" hidden multiple>
+          </div>
+          <div id="dashUploads" class="mt small muted"></div>
+        </div>
+
+        <div class="card activity">
+          <div class="row"><h4>Activity</h4><div class="spacer"></div><button id="btnReport" class="pill sm">Get the report</button></div>
+          <canvas id="activityChart" width="560" height="240"></canvas>
+          <div class="muted small row mt8"><span>Latency</span><div class="spacer"></div><span><b id="latLive">0</b> ms</span></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+</body>
+</html>
