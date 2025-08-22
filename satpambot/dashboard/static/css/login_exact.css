@@ -1,17 +1,147 @@
-:root{--card-width:440px;--card-radius:24px;--avatar-size:96px;--gap:18px;--field-h:56px;--icon-w:56px;--cta-w:300px;--cta-h:46px;--shadow-strong:0 20px 60px rgba(0,0,0,.35);--shadow-soft:0 16px 32px rgba(0,0,0,.18);--card-grad-top:#ece7f2;--card-grad-bot:#d9e1ef;--field-grad-l:#2a3d5f;--field-grad-r:#3e567e;--icon-bg:#142b4b;--icon-fg:#fff}
-html,body{height:100%}
-body.lg-bg{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:radial-gradient(900px 600px at 20% 10%, rgba(156,107,182,.45), transparent),radial-gradient(900px 600px at 80% 85%, rgba(94,117,178,.45), transparent),linear-gradient(160deg,#8f6fa1,#3a4a6b)}
-.lg-stage{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px}
-.lg-card{position:relative;width:var(--card-width);border-radius:var(--card-radius);background:linear-gradient(180deg,var(--card-grad-top),var(--card-grad-bot));box-shadow:var(--shadow-strong);border:1px solid rgba(0,0,0,.06);padding:48px 28px 26px;color:#0b0f1a}
-.lg-avatar{position:absolute;left:50%;top:calc(-1 * var(--avatar-size) / 2);transform:translateX(-50%);width:var(--avatar-size);height:var(--avatar-size);border-radius:50%;background:#0e2345;color:#fff;display:grid;place-items:center;box-shadow:0 12px 28px rgba(0,0,0,.35), inset 0 0 0 6px rgba(255,255,255,.10)}
-.lg-avatar-ico{width:48px;height:48px}
-.lg-form{display:grid;gap:var(--gap)}
-.lg-field{height:var(--field-h);display:grid;grid-template-columns:var(--icon-w) 1fr;border-radius:10px;overflow:hidden;background:linear-gradient(90deg,var(--field-grad-l),var(--field-grad-r));box-shadow:var(--shadow-soft) inset}
-.lg-ico{width:var(--icon-w);height:var(--field-h);background:var(--icon-bg);display:grid;place-items:center;color:var(--icon-fg)}
-.lg-input{height:var(--field-h);border:0;outline:none;background:transparent;color:#e7ecf7;padding:0 14px;font-size:16px}
-.lg-meta{display:flex;align-items:center;justify-content:space-between;margin-top:4px;color:#7f8aa0;font-size:13px}
-.lg-remember{display:inline-flex;align-items:center;gap:8px}
-.lg-remember input{width:16px;height:16px}
-.lg-forgot{color:#7f8aa0;text-decoration:none}
-.lg-forgot:hover{text-decoration:underline}
-.lg-cta{margin-top:14px;width:var(--cta-w);height:var(--cta-h);border-radius:calc(var(--cta-h)/2 + 6px);border:0;cursor:pointer;background:linear-gradient(180deg,#e9ecf7,#dfe6f7);color:#0b0f1a;font-weight:800;letter-spacing:.10em;box-shadow:0 18px 28px rgba(0,0,0,.25)}
+/* ===== Login exact (khusus halaman login) ===== */
+
+/* Background mengikuti tema lewat CSS var; ada fallback */
+:root{
+  --login-bg-from: #b77ca2;   /* fallback gradasi pink */
+  --login-bg-to:   #2b3f73;   /* ke biru tua */
+  --login-dark-1:  #0f2444;   /* kotak ikon kiri */
+  --login-dark-2:  #2b466d;   /* area input kanan */
+  --login-text:    #e8eef8;
+  --login-muted:   #a9b8cc;
+  --login-accent1: #2a57d8;   /* tombol */
+  --login-accent2: #1741bd;
+  --login-pill:    #d7deee;   /* “bayangan” pill bawah */
+}
+
+/* Jika theme.css mendefinisikan variabel2 ini, otomatis override */
+.login-page{
+  min-height:100vh;
+  margin:0;
+  background: linear-gradient(140deg,var(--login-bg-from),var(--login-bg-to));
+}
+
+/* matikan dekor blob global di login saja */
+.login-page::before,
+.login-page::after{ content:none !important; display:none !important; }
+
+.login-center{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:28px 18px;
+}
+
+/* Kartu utama */
+.login-card{
+  position:relative;
+  width:min(92vw, 440px);
+  border-radius:22px;
+  padding:36px 22px 26px;
+  color:var(--login-text);
+  background: linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.07));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow: 0 28px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+/* “Pill” bawah seperti mockup */
+.login-card::after{
+  content:"";
+  position:absolute;
+  left:50%; transform:translateX(-50%);
+  bottom:-28px;
+  width:70%;
+  height:48px;
+  border-radius:18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.8), var(--login-pill));
+  filter: drop-shadow(0 8px 20px rgba(0,0,0,.25));
+}
+
+/* Avatar bulat di atas kartu */
+.login-avatar{
+  position:absolute;
+  left:50%; top:0; transform:translate(-50%, -50%);
+  width:96px; height:96px; border-radius:50%;
+  background: radial-gradient(42px 42px at 50% 45%, #0e3e93, #0ea5e9 70%, #1f2937 100%);
+  box-shadow: 0 12px 34px rgba(14,165,233,.35);
+}
+.login-avatar::before{
+  content:"";
+  position:absolute; inset:0;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/></svg>') center/56% no-repeat;
+  background:#fff8;
+}
+
+/* Form */
+.login-form{ margin-top:18px; }
+
+/* Input dengan kotak ikon kiri */
+.input-group{
+  display:flex; align-items:stretch;
+  height:56px;
+  margin:12px 0;
+}
+.icon-box{
+  width:62px; flex:0 0 62px;
+  border-radius:10px 0 0 10px;
+  background:var(--login-dark-1);
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,.14);
+  border-right:none;
+}
+.icon-box::before{
+  content:"";
+  width:20px; height:20px;
+  background:#fff;
+  -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat;
+  mask-size: contain; mask-repeat: no-repeat;
+}
+.icon-box.user::before{
+  -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/></svg>');
+}
+.icon-box.lock::before{
+  -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0 2-2m-6 7.73V16a1 1 0 1 1 2 0v.73a1 1 0 1 1-2 0M10 9V7a2 2 0 1 1 4 0v2z"/></svg>');
+}
+
+.input-group input{
+  flex:1 1 auto;
+  border-radius:0 10px 10px 0;
+  border:1px solid rgba(255,255,255,.14);
+  background:var(--login-dark-2);
+  color:var(--login-text);
+  font-size:15px;
+  padding:0 14px;
+  outline:none; border-left:none;
+}
+.input-group input::placeholder{ color:var(--login-muted); }
+
+/* Row remember/forgot */
+.minor-row{
+  display:flex; justify-content:space-between; align-items:center;
+  margin:10px 4px 14px; font-size:13px; color:var(--login-muted);
+}
+.remember{ display:inline-flex; gap:6px; align-items:center; }
+.forgot{ color:#cfe0ff; text-decoration:none; }
+.forgot:hover{ text-decoration:underline; }
+
+/* Tombol LOGIN pada “pill” */
+.btn-login{
+  width:100%;
+  padding:13px 16px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, var(--login-accent1), var(--login-accent2));
+  color:#fff; font-weight:800; letter-spacing:.6px;
+  box-shadow: 0 12px 24px rgba(26,84,220,.35);
+  cursor:pointer;
+  transition: transform .08s ease, filter .08s ease;
+}
+.btn-login:hover{ transform: translateY(-1px); }
+.btn-login:active{ transform:none; filter:none; }
+
+/* Link bawah opsional */
+.login-links{
+  display:flex; justify-content:space-between; margin-top:12px;
+  font-size:12px;
+}
+.login-links a{ color:#cfe0ff; text-decoration:none; }
+.login-links a:hover{ text-decoration:underline; }
