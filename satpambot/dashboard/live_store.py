@@ -10,3 +10,19 @@ def get_stats():
 def set_stats(d):
     _stats.update({k: d.get(k, _stats.get(k)) for k in _stats.keys()})
     return get_stats()
+
+
+# --- simple phash store ---
+_phash = []
+def get_phash():
+    global _phash
+    try:
+        return list(_phash)
+    except Exception:
+        return []
+def add_phash(v):
+    global _phash
+    try:
+        _phash.append(str(v))
+    except Exception:
+        pass

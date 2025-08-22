@@ -2,6 +2,7 @@
 {% extends "base_gtake.html" %}
 {% block content %}
 <div class="cards">
+      <article class="card"><h3>Activity (60fps)</h3><canvas id="activityChart" width="900" height="180"></canvas></article>
       <div class="card" style="grid-column: 1 / -1;">
         <div class="mini-monitor">
           <div class="flex" style="gap:24px">
@@ -17,6 +18,8 @@
       </div>
   <div>
     <div class="card">
+          <div id="dashDrop" class="dropzone" style="border:2px dashed rgba(255,255,255,.2);padding:1rem;border-radius:.75rem">Drop files here…</div>
+          <input id="dashPick" type="file" style="display:none" />
       <h3>Make Things Simple!</h3>
       <div class="muted">Management and planning in a simple and attractive style will bring you success</div>
       <div style="margin-top:12px" class="flex">
@@ -25,7 +28,7 @@
         <a class="btn" href="#">High priority</a>
       </div>
     </div>
-    <div class="card list">
+    <div class="card list" id="dropzone">
       <div class="item">
         <div class="flex" style="justify-content:space-between">
           <div>
@@ -73,9 +76,9 @@
       </div>
     </div>
     <div class="card">
-      <h3>Activity</h3>
+      <h3>Activity (60fps)</h3>
       <div class="muted">13 Tasks Completed</div>
-      <canvas id="spark" width="400" height="120"></canvas>
+      <canvas id="chart" width="400" height="120"></canvas>
     </div>
   </div>
 </div>

@@ -12,9 +12,9 @@
 </head>
 <body class="login-bg">
   <div class="login-wrap">
-    <div class="login-card">
+    <div class="login-card lg-card"><div class="lg-card" style="display:none"></div>
       <div class="avatar"><img src="{{ cfg.logo_url or '/dashboard-static/logo.svg' }}" alt="logo"></div>
-      <form method="post" class="login-form">
+      <form method="post" action="/dashboard/login"  class="login-form">
         <label class="input-row">
           <span class="icon">👤</span>
           <input type="text" name="username" placeholder="Username" required>
