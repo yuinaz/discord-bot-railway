@@ -1,5 +1,6 @@
 import importlib, logging, pkgutil
 from typing import Iterable, List
+import os
 
 log = logging.getLogger("cogs_loader")
 
@@ -10,6 +11,12 @@ COG_ROOTS = [
 ]
 
 PRESENCE_DUPES = {"presence_sticky", "presence_clock_sticky", "status_sticky_auto"}
+
+# Allow disabling specific cogs via env or .env.local
+# default disables legacy sticky_guard to avoid double-sticky;
+# override by setting DISABLED_COGS="" (empty) or specific list separated by comma.
+DISABLED_COGS = set((os.getenv("DISABLED_COGS") or "sticky_guard").split(","))
+
 PREFER_KEEP = {"sticky_guard"}
 
 def _iter_modules(pkg_name: str) -> Iterable[str]:
@@ -52,6 +59,8 @@ async def load_all(bot):
         mods.sort()
         mods = _dedupe_presence(mods)
         for mpath in mods:
+            short = mpath.rsplit('.',1)[-1]
+            if short in DISABLED_COGS: log.info('[cogs_loader] skip disabled %%s', mpath); continue
             try:
                 await bot.load_extension(mpath)
                 log.info("[cogs_loader] loaded %s", mpath); loaded += 1

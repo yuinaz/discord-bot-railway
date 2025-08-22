@@ -1,75 +1,24 @@
-
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Settings</title>
-  <link rel="stylesheet" href="/dashboard-theme/{{cfg.theme}}/theme.css">
-  <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css">
-  <style>
-    .form-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
-    .form-grid label{font-size:.9rem;opacity:.85}
-    .row{background:rgba(255,255,255,.06);padding:16px;border-radius:14px;backdrop-filter:blur(8px)}
-    .row h3{margin:.2rem 0 1rem 0}
-    input[type=file]{display:block}
-    .actions{margin-top:12px}
-    .actions button{padding:.6rem 1.2rem;border:0;border-radius:10px;background:#3b82f6;color:#fff}
-  </style>
-</head>
-<body class="neo-bg">
-  <nav class="topnav">
-    <div class="brand"><img src="{{ cfg.logo_url or '/dashboard-static/logo.svg' }}" height="20"> <span>SatpamBot</span></div>
-    <div class="links">
-      <a href="/dashboard">Dashboard</a>
-      <a href="/dashboard/security">Security</a>
-      <a href="/dashboard/settings">Settings</a>
-      <a href="/dashboard/logout">Logout</a>
+{% extends "dashboard.html" %}
+{% block content %}
+<div class="card neo">
+  <h3>Settings</h3>
+  <div class="grid" style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+    <div class="card neo">
+      <h4>Upload Logo (local)</h4>
+      <form id="logo-form" method="post" enctype="multipart/form-data" action="/dashboard/settings/upload">
+        <input type="hidden" name="type" value="logo">
+        <input type="file" name="file" accept=".png,.jpg,.jpeg,.gif,.svg,.webp">
+        <button type="submit" class="btn">Upload</button>
+      </form>
     </div>
-  </nav>
-  <main class="container">
-    <h1>Settings</h1>
-
-    <form class="row" method="post" enctype="multipart/form-data">
-      <div class="form-grid">
-        <div>
-          <label>Theme</label>
-          <select name="theme">
-            <option value="gtake" {% if cfg.theme=='gtake' %}selected{% endif %}>gtake</option>
-          </select>
-        </div>
-        <div>
-          <label>Accent</label>
-          <select name="accent">
-            {% for a in ['teal','blue','violet','pink'] %}
-              <option value="{{a}}" {% if cfg.accent==a %}selected{% endif %}>{{a}}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label>Background Mode</label>
-          <select name="bg_mode" id="bg_mode">
-            <option value="gradient" {% if cfg.bg_mode=='gradient' %}selected{% endif %}>gradient</option>
-            <option value="image" {% if cfg.bg_mode=='image' %}selected{% endif %}>image</option>
-            <option value="none" {% if cfg.bg_mode=='none' %}selected{% endif %}>none</option>
-          </select>
-        </div>
-        <div>
-          <label>Background (upload)</label>
-          <input type="file" name="bg_file" accept="image/*">
-        </div>
-        <div>
-          <label>Logo (upload)</label>
-          <input type="file" name="logo_file" accept="image/*">
-        </div>
-        <div style="display:flex;align-items:end">
-          <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="apply_to_login" {% if cfg.apply_to_login %}checked{% endif %}> Terapkan ke login</label>
-        </div>
-      </div>
-      <div class="actions">
-        <button type="submit">Simpan</button>
-      </div>
-    </form>
-  </main>
-</body>
-</html>
+    <div class="card neo">
+      <h4>Upload Background (local)</h4>
+      <form id="bg-form" method="post" enctype="multipart/form-data" action="/dashboard/settings/upload">
+        <input type="hidden" name="type" value="background">
+        <input type="file" name="file" accept=".png,.jpg,.jpeg,.gif,.svg,.webp">
+        <button type="submit" class="btn">Upload</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
