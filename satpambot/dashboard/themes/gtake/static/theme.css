@@ -8,3 +8,10 @@ body{background: radial-gradient(1200px 600px at 0% 0%, #21345b 0%, transparent 
 .card{background:var(--card); backdrop-filter:var(--blur)}
 .metric{background:var(--card);}
 a{color:#c6dafb}
+
+
+/* micro-shadow & spacing tweaks */
+:root{ --card-shadow: 0 10px 30px rgba(0,0,0,.35); --card-radius: 18px; }
+.card{ box-shadow: var(--card-shadow); border-radius: var(--card-radius); }
+.nav a:hover{ box-shadow: 0 8px 26px rgba(30,64,175,.35); }
+.btn{ box-shadow: 0 6px 18px rgba(59,130,246,.25); }

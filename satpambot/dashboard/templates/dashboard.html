@@ -61,10 +61,10 @@
   <div>
     <div class="card">
       <div class="mini-monitor">
-        <div><b>Mini Monitor</b><div id="mm-uptime" class="muted">Uptime: --</div></div>
+        <div><b>Mini Monitor <small class="muted">(real-time)</small></b><div id="mm-uptime" class="muted">Uptime: <span id="mm-up-real">--</span> --</div></div>
         <div style="text-align:right">
-          <div id="mm-cpu"><b>CPU:</b> --%</div>
-          <div id="mm-ram" class="muted">RAM: -- MB</div>
+          <div id="mm-cpu"><b>CPU: <span id="mm-cpu-real">--</span>%</b> --%</div>
+          <div id="mm-ram" class="muted">RAM: <span id="mm-ram-real">--</span>% -- MB</div>
         </div>
       </div>
     </div>
@@ -89,9 +89,9 @@
   const start = Date.now();
   setInterval(()=>{
     const up = Math.floor((Date.now()-start)/1000);
-    document.getElementById('mm-uptime').textContent = 'Uptime: '+up+'s';
-    document.getElementById('mm-cpu').textContent = 'CPU: '+(5 + Math.floor(Math.random()*20))+'%';
-    document.getElementById('mm-ram').textContent = 'RAM: '+(300 + Math.floor(Math.random()*200))+' MB';
+    document.getElementById('mm-uptime').textContent = 'Uptime: <span id="mm-up-real">--</span> '+up+'s';
+    document.getElementById('mm-cpu').textContent = 'CPU: <span id="mm-cpu-real">--</span>% '+(5 + Math.floor(Math.random()*20))+'%';
+    document.getElementById('mm-ram').textContent = 'RAM: <span id="mm-ram-real">--</span>% '+(300 + Math.floor(Math.random()*200))+' MB';
   }, 1000);
   // tiny sparkline
   (function(){
@@ -109,5 +109,35 @@
       t += 2; requestAnimationFrame(draw);
     } draw();
   })();
-</script>
+
+      async function pollMetrics(){
+        try{
+          const r = await fetch('/dashboard/api/metrics');
+          const j = await r.json();
+          if(j && j.ok){
+            if(document.getElementById('mm-cpu-real')) document.getElementById('mm-cpu-real').textContent = (j.cpu||0).toFixed(0);
+            if(document.getElementById('mm-ram-real')) document.getElementById('mm-ram-real').textContent = (j.mem||0).toFixed(0);
+            if(document.getElementById('mm-up-real'))  document.getElementById('mm-up-real').textContent  = (j.uptime||0)+'s';
+            // chart
+            const el = document.getElementById('activityChart');
+            if(el){
+              const ctx = el.getContext('2d');
+              window.__spark = window.__spark || {t:0, arr:[]};
+              const a = window.__spark.arr;
+              a.push((j.cpu||0)); if(a.length>240) a.shift();
+              ctx.clearRect(0,0,el.width, el.height);
+              ctx.beginPath(); ctx.moveTo(0, el.height*0.7);
+              for(let x=0; x<el.width; x++){
+                const idx = Math.max(0, a.length - el.width + x);
+                const v = a[idx] || 0;
+                const y = el.height*0.8 - (v/100.0)*(el.height*0.6);
+                ctx.lineTo(x, y);
+              }
+              ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(147,197,253,.9)'; ctx.stroke();
+            }
+          }
+        }catch(e){}
+      }
+      setInterval(pollMetrics, 2000); pollMetrics();
+    </script>
 {% endblock %}

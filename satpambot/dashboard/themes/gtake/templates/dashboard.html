@@ -17,7 +17,37 @@
         if (el) el.href = '/dashboard-theme/' + encodeURIComponent(t) + '/theme.css';
       }).catch(function(){});
     })();
-  </script>
+  
+      async function pollMetrics(){
+        try{
+          const r = await fetch('/dashboard/api/metrics');
+          const j = await r.json();
+          if(j && j.ok){
+            if(document.getElementById('mm-cpu-real')) document.getElementById('mm-cpu-real').textContent = (j.cpu||0).toFixed(0);
+            if(document.getElementById('mm-ram-real')) document.getElementById('mm-ram-real').textContent = (j.mem||0).toFixed(0);
+            if(document.getElementById('mm-up-real'))  document.getElementById('mm-up-real').textContent  = (j.uptime||0)+'s';
+            // chart
+            const el = document.getElementById('activityChart');
+            if(el){
+              const ctx = el.getContext('2d');
+              window.__spark = window.__spark || {t:0, arr:[]};
+              const a = window.__spark.arr;
+              a.push((j.cpu||0)); if(a.length>240) a.shift();
+              ctx.clearRect(0,0,el.width, el.height);
+              ctx.beginPath(); ctx.moveTo(0, el.height*0.7);
+              for(let x=0; x<el.width; x++){
+                const idx = Math.max(0, a.length - el.width + x);
+                const v = a[idx] || 0;
+                const y = el.height*0.8 - (v/100.0)*(el.height*0.6);
+                ctx.lineTo(x, y);
+              }
+              ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(147,197,253,.9)'; ctx.stroke();
+            }
+          }
+        }catch(e){}
+      }
+      setInterval(pollMetrics, 2000); pollMetrics();
+    </script>
 </head>
 <body class="gtake">
   <header class="topbar">
@@ -65,8 +95,66 @@
     </section>
   </main>
 
-  <script src="/dashboard-static/js/neo_dashboard_live.js"></script>
+  <script src="/dashboard-static/js/neo_dashboard_live.js">
+      async function pollMetrics(){
+        try{
+          const r = await fetch('/dashboard/api/metrics');
+          const j = await r.json();
+          if(j && j.ok){
+            if(document.getElementById('mm-cpu-real')) document.getElementById('mm-cpu-real').textContent = (j.cpu||0).toFixed(0);
+            if(document.getElementById('mm-ram-real')) document.getElementById('mm-ram-real').textContent = (j.mem||0).toFixed(0);
+            if(document.getElementById('mm-up-real'))  document.getElementById('mm-up-real').textContent  = (j.uptime||0)+'s';
+            // chart
+            const el = document.getElementById('activityChart');
+            if(el){
+              const ctx = el.getContext('2d');
+              window.__spark = window.__spark || {t:0, arr:[]};
+              const a = window.__spark.arr;
+              a.push((j.cpu||0)); if(a.length>240) a.shift();
+              ctx.clearRect(0,0,el.width, el.height);
+              ctx.beginPath(); ctx.moveTo(0, el.height*0.7);
+              for(let x=0; x<el.width; x++){
+                const idx = Math.max(0, a.length - el.width + x);
+                const v = a[idx] || 0;
+                const y = el.height*0.8 - (v/100.0)*(el.height*0.6);
+                ctx.lineTo(x, y);
+              }
+              ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(147,197,253,.9)'; ctx.stroke();
+            }
+          }
+        }catch(e){}
+      }
+      setInterval(pollMetrics, 2000); pollMetrics();
+    </script>
 </body>
 </html>
 
 <input id="dashPick" type="file" style="display:none" />
+
+<script>
+async function _uploadToPhash(url, file){
+  const fd = new FormData(); fd.append("file", file);
+  const r = await fetch(url, {method:"POST", body:fd});
+  return await r.json();
+}
+(function(){
+  const dz = document.getElementById("dashDrop");
+  const pick = document.getElementById("dashPick");
+  if(!dz) return;
+  function show(j){ dz.textContent = j && j.ok ? ("Saved: "+(j.phash||"-")) : ("Err: "+((j&&j.error)||"")); }
+  dz.addEventListener("dragover", e=>{e.preventDefault(); dz.style.opacity=.85});
+  dz.addEventListener("dragleave", e=>{dz.style.opacity=1});
+  dz.addEventListener("drop", async e=>{
+    e.preventDefault(); dz.style.opacity=1;
+    const f = e.dataTransfer.files && e.dataTransfer.files[0]; if(!f) return;
+    show(await _uploadToPhash("/dashboard/upload", f));
+  });
+  dz.addEventListener("click", ()=> pick && pick.click());
+  if(pick){
+    pick.addEventListener("change", async e=>{
+      const f = e.target.files && e.target.files[0]; if(!f) return;
+      show(await _uploadToPhash("/dashboard/upload", f));
+    });
+  }
+})();
+</script>
