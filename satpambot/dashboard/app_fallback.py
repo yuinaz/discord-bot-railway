@@ -7,6 +7,24 @@ Generated: 2025-08-22T03:54:06.926188Z
 from __future__ import annotations
 from flask import Flask, Blueprint, Response, render_template_string, redirect, url_for
 
+import logging
+
+def _install_health_log_filter():
+    try:
+        class _HealthzFilter(logging.Filter):
+            def filter(self, record):
+                try:
+                    msg = record.getMessage()
+                except Exception:
+                    msg = str(record.msg)
+                # Hide access logs for health endpoints
+                return ("/healthz" not in msg) and ("/health" not in msg) and ("/ping" not in msg)
+        logging.getLogger("werkzeug").addFilter(_HealthzFilter())
+        logging.getLogger("gunicorn.access").addFilter(_HealthzFilter())
+    except Exception:
+        # Never crash on logging setup
+        pass
+
 HTML_LOGIN = """<!doctype html>
 <html lang='id'><head>
 <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>

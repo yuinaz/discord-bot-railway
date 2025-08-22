@@ -18,6 +18,24 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
+import logging
+
+def _install_health_log_filter():
+    try:
+        class _HealthzFilter(logging.Filter):
+            def filter(self, record):
+                try:
+                    msg = record.getMessage()
+                except Exception:
+                    msg = str(record.msg)
+                # Hide access logs for health endpoints
+                return ("/healthz" not in msg) and ("/health" not in msg) and ("/ping" not in msg)
+        logging.getLogger("werkzeug").addFilter(_HealthzFilter())
+        logging.getLogger("gunicorn.access").addFilter(_HealthzFilter())
+    except Exception:
+        # Never crash on logging setup
+        pass
+
 # ------------------------------------------------------------------------------
 # Paths & storage
 # ------------------------------------------------------------------------------
