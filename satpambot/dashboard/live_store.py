@@ -1,14 +1,12 @@
-from threading import RLock
-from time import time
 
-_STATS = {"guilds":0,"members":0,"online":0,"channels":0,"threads":0,"latency_ms":0,"updated":0}
-_LOCK = RLock()
-
-def set_stats(d: dict):
-    with _LOCK:
-        _STATS.update(d)
-        _STATS["updated"] = int(time())
-
-def get_stats() -> dict:
-    with _LOCK:
-        return dict(_STATS)
+# Simple in-memory live stats store (optional).
+# External modules can import `set_stats` to push live stats to dashboard.
+_stats = {
+    "guilds": 0, "members": 0, "online": 0, "channels": 0,
+    "threads": 0, "latency_ms": 0, "updated": 0
+}
+def get_stats():
+    return dict(_stats)
+def set_stats(d):
+    _stats.update({k: d.get(k, _stats.get(k)) for k in _stats.keys()})
+    return get_stats()

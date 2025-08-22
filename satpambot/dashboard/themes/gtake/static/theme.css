@@ -1,11 +1,10 @@
-@import url("/dashboard-static/css/neo_aurora_plus.css");@import url("/dashboard-static/css/login_exact.css");
-/* Quick-action pills (header/login) */
-.pill{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:8px 12px;border-radius:999px;
-  background:rgba(255,255,255,.08);
-  border:1px solid rgba(255,255,255,.18);
-  text-decoration:none;color:#e6e8ee;font-weight:600;
-}
-.pill.sm{ padding:6px 10px; font-size:12px; }
-.pill:hover{ background:rgba(255,255,255,.14); }
+
+/* Simple dark theme reminiscent of the provided mock */
+:root{--card: rgba(255,255,255,.06); --blur: blur(8px); --muted:#a3b2d5}
+body{background: radial-gradient(1200px 600px at 0% 0%, #21345b 0%, transparent 45%),
+             radial-gradient(900px 500px at 100% 0%, #4f2c88 0%, transparent 50%),
+             #0b1020; color:#e5e7eb}
+.topnav{background:rgba(0,0,0,.28); backdrop-filter:var(--blur)}
+.card{background:var(--card); backdrop-filter:var(--blur)}
+.metric{background:var(--card);}
+a{color:#c6dafb}
