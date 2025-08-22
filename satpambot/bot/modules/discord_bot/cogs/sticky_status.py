@@ -7,11 +7,20 @@ from pathlib import Path
 import discord
 from discord.ext import tasks, commands
 
+# === Cross-process leader lock ===
+LOCK_DIR = Path("data/sticky")
+LOCK_FILE = LOCK_DIR / "leader.lock"
+LOCK_STALE_SEC = 180  # 3 minutes
+LOCK_RENEW_SEC = 30
+
 STORE_PATH = Path("data/sticky/sticky.json")
 TZ_WIB = timezone(timedelta(hours=7))  # UTC+7
 
 STATUS_SIGNATURE = "SATPAMBOT_STATUS_V1"
 LATENCY_SIGNATURE = "SATPAMBOT_LATENCY_V1"
+
+def _now_utc():
+    return datetime.now(timezone.utc)
 
 def _load_store():
     try:
@@ -28,25 +37,10 @@ def _save_store(data):
     except Exception:
         pass
 
-def _parse_ids(name: str):
-    raw = os.getenv(name, "").strip()
-    if not raw:
-        return set()
-    out = set()
-    for tok in raw.replace(";", ",").split(","):
-        tok = tok.strip()
-        if not tok:
-            continue
-        try:
-            out.add(int(tok))
-        except Exception:
-            pass
-    return out
-
-def _format_uptime(start: datetime) -> str:
-    delta = datetime.now(timezone.utc) - start
-    seconds = int(delta.total_seconds())
-    m, s = divmod(seconds, 60); h, m = divmod(m, 60); d, h = divmod(h, 24)
+def _format_uptime(start):
+    delta = _now_utc() - start
+    sec = int(delta.total_seconds())
+    m, s = divmod(sec, 60); h, m = divmod(m, 60); d, h = divmod(h, 24)
     parts = []
     if d: parts.append(f"{d}d")
     if h: parts.append(f"{h}h")
@@ -55,136 +49,162 @@ def _format_uptime(start: datetime) -> str:
     return " ".join(parts)
 
 class StickyStatus(commands.Cog):
-    """Exclusive sticky (single message per type) with WIB & anti-spam."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.start_at = datetime.now(timezone.utc)
+        self.start_at = _now_utc()
         self.store = _load_store()
-
-        # Channel resolution
         self.pref_name = os.getenv("STICKY_CHANNEL_NAME", "log-botphising").strip("# ").lower()
-        both = _parse_ids("STICKY_CHANNEL_ID")
-        self.status_ids = _parse_ids("STICKY_STATUS_CHANNEL_IDS") or set(both)
-        self.latency_ids = _parse_ids("STICKY_LATENCY_CHANNEL_IDS") or set(both)
 
-        # Internal locks/cooldowns
+        # optional explicit ids
+        def _ids(env):
+            raw = os.getenv(env, "")
+            out = set()
+            for t in raw.replace(";", ",").split(","):
+                t = t.strip()
+                if not t:
+                    continue
+                try: out.add(int(t))
+                except: pass
+            return out
+
+        both = _ids("STICKY_CHANNEL_ID")
+        self.status_ids = _ids("STICKY_STATUS_CHANNEL_IDS") or set(both)
+        self.latency_ids = _ids("STICKY_LATENCY_CHANNEL_IDS") or set(both)
+
         self._lock = asyncio.Lock()
-        self._last_edit = {"status": {}, "latency": {}}  # channel_id -> ts
+        self._last_edit = {"status": {}, "latency": {}}
+        self._leader = False
+        self._leader_task = None
 
     @commands.Cog.listener()
     async def on_ready(self):
-        await self._resolve_default_channel_if_needed()
-        await self._ensure_messages()
-        if not self.status_loop.is_running():
-            self.status_loop.start()
-        if not self.latency_loop.is_running():
-            self.latency_loop.start()
+        await self._resolve_default_channels()
+        await self._elect_leader()
+        if self._leader:
+            await self._ensure_messages()
+            if not self.status_loop.is_running():
+                self.status_loop.start()
+            if not self.latency_loop.is_running():
+                self.latency_loop.start()
 
-    async def _resolve_default_channel_if_needed(self):
-        if self.status_ids or self.latency_ids:
+    async def _resolve_default_channels(self):
+        if self.status_ids and self.latency_ids:
             return
         for g in self.bot.guilds:
             me = g.me
             for ch in g.text_channels:
                 try:
                     if ch.name.lower() == self.pref_name and ch.permissions_for(me).send_messages:
-                        cid = ch.id
-                        self.status_ids.add(cid)
-                        self.latency_ids.add(cid)
+                        self.status_ids.add(ch.id)
+                        self.latency_ids.add(ch.id)
                         return
                 except Exception:
                     continue
 
+    # ---------- Leader election (file lock) ----------
+    async def _elect_leader(self):
+        if os.getenv("STICKY_NO_LOCK"):
+            self._leader = True
+            return
+        LOCK_DIR.mkdir(parents=True, exist_ok=True)
+        pid = os.getpid()
+        while True:
+            try:
+                if not LOCK_FILE.exists():
+                    LOCK_FILE.write_text(json.dumps({"pid": pid, "ts": _now_utc().isoformat()}), encoding="utf-8")
+                    self._leader = True
+                    break
+                else:
+                    data = json.loads(LOCK_FILE.read_text("utf-8"))
+                    ts = datetime.fromisoformat(data.get("ts","").replace("Z","+00:00")) if data.get("ts") else None
+                    if not ts or (_now_utc() - ts).total_seconds() > LOCK_STALE_SEC:
+                        # stale -> take over
+                        LOCK_FILE.write_text(json.dumps({"pid": pid, "ts": _now_utc().isoformat()}), encoding="utf-8")
+                        self._leader = True
+                        break
+                    else:
+                        self._leader = (data.get("pid") == pid)
+                        if self._leader:
+                            break
+            except Exception:
+                # if anything goes wrong, try to become leader anyway
+                self._leader = True
+                break
+            await asyncio.sleep(2.0)
+        if self._leader and (self._leader_task is None or self._leader_task.done()):
+            self._leader_task = asyncio.create_task(self._leader_heartbeat())
+
+    async def _leader_heartbeat(self):
+        pid = os.getpid()
+        while True:
+            try:
+                LOCK_FILE.write_text(json.dumps({"pid": pid, "ts": _now_utc().isoformat()}), encoding="utf-8")
+            except Exception:
+                pass
+            await asyncio.sleep(LOCK_RENEW_SEC)
+
+    # ---------- Sticky logic ----------
     async def _ensure_messages(self):
-        await self.bot.wait_until_ready()
-        for cid in set(self.status_ids):
-            await self._ensure_single(cid, key="status")
-        for cid in set(self.latency_ids):
-            await self._ensure_single(cid, key="latency")
+        for cid in list(self.status_ids):
+            await self._ensure_single(cid, "status")
+        for cid in list(self.latency_ids):
+            await self._ensure_single(cid, "latency")
 
     async def _ensure_single(self, channel_id: int, key: str):
         ch = await self._get_channel(channel_id)
-        if ch is None:
-            return
-        dkey = str(channel_id)
-        self.store.setdefault(key, {})
-        rec = self.store[key].get(dkey) or {}
-        # First, scan channel to claim newest and delete older duplicates
+        if not ch: return
         await self._scan_and_claim(ch, key)
-        # After scan, try to fetch current msg
-        rec = self.store[key].get(dkey) or {}
+        dkey = str(channel_id)
+        rec = self.store.get(key, {}).get(dkey, {})
         msg_id = rec.get("message_id")
         msg = None
         if msg_id:
-            try:
-                msg = await ch.fetch_message(int(msg_id))
-            except Exception:
-                msg = None
+            try: msg = await ch.fetch_message(int(msg_id))
+            except: msg = None
         if msg is None:
-            content, embed = (self._status_payload() if key == "status" else self._latency_payload(rec))
+            content, embed = (self._status_payload() if key=="status" else self._latency_payload())
             try:
-                msg = await ch.send(content=content, embed=embed)
-                self.store[key][dkey] = {"message_id": msg.id, "last_content": content, "last_ts": datetime.now(timezone.utc).isoformat()}
+                m = await ch.send(content=content, embed=embed)
+                self.store.setdefault(key, {})[dkey] = {"message_id": m.id, "last_content": content, "last_ts": _now_utc().isoformat()}
                 _save_store(self.store)
             except Exception:
                 return
 
     async def _scan_and_claim(self, ch: discord.TextChannel, key: str):
-        """Find our own sticky messages in the channel. Keep the newest; delete older duplicates.
-        This enforces single-message per type even if legacy cogs had posted before."""
-        try:
-            me = ch.guild.me
-        except Exception:
-            me = None
-        if me is None:
-            return
-        sign = STATUS_SIGNATURE if key == "status" else LATENCY_SIGNATURE
-        newest = None
-        to_delete = []
+        try: me = ch.guild.me
+        except: me = None
+        if not me: return
+        sign = STATUS_SIGNATURE if key=="status" else LATENCY_SIGNATURE
+        newest = None; duplicates = []
         async for m in ch.history(limit=50):
-            if m.author != me:  # only touch our own messages
-                continue
-            found = False
-            if key == "status":
-                # status: either embed title "SatpamBot Status" OR footer contains signature OR content starts with ✅ Online
-                if m.embeds:
-                    e = m.embeds[0]
-                    if (e.title and "satpambot status" in e.title.lower()) or (e.footer and e.footer.text and sign in e.footer.text):
-                        found = True
-                if not found and m.content and m.content.strip().startswith("✅"):
-                    found = True
-            else:
-                # latency: content starts with the green dot OR footer signature
-                if m.content and "Latency" in m.content and "online" in m.content:
-                    found = True
-                if not found and m.embeds:
-                    e = m.embeds[0]
-                    if e.footer and e.footer.text and sign in e.footer.text:
-                        found = True
-            if found:
-                if newest is None:
-                    newest = m
-                else:
-                    to_delete.append(m)
-        # Keep newest; delete others
-        try:
-            for m in to_delete:
-                await m.delete()
-        except Exception:
-            pass
+            if m.author != me: continue
+            is_ours = False
+            if m.embeds:
+                e = m.embeds[0]
+                if (e.footer and e.footer.text and sign in e.footer.text) or (e.title and "satpambot status" in e.title.lower()):
+                    is_ours = True
+            if not is_ours and m.content:
+                if key=="latency" and "Latency" in m.content and "SatpamBot online" in m.content:
+                    is_ours = True
+                if key=="status" and m.content.strip().startswith("✅ Online"):
+                    is_ours = True
+            if is_ours:
+                if newest is None: newest = m
+                else: duplicates.append(m)
+        # delete older duplicates
+        for m in duplicates:
+            try: await m.delete()
+            except: pass
         if newest is not None:
             dkey = str(ch.id)
-            self.store.setdefault(key, {})
-            self.store[key][dkey] = {"message_id": newest.id, "last_content": newest.content or "", "last_ts": datetime.now(timezone.utc).isoformat()}
+            self.store.setdefault(key, {})[dkey] = {"message_id": newest.id, "last_content": newest.content or "", "last_ts": _now_utc().isoformat()}
             _save_store(self.store)
 
-    async def _get_channel(self, channel_id: int):
-        ch = self.bot.get_channel(channel_id)
+    async def _get_channel(self, cid: int):
+        ch = self.bot.get_channel(cid)
         if ch is None:
-            try:
-                ch = await self.bot.fetch_channel(channel_id)
-            except Exception:
-                return None
+            try: ch = await self.bot.fetch_channel(cid)
+            except: return None
         return ch
 
     def _presence_text(self):
@@ -195,109 +215,82 @@ class StickyStatus(commands.Cog):
         return "online"
 
     def _status_payload(self):
-        user = self.bot.user
-        name = f"{user.name}#{user.discriminator}" if user and user.discriminator != '0' else (user.name if user else "Bot")
+        u = self.bot.user
+        name = f"{u.name}#{u.discriminator}" if u and u.discriminator != "0" else (u.name if u else "Bot")
         presence = self._presence_text()
         uptime = _format_uptime(self.start_at)
         header = f"✅ Online sebagai {name} | presence={presence} | uptime={uptime}"
-        embed = discord.Embed(
+        e = discord.Embed(
             title="SatpamBot Status",
             description="Status ringkas bot.",
             color=0x30D158,
-            timestamp=datetime.now(TZ_WIB)
+            timestamp=datetime.now(TZ_WIB),
         )
-        embed.add_field(name="Akun", value=name, inline=True)
-        embed.add_field(name="Presence", value=f"``{presence}``", inline=True)
-        embed.add_field(name="Uptime", value=uptime, inline=True)
-        embed.set_footer(text=f"{STATUS_SIGNATURE} • WIB (UTC+7)")
-        return header, embed
+        e.add_field(name="Akun", value=name, inline=True)
+        e.add_field(name="Presence", value=f"``{presence}``", inline=True)
+        e.add_field(name="Uptime", value=uptime, inline=True)
+        e.set_footer(text=f"{STATUS_SIGNATURE} • WIB (UTC+7)")
+        return header, e
 
-    def _latency_payload(self, rec=None):
+    def _latency_payload(self):
         ms = int(round((self.bot.latency or 0.0) * 1000))
-        text = f"🟢 SatpamBot online • Latency {ms} ms"
-        # Put signature in footer-less content mode by returning embed=None; store compared by content
-        return text, None
+        return f"🟢 SatpamBot online • Latency {ms} ms", None
 
-    # --- loops (with anti-spam + cooldown) ---
     @tasks.loop(seconds=30.0, reconnect=True)
     async def status_loop(self):
-        for cid in set(self.status_ids):
-            await self._edit_once(cid, key="status", payload_func=self._status_payload, min_periodic=120)
+        if not self._leader: return
+        for cid in list(self.status_ids):
+            await self._edit_once(cid, "status", self._status_payload, min_periodic=120)
 
     @tasks.loop(seconds=15.0, reconnect=True)
     async def latency_loop(self):
-        for cid in set(self.latency_ids):
-            await self._edit_once(cid, key="latency", payload_func=lambda: self._latency_payload(self._get_rec('latency', cid)), min_periodic=120, latency_mode=True)
+        if not self._leader: return
+        for cid in list(self.latency_ids):
+            await self._edit_once(cid, "latency", self._latency_payload, min_periodic=120, latency_mode=True)
 
-    def _get_rec(self, key, channel_id):
-        return self.store.get(key, {}).get(str(channel_id))
-
-    async def _edit_once(self, channel_id: int, key: str, payload_func, min_periodic: int = 120, latency_mode: bool = False):
+    async def _edit_once(self, cid: int, key: str, payload_fn, min_periodic=120, latency_mode=False):
         async with self._lock:
-            ch = await self._get_channel(channel_id)
-            if ch is None:
-                return
-            dkey = str(channel_id)
+            ch = await self._get_channel(cid)
+            if not ch: return
+            dkey = str(cid)
             rec = self.store.get(key, {}).get(dkey)
-            if not rec or not rec.get("message_id"):
-                await self._ensure_single(channel_id, key=key)
+            if not rec:
+                await self._ensure_single(cid, key)
                 rec = self.store.get(key, {}).get(dkey)
-                if not rec:  # still none
-                    return
+                if not rec: return
             try:
                 msg = await ch.fetch_message(int(rec["message_id"]))
             except Exception:
-                # attempt reclaim (legacy cog may have created new one)
-                await self._ensure_single(channel_id, key=key)
-                try:
-                    msg = await ch.fetch_message(int(self.store[key][dkey]["message_id"]))
-                except Exception:
-                    return
-
-            new_content, new_embed = payload_func()
-
-            # Anti-spam check
-            prev_content = rec.get("last_content", "")
-            last_ts_iso = rec.get("last_ts")
+                await self._ensure_single(cid, key)
+                try: msg = await ch.fetch_message(int(self.store[key][dkey]["message_id"]))
+                except Exception: return
+            new_content, new_embed = payload_fn()
+            prev_content = rec.get("last_content","")
             should = True
             if latency_mode:
-                try:
-                    import re as _re
-                    prev_ms = int(_re.search(r"(\d+)\s*ms", prev_content).group(1)) if prev_content else None
-                    new_ms = int(_re.search(r"(\d+)\s*ms", new_content).group(1))
-                except Exception:
-                    prev_ms, new_ms = None, None
-                if prev_ms is not None and new_ms is not None:
-                    delta = abs(new_ms - prev_ms)
-                    pct = (delta / max(prev_ms, 1)) if prev_ms else 1.0
+                import re as _re
+                def _ms(s):
+                    m = _re.search(r"(\d+)\s*ms", s or "")
+                    return int(m.group(1)) if m else None
+                a, b = _ms(prev_content), _ms(new_content)
+                if a is not None and b is not None:
+                    delta, pct = abs(b-a), abs(b-a)/max(a,1)
                     should = (delta >= 50) or (pct >= 0.10)
-
-            # Per-message cooldown (5s) + periodic refresh
-            now = datetime.now(timezone.utc)
-            last_edit_ts = self._last_edit[key].get(dkey)
-            if last_edit_ts and (now - last_edit_ts).total_seconds() < 5 and not should:
-                return
-            if last_ts_iso:
+            # periodic refresh
+            last_ts = rec.get("last_ts")
+            if last_ts:
                 try:
-                    last_dt = datetime.fromisoformat(last_ts_iso.replace("Z","+00:00"))
-                except Exception:
-                    last_dt = None
-                if last_dt:
-                    age = (now - last_dt).total_seconds()
+                    last = datetime.fromisoformat(last_ts.replace("Z","+00:00"))
+                    age = (_now_utc() - last).total_seconds()
                     if age < min_periodic and not should:
                         return
-
-            # Perform edit
+                except: pass
             try:
                 await msg.edit(content=new_content, embed=new_embed)
                 rec["last_content"] = new_content
-                rec["last_ts"] = now.isoformat()
+                rec["last_ts"] = _now_utc().isoformat()
                 self.store[key][dkey] = rec
                 _save_store(self.store)
-                self._last_edit[key][dkey] = now
-            except discord.HTTPException as e:
-                if getattr(e, "status", None) in (403, 404):
-                    await self._ensure_single(channel_id, key=key)
             except Exception:
                 pass
 
