@@ -167,9 +167,53 @@ def _register_compat_assets(app: Flask) -> None:
             return (data, 200, {"Content-Type": "image/png"})
 
 
+
+
+def _register_phash_api(app: Flask) -> None:
+    from flask import jsonify
+    if any(r.rule == "/api/phish/phash" for r in app.url_map.iter_rules()):
+        return
+    def _load_phash_list():
+        # Try data file if present, else return small sample
+        import json, os
+        p_candidates = ["data/phish/phash.json", "data/phash.json"]
+        for p in p_candidates:
+            if os.path.exists(p):
+                try:
+                    return json.load(open(p, "r", encoding="utf-8")) or []
+                except Exception:
+                    break
+        # fallback demo data
+        return ["a1b2c3d4", "e5f60789"]
+    @app.get("/api/phish/phash")
+    def _phash_array():
+        return jsonify({"phash": _load_phash_list()})
+
+
+def _register_uptime(app: Flask) -> None:
+    import time
+    if not getattr(app, "_start_time", None):
+        app._start_time = time.time()
+    @app.route("/uptime", methods=["HEAD"])
+    def _uptime_head():
+        return ("", 200, {"X-Uptime-Seconds": str(int(time.time() - app._start_time))})
+
+
+
+def _register_logout_alias(app: Flask) -> None:
+    from flask import Response, redirect
+    @app.get("/logout")
+    def _logout_page():
+        # 200 page
+        return Response("<!doctype html><title>Logged out</title>Logged out", mimetype="text/html")
+    @app.get("/dashboard/logout")
+    def _logout_redirect():
+        return redirect("/dashboard/login", code=302)
+
+
 def create_app() -> Flask:
     app = Flask("satpambot_dashboard")
-    app.url_map.strict_slashes = False  # /dashboard and /dashboard/
+    app.url_map.strict_slashes = False
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "satpambot-secret")
 
     _ensure_healthz(app)
@@ -179,7 +223,13 @@ def create_app() -> Flask:
     _register_live_stats_api(app)
     _register_aliases(app)
     _register_compat_assets(app)
+    _register_phash_api(app)
+    _register_uptime(app)
+    _register_logout_alias(app)
     return app
+
+
+
 
 
 # Expose module-level app for environments importing `from app import app`
@@ -193,3 +243,5 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     port = int(os.getenv("PORT", "10000"))
     app.run(host="0.0.0.0", port=port, debug=False)
+
+
