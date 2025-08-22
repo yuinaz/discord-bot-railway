@@ -1,27 +1,55 @@
-<!doctype html><html lang="id"><head>
-<meta charset="utf-8"><title>Login - SatpamBot</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="/dashboard-static/css/login_exact.css" rel="stylesheet">
-</head><body class="lg-bg">
-<main class="lg-stage">
-  <section class="lg-card">
-    <div class="lg-avatar">
-      <svg viewBox="0 0 24 24" class="lg-avatar-ico" aria-hidden="true">
-        <path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 4.5V20h16v-1.5C20 16.17 16.33 14 12 14Z"/>
-      </svg>
-    </div>
-    <form id="loginForm" class="lg-form" action="/dashboard/login" method="post" autocomplete="off">
-      <label class="lg-field"><span class="lg-ico">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 4.5V20h16v-1.5C20 16.17 16.33 14 12 14Z"/></svg>
-      </span><input class="lg-input" type="text" name="username" placeholder="Email ID" required></label>
-      <label class="lg-field"><span class="lg-ico">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1V8a5 5 0 0 0-5-5Zm-3 8V8a3 3 0 0 1 6 0v3Z"/></svg>
-      </span><input class="lg-input" type="password" name="password" placeholder="Password" required></label>
-      <div class="lg-meta">
-        <label class="lg-remember"><input type="checkbox" name="remember" value="1"><span>Remember me</span></label>
-        <a href="#" class="lg-forgot">Forgot Password?</a>
-      </div>
-    </form>
-  </section>
-  <button class="lg-cta" type="submit" form="loginForm">LOGIN</button>
-</main></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login</title>
+
+  <!-- Base login style -->
+  <link rel="stylesheet" href="/dashboard-static/css/login_exact.css" />
+
+  <!-- Theme (fallback gtake; akan di-switch via /api/ui-config) -->
+  <link id="theme-css" rel="stylesheet" href="/dashboard-theme/gtake/theme.css" />
+  <script>
+    (function(){
+      fetch('/api/ui-config').then(r=>r.json()).then(function(cfg){
+        var t = (cfg && cfg.theme) ? cfg.theme : 'gtake';
+        var el = document.getElementById('theme-css');
+        if (el) el.href = '/dashboard-theme/'+encodeURIComponent(t)+'/theme.css';
+      }).catch(function(){});
+    })();
+  </script>
+</head>
+<body class="login-page">
+  <main class="login-center">
+    <section class="login-card">
+      <div class="login-avatar" aria-hidden="true"></div>
+
+      <form method="post" class="login-form" autocomplete="off">
+        <label class="input-group">
+          <span class="icon-box user" aria-hidden="true"></span>
+          <input name="username" type="text" placeholder="Username" required />
+        </label>
+
+        <label class="input-group">
+          <span class="icon-box lock" aria-hidden="true"></span>
+          <input name="password" type="password" placeholder="Password" required />
+        </label>
+
+        <div class="minor-row">
+          <label class="remember"><input type="checkbox" /> <span>Remember me</span></label>
+          <a class="forgot" href="#">Forgot Password?</a>
+        </div>
+
+        <button class="btn-login" type="submit">LOGIN</button>
+      </form>
+
+      <!-- nav kecil (optional) -->
+      <nav class="login-links">
+        <a href="javascript:history.back()">Kembali</a>
+        <a href="/dashboard">Home</a>
+      </nav>
+    </section>
+  </main>
+</body>
+</html>

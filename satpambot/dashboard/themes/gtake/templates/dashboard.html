@@ -1,93 +1,70 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8">
-  <title>Dashboard - SatpamBot</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="/dashboard-theme/{{ theme }}/theme.css" rel="stylesheet">
-  <script src="/dashboard-static/js/neo_dashboard_live.js" defer></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dashboard</title>
+
+  <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css" />
+
+  <!-- Theme (fallback gtake; lalu di-switch via /api/ui-config) -->
+  <link id="theme-css" rel="stylesheet" href="/dashboard-theme/gtake/theme.css" />
+  <script>
+    (function () {
+      fetch('/api/ui-config').then(r=>r.json()).then(function(cfg){
+        var t = (cfg && cfg.theme) ? cfg.theme : 'gtake';
+        var el = document.getElementById('theme-css');
+        if (el) el.href = '/dashboard-theme/' + encodeURIComponent(t) + '/theme.css';
+      }).catch(function(){});
+    })();
+  </script>
 </head>
-<body class="neo-bg">
-  <aside class="sb">
-    <div class="sb-brand"><img src="/dashboard-static/logo.svg" class="logo"><span class="brand">G.TAKE</span></div>
-    <nav class="sb-nav">
-      <a class="item active" href="/dashboard"><i class="dot"></i><span>Dashboard</span></a>
-      <a class="item" href="#"><i class="dot"></i><span>Tasks</span></a>
-      <a class="item" href="#"><i class="dot"></i><span>Messages</span></a>
-      <a class="item" href="#"><i class="dot"></i><span>Activity</span></a>
-      <a class="item" href="#"><i class="dot"></i><span>Calendar</span></a>
-      <a class="item" href="#"><i class="dot"></i><span>Options</span></a>
+<body class="gtake">
+  <header class="topbar">
+    <img src="/dashboard-static/logo.svg" alt="logo" class="logo" />
+    <nav class="nav">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard/security">Security</a>
+      <a href="/dashboard/settings">Settings</a>
+      <a href="javascript:history.back()">Back</a>
+      <a href="/logout">Logout</a>
     </nav>
-    <div class="sb-bottom">
-      <a class="item" href="/dashboard/settings"><i class="dot"></i><span>Settings</span></a>
-      <a class="item" href="/dashboard/login"><i class="dot"></i><span>Logout</span></a>
-    </div>
-  </aside>
+  </header>
 
-  <main class="main">
-    <header class="toprow">
-	  <div class="crumbs">
-       <span>Home</span> <span class="sep">/</span> <span class="muted">Dashboard</span> <span class="sep">/</span> <span id="today"></span>
-      </div>
-	  <div class="toptools">
-		<button class="pill sm" type="button" onclick="history.back()">Back</button>
-		<a class="pill sm" href="/dashboard">Home</a>
-		<a class="pill sm" href="/dashboard/settings">Settings</a>
-		<a class="pill sm" href="/dashboard/login">Logout</a>
-	  </div>
-	</header>
+  <main class="container">
+    <h1>Dashboard</h1>
 
-    <section class="layout">
-      <div class="col-main">
-        <div class="card list">
-          <h2 class="list-title">Make Things Simple !</h2>
-          <div class="filters">
-            <button class="chip on">To do</button><button class="chip">Work</button>
-            <button class="chip">High priority</button><button class="chip more">⋯</button>
-          </div>
+    <section class="metrics">
+      <div class="metric"><div class="label">Guilds</div>   <div id="m-guilds"   class="value">0</div></div>
+      <div class="metric"><div class="label">Members</div>  <div id="m-members"  class="value">0</div></div>
+      <div class="metric"><div class="label">Online</div>   <div id="m-online"   class="value">0</div></div>
+      <div class="metric"><div class="label">Channels</div> <div id="m-channels" class="value">0</div></div>
+      <div class="metric"><div class="label">Threads</div>  <div id="m-threads"  class="value">0</div></div>
+      <div class="metric"><div class="label">Latency</div>  <div id="m-latency"  class="value">0 <span class="unit">ms</span></div></div>
+    </section>
 
-          <!-- contoh satu task -->
-          <article class="task">
-            <div class="meta"><span class="badge today">Today</span>
-              <div class="when muted"><span>08:00 AM</span> — <span>10:00 AM</span></div>
-            </div>
-            <div class="content">
-              <h3>Design System</h3>
-              <p class="muted">Description: create a responsive design system…</p>
-              <div class="meta2">
-                <span class="muted small">Participants:</span>
-                <span class="pill sm">Design</span><span class="pill sm">Marketing</span><span class="pill sm">Dev</span>
-                <span class="muted small right">Progress:</span>
-                <div class="progress"><i style="width:70%"></i><span>70%</span></div>
-              </div>
-            </div>
-          </article>
+    <section class="grid">
+      <article class="card wide">
+        <h2>Status</h2>
+        <p>Terakhir update: <span id="last-updated">-</span></p>
+        <pre id="status-log" class="log"></pre>
+      </article>
+
+      <article class="card">
+        <h2>Activity (60fps)</h2>
+        <canvas id="activityChart" width="640" height="240"></canvas>
+      </article>
+
+      <article class="card">
+        <h2>Drag &amp; Drop Phishing Image</h2>
+        <div id="dashDrop" class="dropzone">
+          <p>Lepas gambar di sini untuk cek signature/phash</p>
         </div>
-      </div>
-
-      <aside class="col-side">
-        <div class="card note">
-          <h4>Today note</h4>
-          <p class="muted">Going to the company and planning meetings for the week ahead.</p>
-          <div class="row"><span class="muted small">20 min ago</span><div class="spacer"></div><button class="pill sm">I'm going</button></div>
-        </div>
-
-        <div class="card files">
-          <h4>My files</h4>
-          <div id="dashDrop" class="drop">
-            <p>Drag & drop gambar phish di sini<br><span class="muted small">atau klik untuk memilih</span></p>
-            <input id="dashPick" type="file" hidden multiple>
-          </div>
-          <div id="dashUploads" class="mt small muted"></div>
-        </div>
-
-        <div class="card activity">
-          <div class="row"><h4>Activity</h4><div class="spacer"></div><button id="btnReport" class="pill sm">Get the report</button></div>
-          <canvas id="activityChart" width="560" height="240"></canvas>
-          <div class="muted small row mt8"><span>Latency</span><div class="spacer"></div><span><b id="latLive">0</b> ms</span></div>
-        </div>
-      </aside>
+        <output id="dropResult" class="result"></output>
+      </article>
     </section>
   </main>
+
+  <script src="/dashboard-static/js/neo_dashboard_live.js"></script>
 </body>
 </html>
