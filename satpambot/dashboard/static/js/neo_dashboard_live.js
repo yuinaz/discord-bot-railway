@@ -1,69 +1,91 @@
+(function() {
+  function $(sel) { return document.querySelector(sel); }
+  function $all(sel) { return Array.from(document.querySelectorAll(sel)); }
+  function text(el, v){ if(el) el.textContent = v; }
 
-(function(){
-  const sel = (q)=>document.querySelector(q);
-  const m = (k)=>sel('#m_'+k);
-  const canvas = document.getElementById('activityChart');
-  const ctx = canvas ? canvas.getContext('2d') : null;
-
-  async function pull(){
-    try{
-      const r = await fetch('/api/live/stats',{cache:'no-store'});
-      if(!r.ok) throw new Error('http '+r.status);
-      const j = await r.json();
-      const map = {
-        guilds: 'guilds', members:'members', online:'online',
-        channels:'channels', threads:'threads', latency_ms:'latency'
-      };
-      for(const [src, id] of Object.entries(map)){
-        const el = m(id); if(el) el.textContent = j[src] ?? 0;
-      }
-      const lu = document.getElementById('last_update');
-      if(lu) lu.textContent = new Date().toLocaleTimeString();
-    }catch(e){ /* ignore */ }
+  function setupDropzone(sel, url, after){
+    $all(sel).forEach(function(dz){
+      var prevent = function(e){ e.preventDefault(); e.stopPropagation(); };
+      ['drag','dragstart','dragend','dragover','dragenter','dragleave','drop'].forEach(function(ev){
+        dz.addEventListener(ev, prevent, false);
+      });
+      ['dragover','dragenter'].forEach(function(){ dz.classList.add('is-over'); });
+      ['dragleave','dragend','drop'].forEach(function(){ dz.classList.remove('is-over'); });
+      dz.addEventListener('drop', function(e){
+        var files = (e.dataTransfer && e.dataTransfer.files) ? Array.from(e.dataTransfer.files) : [];
+        if(!files.length) return;
+        var fd = new FormData();
+        files.forEach(function(f){ fd.append('file', f); });
+        fetch(url, { method:'POST', body: fd })
+          .then(function(r){ return r.json().catch(function(){ return {ok:r.ok}; }); })
+          .then(function(j){ if (after) after(j); })
+          .catch(function(err){ console.error('upload failed', err); });
+      }, false);
+    });
   }
-  setInterval(pull, 1000); pull();
 
-  if(ctx){
-    let t=0;
-    function draw(){
-      const w=canvas.width, h=canvas.height;
-      ctx.clearRect(0,0,w,h);
-      // smooth neon line
-      ctx.strokeStyle = '#7aa2ff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for(let x=0; x<w; x+=4){
-        const y = h*0.6 + Math.sin((x+t)/40)*20 + Math.cos((x+t)/23)*10;
-        x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-      t+=2;
-      requestAnimationFrame(draw);
+  function pick(obj, k, d){ return (obj && (k in obj)) ? obj[k] : d; }
+
+  function renderMetrics(m){
+    if(!m) return;
+    text($('#mm-up-real'), pick(m,'uptime', pick(m,'updated', 0)) + 's');
+    var cpu = pick(m, 'cpu_pct', null);
+    var ram = pick(m, 'ram_pct', null);
+    if(cpu !== null) text($('#mm-cpu-real'), cpu + '%');
+    if(ram !== null) text($('#mm-ram-real'), ram + '%');
+    text($('#live-guilds'), pick(m,'guilds', '0'));
+    text($('#live-members'), pick(m,'members', '0'));
+    text($('#live-online'), pick(m,'online', '0'));
+    text($('#live-latency'), pick(m,'latency_ms', '0') + ' ms');
+  }
+
+  function fetchMetrics(){
+    var eps = ['/dashboard/api/metrics','/api/live/stats'];
+    var i = 0;
+    function next(){
+      if(i>=eps.length) return Promise.resolve(null);
+      var ep = eps[i++];
+      return fetch(ep).then(function(r){
+        if(!r.ok) return next();
+        return r.json();
+      }).catch(function(){ return next(); });
     }
-    requestAnimationFrame(draw);
+    return next();
   }
 
-  // Dropzone
-  const dz = sel('#dropzone');
-  if(dz){
-    dz.addEventListener('click', ()=>{
-      const i = document.createElement('input');
-      i.type='file'; i.accept='image/*';
-      i.onchange=()=>{ if(i.files && i.files[0]) upload(i.files[0]); };
-      i.click();
-    });
-    dz.addEventListener('dragover', ev=>{ ev.preventDefault(); dz.classList.add('hover') });
-    dz.addEventListener('dragleave', ()=>dz.classList.remove('hover'));
-    dz.addEventListener('drop', ev=>{
-      ev.preventDefault(); dz.classList.remove('hover');
-      const f = ev.dataTransfer.files[0];
-      if(f) upload(f);
+  function refreshMetrics(){ fetchMetrics().then(function(m){ renderMetrics(m); }); }
+
+  function refreshPhash(){
+    fetch('/api/phish/phash')
+    .then(function(r){ return r.json(); })
+    .then(function(arr){
+      var el = $('#phash-count');
+      if(el) el.textContent = Array.isArray(arr) ? String(arr.length) : '0';
+    }).catch(function(){});
+  }
+
+  function renderBans(items){
+    var ol = $('#ban-feed'); if(!ol) return;
+    ol.innerHTML = '';
+    if(!items || !items.length){ ol.innerHTML = '<li>Tidak ada ban.</li>'; return; }
+    items.forEach(function(it, idx){
+      var who = it.user || ('<@'+(it.user_id||'?')+'>');
+      var li = document.createElement('li');
+      li.textContent = (idx+1)+'. '+who+' banned '+(it.when_str||'');
+      ol.appendChild(li);
     });
   }
-  async function upload(file){
-    const fd = new FormData();
-    fd.append('file', file);
-    const r = await fetch('/dashboard/security/upload',{method:'POST',body:fd});
-    if(r.ok){ dz.textContent='Uploaded: '+file.name; } else { dz.textContent='Upload failed'; }
+  function refreshBans(){
+    var el = $('#ban-feed'); if(!el) return;
+    fetch('/dashboard/api/bans?limit=10').then(function(r){return r.json()}).then(renderBans).catch(function(){ renderBans([]); });
   }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setupDropzone('#dropzone, .dropzone, [data-dropzone="dashboard"]', '/dashboard/upload', function(){ refreshMetrics(); });
+    setupDropzone('#sec-dropzone, .sec-dropzone, [data-dropzone="security"]', '/dashboard/security/upload', function(){ refreshPhash(); });
+
+    refreshMetrics(); setInterval(refreshMetrics, 3000);
+    refreshPhash();
+    refreshBans(); setInterval(refreshBans, 10000);
+  });
 })();
