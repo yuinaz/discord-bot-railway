@@ -1,22 +1,80 @@
-<!doctype html><html lang="id"><head>
-<meta charset="utf-8"><title>Settings - SatpamBot</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="/dashboard-static/css/neo_aurora_plus.css" rel="stylesheet">
-</head><body class="neo-bg">
-<header class="topbar"><div class="brand"><img src="/dashboard-static/logo.svg" class="logo"><span>SatpamBot</span></div>
-<nav class="topnav"><a href="/dashboard">Dashboard</a><a href="/dashboard/security">Security</a><a href="/dashboard/settings" class="active">Settings</a></nav></header>
-<main class="container"><h1 class="page-title">Settings</h1>
-<section class="card"><form id="uiForm" class="grid" style="grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:16px">
-<label>Theme<select name="theme" id="selTheme"></select></label>
-<label>Accent<select name="accent"><option value="blue">blue</option><option value="violet">violet</option><option value="teal">teal</option></select></label>
-<label>Background Mode<select name="bg_mode"><option value="gradient">gradient</option><option value="image">image</option><option value="solid">solid</option></select></label>
-<label>Background URL<input type="text" name="bg_url" placeholder="https://..."></label>
-<label>Logo URL<input type="text" name="logo_url" placeholder="/dashboard-static/logo.svg"></label>
-<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="apply_login" value="1"> Terapkan tema ke halaman login</label>
-</form><div class="mt"><button id="btnSave">Simpan</button><span id="saveMsg" class="muted small"></span></div></section></main>
-<script>
-async function loadThemes(){const r=await fetch('/api/ui-themes');if(!r.ok)return;const {themes,active}=await r.json();const sel=document.getElementById('selTheme');sel.innerHTML='';for(const t of themes){const o=document.createElement('option');o.value=t;o.textContent=t;if(t===active)o.selected=true;sel.appendChild(o);}}
-async function loadCfg(){const r=await fetch('/api/ui-config');if(!r.ok)return;const d=await r.json();const f=document.getElementById('uiForm');for(const [k,v] of Object.entries(d)){const el=f.elements[k];if(!el)continue;el.type==='checkbox'?el.checked=!!v:el.value=v??'';}}
-async function saveCfg(){const f=document.getElementById('uiForm');const d={};for(const el of f.elements){if(!el.name)continue;d[el.name]=el.type==='checkbox'?el.checked:el.value;}const r=await fetch('/api/ui-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});const m=document.getElementById('saveMsg');if(r.ok){m.textContent='Tersimpan.';setTimeout(()=>location.reload(),600);}else{m.textContent='Gagal menyimpan.';}}
-document.getElementById('btnSave').addEventListener('click', saveCfg);loadThemes().then(loadCfg);
-</script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings</title>
+  <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css">
+  <link id="theme-css" rel="stylesheet" href="/dashboard-theme/gtake/theme.css">
+  <link rel="stylesheet" href="/dashboard-static/css/settings.css">
+  <script>
+    (function(){
+      fetch('/api/ui-config').then(r=>r.json()).then(function(cfg){
+        var t = (cfg && cfg.theme) ? cfg.theme : 'gtake';
+        var el = document.getElementById('theme-css');
+        if (el) el.href = '/dashboard-theme/'+encodeURIComponent(t)+'/theme.css';
+        try{
+          document.getElementById('theme').value = t;
+          document.getElementById('accent').value = (cfg.accent || 'teal');
+          if (cfg.bg_mode === 'image') document.getElementById('bg_mode_image').checked = true;
+          if (cfg.apply_login) document.getElementById('apply_login').checked = true;
+          if (cfg.logo_url) document.getElementById('logo_preview').src = cfg.logo_url;
+          if (cfg.bg_url) document.getElementById('bg_preview').src = cfg.bg_url;
+        }catch(e){}
+      }).catch(function(){});
+    })();
+  </script>
+</head>
+<body class="gtake-body">
+  <header class="topbar-compact">
+    <div class="brandline"><img src="/dashboard-static/logo.svg" alt="logo"> SatpamBot</div>
+    <nav class="menuline">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/dashboard/security">Security</a>
+      <a href="/dashboard/settings" class="active">Settings</a>
+    </nav>
+  </header>
+  <main class="settings-wrap">
+    <form class="card form-grid" method="post" enctype="multipart/form-data">
+      <h2>Appearance</h2>
+      <label>Theme
+        <select id="theme" name="theme">
+          {% for t in themes %}<option value="{{t}}">{{t}}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Accent
+        <select id="accent" name="accent">
+          <option>teal</option><option>blue</option><option>violet</option><option>pink</option><option>amber</option>
+        </select>
+      </label>
+
+      <div class="split2">
+        <label class="filebox">Logo (local)
+          <input type="file" name="logo_file" accept=".png,.jpg,.jpeg,.webp,.svg">
+          <img id="logo_preview" class="preview" alt="logo preview">
+        </label>
+        <label class="filebox">Background (local)
+          <input type="file" name="bg_file" accept=".png,.jpg,.jpeg,.webp,.svg">
+          <img id="bg_preview" class="preview" alt="bg preview">
+        </label>
+      </div>
+
+      <div class="toggles">
+        <label class="switch">
+          <input id="bg_mode_image" type="checkbox" name="bg_mode_image">
+          <span>Gunakan gambar sebagai background</span>
+        </label>
+        <label class="switch">
+          <input id="apply_login" type="checkbox" name="apply_login">
+          <span>Terapkan tema ke halaman login</span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn" type="submit">Simpan</button>
+        <a class="btn ghost" href="/dashboard">Kembali</a>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

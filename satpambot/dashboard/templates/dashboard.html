@@ -1,71 +1,138 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dashboard</title>
-
-  <!-- Base style -->
-  <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css" />
-
-  <!-- Theme (fallback gtake; lalu di-switch via /api/ui-config) -->
-  <link id="theme-css" rel="stylesheet" href="/dashboard-theme/gtake/theme.css" />
+  <link rel="stylesheet" href="/dashboard-static/css/neo_aurora_plus.css">
+  <link id="theme-css" rel="stylesheet" href="/dashboard-theme/gtake/theme.css">
+  <link rel="stylesheet" href="/dashboard-static/css/settings.css">
   <script>
-    (function () {
-      fetch('/api/ui-config').then(r=>r.json()).then(function(cfg){
-        var t = (cfg && cfg.theme) ? cfg.theme : 'gtake';
-        var el = document.getElementById('theme-css');
-        if (el) el.href = '/dashboard-theme/' + encodeURIComponent(t) + '/theme.css';
-      }).catch(function(){});
-    })();
+  (function(){
+    fetch('/api/ui-config').then(r=>r.json()).then(function(cfg){
+      var t = (cfg && cfg.theme) ? cfg.theme : 'gtake';
+      var el = document.getElementById('theme-css');
+      if (el) el.href = '/dashboard-theme/'+encodeURIComponent(t)+'/theme.css';
+    }).catch(function(){});
+  })();
   </script>
+  <style>
+  /* Sidebar + layout strip-down, theme handles colors/shadows */
+  body{ margin:0; }
+  .shell{ display:grid; grid-template-columns: 88px 1fr; min-height:100vh; }
+  aside.gtake-sider{ padding:16px 10px; display:flex; flex-direction:column; gap:18px; }
+  .brand{ height:44px; display:flex; align-items:center; justify-content:center; font-weight:900; letter-spacing:.5px; }
+  .navicon{ width:54px; height:54px; border-radius:14px; display:grid; place-items:center; margin:0 auto; cursor:pointer; }
+  .navicon.active{ outline:2px solid var(--accent-600); }
+  header.topbar{ display:flex; justify-content:space-between; align-items:center; padding:18px 26px; }
+  .crumbs{ opacity:.9; font-size:14px; display:flex; align-items:center; gap:12px; }
+  .right-act{ display:flex; gap:10px; align-items:center; }
+  .newtask{ padding:10px 14px; border-radius:12px; font-weight:600; cursor:pointer; }
+  main.canvas{ padding:0 26px 26px; }
+  .grid{ display:grid; gap:18px; }
+  .cards6{ grid-template-columns: repeat(6, minmax(140px,1fr)); }
+  .row{ grid-template-columns: 1.8fr 1fr; }
+  .card{ border-radius:18px; padding:16px; }
+  .kpi{ display:flex; flex-direction:column; gap:6px; }
+  .kpi .num{ font-size:28px; font-weight:800; }
+  .status{ min-height:160px; }
+  .activity{ min-height:220px; }
+  /* dropzone */
+  .drop{ border:1.4px dashed var(--fg-400); display:grid; place-items:center; min-height:140px; border-radius:16px; }
+  .drop input{ display:none; }
+  .drop .hint{ opacity:.8; }
+  canvas#activityChart{ width:100%; height:180px; display:block; }
+  @media (max-width:1100px){
+    .shell{ grid-template-columns: 72px 1fr; }
+    .cards6{ grid-template-columns: repeat(3, 1fr); }
+    .row{ grid-template-columns: 1fr; }
+  }
+  </style>
 </head>
-<body class="gtake">
-  <header class="topbar">
-    <img src="/dashboard-static/logo.svg" alt="logo" class="logo" />
-    <nav class="nav">
-      <a href="/dashboard">Dashboard</a>
-      <a href="/dashboard/security">Security</a>
-      <a href="/dashboard/settings">Settings</a>
-      <a href="javascript:history.back()">Back</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
+<body class="gtake-body">
+  <div class="shell">
+    <aside class="gtake-sider">
+      <div class="brand"><img src="/dashboard-static/logo.svg" alt="logo" style="height:22px"></div>
+      <div class="navicon active">🏠</div>
+      <div class="navicon">🗂️</div>
+      <div class="navicon">💬</div>
+      <div class="navicon">📊</div>
+      <div class="navicon">📅</div>
+      <div class="navicon">⚙️</div>
+      <div style="flex:1"></div>
+      <a href="/logout" class="navicon" title="Logout">🚪</a>
+    </aside>
 
-  <main class="container">
-    <h1>Dashboard</h1>
-
-    <section class="metrics">
-      <div class="metric"><div class="label">Guilds</div>   <div id="m-guilds"   class="value">0</div></div>
-      <div class="metric"><div class="label">Members</div>  <div id="m-members"  class="value">0</div></div>
-      <div class="metric"><div class="label">Online</div>   <div id="m-online"   class="value">0</div></div>
-      <div class="metric"><div class="label">Channels</div> <div id="m-channels" class="value">0</div></div>
-      <div class="metric"><div class="label">Threads</div>  <div id="m-threads"  class="value">0</div></div>
-      <div class="metric"><div class="label">Latency</div>  <div id="m-latency"  class="value">0 <span class="unit">ms</span></div></div>
-    </section>
-
-    <section class="grid">
-      <article class="card wide">
-        <h2>Status</h2>
-        <p>Terakhir update: <span id="last-updated">-</span></p>
-        <pre id="status-log" class="log"></pre>
-      </article>
-
-      <article class="card">
-        <h2>Activity (60fps)</h2>
-        <canvas id="activityChart" width="640" height="240"></canvas>
-      </article>
-
-      <article class="card">
-        <h2>Drag &amp; Drop Phishing Image</h2>
-        <div id="dashDrop" class="dropzone">
-          <p>Lepas gambar di sini untuk cek signature/phash</p>
+    <section>
+      <header class="topbar">
+        <div class="crumbs"><span>Home</span> › <b>Dashboard</b> • <span id="today"></span></div>
+        <div class="right-act">
+          <a class="newtask" href="/dashboard/security">Security</a>
+          <a class="newtask" href="/dashboard/settings">Settings</a>
         </div>
-        <output id="dropResult" class="result"></output>
-      </article>
+      </header>
+
+      <main class="canvas">
+        <section class="grid cards6">
+          <div class="card kpi"><div>Guilds</div><div class="num" id="k_guilds">0</div></div>
+          <div class="card kpi"><div>Members</div><div class="num" id="k_members">0</div></div>
+          <div class="card kpi"><div>Online</div><div class="num" id="k_online">0</div></div>
+          <div class="card kpi"><div>Channels</div><div class="num" id="k_channels">0</div></div>
+          <div class="card kpi"><div>Threads</div><div class="num" id="k_threads">0</div></div>
+          <div class="card kpi"><div>Latency</div><div class="num"><span id="k_latency">0</span> <small>ms</small></div></div>
+        </section>
+
+        <section class="grid row" style="margin-top:18px;">
+          <div class="card status">
+            <h3>Status</h3>
+            <p>Terakhir update: <span id="last_update">-</span></p>
+          </div>
+
+          <div class="card">
+            <h3>Upload Phishing (drag & drop)</h3>
+            <label class="drop">
+              <input id="dashDrop" type="file" accept="image/*" multiple>
+              <div class="hint">Lepas gambar di sini atau klik untuk pilih.</div>
+            </label>
+          </div>
+        </section>
+
+        <section class="grid row" style="margin-top:18px;">
+          <div class="card activity">
+            <h3>Activity (60fps)</h3>
+            <canvas id="activityChart"></canvas>
+          </div>
+          <div class="card">
+            <h3>Today note</h3>
+            <p id="todayNote">Tetap semangat! 🚀</p>
+          </div>
+        </section>
+      </main>
     </section>
-  </main>
+  </div>
 
   <script src="/dashboard-static/js/neo_dashboard_live.js"></script>
+  <script>
+    document.getElementById('today').textContent = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric'});
+
+    // Hook simple drop
+    (function(){
+      const inp = document.getElementById('dashDrop');
+      const label = inp.closest('.drop');
+      function send(files){
+        const fd = new FormData();
+        for (const f of files) fd.append('files', f);
+        fetch('/dashboard/upload', { method:'POST', body: fd });
+      }
+      label.addEventListener('click',()=>inp.click());
+      label.addEventListener('dragover', e=>{ e.preventDefault(); label.style.opacity=.8; });
+      label.addEventListener('dragleave', e=>{ label.style.opacity=1; });
+      label.addEventListener('drop', e=>{
+        e.preventDefault(); label.style.opacity=1;
+        if (e.dataTransfer && e.dataTransfer.files) send(e.dataTransfer.files);
+      });
+      inp.addEventListener('change', ()=> inp.files && send(inp.files));
+    })();
+  </script>
 </body>
 </html>
