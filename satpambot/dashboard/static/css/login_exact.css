@@ -8,19 +8,19 @@
   --login-dark-2:  #2b466d;   /* area input kanan */
   --login-text:    #e8eef8;
   --login-muted:   #a9b8cc;
-  --login-accent1: #2a57d8;   /* tombol */
+  --login-accent1: #2a57d8;   /* tombol (tidak dipakai utk pill) */
   --login-accent2: #1741bd;
-  --login-pill:    #d7deee;   /* “bayangan” pill bawah */
+  --login-pill:    #d7deee;   /* dasar “pill” */
 }
 
-/* Jika theme.css mendefinisikan variabel2 ini, otomatis override */
+/* Halaman login */
 .login-page{
   min-height:100vh;
   margin:0;
   background: linear-gradient(140deg,var(--login-bg-from),var(--login-bg-to));
 }
 
-/* matikan dekor blob global di login saja */
+/* matikan dekor global */
 .login-page::before,
 .login-page::after{ content:none !important; display:none !important; }
 
@@ -31,32 +31,26 @@
   padding:28px 18px;
 }
 
+/* Wrapper agar tombol pill bisa absolute relatif terhadap kartu */
+.login-block{
+  position:relative;
+  width:min(92vw, 440px);
+}
+
 /* Kartu utama */
 .login-card{
   position:relative;
-  width:min(92vw, 440px);
+  width:100%;
   border-radius:22px;
   padding:36px 22px 26px;
   color:var(--login-text);
   background: linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.07));
   border:1px solid rgba(255,255,255,.16);
   box-shadow: 0 28px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+  z-index:2;
 }
 
-/* “Pill” bawah seperti mockup */
-.login-card::after{
-  content:"";
-  position:absolute;
-  left:50%; transform:translateX(-50%);
-  bottom:-28px;
-  width:70%;
-  height:48px;
-  border-radius:18px;
-  background: linear-gradient(180deg, rgba(255,255,255,.8), var(--login-pill));
-  filter: drop-shadow(0 8px 20px rgba(0,0,0,.25));
-}
-
-/* Avatar bulat di atas kartu */
+/* Avatar bulat */
 .login-avatar{
   position:absolute;
   left:50%; top:0; transform:translate(-50%, -50%);
@@ -74,7 +68,7 @@
 /* Form */
 .login-form{ margin-top:18px; }
 
-/* Input dengan kotak ikon kiri */
+/* Input + ikon kiri */
 .input-group{
   display:flex; align-items:stretch;
   height:56px;
@@ -123,20 +117,28 @@
 .forgot{ color:#cfe0ff; text-decoration:none; }
 .forgot:hover{ text-decoration:underline; }
 
-/* Tombol LOGIN pada “pill” */
-.btn-login{
-  width:100%;
-  padding:13px 16px;
-  border-radius:14px;
-  border:1px solid rgba(255,255,255,.18);
-  background: linear-gradient(180deg, var(--login-accent1), var(--login-accent2));
-  color:#fff; font-weight:800; letter-spacing:.6px;
-  box-shadow: 0 12px 24px rgba(26,84,220,.35);
+/* Tombol submit fallback di dalam form disembunyikan */
+.btn-login{ display:none; }
+
+/* Tombol LOGIN pill di luar kartu */
+.btn-login-pill{
+  position:absolute;
+  left:50%; transform:translateX(-50%);
+  bottom:-28px;
+  width:70%;
+  height:48px;
+  border-radius:18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.90), var(--login-pill));
+  color:#1f2a3a;
+  font-weight:800; letter-spacing:.6px;
+  border:1px solid rgba(0,0,0,.06);
+  box-shadow: 0 14px 34px rgba(0,0,0,.28);
   cursor:pointer;
-  transition: transform .08s ease, filter .08s ease;
+  transition: transform .08s ease, filter .08s ease, box-shadow .12s ease;
+  z-index:1;
 }
-.btn-login:hover{ transform: translateY(-1px); }
-.btn-login:active{ transform:none; filter:none; }
+.btn-login-pill:hover{ transform:translateX(-50%) translateY(-1px); }
+.btn-login-pill:active{ transform:translateX(-50%) translateY(0); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
 
 /* Link bawah opsional */
 .login-links{
