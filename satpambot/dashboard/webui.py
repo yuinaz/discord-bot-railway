@@ -1,58 +1,124 @@
-# webui.py (patched) — dashboard + settings (local uploads) + themes list
+# -*- coding: utf-8 -*-
+"""
+WebUI utama SatpamBot (dashboard).
+Blueprint '/dashboard' + static '/dashboard-static' + theme CSS '/dashboard-theme/<name>/theme.css'.
+Tidak mengubah konfigurasi lain.
+"""
+
 from __future__ import annotations
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify
-from flask import current_app, send_from_directory
+import os, time, secrets
 from pathlib import Path
-import secrets, time, os
+from flask import (
+    Blueprint, render_template, request, redirect, url_for,
+    abort, current_app, send_from_directory, make_response
+)
 from .live_store import get_ui_config, set_ui_config
 
-bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
+# -----------------------------------------------------------------------------
+# Lokasi folder relatif ke file ini
+# -----------------------------------------------------------------------------
+HERE = Path(__file__).resolve().parent
+TEMPLATES_DIR = HERE / "templates"
+STATIC_DIR    = HERE / "static"
+THEMES_DIR    = HERE / "themes"
+UPLOADS_DIR   = STATIC_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-def _root_paths():
-    here = Path(__file__).resolve().parent
-    static_dir = here / "static"
-    theme_dir = Path(here, "themes")
-    upload_dir = static_dir / "uploads"
-    upload_dir.mkdir(exist_ok=True, parents=True)
-    return here, static_dir, theme_dir, upload_dir
+# -----------------------------------------------------------------------------
+# Blueprint: /dashboard + /dashboard-static
+# -----------------------------------------------------------------------------
+bp = Blueprint(
+    "dashboard",
+    __name__,
+    template_folder=str(TEMPLATES_DIR),
+    static_folder=str(STATIC_DIR),
+    static_url_path="/dashboard-static",
+    url_prefix="/dashboard"
+)
+
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+def _safe_theme(name: str) -> str:
+    name = (name or "").strip()
+    name = "".join(ch for ch in name if ch.isalnum() or ch in ("-", "_"))
+    return name or "gtake"
 
 def _list_themes() -> list[str]:
-    _, _, theme_dir, _ = _root_paths()
+    # Struktur: themes/<theme>/static/theme.css
     out = []
-    for p in theme_dir.glob("*/theme.css"):
-        out.append(p.parent.name)
+    for p in THEMES_DIR.glob("*/static/theme.css"):
+        out.append(p.parent.parent.name)  # folder themes/<theme>/static/theme.css
     return sorted(out) or ["gtake"]
 
-@bp.route("/")
-def index():
-    return render_template("dashboard.html")
+def _render_or_fallback(tpl: str, fallback_html: str):
+    path = TEMPLATES_DIR / tpl
+    if path.exists():
+        return render_template(tpl)
+    return fallback_html, 200
 
-@bp.route("/settings", methods=["GET","POST"])
+def _save_upload(field: str, prefix: str) -> str | None:
+    f = request.files.get(field)
+    if not f or not f.filename:
+        return None
+    ext = Path(f.filename).suffix.lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".svg"}:
+        return None
+    name = f"{prefix}_{int(time.time())}_{secrets.token_hex(2)}{ext}"
+    dst = UPLOADS_DIR / name
+    f.save(str(dst))
+    return f"/dashboard-static/uploads/{name}"
+
+# -----------------------------------------------------------------------------
+# Halaman utama
+# -----------------------------------------------------------------------------
+@bp.route("/", methods=["GET"])
+def dashboard_home():
+    return _render_or_fallback(
+        "dashboard.html",
+        "<!doctype html><title>Dashboard</title>"
+        "<link rel='stylesheet' href='/dashboard-static/css/neo_aurora_plus.css'>"
+        "<div class='container'><div class='card'>"
+        "<h1>Dashboard</h1><p>Template dashboard.html belum ditemukan.</p>"
+        "</div></div>"
+    )
+
+# -----------------------------------------------------------------------------
+# Login
+# -----------------------------------------------------------------------------
+@bp.route("/login", methods=["GET"])
+def login_get():
+    # Menggunakan template login milikmu apa adanya (tidak diubah layout)
+    return _render_or_fallback(
+        "login.html",
+        "<!doctype html><title>Login</title><p>Template login.html belum ditemukan.</p>"
+    )
+
+@bp.route("/login", methods=["POST"])
+def login_post():
+    # Autentikasi sesuai sistemmu; di sini redirect agar alur tetap 303 -> /dashboard
+    resp = make_response(redirect(url_for("dashboard.dashboard_home"), code=303))
+    # Optional: simpan pilihan theme dari form kalau ada
+    t = request.form.get("theme")
+    if t:
+        resp.set_cookie("theme", _safe_theme(t), max_age=30*24*3600, samesite="Lax")
+    return resp
+
+# -----------------------------------------------------------------------------
+# Settings (mendukung upload file lokal)
+# -----------------------------------------------------------------------------
+@bp.route("/settings", methods=["GET", "POST"])
 def settings():
     cfg = get_ui_config() or {}
-    here, static_dir, theme_dir, upload_dir = _root_paths()
 
     if request.method == "POST":
-        # theme & accent
-        theme = request.form.get("theme") or cfg.get("theme") or "gtake"
-        accent = request.form.get("accent") or cfg.get("accent") or "teal"
+        theme = _safe_theme(request.form.get("theme") or cfg.get("theme") or "gtake")
+        accent = (request.form.get("accent") or cfg.get("accent") or "teal").strip()
         apply_login = bool(request.form.get("apply_login"))
         use_bg_image = bool(request.form.get("bg_mode_image"))
-        # file uploads
-        def save_file(field, prefix):
-            f = request.files.get(field)
-            if not f or not f.filename:
-                return None
-            ext = Path(f.filename).suffix.lower()
-            if ext not in [".png",".jpg",".jpeg",".webp",".svg"]:
-                return None
-            name = f"{prefix}_{int(time.time())}_{secrets.token_hex(2)}{ext}"
-            dst = upload_dir / name
-            f.save(str(dst))
-            return f"/dashboard-static/uploads/{name}"
 
-        logo_url = save_file("logo_file","logo") or cfg.get("logo_url")
-        bg_url = save_file("bg_file","bg") or cfg.get("bg_url")
+        logo_url = _save_upload("logo_file", "logo") or cfg.get("logo_url")
+        bg_url   = _save_upload("bg_file", "bg") or cfg.get("bg_url")
 
         cfg.update({
             "theme": theme,
@@ -65,27 +131,27 @@ def settings():
         set_ui_config(cfg)
         return redirect(url_for(".settings"))
 
-    return render_template("settings.html", cfg=cfg, themes=_list_themes())
+    return _render_or_fallback("settings.html",
+        "<!doctype html><title>Settings</title><p>Template settings.html belum ditemukan.</p>"
+    )
 
-@bp.route("/theme/<name>/theme.css")
-def theme_css(name:str):
-    here, _, theme_dir, _ = _root_paths()
-    css = theme_dir / name / "theme.css"
-    if css.exists():
-        return current_app.send_static_file(str(css))
-    return ("/* theme not found */", 404, {"Content-Type":"text/css"})
+# -----------------------------------------------------------------------------
+# Security (drag & drop)
+# -----------------------------------------------------------------------------
+@bp.route("/security", methods=["GET"])
+def security():
+    return _render_or_fallback("security.html",
+        "<!doctype html><title>Security</title><p>Template security.html belum ditemukan.</p>"
+    )
 
-# Aliases for compatibility
-@bp.route("/theme/<name>/")
-def theme_alias(name:str):
-    return redirect(url_for(".theme_css", name=name))
-
-# ===== API =====
-@bp.route("/../api/ui-config")
-def api_proxy_ui_config():
-    # Using relative traversal to keep endpoint at /api/ui-config through blueprint mounting
-    return jsonify(get_ui_config() or {"theme":"gtake","accent":"teal"})
-
-@bp.route("/../api/ui-themes")
-def api_proxy_ui_themes():
-    return jsonify(_list_themes())
+# -----------------------------------------------------------------------------
+# Theme CSS (kompatibel dengan endpoint lama: /dashboard-theme/<name>/theme.css)
+# Didaftarkan lewat blueprint ini, sehingga URL global tetap sama.
+# -----------------------------------------------------------------------------
+@bp.route("/../dashboard-theme/<name>/theme.css", methods=["GET"])
+def theme_css(name: str):
+    name = _safe_theme(name)
+    css_path = THEMES_DIR / name / "static" / "theme.css"
+    if not css_path.exists():
+        abort(404)
+    return send_from_directory(css_path.parent, css_path.name, mimetype="text/css")
