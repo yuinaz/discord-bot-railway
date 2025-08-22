@@ -1,35 +1,35 @@
-# -*- coding: utf-8 -*-
-from __future__ import annotations
-import importlib, sys
 
-def _apply(app):
+# sitecustomize.py
+# Auto-imported by Python at startup if this directory is on sys.path.
+# Silences noisy /healthz (also /health, /ping) access logs across Werkzeug/Gunicorn.
+import logging
+
+def _install_health_log_filter():
     try:
-        from satpambot.dashboard.force_dashboard import install
-        install(app)
+        class _HealthzFilter(logging.Filter):
+            def filter(self, record):
+                try:
+                    msg = record.getMessage()
+                except Exception:
+                    msg = str(record.msg)
+                return ("/healthz" not in msg) and ("/health" not in msg) and ("/ping" not in msg)
+        logging.getLogger("werkzeug").addFilter(_HealthzFilter())
+        logging.getLogger("gunicorn.access").addFilter(_HealthzFilter())
+    except Exception:
+        pass  # never break app on logging issues
+
+def _monkeypatch_werkzeug_handler():
+    try:
+        from werkzeug.serving import WSGIRequestHandler as _WRH
+        _orig = _WRH.log_request
+        def _silent_health(self, *args, **kwargs):
+            rl = getattr(self, "requestline", "") or ""
+            if "/healthz" in rl or "/health" in rl or "/ping" in rl:
+                return
+            return _orig(self, *args, **kwargs)
+        _WRH.log_request = _silent_health
     except Exception:
         pass
 
-def _wrap(module):
-    try:
-        fn = getattr(module, "create_app", None)
-        if fn and not getattr(fn, "_sb_force_wrapped", False):
-            def _wrap_create_app(*a, **k):
-                app = fn(*a, **k)
-                _apply(app)
-                return app
-            _wrap_create_app._sb_force_wrapped = True
-            module.create_app = _wrap_create_app
-    except Exception:
-        pass
-
-if "app" in sys.modules:
-    _wrap(sys.modules["app"])
-
-_real = importlib.import_module
-def import_module(name, package=None):
-    m = _real(name, package)
-    if name == "app":
-        _wrap(m)
-    return m
-
-importlib.import_module = import_module
+_install_health_log_filter()
+_monkeypatch_werkzeug_handler()
