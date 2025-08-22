@@ -19,7 +19,6 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 import logging
-
 def _install_health_log_filter():
     try:
         class _HealthzFilter(logging.Filter):
@@ -28,13 +27,25 @@ def _install_health_log_filter():
                     msg = record.getMessage()
                 except Exception:
                     msg = str(record.msg)
-                # Hide access logs for health endpoints
                 return ("/healthz" not in msg) and ("/health" not in msg) and ("/ping" not in msg)
         logging.getLogger("werkzeug").addFilter(_HealthzFilter())
         logging.getLogger("gunicorn.access").addFilter(_HealthzFilter())
     except Exception:
-        # Never crash on logging setup
-        pass
+        pass  # never break app on logging issues
+
+# Also silence dev-server access logs at the source (Werkzeug's request handler)
+try:
+    from werkzeug.serving import WSGIRequestHandler as _WRH
+    _orig_log_request = _WRH.log_request
+    def _healthz_silent_log(self, *args, **kwargs):
+        rl = getattr(self, "requestline", "") or ""
+        if "/healthz" in rl or "/health" in rl or "/ping" in rl:
+            return
+        return _orig_log_request(self, *args, **kwargs)
+    _WRH.log_request = _healthz_silent_log
+except Exception:
+    pass
+
 
 # ------------------------------------------------------------------------------
 # Paths & storage
