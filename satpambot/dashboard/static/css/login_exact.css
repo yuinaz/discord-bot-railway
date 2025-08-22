@@ -1,149 +1,27 @@
-/* ===== Login exact (khusus halaman login) ===== */
 
-/* Background mengikuti tema lewat CSS var; ada fallback */
 :root{
-  --login-bg-from: #b77ca2;   /* fallback gradasi pink */
-  --login-bg-to:   #2b3f73;   /* ke biru tua */
-  --login-dark-1:  #0f2444;   /* kotak ikon kiri */
-  --login-dark-2:  #2b466d;   /* area input kanan */
-  --login-text:    #e8eef8;
-  --login-muted:   #a9b8cc;
-  --login-accent1: #2a57d8;   /* tombol (tidak dipakai utk pill) */
-  --login-accent2: #1741bd;
-  --login-pill:    #d7deee;   /* dasar “pill” */
+  --card-bg: rgba(255,255,255,.90);
+  --card-shadow: 0 30px 60px rgba(0,0,0,.35);
+  --btn: #2c56ff;
 }
-
-/* Halaman login */
-.login-page{
-  min-height:100vh;
-  margin:0;
-  background: linear-gradient(140deg,var(--login-bg-from),var(--login-bg-to));
+.login-bg{
+  min-height:100vh; margin:0;
+  background: radial-gradient(90rem 50rem at 10% 10%, #3b82f6 0%, transparent 40%),
+              radial-gradient(70rem 40rem at 90% 20%, #a78bfa 0%, transparent 40%),
+              #0b1020;
+  display:grid; place-items:center; font-family:system-ui,Segoe UI,Arial;
 }
-
-/* matikan dekor global */
-.login-page::before,
-.login-page::after{ content:none !important; display:none !important; }
-
-.login-center{
-  min-height:100vh;
-  display:grid;
-  place-items:center;
-  padding:28px 18px;
-}
-
-/* Wrapper agar tombol pill bisa absolute relatif terhadap kartu */
-.login-block{
-  position:relative;
-  width:min(92vw, 440px);
-}
-
-/* Kartu utama */
-.login-card{
-  position:relative;
-  width:100%;
-  border-radius:22px;
-  padding:36px 22px 26px;
-  color:var(--login-text);
-  background: linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.07));
-  border:1px solid rgba(255,255,255,.16);
-  box-shadow: 0 28px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
-  z-index:2;
-}
-
-/* Avatar bulat */
-.login-avatar{
-  position:absolute;
-  left:50%; top:0; transform:translate(-50%, -50%);
-  width:96px; height:96px; border-radius:50%;
-  background: radial-gradient(42px 42px at 50% 45%, #0e3e93, #0ea5e9 70%, #1f2937 100%);
-  box-shadow: 0 12px 34px rgba(14,165,233,.35);
-}
-.login-avatar::before{
-  content:"";
-  position:absolute; inset:0;
-  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/></svg>') center/56% no-repeat;
-  background:#fff8;
-}
-
-/* Form */
-.login-form{ margin-top:18px; }
-
-/* Input + ikon kiri */
-.input-group{
-  display:flex; align-items:stretch;
-  height:56px;
-  margin:12px 0;
-}
-.icon-box{
-  width:62px; flex:0 0 62px;
-  border-radius:10px 0 0 10px;
-  background:var(--login-dark-1);
-  display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,255,255,.14);
-  border-right:none;
-}
-.icon-box::before{
-  content:"";
-  width:20px; height:20px;
-  background:#fff;
-  -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat;
-  mask-size: contain; mask-repeat: no-repeat;
-}
-.icon-box.user::before{
-  -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-5.33 0-8 2.667-8 5v1h16v-1c0-2.333-2.67-5-8-5Z"/></svg>');
-}
-.icon-box.lock::before{
-  -webkit-mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M17 9h-1V7a4 4 0 1 0-8 0v2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0 2-2m-6 7.73V16a1 1 0 1 1 2 0v.73a1 1 0 1 1-2 0M10 9V7a2 2 0 1 1 4 0v2z"/></svg>');
-}
-
-.input-group input{
-  flex:1 1 auto;
-  border-radius:0 10px 10px 0;
-  border:1px solid rgba(255,255,255,.14);
-  background:var(--login-dark-2);
-  color:var(--login-text);
-  font-size:15px;
-  padding:0 14px;
-  outline:none; border-left:none;
-}
-.input-group input::placeholder{ color:var(--login-muted); }
-
-/* Row remember/forgot */
-.minor-row{
-  display:flex; justify-content:space-between; align-items:center;
-  margin:10px 4px 14px; font-size:13px; color:var(--login-muted);
-}
-.remember{ display:inline-flex; gap:6px; align-items:center; }
-.forgot{ color:#cfe0ff; text-decoration:none; }
-.forgot:hover{ text-decoration:underline; }
-
-/* Tombol submit fallback di dalam form disembunyikan */
-.btn-login{ display:none; }
-
-/* Tombol LOGIN pill di luar kartu */
-.btn-login-pill{
-  position:absolute;
-  left:50%; transform:translateX(-50%);
-  bottom:-28px;
-  width:70%;
-  height:48px;
-  border-radius:18px;
-  background: linear-gradient(180deg, rgba(255,255,255,.90), var(--login-pill));
-  color:#1f2a3a;
-  font-weight:800; letter-spacing:.6px;
-  border:1px solid rgba(0,0,0,.06);
-  box-shadow: 0 14px 34px rgba(0,0,0,.28);
-  cursor:pointer;
-  transition: transform .08s ease, filter .08s ease, box-shadow .12s ease;
-  z-index:1;
-}
-.btn-login-pill:hover{ transform:translateX(-50%) translateY(-1px); }
-.btn-login-pill:active{ transform:translateX(-50%) translateY(0); box-shadow: 0 8px 20px rgba(0,0,0,.25); }
-
-/* Link bawah opsional */
-.login-links{
-  display:flex; justify-content:space-between; margin-top:12px;
-  font-size:12px;
-}
-.login-links a{ color:#cfe0ff; text-decoration:none; }
-.login-links a:hover{ text-decoration:underline; }
+.login-wrap{width:100%;max-width:520px;padding:24px}
+.login-card{position:relative;background:var(--card-bg);border-radius:18px;padding:28px 24px 22px;box-shadow:var(--card-shadow)}
+.avatar{position:absolute; left:50%; transform:translate(-50%,-50%); top:0;background:linear-gradient(180deg,#1e293b,#020617); border-radius:999px; width:110px;height:110px; display:grid;place-items:center; box-shadow:0 12px 30px rgba(0,0,0,.45)}
+.avatar img{width:64px;height:64px;opacity:.9}
+.login-form{margin-top:64px; display:flex; flex-direction:column; gap:14px}
+.input-row{display:flex;align-items:center;gap:12px;background:#1f2a44;color:#cbd5e1;border-radius:8px;padding:12px 14px}
+.input-row .icon{font-size:18px;opacity:.9}
+.input-row input{all:unset;color:#e2e8f0;width:100%}
+.opts{display:flex;justify-content:space-between;align-items:center;font-size:.9rem;color:#64748b;margin-top:6px}
+.muted{color:#64748b;text-decoration:none}
+.btn-primary{margin-top:10px;width:100%;border:0;border-radius:10px;background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:white;padding:12px 14px;font-weight:700;letter-spacing:.06em}
+.login-footer{display:flex;justify-content:space-between; margin-top:10px; color:#475569}
+.spacer{flex:1}
+.shadow-tab{position:absolute; left:50%; transform:translateX(-50%); bottom:-22px; width:70%; height:40px; background:linear-gradient(180deg,rgba(255,255,255,.85), rgba(255,255,255,.55)); border-radius:16px; filter:blur(.2px); box-shadow:0 20px 30px rgba(0,0,0,.3)}

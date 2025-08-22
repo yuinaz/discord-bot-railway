@@ -1,61 +1,41 @@
+
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login</title>
-
-  <!-- Base login style -->
-  <link rel="stylesheet" href="/dashboard-static/css/login_exact.css" />
-
-  <!-- Theme (fallback gtake; akan di-switch via /api/ui-config) -->
-  <link id="theme-css" rel="stylesheet" href="/dashboard-theme/gtake/theme.css" />
-  <script>
-    (function(){
-      fetch('/api/ui-config').then(r=>r.json()).then(function(cfg){
-        var t = (cfg && cfg.theme) ? cfg.theme : 'gtake';
-        var el = document.getElementById('theme-css');
-        if (el) el.href = '/dashboard-theme/'+encodeURIComponent(t)+'/theme.css';
-      }).catch(function(){});
-    })();
-  </script>
+  <link rel="stylesheet" href="/dashboard-static/css/login_exact.css">
+  {% if cfg.apply_to_login %}
+    <link rel="stylesheet" href="/dashboard-theme/{{cfg.theme}}/theme.css">
+  {% endif %}
 </head>
-<body class="login-page">
-  <main class="login-center">
-    <section class="login-block">
-      <section class="login-card">
-        <div class="login-avatar" aria-hidden="true"></div>
-
-        <form id="login-form" method="post" class="login-form" autocomplete="off">
-          <label class="input-group">
-            <span class="icon-box user" aria-hidden="true"></span>
-            <input name="username" type="text" placeholder="Username" required />
-          </label>
-
-          <label class="input-group">
-            <span class="icon-box lock" aria-hidden="true"></span>
-            <input name="password" type="password" placeholder="Password" required />
-          </label>
-
-          <div class="minor-row">
-            <label class="remember"><input type="checkbox" /> <span>Remember me</span></label>
-            <a class="forgot" href="#">Forgot Password?</a>
-          </div>
-
-          <!-- tombol submit di dalam form disembunyikan (fallback untuk submit via Enter) -->
-          <button class="btn-login" type="submit" aria-hidden="true" tabindex="-1">LOGIN</button>
-        </form>
-
-        <!-- nav kecil (optional) -->
-        <nav class="login-links">
-          <a href="javascript:history.back()">Kembali</a>
-          <a href="/dashboard">Home</a>
-        </nav>
-      </section>
-
-      <!-- Tombol LOGIN berupa “pill” di luar kartu -->
-      <button class="btn-login-pill" type="submit" form="login-form">LOGIN</button>
-    </section>
-  </main>
+<body class="login-bg">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="avatar"><img src="{{ cfg.logo_url or '/dashboard-static/logo.svg' }}" alt="logo"></div>
+      <form method="post" class="login-form">
+        <label class="input-row">
+          <span class="icon">👤</span>
+          <input type="text" name="username" placeholder="Username" required>
+        </label>
+        <label class="input-row">
+          <span class="icon">🔒</span>
+          <input type="password" name="password" placeholder="Password" required>
+        </label>
+        <div class="opts">
+          <label><input type="checkbox" name="remember"> Remember me</label>
+          <a class="muted" href="#" onclick="alert('Use admin credentials');return false;">Forgot Password?</a>
+        </div>
+        <button class="btn-primary" type="submit">LOGIN</button>
+      </form>
+      <div class="login-footer">
+        <a href="/" class="muted">Kembali</a>
+        <span class="spacer"></span>
+        <a href="/dashboard" class="muted">Home</a>
+      </div>
+      <div class="shadow-tab"></div>
+    </div>
+  </div>
 </body>
 </html>
