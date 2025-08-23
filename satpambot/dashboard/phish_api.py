@@ -76,7 +76,6 @@ def phash_upload():
 
     return jsonify({"added": added, "skipped": skipped, "total": len(data.get("hashes", []))})
 
-# Simple stubs to avoid 404 while you wire real pages
 @phish_api.route("/dashboard/tasks", methods=["GET"])
 def dashboard_tasks():
     return render_template("stubs/tasks.html")
