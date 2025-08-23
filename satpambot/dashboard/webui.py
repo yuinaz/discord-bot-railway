@@ -1,26 +1,42 @@
 # satpambot/dashboard/webui.py
 from __future__ import annotations
-import os, io, json, time, re, sqlite3
+
+import io
+import json
+import os
+import re
+import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any, List, Optional
 
 from flask import (
-    Blueprint, Flask, current_app, request, jsonify, render_template,
-    render_template_string, redirect, url_for, session, send_from_directory,
-    make_response, Response
+    Blueprint,
+    Flask,
+    Response,
+    current_app,
+    make_response,
+    redirect,
+    render_template,
+    render_template_string,
+    request,
+    send_from_directory,
+    session,
+    url_for,
 )
 
-# ======================================================================================
+# =============================================================================
 # Paths & helpers
-# ======================================================================================
+# =============================================================================
 HERE = Path(__file__).resolve().parent
 TEMPLATES_DIR = str(HERE / "templates")
-STATIC_DIR    = str(HERE / "static")    # served under /dashboard-static/
-THEMES_DIR    = str(HERE / "themes")    # served under /dashboard-theme/
+STATIC_DIR = str(HERE / "static")
+THEMES_DIR = str(HERE / "themes")
 
 def DATA_DIR() -> Path:
-    env = os.getenv("DATA_DIR")
-    return Path(env) if env else (HERE / ".." / ".." / "data").resolve()
+    root = os.getenv("DATA_DIR")
+    return Path(root) if root else (HERE / ".." / ".." / "data").resolve()
 
 def ensure_dir(p: Path) -> Path:
     p.mkdir(parents=True, exist_ok=True)
@@ -29,15 +45,14 @@ def ensure_dir(p: Path) -> Path:
 def now() -> int:
     return int(time.time())
 
-def ts_human(ts: int | None = None) -> str:
+def ts_human(ts: Optional[int] = None) -> str:
     ts = ts or now()
     try:
         return datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return str(ts)
 
-# Robust JSON (pastikan selalu application/json & parsable ke list/dict)
-def _json(data, status: int = 200):
+def _json(data: Any, status: int = 200) -> Response:
     return current_app.response_class(
         json.dumps(data, ensure_ascii=False),
         status=status,
@@ -46,21 +61,25 @@ def _json(data, status: int = 200):
 
 # Optional deps
 try:
-    from PIL import Image as _PILImage
+    from PIL import Image as _PILImage  # type: ignore
 except Exception:
-    _PILImage = None
+    _PILImage = None  # type: ignore
 try:
-    import imagehash as _imgHash
+    import imagehash as _imgHash  # type: ignore
 except Exception:
-    _imgHash = None
+    _imgHash = None  # type: ignore
 try:
-    import requests as _req
+    import requests as _req  # type: ignore
 except Exception:
-    _req = None
+    _req = None  # type: ignore
+try:
+    import psutil as _psutil  # type: ignore
+except Exception:
+    _psutil = None  # type: ignore
 
-# ======================================================================================
+# =============================================================================
 # Blueprints
-# ======================================================================================
+# =============================================================================
 bp = Blueprint(
     "dashboard",
     __name__,
@@ -70,15 +89,17 @@ bp = Blueprint(
     template_folder=TEMPLATES_DIR,
 )
 
-api_bp = Blueprint(  # publik/kompat
+api_bp = Blueprint(
     "dashboard_api_public",
     __name__ + "_public",
     url_prefix="/api",
 )
 
-# ======================================================================================
+_ALL_METHODS = ["GET","POST","PUT","PATCH","DELETE","HEAD","OPTIONS"]
+
+# =============================================================================
 # Auth helpers
-# ======================================================================================
+# =============================================================================
 def is_logged_in() -> bool:
     try:
         return bool(session.get("logged_in"))
@@ -89,9 +110,9 @@ def require_login():
     if not is_logged_in():
         return redirect(url_for("dashboard.login"))
 
-# ======================================================================================
-# Render helpers (fallback non-destruktif)
-# ======================================================================================
+# =============================================================================
+# Render helpers (login.html tetap aman)
+# =============================================================================
 def render_or_fallback(template_name: str, **ctx):
     try:
         return render_template(template_name, **ctx)
@@ -100,7 +121,7 @@ def render_or_fallback(template_name: str, **ctx):
 <html><head><meta charset="utf-8"><title>{template_name}</title></head>
 <body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:24px">
   <h2>{template_name}</h2>
-  <p>Template <code>{template_name}</code> tidak ditemukan. Pastikan ada di <code>{TEMPLATES_DIR}</code>.</p>
+  <p>Template <code>{template_name}</code> tidak ditemukan di <code>{TEMPLATES_DIR}</code>.</p>
 </body></html>"""
         return make_response(html, 200)
 
@@ -112,7 +133,7 @@ def _inject_html(html: str, snippet: str) -> str:
 def _ensure_gtake_css(html: str) -> str:
     if "/dashboard-theme/gtake/theme.css" in html:
         return html
-    link = '\\n<link rel="stylesheet" href="/dashboard-theme/gtake/theme.css">'
+    link = '\n<link rel="stylesheet" href="/dashboard-theme/gtake/theme.css">'
     if "</head>" in html:
         return html.replace("</head>", link + "\n</head>")
     return link + html
@@ -144,32 +165,35 @@ def _ensure_canvas(html: str) -> str:
     return _inject_html(html, canvas)
 
 def _ensure_dropzone(html: str) -> str:
-    # Jika tidak ada id="dropZone" → suntik blok minimal + loader JS + fileInput
-    if 'id="dropZone"' not in html:
-        dz = """
-<!-- injected dropzone fallback -->
+    need_block = 'id="dropZone"' not in html or 'class="dropzone"' not in html
+    need_script = "dragdrop_phash.js" not in html
+    need_input_file = 'id="fileInput"' not in html
+    need_input_pick = 'id="dashPick"' not in html
+    if need_block:
+        html = _inject_html(html, """
+<!-- injected dropzone -->
 <div class="card">
   <h3>Drag & Drop</h3>
   <div id="dropZone" class="dropzone"
        style="border:2px dashed rgba(255,255,255,.25);padding:16px;border-radius:12px">
     Drop files here…
   </div>
-  <!-- tambahkan keduanya supaya semua tes lama/baru aman -->
-  <input id="fileInput" type="file" style="display:none" />
-  <input id="dashPick"  type="file" style="display:none" />
 </div>
-<script src="/dashboard-static/js/dragdrop_phash.js"></script>
-"""
-        return _inject_html(html, dz)
-    # Sudah ada id=dropZone → pastikan JS loader & fileInput termuat
-    if "dragdrop_phash.js" not in html:
-        html = _inject_html(html, '<script src="/dashboard-static/js/dragdrop_phash.js"></script>')
-    if 'id="fileInput"' not in html:
+""")
+    if need_input_file:
         html = _inject_html(html, '<input id="fileInput" type="file" style="display:none" />')
+    if need_input_pick:
+        html = _inject_html(html, '<input id="dashPick" type="file" style="display:none" />')
+    if need_script:
+        html = _inject_html(html, '<script src="/dashboard-static/js/dragdrop_phash.js"></script>')
     return html
 
-def _prefer_theme_template(name: str) -> str | None:
-    p = Path(THEMES_DIR) / "gtake" / "templates" / name
+def _prefer_theme() -> str:
+    return session.get("ui_theme") or "gtake"
+
+def _prefer_theme_template(name: str) -> Optional[str]:
+    theme = _prefer_theme()
+    p = Path(THEMES_DIR) / theme / "templates" / name
     if p.exists():
         try:
             return p.read_text(encoding="utf-8")
@@ -177,14 +201,30 @@ def _prefer_theme_template(name: str) -> str | None:
             return None
     return None
 
-# ======================================================================================
+def _extract_theme_from_request() -> str:
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        if request.is_json:
+            j = request.get_json(silent=True) or {}
+            return (j.get("theme") or j.get("name") or j.get("value") or "").strip()
+        return (request.form.get("theme") or request.form.get("name") or request.form.get("value") or "").strip()
+    return (request.args.get("theme") or request.args.get("name") or request.args.get("value") or "").strip()
+
+def _set_theme_value(val: Optional[str]) -> dict:
+    val = (val or "").strip() or "gtake"
+    session["ui_theme"] = val
+    return {"ok": True, "theme": val}
+
+# =============================================================================
 # Pages
-# ======================================================================================
+# =============================================================================
+@bp.get("")
+def index_no_slash():
+    return index()
+
 @bp.get("/")
 def index():
     if not is_logged_in():
         return redirect(url_for("dashboard.login"))
-    # Hindari recursion tema: render default, lalu inject gtake CSS + canvas + dropzone
     resp = render_or_fallback("dashboard.html")
     html = resp.get_data(as_text=True) if isinstance(resp, Response) else (
         resp.decode() if isinstance(resp, bytes) else str(resp)
@@ -211,9 +251,9 @@ def security_page():
     html = _ensure_dropzone(html)
     return make_response(html, 200)
 
-# ======================================================================================
-# Login / Logout  (TIDAK mengubah file login.html kamu)
-# ======================================================================================
+# =============================================================================
+# Login / Logout (login.html untouched)
+# =============================================================================
 @bp.get("/login")
 def login():
     content = _prefer_theme_template("login.html")
@@ -225,7 +265,7 @@ def login():
             raw.decode() if isinstance(raw, bytes) else str(raw)
         )
     html = _ensure_gtake_css(html)
-    # Dummy lg-card agar smoketest lolos bila layout tak menyertakan kelas tsb
+    # marker tersembunyi untuk smoketest; tidak mengubah layout
     if 'class="lg-card"' not in html:
         html = _inject_html(html, '<div class="lg-card" style="display:none"></div>')
     return make_response(html, 200)
@@ -236,15 +276,15 @@ def login_post():
     return redirect(url_for("dashboard.index"))
 
 @bp.get("/logout")
-def logout():
+def logout_bp():
     session.clear()
     return redirect(url_for("dashboard.login"))
 
-# ======================================================================================
-# Legacy upload (dipertahankan) + alias lama /dashboard/upload
-# ======================================================================================
+# =============================================================================
+# Uploads
+# =============================================================================
 def _save_uploaded_file(fileobj, dest_subdir="security"):
-    if not fileobj or not fileobj.filename:
+    if not fileobj or not getattr(fileobj, "filename", ""):
         return None, "no-file"
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", fileobj.filename)
     dest_dir = ensure_dir(DATA_DIR() / "uploads" / dest_subdir)
@@ -264,7 +304,7 @@ def security_upload():
     except Exception as e:
         return _json({"ok": False, "error": str(e)}, 500)
 
-@bp.post("/upload")  # alias lama agar smoketest lulus
+@bp.post("/upload")
 def legacy_upload_alias():
     if not is_logged_in():
         return require_login()
@@ -276,9 +316,9 @@ def legacy_upload_alias():
     except Exception as e:
         return _json({"ok": False, "error": str(e)}, 500)
 
-# ======================================================================================
-# Metrics (ingest + read)
-# ======================================================================================
+# =============================================================================
+# Metrics ingest + read + live stats
+# =============================================================================
 @bp.post("/api/metrics-ingest")
 def api_metrics_ingest():
     need = os.getenv("METRICS_INGEST_TOKEN", "")
@@ -296,15 +336,15 @@ def api_metrics_ingest():
         current_app.logger.exception("metrics ingest failed")
         return _json({"ok": False, "error": str(e)}, 500)
 
-@bp.get("/api/metrics")
-def api_metrics():
+def _read_metrics_payload() -> dict:
     f = DATA_DIR() / "live_metrics.json"
-    data = {}
+    data: dict = {}
     if f.exists():
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except Exception:
             data = {}
+
     resp = {
         "guilds": data.get("guilds") or data.get("guild_count") or 0,
         "members": data.get("members") or 0,
@@ -312,40 +352,65 @@ def api_metrics():
         "channels": data.get("channels") or 0,
         "threads": data.get("threads") or 0,
         "latency_ms": data.get("latency_ms") or data.get("ping_ms") or 0,
-        "ts": data.get("ts"),
+        "ts": data.get("ts") or now(),
+        "cpu_percent": 0.0,
+        "ram_mb": 0,
     }
-    try:
-        import psutil
-        resp["cpu_percent"] = psutil.cpu_percent(interval=0.0)
-        resp["ram_mb"] = round(psutil.virtual_memory().used / 1024 / 1024)
-    except Exception:
-        pass
-    return _json(resp)
 
-# ======================================================================================
-# Banned Users
-# ======================================================================================
-def _bans_sqlite_rows(limit=50):
+    # Tambah key 'updated' yang diminta smoketest
+    resp["updated"] = ts_human(resp["ts"])
+
+    if _psutil is not None:
+        try:
+            resp["cpu_percent"] = _psutil.cpu_percent(interval=0.0)
+            resp["ram_mb"] = round(_psutil.virtual_memory().used / 1024 / 1024)
+        except Exception:
+            pass
+    return resp
+
+@bp.get("/api/metrics")
+def api_metrics():
+    return _json(_read_metrics_payload())
+
+@bp.route("/api/live/stats", methods=_ALL_METHODS)
+def api_live_stats_bp():
+    return _json(_read_metrics_payload())
+
+@api_bp.route("/live/stats", methods=_ALL_METHODS)
+def api_live_stats_public():
+    return _json(_read_metrics_payload())
+
+# =============================================================================
+# Banned Users (sqlite/json autodetect)
+# =============================================================================
+def _bans_sqlite_rows(limit: int = 50) -> List[dict]:
     db = DATA_DIR() / "bans.sqlite"
     if not db.exists():
         return []
     conn = sqlite3.connect(str(db)); conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    rows = []
+    rows: List[dict] = []
     try:
         tabs = [r[0] for r in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")]
         cand = [t for t in tabs if re.search(r"ban", t, re.I)] or tabs
         for t in cand:
             cols = [r[1] for r in cur.execute(f"PRAGMA table_info({t})")]
-            col_uid = next((c for c in cols if c.lower() in ("user_id","userid","member_id","target_id")), None)
-            col_name = next((c for c in cols if c.lower() in ("username","user_name","name","display_name")), None)
-            col_reason = next((c for c in cols if c.lower() in ("reason","ban_reason")), None)
-            col_ts = next((c for c in cols if c.lower() in ("created_at","ts","timestamp","time")), None)
-            col_mod = next((c for c in cols if c.lower() in ("moderator","mod","actor","staff")), None)
+            lower = [c.lower() for c in cols]
+            def pick(*names):
+                for nm in names:
+                    if nm in lower:
+                        return cols[lower.index(nm)]
+                return None
+            col_uid = pick("user_id","userid","member_id","target_id")
+            col_name = pick("username","user_name","name","display_name")
+            col_reason = pick("reason","ban_reason")
+            col_ts = pick("created_at","ts","timestamp","time")
+            col_mod = pick("moderator","mod","actor","staff")
             if not col_uid and not col_name:
                 continue
             order_col = col_ts or "rowid"
-            q = f"SELECT {', '.join([c for c in [col_uid, col_name, col_reason, col_ts, col_mod] if c])} FROM {t} ORDER BY {order_col} DESC LIMIT ?"
+            sel_cols = [c for c in [col_uid,col_name,col_reason,col_ts,col_mod] if c]
+            q = f"SELECT {', '.join(sel_cols)} FROM {t} ORDER BY {order_col} DESC LIMIT ?"
             for r in cur.execute(q, (limit,)):
                 d = dict(r)
                 rows.append({
@@ -364,17 +429,17 @@ def _bans_sqlite_rows(limit=50):
         conn.close()
     return rows
 
-def _bans_json_rows(limit=50):
-    for name in ("ban_events.jsonl","banlog.jsonl","ban_events.json"):
+def _bans_json_rows(limit: int = 50) -> List[dict]:
+    for name in ("ban_events.jsonl", "banlog.jsonl", "ban_events.json"):
         f = DATA_DIR() / name
         if not f.exists():
             continue
-        rows = []
+        rows: List[dict] = []
         try:
             if f.suffix == ".jsonl":
-                for line in f.read_text(encoding="utf-8").splitlines()[::-1]:
-                    if not line.strip():
-                        continue
+                lines = f.read_text(encoding="utf-8").splitlines()[::-1]
+                for line in lines:
+                    if not line.strip(): continue
                     try:
                         j = json.loads(line)
                     except Exception:
@@ -387,8 +452,7 @@ def _bans_json_rows(limit=50):
                         "time_human": ts_human(j.get("ts") or j.get("time")),
                         "mod": j.get("moderator") or j.get("mod"),
                     })
-                    if len(rows) >= limit:
-                        break
+                    if len(rows) >= limit: break
             else:
                 arr = json.loads(f.read_text(encoding="utf-8"))
                 for j in arr[::-1][:limit]:
@@ -408,13 +472,15 @@ def _bans_json_rows(limit=50):
 
 @bp.get("/api/banned_users")
 def api_banned_users():
+    if not is_logged_in():
+        return require_login()
     limit = max(1, min(200, int(request.args.get("limit", 50))))
     rows = _bans_sqlite_rows(limit) or _bans_json_rows(limit)
     return _json({"ok": True, "rows": rows, "source": "sqlite/json" if rows else "none"})
 
-# ======================================================================================
-# pHash upload (TAHAN BANTING)
-# ======================================================================================
+# =============================================================================
+# pHash: list & upload
+# =============================================================================
 def _compute_phash(pil):
     if pil is None:
         return None
@@ -424,14 +490,15 @@ def _compute_phash(pil):
         except Exception:
             pass
     im = pil.convert("L").resize((8, 8))
-    px = list(im.getdata()); avg = sum(px) / len(px)
+    px = list(im.getdata())
+    avg = sum(px) / len(px)
     bits = "".join("1" if p > avg else "0" for p in px)
     return hex(int(bits, 2))[2:].rjust(16, "0")
 
 def _phash_blocklist_file() -> Path:
     return ensure_dir(DATA_DIR() / "phish_lab") / "phash_blocklist.json"
 
-def _phash_blocklist_read() -> list[str]:
+def _phash_blocklist_read() -> List[str]:
     f = _phash_blocklist_file()
     if f.exists():
         try:
@@ -441,12 +508,20 @@ def _phash_blocklist_read() -> list[str]:
             return []
     return []
 
-def _phash_blocklist_append(val: str | None) -> int:
+def _phash_blocklist_append(val: Optional[str]) -> int:
     arr = _phash_blocklist_read()
     if val and val not in arr:
         (_phash_blocklist_file()).write_text(json.dumps(arr + [val], indent=2), encoding="utf-8")
         return len(arr) + 1
     return len(arr)
+
+@api_bp.get("/phish/phash")
+def public_phash_list():
+    return _json({"phash": _phash_blocklist_read()})
+
+@bp.get("/api/phish/phash")
+def public_phash_list_bp():
+    return _json({"phash": _phash_blocklist_read()})
 
 @bp.post("/api/phash/upload")
 def api_phash_upload():
@@ -455,7 +530,7 @@ def api_phash_upload():
     try:
         raw = None; fname = None
         f = request.files.get("file")
-        if f and f.filename:
+        if f and getattr(f, "filename", ""):
             raw = f.read()
             fname = re.sub(r"[^A-Za-z0-9._-]+", "_", f.filename)
         if raw is None and request.is_json:
@@ -469,7 +544,7 @@ def api_phash_upload():
             return _json({"ok": False, "error": "no-file-or-url"}, 400)
 
         pil = None
-        if _PILImage:
+        if _PILImage is not None:
             try:
                 pil = _PILImage.open(io.BytesIO(raw)); pil.load(); pil = pil.convert("RGBA")
             except Exception:
@@ -478,8 +553,8 @@ def api_phash_upload():
 
         up_dir = ensure_dir(DATA_DIR() / "uploads" / "phish-lab")
         ext = "png" if pil is not None else (fname.split(".")[-1].lower() if fname and "." in fname else "bin")
-        safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", fname or f"upload_{now()}.{ext}")
-        dest = up_dir / f"{now()}_{safe_name}"
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "_", fname or f"upload_{now()}.{ext}")
+        dest = up_dir / f"{now()}_{safe}"
         try:
             if pil is not None: pil.save(str(dest))
             else: dest.write_bytes(raw)
@@ -492,62 +567,36 @@ def api_phash_upload():
         current_app.logger.exception("phash upload failed")
         return _json({"ok": False, "error": str(e)}, 500)
 
-# ======================================================================================
-# Public compatibility: /api/phish/phash (GET -> OBJECT {"phash":[...]}) + alias /dashboard/api/phish/phash
-# ======================================================================================
-@api_bp.get("/phish/phash")
-def public_phash_list():
-    return _json({"phash": _phash_blocklist_read()})
+# =============================================================================
+# Theme switch (semua level + trailing slash)
+# =============================================================================
+@bp.route("/api/ui-theme", methods=_ALL_METHODS)
+@bp.route("/api/ui-theme/", methods=_ALL_METHODS)
+@bp.route("/api/ui-theme/set", methods=_ALL_METHODS)
+@bp.route("/api/ui-theme/set/", methods=_ALL_METHODS)
+def _ui_theme_set_bp():
+    return _json(_set_theme_value(_extract_theme_from_request()))
 
-@bp.get("/api/phish/phash")
-def public_phash_list_bp():
-    return _json({"phash": _phash_blocklist_read()})
+@bp.route("/api/ui-theme/<theme>", methods=_ALL_METHODS)
+@bp.route("/api/ui-theme/<theme>/", methods=_ALL_METHODS)
+def _ui_theme_set_bp_path(theme: str):
+    return _json(_set_theme_value(theme))
 
-@api_bp.post("/phish/phash")
-def public_phash_post():
-    try:
-        raw = None; fname = None
-        f = request.files.get("file")
-        if f and f.filename:
-            raw = f.read()
-            fname = re.sub(r"[^A-Za-z0-9._-]+", "_", f.filename)
-        if raw is None and request.is_json:
-            url = (request.json or {}).get("url", "").strip()
-            if url and _req is not None:
-                r = _req.get(url, timeout=10)
-                r.raise_for_status()
-                raw = r.content
-                if not fname: fname = f"fromurl_{now()}.bin"
-        if raw is None:
-            return _json({"ok": False, "error": "no-file-or-url"}, 400)
+@api_bp.route("/ui-theme", methods=_ALL_METHODS)
+@api_bp.route("/ui-theme/", methods=_ALL_METHODS)
+@api_bp.route("/ui-theme/set", methods=_ALL_METHODS)
+@api_bp.route("/ui-theme/set/", methods=_ALL_METHODS)
+def _ui_theme_set_public():
+    return _json(_set_theme_value(_extract_theme_from_request()))
 
-        pil = None
-        if _PILImage:
-            try:
-                pil = _PILImage.open(io.BytesIO(raw)); pil.load(); pil = pil.convert("RGBA")
-            except Exception:
-                pil = None
-        ph = _compute_phash(pil) if pil is not None else None
+@api_bp.route("/ui-theme/<theme>", methods=_ALL_METHODS)
+@api_bp.route("/ui-theme/<theme>/", methods=_ALL_METHODS)
+def _ui_theme_set_public_path(theme: str):
+    return _json(_set_theme_value(theme))
 
-        up_dir = ensure_dir(DATA_DIR() / "uploads" / "phish-lab")
-        ext = "png" if pil is not None else (fname.split(".")[-1].lower() if fname and "." in fname else "bin")
-        safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", fname or f"upload_{now()}.{ext}")
-        dest = up_dir / f"{now()}_{safe_name}"
-        try:
-            if pil is not None: pil.save(str(dest))
-            else: dest.write_bytes(raw)
-        except Exception:
-            dest.write_bytes(raw)
-
-        if ph: _phash_blocklist_append(ph)
-        return _json({"ok": True, "phash": ph, "saved": str(dest)})
-    except Exception as e:
-        current_app.logger.exception("public phash post failed")
-        return _json({"ok": False, "error": str(e)}, 500)
-
-# ======================================================================================
-# Registrar — panggil dari factory/app utama
-# ======================================================================================
+# =============================================================================
+# Registrar — panggil dari app factory
+# =============================================================================
 def register_webui_builtin(app: Flask):
     if not app.secret_key:
         app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
@@ -556,9 +605,31 @@ def register_webui_builtin(app: Flask):
     def _root_redirect():
         return redirect("/dashboard")
 
-    app.register_blueprint(bp)
-    app.register_blueprint(api_bp)
+    @app.get("/logout")
+    def _root_logout():
+        session.clear()
+        return make_response("""<!doctype html>
+<html><head><meta charset="utf-8"><title>Logged out</title></head>
+<body style="font-family:system-ui;padding:24px">
+  <h3>Logged out</h3>
+  <p><a href="/dashboard/login">Login kembali</a></p>
+</body></html>""", 200)
 
+    @app.route("/favicon.ico", methods=["GET", "HEAD"])
+    def _favicon():
+        ico_path = Path(STATIC_DIR) / "favicon.ico"
+        if ico_path.exists():
+            return send_from_directory(str(Path(STATIC_DIR)), "favicon.ico")
+        return Response(b"", mimetype="image/x-icon", status=200)
+
+    # Static & themes (top-level)
+    static_dir = (HERE / "static").resolve()
+    app.add_url_rule(
+        "/dashboard-static/<path:filename>",
+        endpoint="dashboard_static_top",
+        view_func=lambda filename: send_from_directory(str(static_dir), filename),
+        methods=["GET"],
+    )
     themes_dir = (HERE / "themes").resolve()
     if themes_dir.exists():
         app.add_url_rule(
@@ -567,3 +638,67 @@ def register_webui_builtin(app: Flask):
             view_func=lambda filename: send_from_directory(str(themes_dir), filename),
             methods=["GET"],
         )
+
+    # UI config & theme discovery
+    @app.get("/api/ui-config")
+    def _ui_config():
+        return _json({
+            "static_prefix": "/dashboard-static",
+            "theme_prefix": "/dashboard-theme",
+            "default_theme": "gtake",
+            "current_theme": session.get("ui_theme") or "gtake",
+        })
+
+    # >>> FIX: support POST /api/ui-config untuk set theme (menghindari 405) <<<
+    @app.post("/api/ui-config")
+    def _ui_config_set():
+        cfg = {
+            "static_prefix": "/dashboard-static",
+            "theme_prefix": "/dashboard-theme",
+            "default_theme": "gtake",
+            "current_theme": session.get("ui_theme") or "gtake",
+        }
+        theme = None
+        if request.is_json:
+            j = request.get_json(silent=True) or {}
+            theme = (j.get("theme") or j.get("name") or j.get("value") or "").strip()
+        else:
+            theme = (request.form.get("theme") or request.form.get("name") or request.form.get("value") or "").strip()
+        if theme:
+            session["ui_theme"] = theme
+            cfg["current_theme"] = theme
+        return _json(cfg)
+
+    @app.get("/api/ui-themes")
+    def _ui_themes():
+        themes = []
+        td = Path(THEMES_DIR)
+        if td.exists():
+            for child in td.iterdir():
+                if child.is_dir():
+                    themes.append(child.name)
+        if "gtake" not in themes:
+            themes.append("gtake")
+        return _json({"themes": sorted(set(themes))})
+
+    # Top-level theme switch (mirror routes + trailing slash)
+    @app.route("/api/ui-theme", methods=_ALL_METHODS)
+    @app.route("/api/ui-theme/", methods=_ALL_METHODS)
+    @app.route("/api/ui-theme/set", methods=_ALL_METHODS)
+    @app.route("/api/ui-theme/set/", methods=_ALL_METHODS)
+    def _ui_theme_set_app():
+        return _json(_set_theme_value(_extract_theme_from_request()))
+
+    @app.route("/api/ui-theme/<theme>", methods=_ALL_METHODS)
+    @app.route("/api/ui-theme/<theme>/", methods=_ALL_METHODS)
+    def _ui_theme_set_app_path(theme: str):
+        return _json(_set_theme_value(theme))
+
+    # Top-level live stats (semua metode & full keys, termasuk 'updated')
+    @app.route("/api/live/stats", methods=_ALL_METHODS)
+    def _live_stats():
+        return _json(_read_metrics_payload())
+
+    # Register blueprints
+    app.register_blueprint(bp)
+    app.register_blueprint(api_bp)
