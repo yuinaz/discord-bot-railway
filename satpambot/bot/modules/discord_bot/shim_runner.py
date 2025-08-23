@@ -60,7 +60,7 @@ async def setup_hook():
         try:
             # Discord.py 2.x mendukung setup async/sync; cog sudah menyediakan keduanya.
             if ext not in bot.extensions:
-                bot.load_extension(ext)
+                await bot.load_extension(ext)
                 log.info("✅ Loaded metrics cog: %s", ext)
             else:
                 log.info("ℹ️ Metrics cog already loaded: %s", ext)
