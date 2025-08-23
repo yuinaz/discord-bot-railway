@@ -1,1 +1,139 @@
-.lg-card{display:block}
+/* === Login Exact (final, match mockup) — TANPA ubah login.html === */
+
+/* background gradasi mirip mockup */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: ui-sans-serif, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background:
+    radial-gradient(1200px 600px at 14% 12%, #ffb59c 0%, rgba(255,181,156,0.00) 44%),
+    radial-gradient(1200px 600px at 86% 88%, #8db1ff 0%, rgba(141,177,255,0.00) 36%),
+    linear-gradient(180deg, #e7a2b6 0%, #4566a3 100%);
+  color: #e8edf7;
+}
+
+/* kartu login (dibungkus via webui.py dengan .login-card.lg-card) */
+.login-card.lg-card{
+  box-sizing:border-box;
+  width:min(92vw, 520px);
+  margin: 12vh auto 10vh;
+  padding: 26px 28px 22px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.32), rgba(255,255,255,0.14));
+  border: 1px solid rgba(255,255,255,0.20);
+  box-shadow: 0 26px 60px rgba(9,16,35,0.35);
+  position:relative;
+  backdrop-filter: blur(8px);
+}
+
+/* avatar bulat di atas kartu */
+.login-card.lg-card::before{
+  content:"";
+  position:absolute;
+  top:-44px; left:50%; transform:translateX(-50%);
+  width:96px; height:96px; border-radius:50%;
+  background:#0f2444;
+  border:4px solid rgba(255,255,255,0.65);
+  box-shadow: 0 16px 34px rgba(0,0,0,0.35);
+}
+
+/* ikon user putih di tengah avatar */
+.login-card.lg-card::after{
+  content:"";
+  position:absolute;
+  top:-14px; left:50%; transform:translateX(-50%);
+  width:36px; height:36px;
+  background:#fff;
+  -webkit-mask: url('data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="black" d="M12 12c2.76 0 5-2.69 5-6s-2.24-6-5-6-5 2.69-5 6 2.24 6 5 6zm0 2c-3.86 0-7 3.14-7 7h2c0-2.76 2.24-5 5-5s5 2.24 5 5h2c0-3.86-3.14-7-7-7z"/></svg>') center/100% 100% no-repeat;
+          mask: url('data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="black" d="M12 12c2.76 0 5-2.69 5-6s-2.24-6-5-6-5 2.69-5 6 2.24 6 5 6zm0 2c-3.86 0-7 3.14-7 7h2c0-2.76 2.24-5 5-5s5 2.24 5 5h2c0-3.86-3.14-7-7-7z"/></svg>') center/100% 100% no-repeat;
+}
+
+/* sembunyikan gambar/svg besar bawaan login lama */
+.login-card.lg-card img,
+.login-card.lg-card svg { display:none !important; }
+
+/* ratakan struktur form apapun jadi blok vertikal rapi */
+.login-card.lg-card form,
+.login-card.lg-card .form,
+.login-card.lg-card table{ width:100%; display:block; margin:12px 0 0; }
+.login-card.lg-card table tr, .login-card.lg-card table td{ display:block; width:100%; }
+.login-card.lg-card table td:first-child{ display:none; } /* sembunyikan label kiri lama */
+
+/* grup input (kotak ikon navy + field biru gelap) */
+.login-card.lg-card input[type="text"],
+.login-card.lg-card input[type="email"],
+.login-card.lg-card input[type="password"]{
+  appearance:none; -webkit-appearance:none;
+  width:100%; height:56px; box-sizing:border-box;
+  margin:14px 0; padding-left:66px; padding-right:14px;
+  border-radius:6px; border:0;
+  background:#2a3e63; color:#e8edf7; font-size:15.5px;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.08);
+  outline:none;
+  position:relative;
+}
+
+/* kotak ikon navy di kiri */
+.login-card.lg-card input[type="text"],
+.login-card.lg-card input[type="email"],
+.login-card.lg-card input[type="password"]{
+  background-image:
+    linear-gradient(#0f2444,#0f2444), /* kotak */
+    url('data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-3.859 0-7 3.14-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.86-3.141-7-7-7z"/></svg>');
+  background-repeat:no-repeat,no-repeat;
+  background-size:46px 56px, 18px 18px;
+  background-position:14px 50%, 36px 50%;
+}
+.login-card.lg-card input[type="password"]{
+  background-image:
+    linear-gradient(#0f2444,#0f2444),
+    url('data:image/svg+xml;utf8,\
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17 8V7a5 5 0 10-10 0v1H5v14h14V8h-2zm-8 0V7a3 3 0 016 0v1H9zm3 9a2 2 0 110-4 2 2 0 010 4z"/></svg>');
+  background-repeat:no-repeat,no-repeat;
+  background-size:46px 56px, 18px 18px;
+  background-position:14px 50%, 36px 50%;
+}
+
+/* placeholder lebih kontras */
+.login-card.lg-card input::placeholder{ color:#cdd5e1; }
+
+/* baris kecil: remember & forgot */
+.login-card.lg-card .minor{
+  display:flex; align-items:center; justify-content:space-between;
+  margin:12px 2px 6px; font-size:13px; color:#c8d3ea;
+}
+.login-card.lg-card a{ color:#e7eeff; text-decoration:none; opacity:.9; }
+.login-card.lg-card a:hover{ opacity:1; text-decoration:underline; }
+
+/* tombol LOGIN: dibuat sebagai “base” di bawah kartu */
+.login-card.lg-card input[type="submit"],
+.login-card.lg-card button[type="submit"],
+.login-card.lg-card .btn-login{
+  width:min(92vw, 420px);
+  height:54px; margin:22px auto 0; display:block;
+  border-radius:18px;
+  background: linear-gradient(180deg, #ffffff 0%, #eaeef9 100%);
+  color:#0d1a33; font-weight:700; letter-spacing:.18em;
+  border:0; box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+}
+
+/* kecilkan checkbox */
+.login-card.lg-card input[type="checkbox"]{ width:16px; height:16px; margin-right:6px; }
+
+/* utility: kalau teks “Remember me / Forgot Password?” terpisah,
+   bungkus manual lewat CSS grid ringan (tidak wajib ada) */
+.login-card.lg-card .minor,
+.login-card.lg-card .remember-row{
+  display:flex; gap:10px; align-items:center; justify-content:space-between;
+}
+
+/* responsif */
+@media (max-width:420px){
+  .login-card.lg-card{ width:min(94vw, 480px); margin: 8vh auto 9vh; padding: 22px 18px; }
+  .login-card.lg-card input[type="submit"],
+  .login-card.lg-card button[type="submit"],
+  .login-card.lg-card .btn-login{ width:min(94vw, 420px); }
+}
