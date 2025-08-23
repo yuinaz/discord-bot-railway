@@ -1,30 +1,16 @@
 services:
   - type: web
-    name: satpambot
+    name: satpambot-dashboard
     env: python
+    region: singapore
     plan: free
-    region: singapore            # ganti bila perlu
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app -b 0.0.0.0:$PORT -w 2 --threads 8 --timeout 120
     autoDeploy: true
-    healthCheckPath: /healthz
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
-      - key: PORT
-        value: 10000
-      - key: TZ
-        value: Asia/Jakarta
-      - key: RUN_BOT           # bot jalan di thread background
-        value: "1"
-      - key: DISABLE_EVENTLET  # hindari eventlet pada Flask-SocketIO (sumber klasik stuck)
-        value: "1"
-      - key: SOCKETIO_ASYNC_MODE
-        value: threading
-      # ----- tambahkan env lainmu di bawah ini (token dsb) -----
-      # - key: DISCORD_TOKEN
-      #   sync: false
-      # - key: LOG_CHANNEL_ID
-      #   value: "1400375184048787566"
-
-    buildCommand: |
-      if [ -f scripts/build_render.sh ]; then bash scripts/build_render.sh; else pip install -r requirements.txt; fi
-    startCommand: python main.py
+      - key: METRICS_INGEST_TOKEN
+        generateValue: true
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATA_DIR
+        value: /opt/render/project/data
