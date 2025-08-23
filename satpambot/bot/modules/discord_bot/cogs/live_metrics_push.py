@@ -1,96 +1,84 @@
-# Push live metrics to dashboard store every N seconds.
+# satpambot/bot/modules/discord_bot/cogs/live_metrics_push.py
 from __future__ import annotations
 
-import os
 import asyncio
 from datetime import datetime, timezone, timedelta
-
+from discord.ext import commands, tasks
 import discord
-from discord.ext import tasks, commands
 
-try:
-    import psutil
-except Exception:
-    psutil = None
+TZ_WIB = timezone(timedelta(hours=7), name="WIB")
 
-# Defaults; override via ENV
-GUILD_ID_DEFAULT = int(os.environ.get("SATPAMBOT_METRICS_GUILD_ID", "761163966030151701"))
-INTERVAL_DEFAULT_SEC = int(os.environ.get("SATPAMBOT_METRICS_INTERVAL", "60"))
-
-# WIB (UTC+7)
-WIB = timezone(timedelta(hours=7), name="WIB")
-
+def _status_online(status: discord.Status) -> bool:
+    return status in (discord.Status.online, discord.Status.idle, discord.Status.dnd)
 
 class LiveMetricsPush(commands.Cog):
-    """Collect & publish live metrics to satpambot.dashboard.live_store.STATS."""
-
-    def __init__(self, bot: commands.Bot) -> None:
+    """Single-process: langsung update satpambot.dashboard.live_store.STATS."""
+    def __init__(self, bot: commands.Bot, interval: int = 30):
         self.bot = bot
-        self.loop_task.start()
+        self.push_loop.change_interval(seconds=max(5, interval))
+        self.push_loop.start()
 
-    def cog_unload(self) -> None:
-        try:
-            self.loop_task.cancel()
-        except Exception:
-            pass
+    def cog_unload(self):
+        self.push_loop.cancel()
 
-    @tasks.loop(seconds=INTERVAL_DEFAULT_SEC)
-    async def loop_task(self) -> None:
-        guild = None
-        try:
-            guild = self.bot.get_guild(GUILD_ID_DEFAULT) or await self.bot.fetch_guild(GUILD_ID_DEFAULT)
-        except Exception:
-            guild = None
+    def _collect(self) -> dict:
+        guilds = len(self.bot.guilds)
+        members = 0
+        online  = 0
+        channels= 0
+        threads = 0
 
-        member_count = 0
-        online_count = 0
-
-        if guild is not None:
+        for g in self.bot.guilds:
             try:
-                member_count = int(getattr(guild, "member_count", 0) or 0)
-                if getattr(guild, "chunked", False) and hasattr(guild, "members"):
-                    online_count = sum(
-                        1 for m in guild.members
-                        if getattr(m, "status", discord.Status.offline) != discord.Status.offline
-                    )
+                members += int(getattr(g, "member_count", 0) or 0)
+            except Exception:
+                pass
+            try:
+                channels += len(g.channels)
+            except Exception:
+                pass
+            try:
+                threads += len(getattr(g, "threads", []) or [])
+            except Exception:
+                pass
+            try:
+                for m in getattr(g, "members", []):
+                    if _status_online(getattr(m, "status", discord.Status.offline)):
+                        online += 1
             except Exception:
                 pass
 
         latency_ms = int((self.bot.latency or 0.0) * 1000)
-
-        cpu = 0.0
-        ram = 0.0
-        if psutil is not None:
-            try:
-                cpu = float(psutil.cpu_percent(interval=None))
-            except Exception:
-                cpu = 0.0
-            try:
-                proc = psutil.Process()
-                ram = float(proc.memory_info().rss) / (1024 * 1024)
-            except Exception:
-                ram = 0.0
-
-        payload = {
-            "member_count": member_count,
-            "online_count": online_count,
+        return {
+            "guilds": guilds,
+            "members": members,
+            "online": online,
+            "channels": channels,
+            "threads": threads,
             "latency_ms": latency_ms,
-            "cpu": cpu,
-            "ram": ram,
-            "ts": datetime.now(WIB).isoformat(timespec="seconds"),
         }
 
+    @tasks.loop(seconds=30)
+    async def push_loop(self):
+        payload = self._collect()
         try:
             from satpambot.dashboard import live_store as _ls  # type: ignore
-            _ls.STATS = payload
-        except Exception:
-            pass
+            _ls.STATS = {
+                **payload,
+                "ts": int(datetime.now(TZ_WIB).timestamp()),
+            }
+            # print("[metrics] live_store update OK")  # optional log
+        except Exception as e:
+            print(f"[metrics] live_store error: {e}")
 
-    @loop_task.before_loop
-    async def _before_loop(self) -> None:
+    @push_loop.before_loop
+    async def _before(self):
         await self.bot.wait_until_ready()
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
 
-
-async def setup(bot: commands.Bot) -> None:
+# Loader kompatibel
+async def setup(bot: commands.Bot):
     await bot.add_cog(LiveMetricsPush(bot))
+
+def setup(bot: commands.Bot):
+    bot.add_cog(LiveMetricsPush(bot))
