@@ -1,5 +1,4 @@
 
-import satpambot.dashboard.log_mute_healthz  # noqa: F401
 from __future__ import annotations
 import os, time, json
 from pathlib import Path
@@ -215,9 +214,3 @@ def api_bans_fallback():
         when = x.get("when") or ""
         out.append({"user": user, "user_id": uid, "when_str": when})
     return jsonify(out)
-
-@bp.get("/security")
-def security():
-    from flask import current_app, render_template
-    cfg = current_app.config.get("UI_CFG") or {}
-    return render_template("security.html", title="Security", cfg=cfg)
