@@ -174,3 +174,14 @@ def register_webui_builtin(app):
         return redirect("/dashboard/security")
 
 __all__ = ["bp", "bp_theme", "register_webui_builtin"]
+
+
+@bp.get("/dashboard/api/metrics")
+def dashboard_metrics():
+    from flask import jsonify
+    try:
+        from satpambot.dashboard import live_store as _ls
+        data = getattr(_ls, "STATS", {}) or {}
+        return jsonify(data)
+    except Exception:
+        return jsonify({"member_count": 0, "online_count": 0, "latency_ms": 0, "cpu": 0.0, "ram": 0.0})
