@@ -7,7 +7,7 @@ html, body {
               #0b1220;
   color: #e5e7eb;
 }
-/* MODE A: bila ada .lg-card (tetap didukung) */
+/* MODE A: support wrapper .lg-card (jika ada) */
 .login-card.lg-card {
   box-sizing: border-box; width: min(92vw, 420px);
   margin: 9vh auto; padding: 28px 24px 22px;
@@ -27,7 +27,7 @@ html, body {
   mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-3.859 0-7 3.14-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.86-3.141-7-7-7z"/></svg>') center / contain no-repeat;
   background:#fff;
 }
-/* MODE B: bila TIDAK ada .lg-card → form lama dipaksa jadi kartu */
+/* MODE B: TANPA wrapper → paksa FORM lama jadi kartu */
 body form {
   box-sizing: border-box; width: min(92vw, 420px);
   margin: 12vh auto; padding: 28px 24px 22px;
@@ -46,8 +46,9 @@ body form::after{
   mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 12c2.761 0 5-2.686 5-6s-2.239-6-5-6-5 2.686-5 6 2.239 6 5 6zm0 2c-3.859 0-7 3.14-7 7h2c0-2.761 2.239-5 5-5s5 2.239 5 5h2c0-3.86-3.141-7-7-7z"/></svg>') center / contain no-repeat;
   background:#fff;
 }
+/* ratakan layout lawas */
 body form table, body form tr, body form td { display:block; width:100%; }
-body form td:first-child { display:none; } /* sembunyikan label/ikon lama */
+body form td:first-child { display:none; }
 body form input[type="text"], body form input[type="password"], body form input[type="email"]{
   width:100%; height:44px; margin:10px 0; padding:0 14px 0 46px;
   border-radius:10px; border:1px solid rgba(255,255,255,0.18);
@@ -75,7 +76,7 @@ body form input[type="submit"], body form button[type="submit"], .btn-login{
   box-shadow: 0 10px 24px rgba(59,130,246,0.35); cursor:pointer;
 }
 body form input[type="checkbox"]{ width:16px; height:16px; vertical-align:middle; margin-right:6px; }
-/* SEMBUNYIKAN gambar/svg raksasa di login lama */
+/* sembunyikan gambar/svg raksasa di login lama */
 body img, body svg { display:none !important; }
 @media (max-width:380px){
   .login-card.lg-card, body form { margin: 6vh auto; padding: 22px 18px; }
