@@ -249,9 +249,5 @@ if __name__ == "__main__":
 
 
 # --- added by patch v13: simple health check route ---
-@app.route('/healthz')
-def healthz():
-    return 'ok', 200
-
 # auto-register v13
 register_phish_routes(app)
