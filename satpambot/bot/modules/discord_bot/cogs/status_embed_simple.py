@@ -121,6 +121,3 @@ class StatusEmbedSimple(commands.Cog):
 # loader kompatibel
 async def setup(bot: commands.Bot):
     await bot.add_cog(StatusEmbedSimple(bot))
-
-def setup(bot: commands.Bot):
-    bot.add_cog(StatusEmbedSimple(bot))

@@ -79,6 +79,3 @@ class LiveMetricsPush(commands.Cog):
 # Loader kompatibel
 async def setup(bot: commands.Bot):
     await bot.add_cog(LiveMetricsPush(bot))
-
-def setup(bot: commands.Bot):
-    bot.add_cog(LiveMetricsPush(bot))
