@@ -1,42 +1,56 @@
-
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Login</title>
   <link rel="stylesheet" href="/dashboard-static/css/login_exact.css">
-  {% if cfg.apply_to_login %}
-    <link rel="stylesheet" href="/dashboard-theme/{{cfg.theme}}/theme.css">
-  {% endif %}
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="login-bg">
-  <div class="login-wrap">
-    <div class="login-card">
-      <div class="avatar"><img src="{{ cfg.logo_url or '/dashboard-static/logo.svg' }}" alt="logo"></div>
-      <form method="post" class="login-form">
-        <label class="input-row">
-          <span class="icon">👤</span>
-          <input type="text" name="username" placeholder="Username" required>
-        </label>
-        <label class="input-row">
-          <span class="icon">🔒</span>
-          <input type="password" name="password" placeholder="Password" required>
-        </label>
-        <div class="opts">
-          <label><input type="checkbox" name="remember"> Remember me</label>
-          <a class="muted" href="#" onclick="alert('Use admin credentials');return false;">Forgot Password?</a>
-        </div>
-        <button class="btn-primary" type="submit">LOGIN</button>
-      </form>
-      <div class="login-footer">
-        <a href="/" class="muted">Kembali</a>
-        <span class="spacer"></span>
-        <a href="/dashboard" class="muted">Home</a>
+<body class="login-body">
+  <div class="login-bg"></div>
+
+  <main class="login-wrap">
+    <!-- Card -->
+    <section class="login-card lg-card">
+      <!-- Avatar overlap -->
+      <div class="avatar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" /></svg>
       </div>
-      <div class="shadow-tab"></div>
-    </div>
-  </div>
-<!-- lg-card -->
+
+      <!-- Form -->
+      <form class="login-form" method="post" action="/dashboard/login">
+        <!-- Email row -->
+        <div class="input-row">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          </div>
+          <input type="text" name="username" placeholder="Email ID" autocomplete="username" required>
+        </div>
+
+        <!-- Password row -->
+        <div class="input-row">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="10" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          </div>
+          <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+        </div>
+
+        <!-- Options -->
+        <div class="opts">
+          <label class="remember">
+            <input type="checkbox" name="remember" value="1"><span>Remember me</span>
+          </label>
+          <a class="muted" href="#">Forgot Password?</a>
+        </div>
+
+        <!-- Shelf + Button -->
+        <div class="shelf">
+          <button class="btn-login" type="submit">LOGIN</button>
+        </div>
+      </form>
+    </section>
+  </main>
 </body>
 </html>
