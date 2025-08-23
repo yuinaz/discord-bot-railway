@@ -1,74 +1,97 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "== SatpamBot GitHub Cleanup Kit v1 =="
+echo "== GitHub Cleanup Mini v2 =="
 
+# 0) Sanity: jalankan dari root repo (harus ada folder satpambot/)
 test -d "satpambot" || { echo "!! Jalankan dari root repo (harus ada folder satpambot)"; exit 1; }
 
-python - <<'PY'
-import shutil, pathlib
-src = pathlib.Path("patch")/"satpambot"
-dst = pathlib.Path("satpambot")
-files = [
-  "dashboard/static/css/login_exact.css",
-  "dashboard/themes/gtake/templates/login.html",
-  "dashboard/templates/security.html",
-  "bot/modules/discord_bot/cogs/live_metrics_push.py",
-  "bot/modules/discord_bot/cogs/sticky_status.py",
-  "dashboard/log_mute_healthz.py",
-]
-for rel in files:
-  s = src / rel
-  d = dst / rel
-  d.parent.mkdir(parents=True, exist_ok=True)
-  shutil.copy2(s, d)
-  print("[copy]", rel)
-PY
+# 1) Bersihkan folder staging / artefak patch lokal
+rm -rf .patch_v5 .v5opatch .v5patch 2>/dev/null || true
 
+# 2) Nonaktifkan legacy sticky (hindari dobel)
 for f in \
   "satpambot/bot/modules/discord_bot/cogs/status_sticky_patched.py" \
   "satpambot/bot/modules/discord_bot/cogs/sticky_guard.py"
 do
-  if [ -f "$f" ]; then
+  if [ -f "$f" ] && [ ! -f "$f.disabled" ]; then
     mv -f "$f" "$f.disabled"
     echo "[rename] $f -> $f.disabled"
   fi
 done
 
-if git ls-files --error-unmatch login.html.patch >/dev/null 2>&1; then
-  git rm -f login.html.patch
-  echo "[git rm] login.html.patch"
-else
-  rm -f login.html.patch 2>/dev/null || true
+# 3) Hapus patch artefak login kalau ada
+for f in login.html.patch login.html.rej login.html.orig; do
+  if [ -f "$f" ]; then
+    rm -f "$f"
+    echo "[rm] $f"
+  fi
+done
+
+# 4) Pastikan .gitignore, .gitattributes, .editorconfig sehat (append jika belum ada)
+append_unique () {
+  local file="$1" line="$2"
+  touch "$file"
+  grep -qxF "$line" "$file" || echo "$line" >> "$file"
+}
+
+# .gitignore (tambahkan beberapa pola aman)
+append_unique ".gitignore" "__pycache__/"
+append_unique ".gitignore" "*.py[cod]"
+append_unique ".gitignore" ".env"
+append_unique ".gitignore" ".env.*"
+append_unique ".gitignore" ".patch_v5"
+append_unique ".gitignore" "*.bak"
+append_unique ".gitignore" "*.tmp"
+append_unique ".gitignore" ".DS_Store"
+
+# .gitattributes (normalisasi EOL)
+append_unique ".gitattributes" "* text=auto eol=lf"
+
+# .editorconfig (minimal)
+if [ ! -f ".editorconfig" ]; then
+  cat > .editorconfig <<'EC'
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+EC
+  echo "[write] .editorconfig"
 fi
 
-python - <<'PY'
-from pathlib import Path
-p = Path("satpambot/dashboard/webui.py")
-txt = p.read_text(encoding="utf-8")
-orig = txt
-imp = "import satpambot.dashboard.log_mute_healthz  # noqa: F401"
-if imp not in txt:
-    lines = txt.splitlines()
-    lines.insert(1, imp)
-    txt = "\n".join(lines)
-sec_def = '@bp.get("/security")'
-if sec_def not in txt:
-    txt += "\n\n@bp.get(\"/security\")\ndef security():\n    from flask import current_app, render_template\n    cfg = current_app.config.get(\"UI_CFG\") or {}\n    return render_template(\"security.html\", title=\"Security\", cfg=cfg)\n"
-met_def = '@bp.get("/dashboard/api/metrics")'
-if met_def not in txt:
-    txt += "\n\n@bp.get(\"/dashboard/api/metrics\")\ndef dashboard_metrics():\n    from flask import jsonify\n    try:\n        from satpambot.dashboard import live_store as _ls\n        data = getattr(_ls, \"STATS\", {}) or {}\n        return jsonify(data)\n    except Exception:\n        return jsonify({\"member_count\": 0, \"online_count\": 0, \"latency_ms\": 0, \"cpu\": 0.0, \"ram\": 0.0})\n"
-if txt != orig:
-    Path(str(p)+".bak").write_text(orig, encoding="utf-8")
-    p.write_text(txt, encoding="utf-8")
-    print("[patch] webui.py updated (+ .bak)")
-else:
-    print("[patch] webui.py unchanged")
-PY
-
-if [ -f "requirements.txt" ] && ! grep -qi '^psutil' requirements.txt; then
-  echo "psutil>=5.9" >> requirements.txt
-  echo "[req] psutil added"
+# 5) Tambahkan workflow CI smoketest jika belum ada
+mkdir -p .github/workflows
+if [ ! -f ".github/workflows/smoketest.yml" ]; then
+  cat > .github/workflows/smoketest.yml <<'YML'
+name: smoketest
+on:
+  push: { branches: [ main ] }
+  pull_request: { branches: [ main ] }
+jobs:
+  smoketest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
+          pip install flask psutil
+      - name: Compile syntax
+        run: python -m compileall -q .
+      - name: Run smoketest script if exists
+        run: |
+          if [ -f scripts/smoketest_all.py ]; then python scripts/smoketest_all.py; else echo "no smoketest_all.py"; fi
+YML
+  echo "[write] .github/workflows/smoketest.yml"
 fi
 
-echo "== Cleanup done. Commit recommended =="
+echo "== Done. Selanjutnya: git add -A && git commit -m 'repo: cleanup mini v2' && git push =="

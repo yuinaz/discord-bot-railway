@@ -1,56 +1,64 @@
+{% set title = "Login" %}
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login</title>
-  <link rel="stylesheet" href="/dashboard-static/css/login_exact.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{ title }} — SatpamBot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('dashboard.static', filename='css/login_exact.css') }}{% if cache_bust %}?v={{ cache_bust }}{% endif %}">
 </head>
-<body class="login-body">
-  <div class="login-bg"></div>
+<body class="login-bg">
+  <div class="login-wrap">
+    <div class="avatar-circle" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28">
+        <circle cx="12" cy="8" r="4" fill="currentColor" opacity="0.9"/>
+        <path d="M4 20c0-4 4-6 8-6s8 2 8 6" fill="currentColor" opacity="0.9"/>
+      </svg>
+    </div>
 
-  <main class="login-wrap">
-    <!-- Card -->
-    <section class="login-card lg-card">
-      <!-- Avatar overlap -->
-      <div class="avatar">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6" /></svg>
-      </div>
-
-      <!-- Form -->
-      <form class="login-form" method="post" action="/dashboard/login">
-        <!-- Email row -->
+    <div class="card glass">
+      <form method="post" action="">
         <div class="input-row">
-          <div class="icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-          </div>
-          <input type="text" name="username" placeholder="Email ID" autocomplete="username" required>
+          <span class="icon">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" fill="currentColor"/>
+            </svg>
+          </span>
+          <input name="username" id="username" placeholder="Email ID" autocomplete="username" required>
         </div>
 
-        <!-- Password row -->
         <div class="input-row">
-          <div class="icon">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="10" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
-          </div>
-          <input type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+          <span class="icon">
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path d="M17 8h-1V6A4 4 0 0 0 8 6v2H7a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1Zm-7-2a2 2 0 0 1 4 0v2H10Z" fill="currentColor"/>
+            </svg>
+          </span>
+          <input type="password" name="password" id="password" placeholder="Password" autocomplete="current-password" required>
         </div>
 
-        <!-- Options -->
-        <div class="opts">
+        <div class="row between">
           <label class="remember">
-            <input type="checkbox" name="remember" value="1"><span>Remember me</span>
+            <input type="checkbox" name="remember" value="1"> Remember me
           </label>
-          <a class="muted" href="#">Forgot Password?</a>
+          <a class="muted small" href="#" tabindex="-1">Forgot Password?</a>
         </div>
 
-        <!-- Shelf + Button -->
-        <div class="shelf">
-          <button class="btn-login" type="submit">LOGIN</button>
-        </div>
+        {% if error %}
+          <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <button class="btn-primary" type="submit">LOGIN</button>
       </form>
-    </section>
-  </main>
+    </div>
+  </div>
+
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
 </body>
 </html>
