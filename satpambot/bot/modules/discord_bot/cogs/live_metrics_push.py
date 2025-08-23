@@ -1,82 +1,125 @@
 
-# -*- coding: utf-8 -*-
-from __future__ import annotations
-import time, math, asyncio
-from typing import Dict, Tuple
+import os, asyncio, json, time, tempfile, logging
+from typing import Dict, Any, Optional
+
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks, commands
 
-def _lat_ms(bot)->int:
+log = logging.getLogger(__name__)
+
+GUILD_ID_DEFAULT = 761163966030151701  # LeinDiscord
+INTERVAL_DEFAULT_SEC = int(os.environ.get("SATPAMBOT_METRICS_INTERVAL", "60"))
+
+def _stats_file() -> str:
+    return os.environ.get("SATPAMBOT_LIVE_STATS_FILE",
+                          os.path.join(tempfile.gettempdir(), "satpambot_live_stats.json"))
+
+def _atomic_write(path: str, data: Dict[str, Any]) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+def _safe_psutil() -> Dict[str, Any]:
     try:
-        v = float(getattr(bot,'latency',0.0) or 0.0)
-        if not math.isfinite(v) or v<0: return 0
-        return int(v*1000.0)
+        import psutil
+        cpu = psutil.cpu_percent(interval=None)
+        mem = psutil.virtual_memory().percent
+        return {"cpu": cpu, "ram": mem}
     except Exception:
-        return 0
+        return {"cpu": 0.0, "ram": 0.0}
 
-async def _rest_counts(bot)->Tuple[int,int]:
-    mem=onl=0
-    for g in list(bot.guilds):
-        try:
-            fg = await bot.fetch_guild(g.id, with_counts=True)
-            mem += int(getattr(fg,"approximate_member_count",0) or 0)
-            onl += int(getattr(fg,"approximate_presence_count",0) or 0)
-        except Exception: pass
-        await asyncio.sleep(0)
-    return mem,onl
-
-def _cache_counts(bot)->Tuple[int,int]:
-    mem=onl=0
-    for g in list(bot.guilds):
-        mc = getattr(g,"member_count",None)
-        if isinstance(mc,int): mem += max(0,mc)
-        try:
-            onl += sum(1 for m in g.members if getattr(m,"status",discord.Status.offline)!=discord.Status.offline)
-        except Exception: pass
-    return mem,onl
-
-async def snapshot(bot)->Dict[str,int]:
-    guilds = len(bot.guilds)
-    try: channels=sum(len(g.channels) for g in bot.guilds)
-    except Exception: channels=0
-    try: threads=sum(len(getattr(g,"threads",[])) for g in bot.guilds)
-    except Exception: threads=0
-
-    mem,onl = _cache_counts(bot)
-    if mem==0 or onl==0:
-        rmem,ronl = await _rest_counts(bot)
-        mem=max(mem,rmem); onl=max(onl,ronl)
-
-    return {"guilds":guilds,"members":mem,"online":onl,"channels":channels,"threads":threads,"latency_ms":_lat_ms(bot),"updated":int(time.time())}
+def _pick_primary_guild(bot: commands.Bot) -> Optional[discord.Guild]:
+    gid_env = os.environ.get("SATPAMBOT_METRICS_GUILD_ID") or os.environ.get("GUILD_ID")
+    gid = None
+    if gid_env:
+        try: gid = int(gid_env)
+        except Exception: gid = None
+    if gid is None:
+        gid = GUILD_ID_DEFAULT
+    g = bot.get_guild(gid) if gid else None
+    if g: return g
+    best, best_n = None, -1
+    for gg in bot.guilds:
+        n = getattr(gg, "member_count", 0) or 0
+        if n > best_n: best, best_n = gg, n
+    return best
 
 class LiveMetricsPush(commands.Cog):
-    def __init__(self, bot:commands.Bot)->None:
-        self.bot=bot
-        self._last_rest=0.0
-        self._loop.start()
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self._started = False
+        self.push_loop.change_interval(seconds=INTERVAL_DEFAULT_SEC)
 
-    @tasks.loop(seconds=5.0)
-    async def _loop(self)->None:
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self._started:
+            self._started = True
+            gids = [g.id for g in self.bot.guilds]
+            log.info("[live_metrics] loop=%ss guilds=%s default_gid=%s",
+                     INTERVAL_DEFAULT_SEC, gids, GUILD_ID_DEFAULT)
+            self.push_loop.start()
+
+    @tasks.loop(seconds=60.0)
+    async def push_loop(self):
+        await self.bot.wait_until_ready()
+        g = _pick_primary_guild(self.bot)
+
+        member_total = int(getattr(g, "member_count", 0) or 0) if g else 0
+
+        online = 0
         try:
-            snap = await snapshot(self.bot)
-            # find setter
-            app = getattr(self.bot,"_flask_app",None)
-            set_fn = None
-            if app and hasattr(app.config,"get"):
-                set_fn = app.config.get("set_stats_fn")
-            if not set_fn:
-                # fallback import
-                try:
-                    from satpambot.dashboard.live_store import set_stats as set_fn  # type: ignore
-                except Exception:
-                    set_fn=None
-            if set_fn: set_fn(snap)
-        except Exception as e:
-            print("[live_metrics] WARN:", repr(e))
+            if g and any(True for _m in g.members):
+                online = sum(1 for m in g.members if str(getattr(m, "status", "offline")) != "offline")
+        except Exception:
+            online = 0
 
-    @_loop.before_loop
-    async def _before(self)->None:
+        sysm = _safe_psutil()
+        latency_ms = int((getattr(self.bot, "latency", 0.0) or 0.0) * 1000)
+
+        payload = {
+            "ts": int(time.time()),
+            "guild_id": g.id if g else None,
+            "member_count": member_total,
+            "online_count": int(online),
+            "latency_ms": latency_ms,
+            "cpu": float(sysm.get("cpu", 0.0)),
+            "ram": float(sysm.get("ram", 0.0)),
+        }
+
+        pushed = False
+        try:
+            from satpambot.dashboard import live_store as _ls  # type: ignore
+            for name in ("update_stats", "write_stats", "set_stats", "set", "publish_stats"):
+                fn = getattr(_ls, name, None)
+                if callable(fn):
+                    try:
+                        fn(payload)
+                        pushed = True
+                        break
+                    except Exception as e:
+                        log.debug("live_store.%s failed: %s", name, e)
+            if not pushed:
+                try:
+                    setattr(_ls, "STATS", payload)
+                    pushed = True
+                except Exception:
+                    pass
+        except Exception as e:
+            log.debug("live_store import not available: %s", e)
+
+        if not pushed:
+            try:
+                _atomic_write(_stats_file(), payload)
+                pushed = True
+            except Exception as e:
+                log.warning("failed writing live stats file: %s", e)
+
+        log.debug("[live_metrics] pushed: %s", payload)
+
+    @push_loop.before_loop
+    async def before_loop(self):
         await self.bot.wait_until_ready()
 
-async def setup(bot: commands.Bot)->None:
+async def setup(bot: commands.Bot):
     await bot.add_cog(LiveMetricsPush(bot))
