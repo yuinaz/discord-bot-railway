@@ -601,6 +601,37 @@ def register_webui_builtin(app: Flask):
     if not app.secret_key:
         app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
 
+    # ====== 1) Jangan tulis log untuk /healthz & /uptime (dev server / werkzeug) ======
+    @app.before_request
+    def _mute_healthz_logs():
+        try:
+            if request.path in ("/healthz", "/uptime"):
+                # minta werkzeug skip log utk request ini
+                request.environ["werkzeug.skip_log"] = True
+        except Exception:
+            pass
+
+    # ====== 2) Pasang filter logger utk akses log (werkzeug & gunicorn) ======
+    def _install_healthz_log_silencer():
+        try:
+            import logging
+            class _HealthzFilter(logging.Filter):
+                def filter(self, record):
+                    try:
+                        msg = record.getMessage()
+                    except Exception:
+                        return True
+                    # drop baris log yang memuat /healthz atau /uptime
+                    return ("/healthz" not in msg) and ("/uptime" not in msg)
+            for name in ("werkzeug", "gunicorn.access"):
+                logging.getLogger(name).addFilter(_HealthzFilter())
+        except Exception:
+            pass
+
+    if not getattr(app, "_healthz_filter_installed", False):
+        _install_healthz_log_silencer()
+        app._healthz_filter_installed = True
+
     @app.get("/")
     def _root_redirect():
         return redirect("/dashboard")
