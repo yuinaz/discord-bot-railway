@@ -22,3 +22,12 @@ env/
 .DS_Store
 Thumbs.db
 
+
+# === auto-appended v13 ===
+*.log
+*.zip
+*.bak
+__pycache__/
+.venv/
+venv/
+.DS_Store

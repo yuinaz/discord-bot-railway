@@ -1,3 +1,4 @@
+from satpambot.dashboard.phish_api import register_phish_routes
 
 # app.py — robust entry for SatpamBot Dashboard
 from __future__ import annotations
@@ -245,3 +246,12 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=port, debug=False)
 
 
+
+
+# --- added by patch v13: simple health check route ---
+@app.route('/healthz')
+def healthz():
+    return 'ok', 200
+
+# auto-register v13
+register_phish_routes(app)
