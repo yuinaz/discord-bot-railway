@@ -52,7 +52,7 @@ def login_get():
 <html>
   <head>
     <meta charset="utf-8">
-    <link rel="stylesheet" href="/dashboard-static/css/login_exact.css">
+    <link rel="stylesheet" href="/dashboard-static/css/login_exact.css?v=12">
     <title>Login</title>
   </head>
   <body>
