@@ -110,7 +110,11 @@ class LiveMetricsPush(commands.Cog):
 
         if not pushed:
             try:
-                _atomic_write(_stats_file(), payload)
+                tmp = _stats_file()
+                with open(tmp+".tmp", "w", encoding="utf-8") as f:
+                    import json as _j
+                    _j.dump(payload, f, ensure_ascii=False)
+                os.replace(tmp+".tmp", tmp)
                 pushed = True
             except Exception as e:
                 log.warning("failed writing live stats file: %s", e)
