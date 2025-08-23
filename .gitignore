@@ -1,2 +1,24 @@
 __pycache__/
 .env*
+
+# === CLEANUP KIT (auto-appended) ===
+# Backups / archives
+*.bak
+*.patch
+*.orig
+*.rej
+*.zip
+# Logs & caches
+error.log
+*.log
+__pycache__/
+.pytest_cache/
+.coverage
+# Envs
+venv/
+.venv/
+env/
+# OS junk
+.DS_Store
+Thumbs.db
+
