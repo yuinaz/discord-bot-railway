@@ -13,17 +13,17 @@
     fetch("/dashboard/api/phash/upload", { method: "POST", body: fd })
       .then(r => r.json())
       .then(d => {
-        if (d.error){ show(`<span style="color:#ef4444">${d.error}</span>`); return; }
+        if (d.error){ out.insertAdjacentHTML("afterbegin", `<div class="dz-item" style="color:#ef4444">${d.error}</div>`); return; }
         (d.added || []).forEach(it => {
           const meta = it.filename ? ` <span class="muted">(${it.filename})</span>` : "";
           show(`✔️ <span class="hash">${it.hash}</span>${meta}`);
         });
         if (d.skipped && d.skipped.length){
-          d.skipped.forEach(h => show(`⚠️ skipped (duplicate) <span class="hash">${h}</span>`));
+          d.skipped.forEach(h => show(`⚠️ skipped <span class="hash">${h}</span>`));
         }
         if (typeof d.total === "number"){ show(`<em>Total hashes: ${d.total}</em>`); }
       })
-      .catch(err => show(`<span style="color:#ef4444">Upload failed: ${String(err)}</span>`));
+      .catch(err => out.insertAdjacentHTML("afterbegin", `<div class="dz-item" style="color:#ef4444">Upload failed: ${String(err)}</div>`));
   }
 
   dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("hover"); });
