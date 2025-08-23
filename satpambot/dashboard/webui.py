@@ -605,6 +605,11 @@ def register_webui_builtin(app: Flask):
     def _root_redirect():
         return redirect("/dashboard")
 
+    # >>> Tambahan kecil: top-level /login supaya tidak 404 <<<
+    @app.route("/login", methods=["GET", "HEAD"])
+    def _root_login_redirect():
+        return redirect(url_for("dashboard.login"))
+
     @app.get("/logout")
     def _root_logout():
         session.clear()
@@ -649,7 +654,7 @@ def register_webui_builtin(app: Flask):
             "current_theme": session.get("ui_theme") or "gtake",
         })
 
-    # >>> FIX: support POST /api/ui-config untuk set theme (menghindari 405) <<<
+    # Support POST /api/ui-config agar tidak 405 saat switch theme via POST
     @app.post("/api/ui-config")
     def _ui_config_set():
         cfg = {
