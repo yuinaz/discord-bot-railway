@@ -20,6 +20,7 @@ input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--l
 .uprow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .checkbox{display:flex;gap:8px;align-items:center}
 </style>
+<link rel="stylesheet" href="/dashboard/dashboard-static/css/layout_compact.css">
 </head>
 <body>
 <div class="wrap">
@@ -139,4 +140,6 @@ function showBox(mode){
     document.getElementById('msg').textContent = res && res.ok? '✅ Tersimpan.' : '❌ Gagal menyimpan.';
   };
 })();</script>
+<script src="/dashboard/dashboard-static/js/compact_layout.js"></script>
+<script src="/dashboard/dashboard-static/js/remove_option_button.js"></script>
 </body></html>

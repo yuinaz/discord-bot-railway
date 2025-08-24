@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title or "SatpamBot Dashboard" }}</title>
   <link rel="stylesheet" href="/dashboard-theme/gtake/theme.css">
+  <link rel="stylesheet" href="/dashboard/dashboard-static/css/layout_compact.css">
   <style>
     :root{
       --bg:#0b1220; --panel:#0f172a; --panel-2:#111827; --text:#dbe1ff; --muted:#94a3b8;
@@ -63,5 +64,7 @@
     </main>
   </div>
   {% block body_end %}{% endblock %}
+<script src="/dashboard/dashboard-static/js/compact_layout.js"></script>
+<script src="/dashboard/dashboard-static/js/remove_option_button.js"></script>
 </body>
 </html>
