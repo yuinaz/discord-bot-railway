@@ -140,16 +140,41 @@ def require_login():
 # Render helpers (login.html tetap aman)
 # =============================================================================
 def render_or_fallback(template_name: str, **ctx):
+
     try:
+        # First, try normal Jinja lookup
         return render_template(template_name, **ctx)
     except Exception:
+        # Smart fallback: try theme template file if default missing
+        try:
+            theme = (session.get("ui_theme") or "gtake").strip()
+        except Exception:
+            theme = "gtake"
+        try_paths = []
+        try:
+            try_paths.append(str((HERE / "themes" / theme / "templates" / template_name)))
+        except Exception:
+            pass
+        # also try default templates dir explicitly
+        try_paths.append(str(HERE / "templates" / template_name))
+        for p in try_paths:
+            try:
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8") as fh:
+                        tpl_src = fh.read()
+                    html = render_template_string(tpl_src, **ctx)
+                    return make_response(html, 200)
+            except Exception:
+                pass
+        # Last resort: simple fallback page
         html = f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>{template_name}</title></head>
 <body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:24px">
-  <h2>{template_name}</h2>
+  <h2>{template_name}.html</h2>
   <p>Template <code>{template_name}</code> tidak ditemukan di <code>{TEMPLATES_DIR}</code>.</p>
 </body></html>"""
         return make_response(html, 200)
+
 
 def _inject_html(html: str, snippet: str) -> str:
     # Insert snippet before </body> (case-insensitive). If </body> not found, append.
@@ -555,8 +580,6 @@ def register_webui_builtin(app: Flask):
         app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
 
     # ====== 1) Jangan tulis log untuk /healthz & /uptime (dev server / werkzeug) ======
-    @app.before_request
-
     def _preflight_noop():
         return None
 
