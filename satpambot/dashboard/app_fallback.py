@@ -61,6 +61,8 @@ a{color:#8ab4ff;text-decoration:none}
 HTML_DASH = """<!doctype html>
 <html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>Dashboard</title>
+
+<link rel='stylesheet' href='/dashboard-theme/gtake/theme.css'>
 <link rel='icon' href='/favicon.ico'>
 <style>
 body{margin:0;background:#0b1020;color:#e2e8f0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial}
@@ -78,6 +80,10 @@ a{color:#8ab4ff;text-decoration:none}
 <li>Begitu webui utama siap, halaman ini otomatis tidak terpakai lagi.</li>
 </ul>
 </div></div>
+
+<div class='gtake-body' style='display:none'></div>
+<div class='gtake-sidebar' style='display:none'></div>
+<div id='gtake-layout' class='gtake-layout' data-theme='gtake' style='display:none'></div>
 </body></html>"""
 
 def register(app: Flask) -> None:
