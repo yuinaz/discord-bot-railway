@@ -21,6 +21,18 @@ except Exception:
     def _uptime(): return "OK", 200
     log.warning("[app] fallback Flask app created")
 
+# === APPEND-ONLY: alias /login -> /dashboard/login (cek dulu biar tidak duplikat) ===
+try:
+    from flask import redirect, url_for
+    routes = {r.rule for r in app.url_map.iter_rules()}
+    if "/login" not in routes:
+        @app.get("/login")
+        def __satp_login_alias():
+            return redirect(url_for("dashboard.login"))
+except Exception:
+    pass
+# === END ===
+
 def _run_asyncmaybe(fn):
     if asyncio.iscoroutinefunction(fn):
         asyncio.run(fn())

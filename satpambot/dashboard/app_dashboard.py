@@ -128,3 +128,49 @@ def _register_dashboard_extras(app):
             return {"user": user, "user_id": uid, "when_str": when}
         recs = [norm(r) for r in recs][-limit:]
         return jsonify(recs)
+
+# === SATPAM PATCH (APPEND-ONLY) — jangan hapus kode di atas ===
+import os as _satp_os
+from flask import Response as _satp_Response
+
+def _satp_route_exists(_app, _path: str) -> bool:
+    try:
+        for r in _app.url_map.iter_rules():
+            if r.rule == _path:
+                return True
+    except Exception:
+        pass
+    return False
+
+def _satp_bind_health(_app):
+    # /healthz
+    if not _satp_route_exists(_app, "/healthz"):
+        @_app.route("/healthz", methods=["GET","HEAD"])
+        def __satp_healthz_ok():
+            return _satp_Response(status=200)
+    # /uptime
+    if not _satp_route_exists(_app, "/uptime"):
+        @_app.route("/uptime", methods=["GET","HEAD"])
+        def __satp_uptime_ok():
+            return _satp_Response(status=200)
+    # alias /login -> /dashboard/login (biar gak 404)
+    if not _satp_route_exists(_app, "/login"):
+        @_app.get("/login")
+        def __satp_login_alias():
+            from flask import redirect, url_for
+            return redirect(url_for("dashboard.login"))
+
+# panggil ke instance app yang sudah ada di file kamu
+try:
+    _satp_bind_health(app)
+except NameError:
+    pass
+
+# kalau file ini dijalankan langsung, tetap hormati PORT
+if __name__ == "__main__":
+    try:
+        _satp_port = int(_satp_os.getenv("PORT", "10000"))
+        app.run(host="0.0.0.0", port=_satp_port, debug=False)
+    except Exception:
+        pass
+# === END PATCH ===
