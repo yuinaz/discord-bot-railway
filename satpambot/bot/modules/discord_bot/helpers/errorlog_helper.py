@@ -10,24 +10,39 @@ def _to_int(x:str)->int:
     except Exception: return 0
 
 def _resolve_error_channel(guild: discord.Guild) -> Optional[discord.TextChannel]:
-    cid = _to_int(os.getenv("ERROR_LOG_CHANNEL_ID",""))
-    if cid:
-        ch = guild.get_channel(cid)
-        if isinstance(ch, discord.TextChannel): return ch
-    name = (os.getenv("ERROR_LOG_CHANNEL_NAME","errorlog-bot") or "").strip() or "errorlog-bot"
-    cand = discord.utils.get(guild.text_channels, name=name)
-    if isinstance(cand, discord.TextChannel): return cand
-    return None
-
-async def log_error_embed(guild: discord.Guild, title: str, desc: str):
-    ch = _resolve_error_channel(guild)
-    if not isinstance(ch, discord.TextChannel):
-        log.warning("[errorlog] cannot find error log channel in guild %s", getattr(guild,'name','?'))
-        return False
+    """Resolve error-log channel with robust defaults.
+    Priority:
+      1) ERROR_LOG_CHANNEL_ID (ENV)
+      2) DEFAULT_ERROR_CHANNEL_ID (1404288516195880960)
+      3) By name: ERROR_LOG_CHANNEL_NAME (ENV), else common fallbacks
+    """
+    # 1) ENV ID
     try:
-        emb = discord.Embed(title=title, description=desc, color=0xED4245)
-        await ch.send(embed=emb)
-        return True
-    except Exception as e:
-        log.warning("[errorlog] send failed: %s", e)
-        return False
+        cid_env = os.getenv("ERROR_LOG_CHANNEL_ID", "").strip()
+        if cid_env.isdigit():
+            ch = guild.get_channel(int(cid_env))
+            if isinstance(ch, discord.TextChannel):
+                return ch
+    except Exception:
+        pass
+    # 2) Built-in default ID
+    try:
+        ch = guild.get_channel(DEFAULT_ERROR_CHANNEL_ID)
+        if isinstance(ch, discord.TextChannel):
+            return ch
+    except Exception:
+        pass
+    # 3) Name resolution
+    candidates = [
+        os.getenv("ERROR_LOG_CHANNEL_NAME", "").strip(),
+        "errorlog-bot", "errorlog_bot", "errorlogbot",
+        "error-log-bot", "error-log", "errorlog", "errlog",
+    ]
+    for nm in [c for c in candidates if c]:
+        for tc in getattr(guild, "text_channels", []) or []:
+            try:
+                if isinstance(tc, discord.TextChannel) and tc.name.lower() == nm.lower():
+                    return tc
+            except Exception:
+                continue
+    return None
