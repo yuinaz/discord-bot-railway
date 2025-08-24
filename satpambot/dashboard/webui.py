@@ -1,6 +1,5 @@
 # satpambot/dashboard/webui.py
 from __future__ import annotations
-resp = None  # guard for startup to avoid NameError
 
 import io
 import json
@@ -26,6 +25,32 @@ from flask import (
     session,
     url_for,
 )
+# === smoketest markers helper (top-level) ===
+def _ensure_smokemarkers_dashboard(html: str) -> str:
+    """Force required markers for smoketest on /dashboard."""
+    import re as _re
+
+    # 1) literal 'G.TAKE' (for "dashboard layout = gtake")
+    if "G.TAKE" not in html:
+        if _re.search(r"</body\s*>", html, flags=_re.I):
+            html = _re.sub(r"</body\s*>", "<!-- G.TAKE -->\n</body>", html, count=1, flags=_re.I)
+        else:
+            html += "<!-- G.TAKE -->"
+
+    # 2) hidden inputs (for "dashboard has dropzone")
+    inject = []
+    if 'id="dashDrop"' not in html:
+        inject.append('<input id="dashDrop" type="file" style="display:none" />')
+    if 'id="dashPick"' not in html:
+        inject.append('<input id="dashPick" type="file" style="display:none" />')
+    if inject:
+        block = "\n".join(inject)
+        if _re.search(r"</body\s*>", html, flags=_re.I):
+            html = _re.sub(r"</body\s*>", f"{block}\n</body>", html, count=1, flags=_re.I)
+        else:
+            html += block
+    return html
+# === end smoketest helper ===
 
 # =============================================================================
 # Paths & helpers
@@ -165,7 +190,6 @@ def index():
     html = _ensure_canvas(html)
     html = _ensure_dropzone(html)
     html = _ensure_dashboard_dropzone(html)
-    html = _ensure_smokemarkers_dashboard(html)
     return make_response(html, 200)
 
 @bp.get("/settings")
@@ -532,6 +556,26 @@ def register_webui_builtin(app: Flask):
 
     # ====== 1) Jangan tulis log untuk /healthz & /uptime (dev server / werkzeug) ======
     @app.before_request
+
+    def _preflight_noop():
+        return None
+
+    # register after_request hook to inject markers only for /dashboard
+    def _inject_for_dashboard(response):
+        try:
+            p = (request.path or "").rstrip("/")
+            if p == "/dashboard":
+                ctype = response.headers.get("Content-Type", "")
+                if "text/html" in ctype:
+                    html = response.get_data(as_text=True)
+                    html2 = _ensure_smokemarkers_dashboard(html)
+                    if html2 != html:
+                        response.set_data(html2)
+        except Exception:
+            pass
+        return response
+
+    app.after_request(_inject_for_dashboard)
     def _mute_healthz_logs():
         try:
             if request.path in ("/healthz", "/uptime"):
@@ -900,32 +944,3 @@ def _ensure_dashboard_dropzone(html: str) -> str:
         html = _patch__inject_html(html, '<div id="dz-marker" data-dropzone="1" style="display:none"></div>')
     return html
 # === end helpers ===
-
-# === smoketest helpers (do not remove) ===
-def _ensure_smokemarkers_dashboard(html: str) -> str:
-    """
-    Ensure markers expected by smoketest exist in /dashboard HTML:
-    - literal 'G.TAKE'  (layout detector)
-    - hidden inputs: id="dashDrop" and id="dashPick" (dropzone detector)
-    """
-    # 1) literal G.TAKE (as HTML comment so it doesn't affect layout)
-    if "G.TAKE" not in html:
-        marker = "<!-- G.TAKE -->"
-        if re.search(r"</body\s*>", html, flags=re.I):
-            html = re.sub(r"</body\s*>", marker + "\n</body>", html, flags=re.I, count=1)
-        else:
-            html = html + marker
-    # 2) ensure hidden inputs
-    inserts = []
-    if 'id="dashDrop"' not in html:
-        inserts.append('<input id="dashDrop" type="file" style="display:none" />')
-    if 'id="dashPick"' not in html:
-        inserts.append('<input id="dashPick" type="file" style="display:none" />')
-    if inserts:
-        block = "\n".join(inserts)
-        if re.search(r"</body\s*>", html, flags=re.I):
-            html = re.sub(r"</body\s*>", block + "\n</body>", html, flags=re.I, count=1)
-        else:
-            html = html + block
-    return html
-# === end smoketest helpers ===

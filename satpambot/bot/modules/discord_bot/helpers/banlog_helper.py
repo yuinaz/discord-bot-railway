@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging, os
 from typing import Optional
 import discord
+from .errorlog_helper import log_error_embed
 
 log = logging.getLogger(__name__)
 TARGET_THREAD_NAME = "Ban Log"

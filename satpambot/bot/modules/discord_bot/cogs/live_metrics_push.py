@@ -138,3 +138,85 @@ class LiveMetricsPush(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(LiveMetricsPush(bot))
+
+
+# === sticky embed helpers (free plan friendly) ===
+import json, time
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo as _Zone
+except Exception:
+    _Zone = None
+
+def _tz_wib():
+    try:
+        return _Zone("Asia/Jakarta")
+    except Exception:
+        return timezone(timedelta(hours=7))
+
+def _sticky_store_path():
+    root = os.getenv("STICKY_MESSAGE_FILE", "data/sticky_embed.json")
+    p = Path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+def _sticky_load():
+    p = _sticky_store_path()
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+def _sticky_save(d:dict):
+    p = _sticky_store_path()
+    try:
+        p.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+async def _sticky_poster(self):
+    # post/update sticky embed periodically using collected metrics
+    chan_id = int(os.getenv("STICKY_CHANNEL_ID", "0") or 0)
+    if not chan_id:
+        return
+    last_hash = None
+    last_edit = 0
+    force_every = int(os.getenv("STICKY_FORCE_SEC", "60"))
+    while True:
+        try:
+            ch = self.bot.get_channel(chan_id) or await self.bot.fetch_channel(chan_id)
+            payload = await self._collect_async()
+            # Build embed text (simple text to avoid heavy styling on free plan)
+            online = payload.get("online") or payload.get("members_online") or 0
+            cpu = payload.get("cpu_pct") or payload.get("cpu_percent") or 0
+            ram = payload.get("ram_pct") or payload.get("ram_mb") or 0
+            ts = datetime.now(_tz_wib())
+            content = f"LeinDiscord • online={online} • CPU={cpu}% • RAM={ram}% • {ts:%Y-%m-%d %H:%M:%S} WIB"
+            # locate sticky message id from store
+            store = _sticky_load()
+            key = str(chan_id)
+            msg_id = store.get(key)
+            msg = None
+            if msg_id:
+                try:
+                    msg = await ch.fetch_message(int(msg_id))
+                except Exception:
+                    msg = None
+            if not msg:
+                m = await ch.send(content)
+                store[key] = str(m.id)
+                _sticky_save(store)
+                last_hash = None
+            else:
+                # Only edit if changed or forced by time
+                h = hash(content)
+                now = time.time()
+                if h != last_hash or (now - last_edit) >= force_every:
+                    await msg.edit(content=content)
+                    last_hash = h
+                    last_edit = now
+        except Exception:
+            pass
+        await asyncio.sleep(float(os.getenv("STICKY_UPDATE_SEC", "15")))

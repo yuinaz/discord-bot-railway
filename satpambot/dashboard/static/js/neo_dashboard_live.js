@@ -84,7 +84,7 @@
     setupDropzone('#dropzone, .dropzone, [data-dropzone="dashboard"]', '/dashboard/upload', function(){ refreshMetrics(); });
     setupDropzone('#sec-dropzone, .sec-dropzone, [data-dropzone="security"]', '/dashboard/security/upload', function(){ refreshPhash(); });
 
-    refreshMetrics(); setInterval(refreshMetrics, 3000);
+    fetch('/api/ui-config').then(r=>r.json()).then(cfg=>{var ms=(cfg && cfg.poll_interval_ms)||3000; refreshMetrics(); setInterval(refreshMetrics, ms);}).catch(function(){ refreshMetrics(); setInterval(refreshMetrics, 3000); });
     refreshPhash();
     refreshBans(); setInterval(refreshBans, 10000);
   });
