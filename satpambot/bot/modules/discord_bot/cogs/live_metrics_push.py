@@ -77,10 +77,13 @@ class LiveMetricsPush(commands.Cog):
         latency_ms = int((self.bot.latency or 0.0) * 1000)
         cpu = 0.0
         ram_mb = 0
+        mem_pct = None
         if psutil:
             try:
+                vm = psutil.virtual_memory()
                 cpu = float(psutil.cpu_percent(interval=None))
-                ram_mb = int(psutil.virtual_memory().used / 1024 / 1024)
+                ram_mb = int(vm.used / 1024 / 1024)
+                mem_pct = float(vm.percent)
             except Exception:
                 pass
 
@@ -96,6 +99,13 @@ class LiveMetricsPush(commands.Cog):
             "cpu_percent": cpu,
             "ram_mb": ram_mb,
             "uptime_s": round(time.time() - self.start_ts, 1),
+            
+# compatibility & richer keys for dashboard
+"online": online,
+"cpu_pct": round(cpu, 1) if cpu is not None else None,
+"ram_pct": round(mem_pct, 1) if mem_pct is not None else None,
+"uptime": int(time.time() - self.start_ts),
+
         }
 
     def _write_file(self, payload: dict):
