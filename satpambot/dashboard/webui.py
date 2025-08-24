@@ -738,3 +738,86 @@ def register_webui_builtin(app: Flask):
     # Register blueprints
     app.register_blueprint(bp)
     app.register_blueprint(api_bp)
+
+
+# ====== ADDED HELPERS (ADD-ONLY, safe) ======
+from pathlib import Path as __SATP_Path
+import json as __SATP_json
+import os as __SATP_os
+
+def _satp_data_dir():
+    return __SATP_Path(__SATP_os.getenv("DATA_DIR","data")).resolve()
+
+def _satp_ensure_dir(p: __SATP_Path) -> __SATP_Path:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+def _satp_blocklist_path() -> __SATP_Path:
+    return _satp_ensure_dir(_satp_data_dir() / "phish_lab" / "phash_blocklist.json")
+
+def _satp_json_load_list(p: __SATP_Path) -> list:
+    try:
+        if p.exists():
+            return __SATP_json.loads(p.read_text(encoding="utf-8")) or []
+    except Exception:
+        pass
+    return []
+# ====== END HELPERS ======
+
+
+# ====== ADDED: “Updated today log” endpoint (ADD-ONLY) ======
+from datetime import datetime as __SATP_dt, timezone as __SATP_tz, timedelta as __SATP_td
+try:
+    _WIB = __SATP_tz(__SATP_td(hours=7), name="WIB")
+except Exception:
+    _WIB = __SATP_tz(__SATP_td(hours=7))
+
+def _satp_now_wib():
+    return __SATP_dt.now(_WIB)
+
+def _satp_today_range_wib():
+    now = _satp_now_wib()
+    start = __SATP_dt(now.year, now.month, now.day, tzinfo=_WIB)
+    end = start + __SATP_td(days=1)
+    return (start.timestamp(), end.timestamp())
+
+@bp.get("/api/uploads/today")  # << FIX: pakai blueprint; URL akhir = /dashboard/api/uploads/today
+def dashboard_api_uploads_today():
+    """
+    Return daftar upload via dropzone yang terjadi HARI INI (WIB),
+    diambil dari data/phish_lab/phash_blocklist.json.
+    """
+    try:
+        data = _satp_json_load_list(_satp_blocklist_path())
+    except NameError:
+        # if helpers not available in this module
+        try:
+            from pathlib import Path as _P; import os as _O, json as _J
+            base = _P(_O.getenv("DATA_DIR","data")).resolve()
+            p = base / "phish_lab" / "phash_blocklist.json"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            data = _J.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+        except Exception:
+            data = []
+
+    t0, t1 = _satp_today_range_wib()
+    items = []
+    for e in data:
+        if not isinstance(e, dict):
+            continue
+        ts = float(e.get("ts") or 0)
+        if e.get("source") == "dashboard" and t0 <= ts < t1:
+            items.append({
+                "filename": e.get("filename") or "",
+                "hash": str(e.get("hash") or ""),
+                "ts": int(ts),
+            })
+    items.sort(key=lambda x: x["ts"], reverse=True)
+    try:
+        from flask import jsonify as _jsonify
+        return _jsonify({"ok": True, "count": len(items), "items": items}), 200
+    except Exception:
+        # last resort plain json
+        import json as _json
+        return (_json.dumps({"ok": True, "count": len(items), "items": items}), 200, {"Content-Type":"application/json"})
+# ====== END ENDPOINT ======
