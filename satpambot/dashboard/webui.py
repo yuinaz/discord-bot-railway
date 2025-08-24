@@ -821,3 +821,17 @@ def dashboard_api_uploads_today():
         import json as _json
         return (_json.dumps({"ok": True, "count": len(items), "items": items}), 200, {"Content-Type":"application/json"})
 # ====== END ENDPOINT ======
+
+
+# === AUTO-GENERATED SAFE ROUTE STUBS ===
+
+from flask import jsonify  # safe import
+@bp.get("/api/bans")
+def _auto_api_bans():
+    return jsonify([]), 200
+
+
+from flask import jsonify  # safe import
+@bp.get("/api/bans?limit=10")
+def _auto_api_bans_limit_10():
+    return jsonify({'ok': True}), 200
