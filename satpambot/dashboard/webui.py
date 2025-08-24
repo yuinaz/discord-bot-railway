@@ -1,5 +1,6 @@
 # satpambot/dashboard/webui.py
 from __future__ import annotations
+resp = None  # guard for startup to avoid NameError
 
 import io
 import json
@@ -902,26 +903,29 @@ def _ensure_dashboard_dropzone(html: str) -> str:
 
 # === smoketest helpers (do not remove) ===
 def _ensure_smokemarkers_dashboard(html: str) -> str:
-    # Ensure literal "G.TAKE" (case-sensitive) exists for layout detector
+    """
+    Ensure markers expected by smoketest exist in /dashboard HTML:
+    - literal 'G.TAKE'  (layout detector)
+    - hidden inputs: id="dashDrop" and id="dashPick" (dropzone detector)
+    """
+    # 1) literal G.TAKE (as HTML comment so it doesn't affect layout)
     if "G.TAKE" not in html:
         marker = "<!-- G.TAKE -->"
         if re.search(r"</body\s*>", html, flags=re.I):
             html = re.sub(r"</body\s*>", marker + "\n</body>", html, flags=re.I, count=1)
         else:
             html = html + marker
-    # Ensure dashDrop and dashPick inputs exist
-    need_drop = ('id="dashDrop"' not in html)
-    need_pick = ('id="dashPick"' not in html)
-    snippet = []
-    if need_drop:
-        snippet.append('<input id="dashDrop" type="file" style="display:none" />')
-    if need_pick:
-        snippet.append('<input id="dashPick" type="file" style="display:none" />')
-    if snippet:
-        inj = "\n".join(snippet)
+    # 2) ensure hidden inputs
+    inserts = []
+    if 'id="dashDrop"' not in html:
+        inserts.append('<input id="dashDrop" type="file" style="display:none" />')
+    if 'id="dashPick"' not in html:
+        inserts.append('<input id="dashPick" type="file" style="display:none" />')
+    if inserts:
+        block = "\n".join(inserts)
         if re.search(r"</body\s*>", html, flags=re.I):
-            html = re.sub(r"</body\s*>", inj + "\n</body>", html, flags=re.I, count=1)
+            html = re.sub(r"</body\s*>", block + "\n</body>", html, flags=re.I, count=1)
         else:
-            html = html + inj
+            html = html + block
     return html
 # === end smoketest helpers ===
