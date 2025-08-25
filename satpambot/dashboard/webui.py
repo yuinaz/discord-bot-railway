@@ -115,6 +115,24 @@ bp = Blueprint(
     template_folder=TEMPLATES_DIR,
 )
 
+
+# Root-level alias blueprint so the bot can POST /api/metrics-ingest (not only /dashboard/api/metrics-ingest)
+metrics_alias_bp = Blueprint("metrics_alias_bp", __name__)
+
+@metrics_alias_bp.post("/api/metrics-ingest")
+def _metrics_ingest_alias():
+    # Forward to the same handler used under /dashboard/api/metrics-ingest
+    try:
+        return api_metrics_ingest()
+    except Exception as e:
+        # return JSON error compatible with existing API
+        try:
+            from flask import jsonify
+            return jsonify({"ok": False, "error": str(e)}), 500
+        except Exception:
+            return ("metrics alias error", 500)
+
+
 api_bp = Blueprint(
     "dashboard_api_public",
     __name__ + "_public",
@@ -585,6 +603,7 @@ def register_webui_builtin(app: Flask):
         app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
 
     # ====== 1) Jangan tulis log untuk /healthz & /uptime (dev server / werkzeug) ======
+    app.register_blueprint(metrics_alias_bp)
     def _preflight_noop():
         return None
 
