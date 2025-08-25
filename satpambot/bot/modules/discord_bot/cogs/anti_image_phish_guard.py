@@ -1,77 +1,111 @@
+# satpambot/bot/modules/discord_bot/cogs/anti_image_phish_guard.py
 from __future__ import annotations
-import discord, io, logging, os, json
-from discord.ext import commands
-from PIL import Image
-import imagehash
 
-log = logging.getLogger(__name__)
+import asyncio
+import json
+import os
+from pathlib import Path
+from typing import List, Dict, Any, Optional
 
-PHISH_IMG_DB = os.getenv("PHISH_IMG_DB", "data/phish_phash.json")
-PHISH_CONFIG_PATH = os.getenv("PHISH_CONFIG_PATH", "data/phish_config.json")
+import discord
+from discord.ext import commands, tasks
 
-def _load_json(path:str)->dict:
-    try:
-        with open(path, "r", encoding="utf-8") as f: return json.load(f)
-    except Exception:
-        return {}
+try:
+    import aiohttp  # discord.py uses aiohttp, should be available
+except Exception:  # pragma: no cover
+    aiohttp = None
 
-def _save_json(path:str, data:dict):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
+# --- Tuning ---
+PHASH_THRESHOLD = 8
+AUTOBAN = False
 
-def _hamming(a:str,b:str)->int:
-    try:
-        return bin(int(a,16) ^ int(b,16)).count("1")
-    except Exception:
-        return 999
+# Candidate files where dashboard writes pHash entries (first that exists will be used)
+PHASH_DB_CANDIDATES = [
+    Path("satpambot/dashboard/data/phash_index.json"),
+    Path("satpambot/dashboard/phash_index.json"),
+    Path("satpambot/dashboard/.data/phash_index.json"),
+    Path("data/phash_index.json"),
+    Path("/data/phash_index.json"),
+    Path("/tmp/phash_index.json"),
+]
+
+# Optionally allow override by env without requiring it
+ENV_PATH = os.getenv("SATPAMBOT_PHASH_DB")
+if ENV_PATH:
+    PHASH_DB_CANDIDATES.insert(0, Path(ENV_PATH))
+
+def _load_from_file() -> List[Dict[str, Any]]:
+    for p in PHASH_DB_CANDIDATES:
+        try:
+            if p.exists():
+                with p.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    return data
+        except Exception:
+            continue
+    return []
+
+async def _load_from_http() -> List[Dict[str, Any]]:
+    if aiohttp is None:
+        return []
+    # Try local Flask origin
+    port = os.getenv("PORT", "5000")
+    candidates = [
+        f"http://127.0.0.1:{port}/api/phish/phash",
+        f"http://localhost:{port}/api/phish/phash",
+        "http://127.0.0.1:3115/api/phish/phash",
+    ]
+    async with aiohttp.ClientSession() as s:
+        for url in candidates:
+            try:
+                async with s.get(url, timeout=3) as r:
+                    if r.status == 200:
+                        j = await r.json()
+                        if isinstance(j, list):
+                            return j
+            except Exception:
+                continue
+    return []
 
 class AntiImagePhishGuard(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.db = _load_json(PHISH_IMG_DB)
-        self.cfg = _load_json(PHISH_CONFIG_PATH)
-        self.threshold = int(self.cfg.get("threshold", 8))
-        self.autoban = bool(self.cfg.get("autoban", False))
-        log.info("[phish] load phash=%s threshold=%s autoban=%s", len(self.db.get("phash",[])), self.threshold, self.autoban)
+        self._phash_entries: List[Dict[str, Any]] = []
+        self.threshold = PHASH_THRESHOLD
+        self.autoban = AUTOBAN
+        self._reload_task.start()
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if not message.attachments or not getattr(message, "guild", None): return
-        for att in message.attachments:
-            if not att.content_type or not att.content_type.startswith("image"): continue
+    # Public accessor if other cogs need it
+    def phash_count(self) -> int:
+        return len(self._phash_entries)
+
+    # -------------- loading logic --------------
+    async def _reload_once(self) -> None:
+        new = _load_from_file()
+        if not new:
             try:
-                b = await att.read()
-                img = Image.open(io.BytesIO(b)).convert("RGB")
-                h = str(imagehash.phash(img))
-                for sig in self.db.get("phash", []):
-                    if _hamming(sig, h) <= self.threshold:
-                        try:
-                            await message.delete()
-                        except Exception:
-                            pass
-                        await self._log_detect(message, sig, h)
-                        if self.autoban:
-                            try:
-                                await message.guild.ban(message.author, reason="Phish image signature match")
-                            except Exception:
-                                pass
-                        return
-            except Exception as e:
-                log.debug("[phish] error reading attachment: %s", e)
+                new = await _load_from_http()
+            except Exception:
+                new = []
+        self._phash_entries = new or []
+        print(f"[phish] load phash={len(self._phash_entries)} threshold={self.threshold} autoban={self.autoban}")
 
-    async def _log_detect(self, message: discord.Message, sig: str, h: str):
-        # Simple log to banlog thread
-        try:
-            from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread
-            th = await get_banlog_thread(message.guild)
-            emb = discord.Embed(title="Deteksi Gambar Phishing", description=f"Match pHash <= {self.threshold}", color=0xF59E0B)
-            emb.add_field(name="Signature", value=sig, inline=False)
-            emb.add_field(name="Hash", value=h, inline=False)
-            emb.add_field(name="User", value=f"{message.author.mention}", inline=False)
-            if th:
-                await th.send(embed=emb)
-        except Exception:
-            pass
+    @tasks.loop(seconds=60)
+    async def _reload_task(self):
+        await self._reload_once()
+
+    @_reload_task.before_loop
+    async def _before(self):
+        await self.bot.wait_until_ready()
+        # initial load
+        await self._reload_once()
+
+    # -------------- (placeholder) detection hooks --------------
+    # Implement your image message handlers here using self._phash_entries,
+    # threshold (self.threshold) and autoban flag (self.autoban).
+    # The structure of each entry in _phash_entries should match what your
+    # dashboard uploader produces (e.g., {"hash": ..., "reason": ..., "by": ..., "at": ...}).
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhishGuard(bot))
