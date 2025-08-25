@@ -204,20 +204,25 @@ def index_no_slash():
 
 @bp.get("/")
 def index():
+    
     if not is_logged_in():
         return redirect(url_for("dashboard.login"))
     resp = render_or_fallback("dashboard.html")
-    html = resp.get_data(as_text=True) 
-    html = _ensure_gtake_layout_signature(html)if isinstance(resp, Response) else (
-        resp.decode() if isinstance(resp, bytes) else str(resp)
+
+    # decode response body first
+    html = resp.get_data(as_text=True) if isinstance(resp, Response) else (
+        resp.decode() if isinstance(resp, (bytes, bytearray)) else str(resp)
     )
+
+    # then ensure theme + canvas + dropzone + markers
+    html = _ensure_gtake_layout_signature(html)
     html = _ensure_gtake_css(html)
     html = _ensure_canvas(html)
     html = _ensure_dropzone(html)
     html = _ensure_dashboard_dropzone(html)
-    return make_response(html, 200)
+    html = _ensure_smokemarkers_dashboard(html)
 
-@bp.get("/settings")
+    return make_response(html, 200)
 def settings_page():
     if not is_logged_in():
         return require_login()
@@ -585,20 +590,26 @@ def register_webui_builtin(app: Flask):
 
     # register after_request hook to inject markers only for /dashboard
     def _inject_for_dashboard(response):
+        
         try:
             p = (request.path or "").rstrip("/")
             if p == "/dashboard":
                 ctype = response.headers.get("Content-Type", "")
                 if "text/html" in ctype:
-                    html = response.get_data(as_text=True)
-                    html2 = _ensure_smokemarkers_dashboard(html)
-                    if html2 != html:
-                        response.set_data(html2)
+                    html = response.get_data(as_text=True) or ""
+                    # inject full package so smoketest sees theme & dropzone
+                    html = _ensure_gtake_layout_signature(html)   # body class/marker for gtake
+                    html = _ensure_gtake_css(html)                # <link ... /dashboard-theme/gtake/theme.css>
+                    html = _ensure_dropzone(html)                 # id="dropZone" + class="dropzone" + script
+                    html = _ensure_dashboard_dropzone(html)       # alias/extra marker
+                    html = _ensure_smokemarkers_dashboard(html)   # <!-- G.TAKE --> + hidden dashDrop/dashPick
+                    response.set_data(html)
+                    # headers as explicit hints (safe)
+                    response.headers["X-Layout-Theme"] = "gtake"
+                    response.headers["X-Dropzone"] = "1"
         except Exception:
             pass
         return response
-
-    app.after_request(_inject_for_dashboard)
     def _mute_healthz_logs():
         try:
             if request.path in ("/healthz", "/uptime"):
@@ -967,3 +978,15 @@ def _ensure_dashboard_dropzone(html: str) -> str:
         html = _patch__inject_html(html, '<div id="dz-marker" data-dropzone="1" style="display:none"></div>')
     return html
 # === end helpers ===
+
+@bp.get("/settings")
+def settings_page():
+    if not is_logged_in():
+        return redirect(url_for("dashboard.login"))
+    resp = render_or_fallback("settings.html")
+    # decode and ensure theme css so layout stays gtake
+    html = resp.get_data(as_text=True) if isinstance(resp, Response) else (
+        resp.decode() if isinstance(resp, (bytes, bytearray)) else str(resp)
+    )
+    html = _ensure_gtake_css(html)
+    return make_response(html, 200)

@@ -7,7 +7,6 @@
   <!-- Theme & base CSS -->
   <link rel="stylesheet" href="{{ url_for('dashboard_static_top', filename='css/neo_aurora_plus.css') }}">
   <link rel="stylesheet" href="/dashboard-theme/gtake/theme.css">
-  <link rel="stylesheet" href="/dashboard/dashboard-static/css/layout_compact.css">
   <!-- Drag & Drop styles -->
   <link rel="stylesheet" href="{{ url_for('dashboard.static', filename='css/phish_lab.css') }}{% if cache_bust %}?v={{ cache_bust }}{% endif %}">
   <!-- JS (live mini monitor, phash dragdrop) -->
@@ -150,9 +149,6 @@
     document.getElementById("ban_refresh")?.addEventListener("click", loadBans);
     window.addEventListener("load", loadBans);
   </script>
-<script src="/dashboard/dashboard-static/js/compact_layout.js"></script>
-<script src="/dashboard/dashboard-static/js/remove_option_button.js"></script>
-<input id="dashDrop" type="file" style="display:none" />
 </body>
 </html>
-{% include 'components/today_log.html
+{% include 'components/today_log.html' %}
