@@ -1,5 +1,16 @@
 # satpambot/dashboard/webui.py
 from __future__ import annotations
+import logging
+class _NoisyPathFilter(logging.Filter):
+    NOISY_SUBSTRS = ("/api/metrics-ingest", "/dashboard/api/metrics")
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+        except Exception:
+            msg = str(record.msg)
+        # return False to drop the log record
+        return not any(s in msg for s in self.NOISY_SUBSTRS)
+
 
 import io
 import json
@@ -599,8 +610,16 @@ def _ui_theme_set_public_path(theme: str):
 # Registrar — panggil dari app factory
 # =============================================================================
 def register_webui_builtin(app: Flask):
+    # Silence noisy access logs for metrics endpoints on Render
+    try:
+        wz = logging.getLogger("werkzeug")
+        wz.addFilter(_NoisyPathFilter())
+        app.logger.addFilter(_NoisyPathFilter())
+    except Exception:
+        pass
     if not app.secret_key:
         app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
+
 
     # ====== 1) Jangan tulis log untuk /healthz & /uptime (dev server / werkzeug) ======
     app.register_blueprint(metrics_alias_bp)
@@ -1000,12 +1019,13 @@ def _ensure_dashboard_dropzone(html: str) -> str:
 
 @bp.get("/settings")
 def settings_page():
+    
     if not is_logged_in():
         return redirect(url_for("dashboard.login"))
     resp = render_or_fallback("settings.html")
-    # decode and ensure theme css so layout stays gtake
     html = resp.get_data(as_text=True) if isinstance(resp, Response) else (
         resp.decode() if isinstance(resp, (bytes, bytearray)) else str(resp)
     )
+    # keep theme consistent
     html = _ensure_gtake_css(html)
     return make_response(html, 200)
