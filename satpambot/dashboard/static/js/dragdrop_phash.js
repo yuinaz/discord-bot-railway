@@ -1,119 +1,112 @@
-// satpambot/dashboard/static/js/dragdrop_phash.js
-// Non-breaking enhancer: accept FILE or URL; upload to /dashboard/api/phash/upload;
-// fallback to /api/phish/phash if available; refresh banned users + metrics.
+
 (function(){
-  const TRY_ENDPOINTS = ["/dashboard/api/phash/upload", "/api/phish/phash"];
-  const API_BANS = "/dashboard/api/banned_users";
-  const API_METRICS = "/dashboard/api/metrics";
+  const API_UPLOAD = "/dashboard/api/phash/upload";
+  const API_LIST   = "/api/phish/phash"; // GET only
 
-  function $(s, r){ return (r||document).querySelector(s); }
-  function $all(s, r){ return Array.from((r||document).querySelectorAll(s)); }
+  function $(sel){ return document.querySelector(sel); }
 
-  function logSuccess(name){try{const b=document.getElementById('upload-log');if(!b)return;const row=document.createElement('div');row.textContent='✓ Uploaded '+name;row.style.color='#22c55e';b.prepend(row);while(b.childElementCount>6)b.lastChild.remove();}catch(e){}}
-  async function postFileOrUrl(file, url){
-    for (const ep of TRY_ENDPOINTS) {
-      try {
-        if (file){ const fn=file.name||'image';
-          const fd = new FormData();
-          fd.append("file", file, file.name||"image");
-          const r = await fetch(ep, {method:"POST", body:fd}); const j=await r.json();
-          if (!r.ok || j.ok===false) throw new Error(j.error||r.status);
-          return j;
-        } else if (url){
-          const r = await fetch(ep, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({url})});
-          const j = await r.json(); if (!r.ok || j.ok===false) throw new Error(j.error||r.status);
-          return j;
-        }
-      } catch(e){ /* try next */ }
+  function ensureLogBox(anchor){
+    let box = document.getElementById("upload-log");
+    if (!box){
+      box = document.createElement("div");
+      box.id = "upload-log";
+      box.style.marginTop = "8px";
+      box.style.fontSize = "12px";
+      box.style.opacity = "0.95";
+      box.style.lineHeight = "1.3";
+      (anchor.parentElement || document.body).appendChild(box);
     }
-    throw new Error("No phash endpoint available.");
+    return box;
   }
 
-  function bindDropzones(){
-    // ensure inline log container under dropzone
-    let logBox = document.getElementById('upload-log');
-    if(!logBox){ logBox = document.createElement('div'); logBox.id='upload-log'; logBox.style.margin='8px 0 0'; logBox.style.fontSize='12px'; logBox.style.opacity='0.9';
-      const anchor = document.querySelector('#dropZone') || document.querySelector('[data-dropzone]') || document.querySelector('.dropzone') || document.body;
-      (anchor.parentElement||document.body).appendChild(logBox);
-    }
+  function pushLog(ok, msg){
+    const box = ensureLogBox($('#dropZone') || document.querySelector('[data-dropzone]') || document.querySelector('.dropzone') || document.body);
+    const row = document.createElement("div");
+    row.textContent = (ok?"✓ ":"✗ ") + msg;
+    row.style.color = ok ? "#16a34a" : "#f59e0b";
+    box.prepend(row);
+    while (box.childElementCount > 6) box.lastChild.remove();
+  }
 
-    const zones = $all("#dropZone, [data-dropzone], .dropzone, .drop");
-    zones.forEach(z => {
-      z.addEventListener("dragover", e => { e.preventDefault(); z.classList.add("dragging"); });
-      z.addEventListener("dragleave", () => z.classList.remove("dragging"));
-      z.addEventListener("drop", e => {
-        e.preventDefault(); z.classList.remove("dragging");
-        const dt = e.dataTransfer;
-        const tasks = [];
-        if (dt.files && dt.files.length) {
-          for (const f of dt.files) tasks.push(postFileOrUrl(f,null));
-        }
-        for (const item of dt.items||[]) {
-          if (item.kind==="string" && (item.type==="text/uri-list"||item.type==="text/plain")){
-            tasks.push(new Promise(resolve=>{
-              item.getAsString(async s => {
-                const m=(s||"").match(/https?:\/\/\S+/); const u=m?m[0]:s;
-                try{ resolve(await postFileOrUrl(null, u)); }catch(e){ resolve({ok:false,error:String(e)}) }
-              });
-            }));
-          }
-        }
-        Promise.all(tasks).then(()=>{ refreshBans(); });
-      });
+  async function refreshList(){
+    try {
+      const r = await fetch(API_LIST, {method:"GET"});
+      if (!r.ok) return;
+      const j = await r.json();
+      const n = Array.isArray(j) ? j.length : (j && j.phash && j.phash.length) || 0;
+      pushLog(true, "List updated ("+n+")");
+    } catch(e){}
+  }
+
+  async function uploadFile(file){
+    const fd = new FormData();
+    fd.append("file", file, file.name || "image");
+    const r = await fetch(API_UPLOAD, { method:"POST", body: fd });
+    if (!r.ok) throw new Error("upload failed ("+r.status+")");
+    await r.json().catch(()=>({}));
+    pushLog(true, "Uploaded "+(file.name||"image"));
+    await refreshList();
+  }
+
+  async function uploadUrl(url){
+    const r = await fetch(API_UPLOAD, {
+      method:"POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({url})
     });
-    document.addEventListener("paste", e => {
-      const dt = e.clipboardData || window.clipboardData; if (!dt) return;
-      if (dt.files && dt.files.length) { postFileOrUrl(dt.files[0], null).then(refreshBans); return; }
-      const s = dt.getData("text"); if (s) { postFileOrUrl(null, s).then(refreshBans); }
+    if (!r.ok) throw new Error("upload url failed ("+r.status+")");
+    await r.json().catch(()=>({}));
+    pushLog(true, "Uploaded URL");
+    await refreshList();
+  }
+
+  function bindDrop(){
+    const dz = $('#dropZone') || document.querySelector('[data-dropzone]') || document.querySelector('.dropzone');
+    if (!dz) return;
+
+    ensureLogBox(dz);
+
+    ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation();
+      dz.classList.add("dragging");
+    }));
+    ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev, e=>{
+      e.preventDefault(); e.stopPropagation();
+      dz.classList.remove("dragging");
+    }));
+
+    dz.addEventListener("drop", async (e)=>{
+      const files = e.dataTransfer && e.dataTransfer.files;
+      const text  = (e.dataTransfer && (e.dataTransfer.getData("text") || e.dataTransfer.getData("text/plain"))) || "";
+      const tasks = [];
+      if (files && files.length){
+        for (const f of files){
+          if (f.type && !f.type.startsWith("image")) { pushLog(false, "Skip non-image "+(f.name||"file")); continue; }
+          tasks.push(uploadFile(f));
+        }
+      }
+      if (text && /^https?:\/\//i.test(text)){
+        tasks.push(uploadUrl(text.trim()));
+      }
+      try{ await Promise.all(tasks); }catch(err){ pushLog(false, String(err)); }
+    });
+
+    // Paste support
+    window.addEventListener("paste", async (e)=>{
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      const tasks = [];
+      for (const it of items){
+        if (it.kind === "file"){
+          const f = it.getAsFile();
+          if (f) tasks.push(uploadFile(f));
+        } else if (it.kind === "string"){
+          it.getAsString(s=>{ if(/^https?:\/\//i.test(s.trim())) uploadUrl(s.trim()); });
+        }
+      }
+      try{ await Promise.all(tasks); }catch(err){ pushLog(false, String(err)); }
     });
   }
 
-  function mountBansCard(){
-    if ($("#bans-card")) return;
-    const card = document.createElement("div");
-    card.id="bans-card"; card.className="card"; card.style.marginTop="1rem";
-    card.innerHTML = `<div class="card-body">
-      <div class="d-flex justify-content-between align-items-center" style="margin-bottom:.5rem">
-        <div style="font-weight:600">Banned Users (live)</div>
-        <button id="bans-refresh" class="btn btn-sm">Refresh</button>
-      </div>
-      <div class="table-responsive">
-        <table class="table"><thead><tr><th>Time</th><th>User</th><th>ID</th><th>Reason</th><th>By</th></tr></thead><tbody id="bans-tbody"><tr><td colspan="5">Loading...</td></tr></tbody></table>
-      </div></div>`;
-    const anchor = document.querySelector(".card, #dropZone") || document.body;
-    anchor.parentElement?.appendChild(card);
-    $("#bans-refresh")?.addEventListener("click", ()=>refreshBans(true));
-  }
-
-  async function refreshBans(){
-    try{
-      const r = await fetch(API_BANS); const j = await r.json();
-      const tb = $("#bans-tbody"); if (!tb) return;
-      tb.innerHTML = "";
-      (j.rows||[]).forEach(rw => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${rw.time_human||rw.time||""}</td><td>${rw.username||"-"}</td><td>${rw.user_id||"-"}</td><td>${rw.reason||"-"}</td><td>${rw.mod||"-"}</td>`;
-        tb.appendChild(tr);
-      });
-      if (!j.rows?.length) tb.innerHTML = `<tr><td colspan="5" style="opacity:.7">Belum ada data ban.</td></tr>`;
-    }catch(e){}
-  }
-
-  async function tickMetrics(){
-    try{
-      const r = await fetch(API_METRICS); const j = await r.json();
-      const idset = [["stat-guilds","guilds"],["stat-members","members"],["stat-online","online"],["stat-channels","channels"],["stat-threads","threads"],["stat-latency","latency_ms"]];
-      idset.forEach(([id,k])=>{ const el = document.getElementById(id); if (el && k in j) el.textContent = k==="latency_ms" ? (j[k]+" ms") : j[k]; });
-    }catch(e){}
-  }
-
-  function boot(){
-    bindDropzones();
-    mountBansCard();
-    refreshBans();
-    tickMetrics();
-    setInterval(refreshBans, 10000);
-    setInterval(tickMetrics, 5000);
-  }
-  if (document.readyState==="loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+  document.addEventListener("DOMContentLoaded", bindDrop);
 })();
