@@ -7,26 +7,18 @@ import imagehash
 
 log = logging.getLogger(__name__)
 
-# === Back-compat config (do NOT change existing env keys) ===
 PHISH_IMG_DB = os.getenv("PHISH_IMG_DB", "data/phish_phash.json")
 PHISH_CONFIG_PATH = os.getenv("PHISH_CONFIG_PATH", "data/phish_config.json")
 
-# Optional mirror: keep across redeploy by pinning JSON in a channel (fallback only; no env needed)
 PHASH_MIRROR_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "1400375184048787566"))
 PHASH_MARKER = "SATPAMBOT_PHASH_DB_V1"
 
 def _load_json(path:str)->dict:
     try:
-        with open(path, "r", encoding="utf-8") as f: return json.load(f)
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
         return {}
-
-def _save_json(path:str, data:dict):
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f: json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
 
 def _hamming(a:str,b:str)->int:
     try:
@@ -34,28 +26,57 @@ def _hamming(a:str,b:str)->int:
     except Exception:
         return 999
 
+def _coerce_list(j):
+    if isinstance(j, dict) and "phash" in j and isinstance(j["phash"], list):
+        return [str(x) for x in j["phash"]]
+    if isinstance(j, list):
+        return [str(x) for x in j]
+    return []
+
 async def _fetch_http_phash() -> list[str]:
-    """Fallback: read phash list from local HTTP API if file missing/empty."""
+    # Try aiohttp, then requests, then urllib
+    urls = []
+    port = os.getenv("PORT", "5000")
+    urls.append(f"http://127.0.0.1:{port}/api/phish/phash")
+    urls.append(f"http://localhost:{port}/api/phish/phash")
+    urls.append("http://127.0.0.1:3115/api/phish/phash")
+    # 1) aiohttp
     try:
         import aiohttp
+        async with aiohttp.ClientSession() as s:
+            for u in urls:
+                try:
+                    async with s.get(u, timeout=3) as r:
+                        if r.status == 200:
+                            return _coerce_list(await r.json())
+                except Exception:
+                    continue
     except Exception:
-        return []
-    port = os.getenv("PORT", "5000")
-    urls = [
-        f"http://127.0.0.1:{port}/api/phish/phash",
-        f"http://localhost:{port}/api/phish/phash",
-        "http://127.0.0.1:3115/api/phish/phash",
-    ]
-    async with aiohttp.ClientSession() as s:
+        pass
+    # 2) requests
+    try:
+        import requests  # type: ignore
         for u in urls:
             try:
-                async with s.get(u, timeout=3) as r:
-                    if r.status == 200:
-                        j = await r.json()
-                        if isinstance(j, dict) and "phash" in j: return [str(x) for x in j["phash"]]
-                        if isinstance(j, list): return [str(x) for x in j]
+                r = requests.get(u, timeout=3)
+                if r.status_code == 200:
+                    return _coerce_list(r.json())
             except Exception:
                 continue
+    except Exception:
+        pass
+    # 3) urllib
+    try:
+        import urllib.request, urllib.error  # type: ignore
+        for u in urls:
+            try:
+                with urllib.request.urlopen(u, timeout=3) as fp:
+                    data = fp.read()
+                return _coerce_list(json.loads(data.decode("utf-8", "ignore")))
+            except Exception:
+                continue
+    except Exception:
+        pass
     return []
 
 class AntiImagePhishGuard(commands.Cog):
@@ -64,14 +85,11 @@ class AntiImagePhishGuard(commands.Cog):
         self.db = {"phash": []}
         self.threshold = 8
         self.autoban = False
-        # Load config (threshold/autoban) if present
         cfg = _load_json(PHISH_CONFIG_PATH)
         self.threshold = int(cfg.get("threshold", self.threshold))
         self.autoban = bool(cfg.get("autoban", self.autoban))
-        # Background refresh
         self._refresh_task.start()
 
-    # ------------- persistence helpers (Discord pinned) -------------
     async def _read_from_discord(self) -> list[str]:
         try:
             ch = self.bot.get_channel(int(PHASH_MIRROR_CHANNEL_ID))
@@ -80,7 +98,6 @@ class AntiImagePhishGuard(commands.Cog):
             for m in pins:
                 if m.author.id == self.bot.user.id and m.content and PHASH_MARKER in m.content:
                     txt = m.content
-                    # Extract JSON from ```json ... ```
                     start = txt.find("```json")
                     if start == -1: start = txt.find("```")
                     if start != -1:
@@ -89,9 +106,7 @@ class AntiImagePhishGuard(commands.Cog):
                     else:
                         payload = txt
                     try:
-                        j = json.loads(payload)
-                        if isinstance(j, dict) and "phash" in j: return [str(x) for x in j["phash"]]
-                        if isinstance(j, list): return [str(x) for x in j]
+                        return _coerce_list(json.loads(payload))
                     except Exception:
                         return []
         except Exception:
@@ -119,24 +134,41 @@ class AntiImagePhishGuard(commands.Cog):
             pass
 
     async def _refresh_once(self):
-        # Primary: local file
-        db = _load_json(PHISH_IMG_DB)
-        ph = []
-        if isinstance(db, dict) and isinstance(db.get("phash"), list):
-            ph = [str(x) for x in db["phash"]]
-        if not ph:
-            # Fallback HTTP
-            ph = await _fetch_http_phash()
-        if not ph:
-            # Fallback Discord mirror
-            ph = await self._read_from_discord()
-        # Update and mirror back (non-destructive)
-        self.db["phash"] = list(dict.fromkeys(ph))
-        if self.db["phash"]:
-            await self._write_to_discord(self.db["phash"])
-        log.info("[phish] load phash=%s threshold=%s autoban=%s", len(self.db.get("phash",[])), self.threshold, self.autoban)
+        file_ph = []
+        http_ph = []
+        disc_ph = []
 
-    @tasks.loop(seconds=60)
+        j = _load_json(PHISH_IMG_DB)
+        if isinstance(j, dict) and isinstance(j.get("phash"), list):
+            file_ph = [str(x) for x in j["phash"]]
+
+        if not file_ph:
+            try:
+                http_ph = await _fetch_http_phash()
+            except Exception:
+                http_ph = []
+
+        if not file_ph and not http_ph:
+            try:
+                disc_ph = await self._read_from_discord()
+            except Exception:
+                disc_ph = []
+
+        merged = []
+        for src in (file_ph, http_ph, disc_ph):
+            for h in src:
+                if h not in merged:
+                    merged.append(h)
+        self.db["phash"] = merged
+
+        # mirror back if we have any
+        if merged:
+            await self._write_to_discord(merged)
+
+        log.info("[phish] refresh: file=%d http=%d discord=%d total=%d threshold=%d autoban=%s",
+                 len(file_ph), len(http_ph), len(disc_ph), len(merged), self.threshold, self.autoban)
+
+    @tasks.loop(seconds=30)
     async def _refresh_task(self):
         await self._refresh_once()
 
@@ -146,7 +178,6 @@ class AntiImagePhishGuard(commands.Cog):
         await asyncio.sleep(2)
         await self._refresh_once()
 
-    # ------------- detection -------------
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if not message.attachments or not getattr(message, "guild", None): return
@@ -158,13 +189,11 @@ class AntiImagePhishGuard(commands.Cog):
                 h = str(imagehash.phash(img))
                 for sig in self.db.get("phash", []):
                     if _hamming(sig, h) <= self.threshold:
-                        # Moderation action optional
                         if self.autoban:
                             try:
                                 await message.author.ban(reason=f"Phishing image matched: {sig}")
                             except Exception:
                                 pass
-                        # Log to banlog thread if available
                         try:
                             from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread
                             th = await get_banlog_thread(message.guild)

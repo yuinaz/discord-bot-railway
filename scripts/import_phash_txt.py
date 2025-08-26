@@ -8,7 +8,7 @@
 import argparse, sys, json, re
 from pathlib import Path
 
-DEFAULT_TXT = Path("satpambot/dashboard/data/image hash.txt")
+DEFAULT_TXT = Path("satpambot/dashboard/data/blacklist_image_hashes.txt")
 DASHBOARD_JSON = Path("satpambot/dashboard/data/phash_index.json")
 BOT_JSON = Path("data/phish_phash.json")  # default used by anti_image_phish_guard via PHISH_IMG_DB
 
