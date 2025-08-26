@@ -1,17 +1,25 @@
+
+{% set title = "Settings" %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Settings</title>
-  <!-- gtake theme CSS will be injected by webui _ensure_gtake_css hook -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/dashboard-theme/gtake/theme.css">
+  <link rel="stylesheet" href="/dashboard/dashboard-static/css/layout_compact.css">
 </head>
 <body class="gtake">
-  <main class="container" style="max-width:960px;margin:32px auto;padding:0 16px;">
-    <h1 style="margin:0 0 12px 0;">Settings</h1>
-    <p>Konfigurasi dasar dashboard. (Template default minimal)</p>
-    <section style="margin-top:16px">
-      <p>Silakan gunakan tema gtake untuk pengaturan tampilan (logo, background, dll.).</p>
+  <header class="gtake-header">
+    <nav class="gtake-breadcrumb"><a href="/dashboard">Home</a><span>›</span><span>{{ title }}</span></nav>
+    <h1 class="page-title">{{ title }}</h1>
+  </header>
+  <main class="container" style="max-width:960px;margin:24px auto;padding:0 12px;">
+    <section class="card">
+      <div class="card-title">Tampilan</div>
+      <div class="card-body">
+        <p>Konfigurasi dasar dashboard. Tema aktif: <b>gtake</b>.</p>
+      </div>
     </section>
   </main>
 </body>
