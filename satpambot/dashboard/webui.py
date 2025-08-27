@@ -1080,10 +1080,34 @@ class _PhashSkipWerkzeugLogMiddleware:
         self.app = app
     def __call__(self, environ, start_response):
         try:
-            path = environ.get("PATH_INFO", "") or ""
-            if path.endswith("/api/phish/phash"):
+            if (environ.get("PATH_INFO","") or "").endswith("/api/phish/phash"):
                 environ["werkzeug.skip_log"] = True
         except Exception:
             pass
         return self.app(environ, start_response)
 # === END ADD-ONLY ===
+
+
+@bp.after_app_request
+def _after_log_phash_bp(resp):
+    try:
+        p = (getattr(request, "path", "") or "").rstrip("/")
+        if p.endswith("/phish/phash"):
+            cnt, src_from = _extract_phash_count_from_response(resp)
+            if cnt is None:
+                cnt, src_from = 0, "unknown"
+            # log only when count changes
+            if not hasattr(current_app, "_phash_last_count"):
+                current_app._phash_last_count = None
+            if current_app._phash_last_count == cnt:
+                return resp
+            current_app._phash_last_count = cnt
+            try:
+                autoban = _phash_security_cfg()
+            except Exception:
+                autoban = True
+            current_app.logger.info("[phash] autoban=%s count=%s src=%s referer=%s ua=%s",
+                                    autoban, cnt, src_from, request.referrer, request.headers.get("User-Agent",""))
+    except Exception:
+        pass
+    return resp
