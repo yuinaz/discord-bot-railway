@@ -1,60 +1,52 @@
 (function () {
-  if (window.__phashPoller) return; // prevent duplicate loads
-
-  // Guard: run only on dashboard (not on /dashboard/login)
+  if (window.__phashPoller) return;
   try {
     var path = (window.location && window.location.pathname) || '';
     var onDashboard = path.indexOf('/dashboard') === 0 && path !== '/dashboard/login' && path.indexOf('/login') === -1;
     if (!onDashboard) return;
   } catch (e) {}
 
-  const POLL_MS_DEFAULT = 5000;
-  let interval = null;
-  let abortCtl = null;
-  let last = null;
+  var CHANNEL_NAME = 'phash-channel';
+  var LS_KEY = 'phash_poller_leader';
+  var HEARTBEAT_MS = 4000;
+  var LEASE_MS = 10000;
+  var POLL_MS_DEFAULT = 5000;
 
-  async function fetchOnce(signal) {
-    const res = await fetch('/api/phish/phash', { signal, cache: 'no-store' });
-    if (!res.ok) return null;
-    return await res.json();
-  }
+  var bc = null;
+  try { bc = new BroadcastChannel(CHANNEL_NAME); } catch (e) {}
 
-  async function tick() {
-    try {
-      if (abortCtl) abortCtl.abort();
-      abortCtl = new AbortController();
-      const data = await fetchOnce(abortCtl.signal);
-      if (!data) return;
-      last = data;
-      window.dispatchEvent(new CustomEvent('phash:update', { detail: data }));
-    } catch (e) {
-      // swallow
-    }
-  }
+  function now() { return Date.now(); }
+  function getLease() { try { var raw = localStorage.getItem(LS_KEY); return raw?JSON.parse(raw):null; } catch(e){ return null; } }
+  function setLease(ownerId) { try { var p={id:ownerId,until:now()+LEASE_MS}; localStorage.setItem(LS_KEY, JSON.stringify(p)); return p; } catch(e){ return null; } }
+  function isLeaseValid(l){ return l && l.until && l.until>now(); }
+  function tryBecomeLeader(){ var c=getLease(); if(!isLeaseValid(c)){ setLease(MY_ID); c=getLease(); } return c && c.id===MY_ID && isLeaseValid(c); }
+  function renewIfLeader(){ var c=getLease(); if(c && c.id===MY_ID) setLease(MY_ID); }
+  function onStorage(e){ if(e && e.key===LS_KEY){ /* no-op */ } }
 
-  function start() {
-    stop();
-    try { tick(); } catch(e) {}
-    const ms = (window.__uiConfig && window.__uiConfig.poll_interval_ms) || POLL_MS_DEFAULT;
-    interval = setInterval(tick, ms);
-  }
+  var MY_ID = Math.random().toString(36).slice(2) + String(Date.now());
 
-  function stop() {
-    if (interval) clearInterval(interval);
-    interval = null;
-    if (abortCtl) abortCtl.abort();
-  }
+  var interval=null, abortCtl=null, last=null, isLeader=false;
 
-  function requestNow() {
-    try { tick(); } catch(e) {}
-  }
+  async function fetchOnce(signal){ const res=await fetch('/api/phish/phash',{signal,cache:'no-store'}); if(!res.ok) return null; return await res.json(); }
+  function broadcast(d){ try{ if(bc) bc.postMessage({type:'phash:update', payload:d}); }catch(e){} }
+  function handleBroadcast(ev){ try{ var m=(ev&&ev.data)||{}; if(m&&m.type==='phash:update'){ last=m.payload||null; window.dispatchEvent(new CustomEvent('phash:update',{detail:last})); } }catch(e){} }
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') stop();
-    else start();
-  });
-  window.addEventListener('beforeunload', stop);
+  async function leaderTick(){ try{ if(!isLeader) return; if(abortCtl) abortCtl.abort(); abortCtl=new AbortController(); const data=await fetchOnce(abortCtl.signal); if(!data) return; last=data; window.dispatchEvent(new CustomEvent('phash:update',{detail:data})); broadcast(data);}catch(e){} }
 
-  start();
-  window.__phashPoller = { start, stop, requestNow, getLast: () => last };
+  function startLeader(){ stopLeader(); try{ leaderTick(); }catch(e){} var ms=(window.__uiConfig&&window.__uiConfig.poll_interval_ms)||POLL_MS_DEFAULT; interval=setInterval(leaderTick, ms); }
+  function stopLeader(){ if(interval) clearInterval(interval); interval=null; if(abortCtl) abortCtl.abort(); }
+
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden'){ stopLeader(); } else if(isLeader){ startLeader(); } });
+
+  var hb=setInterval(function(){ var c=getLease(); var v=isLeaseValid(c); if(isLeader){ if(!v || (c&&c.id!==MY_ID)){ isLeader=false; stopLeader(); } else { renewIfLeader(); } } else { if(!v){ if(tryBecomeLeader()){ isLeader=true; startLeader(); } } } }, HEARTBEAT_MS);
+
+  try{ window.addEventListener('storage', onStorage); }catch(e){} if(bc) bc.onmessage=handleBroadcast;
+
+  if(tryBecomeLeader()){ isLeader=true; startLeader(); }
+
+  function requestNow(){ if(isLeader){ leaderTick(); } }
+
+  window.__phashPoller = { requestNow: requestNow, isLeader: function(){return isLeader;}, getLast: function(){return last;} };
+
+  window.addEventListener('beforeunload', function(){ try{ var c=getLease(); if(c && c.id===MY_ID){ /* let it expire */ } }catch(e){} try{ clearInterval(hb);}catch(e){} stopLeader(); });
 })();
