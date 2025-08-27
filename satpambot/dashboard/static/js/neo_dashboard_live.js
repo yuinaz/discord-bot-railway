@@ -56,8 +56,8 @@
   function refreshMetrics(){ fetchMetrics().then(function(m){ renderMetrics(m); }); }
 
   function refreshPhash(){
-    fetch('/api/phish/phash')
-    .then(function(r){ return r.json(); })
+    // replaced by phash:update listener;
+ })
     .then(function(arr){
       var el = $('#phash-count');
       if(el) el.textContent = Array.isArray(arr) ? String(arr.length) : '0';
