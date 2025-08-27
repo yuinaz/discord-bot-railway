@@ -1055,3 +1055,41 @@ def _suppress_werkzeug_log_for_phash_bp():
 def _suppress_werkzeug_log_for_phash_api():
     _suppress_werkzeug_impl()
 # === END ADD-ONLY ===
+
+# === ADD-ONLY: helpers for phash logging ===
+from time import time as _time
+
+def _phash_index_file() -> Path:
+    return DATA_DIR() / "phash_index.json"
+
+def _phash_index_read() -> List[str]:
+    f = _phash_index_file()
+    if f.exists():
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "phash" in data and isinstance(data["phash"], list):
+                return data["phash"]
+        except Exception:
+            pass
+    return []
+
+def _extract_phash_count_from_response(resp):
+    try:
+        if getattr(resp, "is_json", False):
+            data = resp.get_json(silent=True) or {}
+            if isinstance(data, dict):
+                if isinstance(data.get("count"), int):
+                    return data["count"], "api-count"
+                if isinstance(data.get("hashes"), list):
+                    return len(data["hashes"]), "api-hashes"
+                if isinstance(data.get("phash"), list):
+                    return len(data["phash"]), "api-phash"
+    except Exception:
+        pass
+    return None, None
+
+try:
+    _phash_log_cache
+except NameError:
+    _phash_log_cache = {"last_count": None}
+# === END ADD-ONLY ===
