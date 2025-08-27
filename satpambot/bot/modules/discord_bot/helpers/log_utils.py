@@ -94,7 +94,8 @@ async def _find_channel_by_id_or_name(bot: discord.Client, guild: discord.Guild)
             return cand
     return None
 
-async def _get_or_create_message(bot: discord.Client, ch: discord.TextChannel, guild_id: int):
+async def _get_or_create_message(bot, ch, guild_id: int):
+    # gunakan sticky_store yang sudah ada di module
     rec = sticky_store.get_guild(guild_id) or {}
     msg_id = rec.get("message_id")
     msg = None
@@ -103,10 +104,16 @@ async def _get_or_create_message(bot: discord.Client, ch: discord.TextChannel, g
             msg = await ch.fetch_message(int(msg_id))
         except Exception:
             msg = None
+
+    if msg is None:
+        # cari pesan lama yang dipin / ada marker
+        msg = await _find_existing_status_message(bot, ch)
+
     if msg is None:
         try:
             e, content = _embed_and_content(bot)
             msg = await ch.send(content=content, embed=e)
+            await _pin_if_needed(msg)
             sticky_store.upsert_guild(guild_id, channel_id=ch.id, message_id=msg.id, last_edit_ts=int(time.time()))
         except Exception as e:
             log.warning("[status] create message failed in #%s: %s", getattr(ch, "name", "?"), e)
@@ -194,3 +201,32 @@ def log_startup_status(bot: discord.Client, guild: discord.Guild) -> None:
     else:
         log.warning("[status] log channel not found in guild='%s' (id=%s)",
                     getattr(guild, "name", "?"), getattr(guild, "id", "?"))
+
+async def _pin_if_needed(msg):
+    try:
+        if getattr(msg, "pinned", False) is False:
+            await msg.pin(reason="SatpamBot sticky status")
+    except Exception:
+        pass
+
+
+async def _find_existing_status_message(bot, ch):
+    marker = _STATUS_MARKER
+    try:
+        pins = await ch.pins()
+        for m in pins or []:
+            if getattr(m, "author", None) and getattr(bot, "user", None) and m.author.id == bot.user.id:
+                body = (m.content or "") + " " + " ".join([(e.footer.text or "") for e in (m.embeds or []) if getattr(e, "footer", None)])
+                if marker in body:
+                    return m
+    except Exception:
+        pass
+    try:
+        async for m in ch.history(limit=50, oldest_first=False):
+            if getattr(m, "author", None) and getattr(bot, "user", None) and m.author.id == bot.user.id:
+                body = (m.content or "") + " " + " ".join([(e.footer.text or "") for e in (m.embeds or []) if getattr(e, "footer", None)])
+                if marker in body:
+                    return m
+    except Exception:
+        pass
+    return None
