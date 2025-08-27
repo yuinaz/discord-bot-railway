@@ -1,6 +1,13 @@
 (function () {
   if (window.__phashPoller) return; // prevent duplicate loads
 
+  // Guard: run only on dashboard (not on /dashboard/login)
+  try {
+    var path = (window.location && window.location.pathname) || '';
+    var onDashboard = path.indexOf('/dashboard') === 0 && path !== '/dashboard/login' && path.indexOf('/login') === -1;
+    if (!onDashboard) return;
+  } catch (e) {}
+
   const POLL_MS_DEFAULT = 5000;
   let interval = null;
   let abortCtl = null;

@@ -61,7 +61,6 @@
     if(files.length) handleFiles(files);
   });
 })();
-
 // Listen to global phash poller updates
 window.addEventListener('phash:update', (e) => {
   const data = e.detail || {};
