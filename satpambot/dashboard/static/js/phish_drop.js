@@ -12,7 +12,10 @@
       if (file) fd.append('file', file);
       if (url) fd.append('url', url);
       const res = await fetch('/api/phish/phash', { method: 'POST', body: fd });
-      const data = await res.json();
+      
+// Trigger an immediate refresh of pHash data
+if (window.__phashPoller && window.__phashPoller.requestNow) { window.__phashPoller.requestNow(); }
+const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP '+res.status));
       result.textContent = 'OK: ' + (data.hash || '(added)') + ' ('+(data.count||'?')+')';
       result.style.color = 'var(--ok-color,#39c06b)';

@@ -28,8 +28,7 @@
         if(j && (j.ok || j.status==='ok')){
           logLine('✅ ' + (file.name || 'file') + (j.phash ? (' → ' + j.phash) : ''));
           // Optional refresh list
-          fetch('/api/phish/phash').catch(()=>{});
-        }else{
+          }else{
           logLine('❌ ' + (file.name || 'file') + ' → ' + (j && j.error ? j.error : 'upload failed'));
         }
       }).catch(e => logLine('❌ ' + (file.name || 'file') + ' → ' + e));
@@ -62,3 +61,12 @@
     if(files.length) handleFiles(files);
   });
 })();
+
+// Listen to global phash poller updates
+window.addEventListener('phash:update', (e) => {
+  const data = e.detail || {};
+  const elCount = document.querySelector('[data-phash-count]');
+  if (elCount) elCount.textContent = String(data.count || 0);
+  const elAutoban = document.querySelector('[data-autoban-badge]');
+  if (elAutoban) elAutoban.textContent = data.autoban ? 'ON' : 'OFF';
+});
