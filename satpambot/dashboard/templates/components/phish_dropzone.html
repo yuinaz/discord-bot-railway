@@ -7,3 +7,5 @@
 </section>
 <link rel="stylesheet" href="{{ url_for('dashboard.static', filename='css/phish_lab.css') }}{% if cache_bust %}?v={{ cache_bust }}{% endif %}">
 <script src="{{ url_for('dashboard.static', filename='js/dragdrop_phash.js') }}{% if cache_bust %}?v={{ cache_bust }}{% endif %}"></script>
+
+<script src="/dashboard-static/js/phash_poller.js?v={{ cache_bust }}"></script>
