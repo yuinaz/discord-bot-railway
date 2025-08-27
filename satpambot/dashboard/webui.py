@@ -1030,122 +1030,32 @@ def settings_page():
     html = _ensure_gtake_css(html)
     return make_response(html, 200)
 
-# === ADD-ONLY: helpers for phash logging (anti-spam) ===
-from time import time as _time
-
-def _phash_index_file() -> Path:
-    return DATA_DIR() / "phash_index.json"
-
-def _phash_index_read() -> List[str]:
-    f = _phash_index_file()
-    if f.exists():
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and "phash" in data and isinstance(data["phash"], list):
-                return data["phash"]
-        except Exception:
-            pass
-    return []
-
-def _extract_phash_count_from_response(resp):
-    try:
-        if getattr(resp, "is_json", False):
-            data = resp.get_json(silent=True) or {}
-            if isinstance(data, dict):
-                if isinstance(data.get("count"), int):
-                    return data["count"], "api-count"
-                if isinstance(data.get("hashes"), list):
-                    return len(data["hashes"]), "api-hashes"
-                if isinstance(data.get("phash"), list):
-                    return len(data["phash"]), "api-phash"
-    except Exception:
-        pass
-    return None, None
-
-# in-memory anti-spam cache
+# === ADD-ONLY: suppress Werkzeug log for noisy aiohttp/python pollers on /api/phish/phash ===
 try:
-    _phash_log_cache
-except NameError:
-    _phash_log_cache = {"last_count": None, "ts": {}}
+    from flask import request
+except Exception:
+    pass
+
+def _suppress_werkzeug_impl():
+    try:
+        p = (getattr(request, "path", "") or "")
+        if p.endswith("/phish/phash"):
+            ua = (request.headers.get("User-Agent","") or "").lower()
+            ref = request.referrer
+            if (("aiohttp" in ua or "python" in ua) and not ref):
+                try:
+                    # Werkzeug supports this flag to skip access log for the request
+                    request.environ["werkzeug.skip_log"] = True
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+@bp.before_app_request
+def _suppress_werkzeug_log_for_phash_bp():
+    _suppress_werkzeug_impl()
+
+@api_bp.before_app_request
+def _suppress_werkzeug_log_for_phash_api():
+    _suppress_werkzeug_impl()
 # === END ADD-ONLY ===
-
-@bp.after_app_request
-def _after_log_phash_bp(resp):
-    try:
-        if getattr(resp, "headers", None) and resp.headers.get("X-Phash-Logged") == "1":
-            return resp
-        p = (getattr(request, "path", "") or "").rstrip("/")
-        if p.endswith("/phish/phash"):
-            ua = (request.headers.get("User-Agent", "") or "")
-            ref = request.referrer
-            cnt, src = _extract_phash_count_from_response(resp)
-            if cnt is None:
-                try:
-                    cnt = len(_phash_blocklist_read()) or len(_phash_index_read())
-                    src = "file-fallback"
-                except Exception:
-                    cnt, src = 0, "unknown"
-            is_noise = (("aiohttp" in ua.lower() or "python" in ua.lower()) and not ref)
-            key = f"{ua}|{ref}|{cnt}"
-            now = _time()
-            last = _phash_log_cache["ts"].get(key, 0.0)
-            if is_noise and (now - last) < 55 and _phash_log_cache.get("last_count") == cnt:
-                return resp
-            try:
-                autoban = _phash_security_cfg()
-            except Exception:
-                autoban = True
-            current_app.logger.info(
-                "[phash] autoban=%s count=%s src=%s referer=%s ua=%s",
-                autoban, cnt, src, ref, ua
-            )
-            _phash_log_cache["ts"][key] = now
-            _phash_log_cache["last_count"] = cnt
-            try:
-                resp.headers["X-Phash-Logged"] = "1"
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return resp
-
-@api_bp.after_app_request
-def _after_log_phash_api(resp):
-    try:
-        if getattr(resp, "headers", None) and resp.headers.get("X-Phash-Logged") == "1":
-            return resp
-        p = (getattr(request, "path", "") or "").rstrip("/")
-        if p.endswith("/phish/phash"):
-            ua = (request.headers.get("User-Agent", "") or "")
-            ref = request.referrer
-            cnt, src = _extract_phash_count_from_response(resp)
-            if cnt is None:
-                try:
-                    cnt = len(_phash_blocklist_read()) or len(_phash_index_read())
-                    src = "file-fallback"
-                except Exception:
-                    cnt, src = 0, "unknown"
-            is_noise = (("aiohttp" in ua.lower() or "python" in ua.lower()) and not ref)
-            key = f"{ua}|{ref}|{cnt}"
-            now = _time()
-            last = _phash_log_cache["ts"].get(key, 0.0)
-            if is_noise and (now - last) < 55 and _phash_log_cache.get("last_count") == cnt:
-                return resp
-            try:
-                autoban = _phash_security_cfg()
-            except Exception:
-                autoban = True
-            current_app.logger.info(
-                "[phash] autoban=%s count=%s src=%s referer=%s ua=%s",
-                autoban, cnt, src, ref, ua
-            )
-            _phash_log_cache["ts"][key] = now
-            _phash_log_cache["last_count"] = cnt
-            try:
-                resp.headers["X-Phash-Logged"] = "1"
-            except Exception:
-                pass
-    except Exception:
-        pass
-    return resp
-
