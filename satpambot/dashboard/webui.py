@@ -1057,7 +1057,86 @@ def _suppress_werkzeug_log_for_phash_api():
 # === END ADD-ONLY ===
 
 
-# === ADD-ONLY: helpers for phash logging ===
+# === ADD-ONLY: WSGI middleware to suppress Werkzeug access log for /api/phish/phash ===
+class _PhashSkipWerkzeugLogMiddleware:
+    def __init__(self, app):
+        self.app = app
+    def __call__(self, environ, start_response):
+        try:
+            path = (environ.get("PATH_INFO","") or "")
+            if path.endswith("/api/phish/phash"):
+                environ["werkzeug.skip_log"] = True
+        except Exception:
+            pass
+        return self.app(environ, start_response)
+# === END ADD-ONLY ===
+
+
+# === ADD-ONLY: blueprint-level suppressor for Werkzeug access log ===
+try:
+    from flask import request as _req_skiplog
+except Exception:
+    _req_skiplog = None
+
+def _set_skip_log():
+    try:
+        if _req_skiplog is None:
+            return
+        p = (getattr(_req_skiplog, "path", "") or "")
+        if p.endswith("/api/phish/phash"):
+            try:
+                _req_skiplog.environ["werkzeug.skip_log"] = True
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+@bp.before_app_request
+def _skiplog_bp():
+    _set_skip_log()
+
+@api_bp.before_app_request
+def _skiplog_api():
+    _set_skip_log()
+# === END ADD-ONLY ===
+
+
+# === ADD-ONLY: logger filter to drop '/api/phish/phash' access log lines ===
+import logging as _logging
+try:
+    _phash_filter_installed
+except NameError:
+    _phash_filter_installed = False
+
+class _DropPhashAccessLogFilter(_logging.Filter):
+    def filter(self, record):
+        try:
+            msg = record.getMessage()
+            if "/api/phish/phash" in msg:
+                return False
+        except Exception:
+            pass
+        return True
+
+def _install_phash_log_filter():
+    global _phash_filter_installed
+    if _phash_filter_installed:
+        return
+    try:
+        for lname in ("werkzeug", "gunicorn.access"):
+            lg = _logging.getLogger(lname)
+            lg.addFilter(_DropPhashAccessLogFilter())
+    except Exception:
+        pass
+    _phash_filter_installed = True
+
+try:
+    _install_phash_log_filter()
+except Exception:
+    pass
+
+
+# === ADD-ONLY: helper to extract count for log-on-change ===
 def _extract_phash_count_from_response(resp):
     try:
         if getattr(resp, "is_json", False):
@@ -1072,42 +1151,3 @@ def _extract_phash_count_from_response(resp):
     except Exception:
         pass
     return None, None
-
-
-# === ADD-ONLY: WSGI middleware to suppress Werkzeug access log for /api/phish/phash ===
-class _PhashSkipWerkzeugLogMiddleware:
-    def __init__(self, app):
-        self.app = app
-    def __call__(self, environ, start_response):
-        try:
-            if (environ.get("PATH_INFO","") or "").endswith("/api/phish/phash"):
-                environ["werkzeug.skip_log"] = True
-        except Exception:
-            pass
-        return self.app(environ, start_response)
-# === END ADD-ONLY ===
-
-
-@bp.after_app_request
-def _after_log_phash_bp(resp):
-    try:
-        p = (getattr(request, "path", "") or "").rstrip("/")
-        if p.endswith("/phish/phash"):
-            cnt, src_from = _extract_phash_count_from_response(resp)
-            if cnt is None:
-                cnt, src_from = 0, "unknown"
-            # log only when count changes
-            if not hasattr(current_app, "_phash_last_count"):
-                current_app._phash_last_count = None
-            if current_app._phash_last_count == cnt:
-                return resp
-            current_app._phash_last_count = cnt
-            try:
-                autoban = _phash_security_cfg()
-            except Exception:
-                autoban = True
-            current_app.logger.info("[phash] autoban=%s count=%s src=%s referer=%s ua=%s",
-                                    autoban, cnt, src_from, request.referrer, request.headers.get("User-Agent",""))
-    except Exception:
-        pass
-    return resp
