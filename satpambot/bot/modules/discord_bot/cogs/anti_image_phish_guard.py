@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from satpambot.bot.modules.discord_bot.helpers import modlog
 from ..helpers import guard_state  # dedupe shared
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -70,6 +71,25 @@ async def _load_from_http() -> List[Dict[str, Any]]:
     return []
 
 class AntiImagePhishGuard(commands.Cog):
+
+
+    def _apply_lists(self, lists_dict):
+        try:
+            self._wl_domains = set(lists_dict.get("wl_domains") or [])
+            self._wl_patterns = lists_dict.get("wl_patterns") or []
+            self._bl_domains = set(lists_dict.get("bl_domains") or [])
+            self._bl_patterns = lists_dict.get("bl_patterns") or []
+        except Exception:
+            pass
+
+    def _nsfw_soft_exempt_thread(self, message: discord.Message) -> bool:
+        ch = message.channel
+        if isinstance(ch, discord.Thread):
+            tname = (getattr(ch, "name", "") or "").lower()
+            if tname and any(tname == n for n in NSFW_SOFT_THREAD_NAMES):
+                return True
+        return False
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._phash_entries: List[Dict[str, Any]] = []
