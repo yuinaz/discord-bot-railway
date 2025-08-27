@@ -1056,23 +1056,8 @@ def _suppress_werkzeug_log_for_phash_api():
     _suppress_werkzeug_impl()
 # === END ADD-ONLY ===
 
+
 # === ADD-ONLY: helpers for phash logging ===
-from time import time as _time
-
-def _phash_index_file() -> Path:
-    return DATA_DIR() / "phash_index.json"
-
-def _phash_index_read() -> List[str]:
-    f = _phash_index_file()
-    if f.exists():
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and "phash" in data and isinstance(data["phash"], list):
-                return data["phash"]
-        except Exception:
-            pass
-    return []
-
 def _extract_phash_count_from_response(resp):
     try:
         if getattr(resp, "is_json", False):
@@ -1088,8 +1073,17 @@ def _extract_phash_count_from_response(resp):
         pass
     return None, None
 
-try:
-    _phash_log_cache
-except NameError:
-    _phash_log_cache = {"last_count": None}
+
+# === ADD-ONLY: WSGI middleware to suppress Werkzeug access log for /api/phish/phash ===
+class _PhashSkipWerkzeugLogMiddleware:
+    def __init__(self, app):
+        self.app = app
+    def __call__(self, environ, start_response):
+        try:
+            path = environ.get("PATH_INFO", "") or ""
+            if path.endswith("/api/phish/phash"):
+                environ["werkzeug.skip_log"] = True
+        except Exception:
+            pass
+        return self.app(environ, start_response)
 # === END ADD-ONLY ===
