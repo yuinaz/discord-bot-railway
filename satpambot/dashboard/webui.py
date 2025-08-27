@@ -1109,7 +1109,7 @@ def _after_log_phash_bp(resp):
         pass
     return resp
 
-@api_api.after_app_request
+@api_bp.after_app_request
 def _after_log_phash_api(resp):
     try:
         if getattr(resp, "headers", None) and resp.headers.get("X-Phash-Logged") == "1":
