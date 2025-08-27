@@ -6,7 +6,7 @@
   const zone = document.querySelector('#dropZone, .dropzone');
   if(!zone){ return; }
 
-  const logBox = document.querySelector('#drop-log');
+  const logBox = document.querySelector('#drop-log, #dz-result');
   function logLine(msg){
     if(!logBox) return;
     const el = document.createElement('div');
