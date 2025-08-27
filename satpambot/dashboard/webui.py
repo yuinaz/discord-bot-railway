@@ -1030,22 +1030,18 @@ def settings_page():
     html = _ensure_gtake_css(html)
     return make_response(html, 200)
 
-# === ADD-ONLY: suppress Werkzeug log for noisy aiohttp/python pollers on /api/phish/phash ===
-try:
-    from flask import request
-except Exception:
-    pass
+# === ADD-ONLY: suppress Werkzeug access log for noisy /api/phish/phash ===
+from flask import request as _flask_req  # distinct alias to avoid shadowing
 
 def _suppress_werkzeug_impl():
     try:
-        p = (getattr(request, "path", "") or "")
+        p = (getattr(_flask_req, "path", "") or "")
         if p.endswith("/phish/phash"):
-            ua = (request.headers.get("User-Agent","") or "").lower()
-            ref = request.referrer
+            ua = (_flask_req.headers.get("User-Agent","") or "").lower()
+            ref = _flask_req.referrer
             if (("aiohttp" in ua or "python" in ua) and not ref):
                 try:
-                    # Werkzeug supports this flag to skip access log for the request
-                    request.environ["werkzeug.skip_log"] = True
+                    _flask_req.environ["werkzeug.skip_log"] = True
                 except Exception:
                     pass
     except Exception:
