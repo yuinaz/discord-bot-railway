@@ -25,40 +25,32 @@ def _extract_hashes(payload) -> List[str]:
     hashes = []
     try:
         if isinstance(payload, dict):
-            # common shapes
             if isinstance(payload.get("added"), list):
                 hashes.extend([str(x) for x in payload["added"]])
             if isinstance(payload.get("hashes"), list):
                 hashes.extend([str(x) for x in payload["hashes"]])
             if isinstance(payload.get("phash"), list):
                 hashes.extend([str(x) for x in payload["phash"]])
-            # singletons
             for k in ("phash", "hash"):
                 v = payload.get(k)
                 if isinstance(v, str):
                     hashes.append(v)
     except Exception:
         pass
-    # unique & stable
-    uniq = []
-    seen = set()
+    uniq, seen = [], set()
     for h in hashes:
         k = h.strip()
         if k and k not in seen:
-            seen.add(k)
-            uniq.append(k)
+            seen.add(k); uniq.append(k)
     return uniq
 
 class PhishHashInbox(commands.Cog):
-    """Collect image attachments from a Discord thread named 'imagephising',
-    register their pHash via the dashboard API, and notify #log-botphising with a SPOILER JSON.
-    """
+    """Watch thread 'imagephising', register pHash via dashboard API, and notify parent channel with SPOILER JSON."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):
-        # fast exits
         if message.author.bot or not message.attachments:
             return
         ch = message.channel
@@ -99,13 +91,12 @@ class PhishHashInbox(commands.Cog):
         if not (filenames or added_hashes):
             return
 
-        # compose embed
         sample_hash = ", ".join(f"`{x[:16]}…`" for x in added_hashes[:3]) if added_hashes else "-"
         sample_file = ", ".join(f"`{x}`" for x in filenames[:3]) if filenames else "-"
 
         emb = Embed(
             title="✅ Phish image registered",
-            description="Gambar dari thread **imagephising** berhasil diproses dan didaftarkan.",
+            description="Gambar dari thread **imagephising** berhasil diproses & didaftarkan.",
             colour=Colour.green(),
         )
         emb.add_field(name="Files", value=str(len(filenames)), inline=True)
@@ -115,8 +106,7 @@ class PhishHashInbox(commands.Cog):
         emb.add_field(name="Contoh File", value=sample_file, inline=False)
         emb.set_footer(text="SatpamBot • Inbox watcher")
 
-        file_arg = None
-        tmp_path = None
+        file_arg = None; tmp_path = None
         if added_hashes:
             try:
                 with tempfile.NamedTemporaryFile("w+", encoding="utf-8", suffix=".json", delete=False) as tf:
@@ -132,10 +122,8 @@ class PhishHashInbox(commands.Cog):
             pass
         finally:
             if tmp_path:
-                try:
-                    os.remove(tmp_path)
-                except Exception:
-                    pass
+                try: os.remove(tmp_path)
+                except Exception: pass
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishHashInbox(bot))
