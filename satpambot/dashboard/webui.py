@@ -1030,33 +1030,6 @@ def settings_page():
     html = _ensure_gtake_css(html)
     return make_response(html, 200)
 
-# === ADD-ONLY: suppress Werkzeug access log for noisy /api/phish/phash ===
-from flask import request as _flask_req  # distinct alias to avoid shadowing
-
-def _suppress_werkzeug_impl():
-    try:
-        p = (getattr(_flask_req, "path", "") or "")
-        if p.endswith("/phish/phash"):
-            ua = (_flask_req.headers.get("User-Agent","") or "").lower()
-            ref = _flask_req.referrer
-            if (("aiohttp" in ua or "python" in ua) and not ref):
-                try:
-                    _flask_req.environ["werkzeug.skip_log"] = True
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-@bp.before_app_request
-def _suppress_werkzeug_log_for_phash_bp():
-    _suppress_werkzeug_impl()
-
-@api_bp.before_app_request
-def _suppress_werkzeug_log_for_phash_api():
-    _suppress_werkzeug_impl()
-# === END ADD-ONLY ===
-
-
 # === ADD-ONLY: WSGI middleware to suppress Werkzeug access log for /api/phish/phash ===
 class _PhashSkipWerkzeugLogMiddleware:
     def __init__(self, app):
@@ -1130,6 +1103,7 @@ def _install_phash_log_filter():
         pass
     _phash_filter_installed = True
 
+# Install at import and in create_app
 try:
     _install_phash_log_filter()
 except Exception:
@@ -1151,3 +1125,26 @@ def _extract_phash_count_from_response(resp):
     except Exception:
         pass
     return None, None
+
+
+@bp.after_app_request
+def _after_log_phash_bp(resp):
+    try:
+        p = (getattr(request, "path", "") or "").rstrip("/")
+        if p.endswith("/phish/phash"):
+            cnt, src_from = _extract_phash_count_from_response(resp)
+            if cnt is None:
+                cnt, src_from = 0, "unknown"
+            if not hasattr(current_app, "_phash_last_count"):
+                current_app._phash_last_count = None
+            if current_app._phash_last_count != cnt:
+                current_app._phash_last_count = cnt
+                try:
+                    autoban = _phash_security_cfg()
+                except Exception:
+                    autoban = True
+                current_app.logger.info("[phash] autoban=%s count=%s src=%s referer=%s ua=%s",
+                                        autoban, cnt, src_from, request.referrer, request.headers.get("User-Agent",""))
+    except Exception:
+        pass
+    return resp
