@@ -1,5 +1,7 @@
 from __future__ import annotations
 import os
+from satpambot.bot.modules.discord_bot.helpers import threadlog
+from satpambot.bot.modules.discord_bot.helpers import static_cfg
 from satpambot.bot.modules.discord_bot.helpers import modlog, re, json
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
@@ -287,62 +289,7 @@ class AntiUrlPhishGuard(commands.Cog):
         return True
 
     async def _log(self, guild: discord.Guild, text: str):
-        if not LOG_CHANNEL_ID: return
-        ch = guild.get_channel(LOG_CHANNEL_ID) or self.bot.get_channel(LOG_CHANNEL_ID)
-        try:
-            if ch: await ch.send(text)
-        except Exception: pass
-
-    async def _delete_and_ban(self, message: discord.Message, reason: str):
-        try: await message.delete()
-        except Exception: pass
-        try:
-            member = message.guild.get_member(message.author.id) or await message.guild.fetch_member(message.author.id)
-            await message.guild.ban(member, reason=reason, delete_message_days=1)
-            await self._log(message.guild, f"⛔️ Auto-banned **{message.author}** karena {reason}")
-        except Exception as e:
-            await self._log(message.guild, f"⚠️ Gagal ban {message.author}: {e} (reason={reason})")
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if not self._ready or not message.guild: return
-        if guard_state and not guard_state.should_process(getattr(message, "id", 0)): return
-        if not self._can_punish(message): return
-
-        content = message.content or ""
-        domains = _extract_domains(content)
-        if not domains: return
-
-        domains = [d for d in domains if d not in self.policy.allowlist]
-        if not domains: return
-
-        bad = [d for d in domains if d in self.policy.blocklist]
-        if bad and self.policy.autoban:
-            await self._delete_and_ban(message, f"URL phishing (blocklist): {', '.join(bad)}")
-            return
-
-        
-        if self.policy.nsfw_autoban and self._is_nsfw_domain(domains):
-            if self._is_soft_exempt(domains, content, message.channel):
-                if NSFW_SOFT_POLICY == "warn":
-                    try:
-                        await message.reply("⚠️ NSFW-soft terdeteksi (exempt). Pesan dibiarkan (soft).", delete_after=8)
-                    except Exception:
-                        pass
-                elif NSFW_SOFT_POLICY == "timeout":
-                    try:
-                        until = discord.utils.utcnow() + discord.timedelta(minutes=NSFW_SOFT_TIMEOUT_MIN)
-                        await message.author.timeout(until)
-                    except Exception:
-                        pass
-                return
-            await self._delete_and_ban(message, f"NSFW link (policy): {', '.join(domains[:3])}")
-            return
-
-
-        if self.policy.heur_autoban and self._looks_suspicious(domains, content):
-            await self._delete_and_ban(message, f"URL phishing (heuristic): {', '.join(domains[:3])}")
-            return
+        await threadlog.send_text(guild, text)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiUrlPhishGuard(bot))

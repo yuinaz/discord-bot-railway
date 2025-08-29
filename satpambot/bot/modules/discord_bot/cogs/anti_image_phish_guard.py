@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from satpambot.bot.modules.discord_bot.helpers import threadlog
+from satpambot.bot.modules.discord_bot.helpers import static_cfg
 from satpambot.bot.modules.discord_bot.helpers import modlog
 from ..helpers import guard_state  # dedupe shared
 from pathlib import Path
@@ -130,3 +132,70 @@ class AntiImagePhishGuard(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhishGuard(bot))
+
+import io
+try:
+    from PIL import Image
+    import imagehash
+except Exception:
+    Image=None
+    imagehash=None
+async def _fetch_bytes(url):
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as s:
+            async with s.get(url, timeout=aiohttp.ClientTimeout(total=6)) as r:
+                return await r.read()
+    except Exception:
+        return None
+
+def _quick_phash(data: bytes):
+    if not Image or not imagehash:
+        return None
+    try:
+        img=Image.open(io.BytesIO(data)).convert("RGB")
+        return str(imagehash.phash(img))
+    except Exception:
+        return None
+
+def _phash_hit(hashes, entries: dict):
+    for h in hashes:
+        if h and h in (entries or {}):
+            return h
+    return None
+
+from discord.ext import commands
+@commands.Cog.listener()
+async def on_message(self, message):
+    try:
+        if not getattr(message, "guild", None) or message.author.bot:
+            return
+        if not getattr(message, "attachments", None):
+            return
+        content=message.content or ""
+        if static_cfg.REQUIRE_MASS_MENTION and not (message.mention_everyone or ("@everyone" in content or "@here" in content)):
+            return
+        urls=[a.url for a in message.attachments if getattr(a,"content_type","") and "image" in a.content_type]
+        if not urls:
+            return
+        hashes=[]
+        for u in urls[:4]:
+            b=await _fetch_bytes(u)
+            if b:
+                h=_quick_phash(b)
+                if h:
+                    hashes.append(h)
+        hit=_phash_hit(hashes, getattr(self, "_phash_entries", {}) or {})
+        if hit:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            try:
+                m=message.guild.get_member(message.author.id) or await message.guild.fetch_member(message.author.id)
+                await message.guild.ban(m, reason=f"Image phishing (pHash={hit})", delete_message_days=static_cfg.BAN_DELETE_DAYS)
+                await threadlog.send_text(message.guild, f"⛔️ Auto-banned **{message.author}** (pHash `{hit}`)")
+            except Exception as e:
+                await threadlog.send_error(message.guild, f"Gagal ban {message.author}: {e}")
+    except Exception:
+        pass
