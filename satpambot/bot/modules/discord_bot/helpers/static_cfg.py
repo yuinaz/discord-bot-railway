@@ -8,3 +8,8 @@ SHORTENER_DOMAINS={"bit.ly","t.co","tinyurl.com","is.gd","buff.ly","cutt.ly","s.
 GSB_TIMEOUT=1.2
 VT_TIMEOUT=2.0
 REPUTATION_CACHE_TTL=3600
+
+PHASH_MAX_DISTANCE = 6
+PHASH_MAX_FRAMES = 6
+PHASH_AUGMENT_REGISTER = True
+PHASH_AUGMENT_PER_FRAME = 5  # base + hflip + rot±7 + center-crop

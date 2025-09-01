@@ -5,7 +5,7 @@ import asyncio
 import json
 import os
 from satpambot.bot.modules.discord_bot.helpers import threadlog
-from satpambot.bot.modules.discord_bot.helpers import static_cfg
+from satpambot.bot.modules.discord_bot.helpers import static_cfg, img_hashing
 from satpambot.bot.modules.discord_bot.helpers import modlog
 from ..helpers import guard_state  # dedupe shared
 from pathlib import Path

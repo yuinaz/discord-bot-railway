@@ -1,34 +1,20 @@
+# Python cache
 __pycache__/
-.env*
+*.py[cod]
+*.egg-info/
 
-# === CLEANUP KIT (auto-appended) ===
-# Backups / archives
-*.bak
-*.patch
-*.orig
-*.rej
-*.zip
-# Logs & caches
-error.log
-*.log
-__pycache__/
-.pytest_cache/
-.coverage
-# Envs
-venv/
+# Virtual env
 .venv/
-env/
+venv/
+
 # OS junk
 .DS_Store
 Thumbs.db
 
-
-# === auto-appended v13 ===
+# Logs & artifacts
 *.log
 *.zip
-*.bak
-__pycache__/
-.venv/
-venv/
-.DS_Store
-data/uploads/
+
+# Secrets
+.env
+.env.*
