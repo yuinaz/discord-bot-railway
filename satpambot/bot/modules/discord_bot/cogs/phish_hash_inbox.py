@@ -1,95 +1,69 @@
 
-import os
 import json
-from typing import List, Optional
-
 import aiohttp
 import discord
 from discord.ext import commands
-from discord import Thread, Message, Embed, Colour, AllowedMentions
+from discord import Thread, Message, AllowedMentions
 
-from satpambot.bot.modules.discord_bot.helpers import img_hashing
+# use helpers already in project; DO NOT change config file
+from satpambot.bot.modules.discord_bot.helpers import img_hashing, static_cfg
 
-TARGET_THREAD_NAME = os.getenv("SATPAMBOT_IMAGE_THREAD", "imagephising").lower()
 PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
-IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif")
+TARGET_THREAD_NAME = getattr(static_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
+IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff")
 
 def _is_image_attachment(att: discord.Attachment) -> bool:
-    try:
-        ct = (att.content_type or "").lower()
-    except Exception:
-        ct = ""
+    ct = (att.content_type or "").lower() if hasattr(att, "content_type") else ""
     if ct.startswith("image/"):
         return True
     fn = (att.filename or "").lower()
     return any(fn.endswith(x) for x in IMAGE_EXTS)
 
-def _extract_hashes_from_msg(msg: Message) -> List[str]:
-    if not msg or not msg.content:
-        return []
-    try:
-        start = msg.content.find("{")
-        end = msg.content.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            j = json.loads(msg.content[start:end+1])
-            if isinstance(j, dict) and "phash" in j and isinstance(j["phash"], list):
-                uniq, seen = [], set()
-                for h in j["phash"]:
-                    s = str(h).strip()
-                    if s and s not in seen:
-                        seen.add(s); uniq.append(s)
-                return uniq
-    except Exception:
-        pass
-    return []
-
-def _render_db_content(arr: List[str]) -> str:
-    data = {"phash": arr}
+def _render_db(phashes):
+    data = {"phash": phashes}
     return f"{PHASH_DB_TITLE}\n```json\n{json.dumps(data, ensure_ascii=False)}\n```"
 
+def _extract_hashes_from_json_msg(msg: discord.Message):
+    if not msg or not msg.content:
+        return []
+    s = msg.content
+    i, j = s.find("{"), s.rfind("}")
+    if i != -1 and j != -1 and j > i:
+        try:
+            obj = json.loads(s[i:j+1])
+            arr = obj.get("phash", [])
+            return [str(x).strip() for x in arr if str(x).strip()]
+        except Exception:
+            return []
+    return []
+
 class PhishHashInbox(commands.Cog):
-    """Watch a specific thread and register pHash values into a JSON message in the parent channel."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    async def _find_db_message(self, channel: discord.TextChannel) -> Optional[Message]:
-        async for m in channel.history(limit=100):
+    async def _find_db_message(self, channel: discord.TextChannel):
+        async for m in channel.history(limit=200):
             if (m.content or "").startswith(PHASH_DB_TITLE):
                 return m
         return None
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):
+        # only react to attachments in the target inbox thread
         if message.author.bot or not message.attachments:
             return
         ch = message.channel
         if not isinstance(ch, Thread):
             return
-        try:
-            if (ch.name or "").lower() != TARGET_THREAD_NAME:
-                return
-        except Exception:
+        if (ch.name or "").lower() != TARGET_THREAD_NAME:
             return
 
-        atts = [a for a in message.attachments if _is_image_attachment(a)]
-        if not atts:
-            return
-
-        filenames: List[str] = []
-        added_hashes: List[str] = []
-        all_hashes: List[str] = []
-
-        # load cfg defaults safely
-        try:
-            from satpambot.bot.modules.discord_bot.helpers import static_cfg
-        except Exception:
-            class static_cfg:
-                PHASH_MAX_FRAMES = 6
-                PHASH_AUGMENT_REGISTER = True
-                PHASH_AUGMENT_PER_FRAME = 5
-
+        # compute multi-frame hashes per attachment
+        all_hashes, filenames = [], []
         async with aiohttp.ClientSession() as session:
-            for att in atts:
+            for att in message.attachments:
+                if not _is_image_attachment(att):
+                    continue
                 try:
                     async with session.get(att.url) as r:
                         raw = await r.read()
@@ -110,40 +84,41 @@ class PhishHashInbox(commands.Cog):
 
         parent = ch.parent or ch
         db_msg = await self._find_db_message(parent)
-        existing: List[str] = _extract_hashes_from_msg(db_msg) if db_msg else []
+        existing = _extract_hashes_from_json_msg(db_msg) if db_msg else []
         existing_set = set(existing)
+        added = []
         for h in all_hashes:
             if h not in existing_set:
                 existing.append(h)
                 existing_set.add(h)
-                added_hashes.append(h)
+                added.append(h)
 
+        # write back to channel JSON message (persist on Discord)
         try:
-            content = _render_db_content(existing)
+            content = _render_db(existing)
             if db_msg:
                 await db_msg.edit(content=content, allowed_mentions=AllowedMentions.none())
             else:
-                db_msg = await parent.send(content, allowed_mentions=AllowedMentions.none())
+                await parent.send(content, allowed_mentions=AllowedMentions.none())
         except Exception:
             pass
 
-        sample_hash = ", ".join(f"`{x[:16]}…`" for x in added_hashes[:3]) if added_hashes else "-"
-        sample_file = ", ".join(f"`{x}`" for x in filenames[:3]) if filenames else "-"
-
-        emb = discord.Embed(
-            title="✅ Phish image registered",
-            description=f"Gambar dari thread **{TARGET_THREAD_NAME}** berhasil diproses & didaftarkan.",
-            colour=discord.Colour.green(),
-        )
-        emb.add_field(name="Files", value=str(len(filenames)), inline=True)
-        emb.add_field(name="Hashes added", value=str(len(added_hashes)), inline=True)
-        if sample_hash != "-":
-            emb.add_field(name="Contoh Hash", value=sample_hash, inline=False)
-        emb.add_field(name="Contoh File", value=sample_file, inline=False)
-        emb.set_footer(text="SatpamBot • Inbox watcher")
-
+        # send summary EMBED to **parent channel** (not thread)
         try:
-            await message.reply(embed=emb, allowed_mentions=AllowedMentions.none())
+            e = discord.Embed(
+                title="✅ Phish image registered",
+                description=f"Gambar dari thread **{TARGET_THREAD_NAME}** berhasil diproses & didaftarkan.",
+                colour=discord.Colour.green(),
+            )
+            e.add_field(name="Files", value=str(len(filenames)), inline=True)
+            e.add_field(name="Hashes added", value=str(len(added)), inline=True)
+            if added:
+                sample = ", ".join(f"`{h[:16]}…`" for h in added[:3])
+                e.add_field(name="Contoh Hash", value=sample, inline=False)
+            if filenames:
+                e.add_field(name="Contoh File", value=", ".join(f"`{f}`" for f in filenames[:3]), inline=False)
+            e.set_footer(text="SatpamBot • Inbox watcher")
+            await parent.send(embed=e, allowed_mentions=AllowedMentions.none())
         except Exception:
             pass
 
