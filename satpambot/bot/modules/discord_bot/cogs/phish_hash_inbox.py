@@ -1,54 +1,62 @@
 
 import os
 import json
-import tempfile
-from typing import List
+from typing import List, Optional
 
 import aiohttp
 import discord
 from discord.ext import commands
-from discord import Thread, Message, Embed, Colour, AllowedMentions, File
+from discord import Thread, Message, Embed, Colour, AllowedMentions
+
+from satpambot.bot.modules.discord_bot.helpers import img_hashing
 
 TARGET_THREAD_NAME = os.getenv("SATPAMBOT_IMAGE_THREAD", "imagephising").lower()
-DASHBOARD_BASE = os.getenv("SATPAMBOT_DASHBOARD_URL", "http://127.0.0.1:10000").rstrip("/")
-PHASH_API = f"{DASHBOARD_BASE}/api/phish/phash"
-
+PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif")
 
 def _is_image_attachment(att: discord.Attachment) -> bool:
-    ct = (att.content_type or "").lower()
+    try:
+        ct = (att.content_type or "").lower()
+    except Exception:
+        ct = ""
     if ct.startswith("image/"):
         return True
-    fname = (att.filename or "").lower()
-    return any(fname.endswith(ext) for ext in IMAGE_EXTS)
+    fn = (att.filename or "").lower()
+    return any(fn.endswith(x) for x in IMAGE_EXTS)
 
-def _extract_hashes(payload) -> List[str]:
-    hashes = []
+def _extract_hashes_from_msg(msg: Message) -> List[str]:
+    if not msg or not msg.content:
+        return []
     try:
-        if isinstance(payload, dict):
-            if isinstance(payload.get("added"), list):
-                hashes.extend([str(x) for x in payload["added"]])
-            if isinstance(payload.get("hashes"), list):
-                hashes.extend([str(x) for x in payload["hashes"]])
-            if isinstance(payload.get("phash"), list):
-                hashes.extend([str(x) for x in payload["phash"]])
-            for k in ("phash", "hash"):
-                v = payload.get(k)
-                if isinstance(v, str):
-                    hashes.append(v)
+        start = msg.content.find("{")
+        end = msg.content.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            j = json.loads(msg.content[start:end+1])
+            if isinstance(j, dict) and "phash" in j and isinstance(j["phash"], list):
+                uniq, seen = [], set()
+                for h in j["phash"]:
+                    s = str(h).strip()
+                    if s and s not in seen:
+                        seen.add(s); uniq.append(s)
+                return uniq
     except Exception:
         pass
-    uniq, seen = [], set()
-    for h in hashes:
-        k = h.strip()
-        if k and k not in seen:
-            seen.add(k); uniq.append(k)
-    return uniq
+    return []
+
+def _render_db_content(arr: List[str]) -> str:
+    data = {"phash": arr}
+    return f"{PHASH_DB_TITLE}\n```json\n{json.dumps(data, ensure_ascii=False)}\n```"
 
 class PhishHashInbox(commands.Cog):
-    """Watch thread 'imagephising', register pHash via dashboard API, and notify parent channel with SPOILER JSON."""
+    """Watch a specific thread and register pHash values into a JSON message in the parent channel."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    async def _find_db_message(self, channel: discord.TextChannel) -> Optional[Message]:
+        async for m in channel.history(limit=100):
+            if (m.content or "").startswith(PHASH_DB_TITLE):
+                return m
+        return None
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):
@@ -63,42 +71,69 @@ class PhishHashInbox(commands.Cog):
         except Exception:
             return
 
-        parent = ch.parent or ch
+        atts = [a for a in message.attachments if _is_image_attachment(a)]
+        if not atts:
+            return
 
-        added_hashes: List[str] = []
         filenames: List[str] = []
+        added_hashes: List[str] = []
+        all_hashes: List[str] = []
+
+        # load cfg defaults safely
+        try:
+            from satpambot.bot.modules.discord_bot.helpers import static_cfg
+        except Exception:
+            class static_cfg:
+                PHASH_MAX_FRAMES = 6
+                PHASH_AUGMENT_REGISTER = True
+                PHASH_AUGMENT_PER_FRAME = 5
+
         async with aiohttp.ClientSession() as session:
-            for att in message.attachments:
-                if not _is_image_attachment(att):
-                    continue
-                filenames.append(att.filename or "image")
+            for att in atts:
                 try:
-                    data = await att.read()
-                    if not data:
-                        continue
-                    fd = aiohttp.FormData()
-                    fd.add_field("file", data, filename=att.filename or "image",
-                                 content_type=att.content_type or "application/octet-stream")
-                    async with session.post(PHASH_API, data=fd, timeout=aiohttp.ClientTimeout(total=45)) as resp:
-                        payload = None
-                        try:
-                            payload = await resp.json()
-                        except Exception:
-                            payload = None
-                        added_hashes.extend(_extract_hashes(payload))
+                    async with session.get(att.url) as r:
+                        raw = await r.read()
                 except Exception:
                     continue
+                hs = img_hashing.phash_list_from_bytes(
+                    raw,
+                    max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 6),
+                    augment=getattr(static_cfg, "PHASH_AUGMENT_REGISTER", True),
+                    augment_per_frame=getattr(static_cfg, "PHASH_AUGMENT_PER_FRAME", 5),
+                )
+                if hs:
+                    all_hashes.extend(hs)
+                    filenames.append(att.filename or "file")
 
-        if not (filenames or added_hashes):
+        if not all_hashes:
             return
+
+        parent = ch.parent or ch
+        db_msg = await self._find_db_message(parent)
+        existing: List[str] = _extract_hashes_from_msg(db_msg) if db_msg else []
+        existing_set = set(existing)
+        for h in all_hashes:
+            if h not in existing_set:
+                existing.append(h)
+                existing_set.add(h)
+                added_hashes.append(h)
+
+        try:
+            content = _render_db_content(existing)
+            if db_msg:
+                await db_msg.edit(content=content, allowed_mentions=AllowedMentions.none())
+            else:
+                db_msg = await parent.send(content, allowed_mentions=AllowedMentions.none())
+        except Exception:
+            pass
 
         sample_hash = ", ".join(f"`{x[:16]}…`" for x in added_hashes[:3]) if added_hashes else "-"
         sample_file = ", ".join(f"`{x}`" for x in filenames[:3]) if filenames else "-"
 
-        emb = Embed(
+        emb = discord.Embed(
             title="✅ Phish image registered",
-            description="Gambar dari thread **imagephising** berhasil diproses & didaftarkan.",
-            colour=Colour.green(),
+            description=f"Gambar dari thread **{TARGET_THREAD_NAME}** berhasil diproses & didaftarkan.",
+            colour=discord.Colour.green(),
         )
         emb.add_field(name="Files", value=str(len(filenames)), inline=True)
         emb.add_field(name="Hashes added", value=str(len(added_hashes)), inline=True)
@@ -107,45 +142,13 @@ class PhishHashInbox(commands.Cog):
         emb.add_field(name="Contoh File", value=sample_file, inline=False)
         emb.set_footer(text="SatpamBot • Inbox watcher")
 
-        file_arg = None; tmp_path = None
-        if added_hashes:
-            try:
-                with tempfile.NamedTemporaryFile("w+", encoding="utf-8", suffix=".json", delete=False) as tf:
-                    json.dump({"added": added_hashes}, tf, ensure_ascii=False, indent=2)
-                    tmp_path = tf.name
-                file_arg = File(tmp_path, filename="SPOILER_phash_added.json", spoiler=True)
-            except Exception:
-                file_arg = None
-
         try:
-            await parent.send(embed=emb, file=file_arg, allowed_mentions=AllowedMentions.none())
+            await message.reply(embed=emb, allowed_mentions=AllowedMentions.none())
         except Exception:
             pass
-        finally:
-            if tmp_path:
-                try: os.remove(tmp_path)
-                except Exception: pass
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishHashInbox(bot))
 
 def legacy_setup(bot: commands.Bot):
     bot.add_cog(PhishHashInbox(bot))
-
-
-async def _hashes_from_attachment(att, session):
-    try:
-        async with session.get(att.url) as r:
-            data = await r.read()
-    except Exception:
-        return []
-    try:
-        from satpambot.bot.modules.discord_bot.helpers import static_cfg
-    except Exception:
-        class static_cfg: PHASH_MAX_FRAMES = 6; PHASH_AUGMENT_REGISTER = True; PHASH_AUGMENT_PER_FRAME = 5
-    return img_hashing.phash_list_from_bytes(
-        data,
-        max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 6),
-        augment=getattr(static_cfg, "PHASH_AUGMENT_REGISTER", True),
-        augment_per_frame=getattr(static_cfg, "PHASH_AUGMENT_PER_FRAME", 5),
-    )
