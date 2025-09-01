@@ -131,3 +131,21 @@ async def setup(bot: commands.Bot):
 
 def legacy_setup(bot: commands.Bot):
     bot.add_cog(PhishHashInbox(bot))
+
+
+async def _hashes_from_attachment(att, session):
+    try:
+        async with session.get(att.url) as r:
+            data = await r.read()
+    except Exception:
+        return []
+    try:
+        from satpambot.bot.modules.discord_bot.helpers import static_cfg
+    except Exception:
+        class static_cfg: PHASH_MAX_FRAMES = 6; PHASH_AUGMENT_REGISTER = True; PHASH_AUGMENT_PER_FRAME = 5
+    return img_hashing.phash_list_from_bytes(
+        data,
+        max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 6),
+        augment=getattr(static_cfg, "PHASH_AUGMENT_REGISTER", True),
+        augment_per_frame=getattr(static_cfg, "PHASH_AUGMENT_PER_FRAME", 5),
+    )
