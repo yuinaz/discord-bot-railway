@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-temp_dismiss_log.py (targeted v2.6b)
+temp_dismiss_log.py (targeted v2.6c)
 ------------------------------------
-HANYA hapus pesan bot dengan embed-title berikut (case-insensitive, exact):
-  - "Lists updated"
-  - "Phish image registered"
+HANYA hapus pesan bot di #log-botphising (+ thread di bawahnya, kecuali "memory W*B")
+dengan embed title yang MENGANDUNG (case-insensitive) salah satu frasa:
+  - "lists updated"
+  - "phish image registered"
+Ini mengatasi judul yang ada emoji di depan seperti "✅ Phish image registered".
 
-Ruang lingkup:
-- Channel #log-botphising dan semua thread di bawahnya
-- KECUALI thread "memory W*B" (tidak pernah dihapus)
-- Pesan lama (>=60 dtk) ikut dibersihkan SEKALI saat startup (backfill)
-- TANPA ENV
+Pesan baru: dihapus tepat saat umur 60 dtk.
+Pesan lama: dibersihkan SEKALI saat startup (backfill).
 
-Catatan izin: hapus pesan bot sendiri biasanya cukup; untuk aman beri Manage Messages di channel log.
+Tidak pakai ENV.
 """
 from __future__ import annotations
 import asyncio
@@ -25,7 +24,7 @@ from discord.ext import commands
 CHANNEL_NAME = "log-botphising"
 EXCLUDED_THREAD_NAME = "memory W*B"
 DISMISS_AFTER_SEC = 60
-TARGET_TITLES = {"lists updated", "phish image registered"}  # exact, case-insensitive
+TARGET_PHRASES = ("lists updated", "phish image registered")
 
 class TempDismissLog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -50,8 +49,8 @@ class TempDismissLog(commands.Cog):
 
     def _matches_target(self, embeds: List[discord.Embed]) -> bool:
         for e in embeds or []:
-            title = (e.title or "").strip().lower()
-            if title in TARGET_TITLES:
+            t = (e.title or "").strip().lower()
+            if any(p in t for p in TARGET_PHRASES):
                 return True
         return False
 
@@ -83,8 +82,7 @@ class TempDismissLog(commands.Cog):
             return
         if not message.embeds or not self._matches_target(message.embeds):
             return
-        # schedule deletion exactly at 60s age
-        self.bot.loop.create_task(self._delete_at_60s(message))
+        asyncio.create_task(self._delete_at_60s(message))
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
@@ -94,7 +92,7 @@ class TempDismissLog(commands.Cog):
             return
         if not after.embeds or not self._matches_target(after.embeds):
             return
-        self.bot.loop.create_task(self._delete_at_60s(after))
+        asyncio.create_task(self._delete_at_60s(after))
 
     # ---------- backfill sekali saat startup ----------
     async def _backfill_cleanup(self):
@@ -115,13 +113,21 @@ class TempDismissLog(commands.Cog):
                     if (th.name or "").lower() == EXCLUDED_THREAD_NAME.lower():
                         continue
                     await self._clean_one(th)
-                # bersihkan thread arsip terbaru (opsional)
+                # bersihkan beberapa thread arsip (opsional, ignore error bila API beda)
                 try:
-                    archived = await ch.archived_threads(limit=10).flatten()
-                    for th in archived:
-                        if (th.name or "").lower() == EXCLUDED_THREAD_NAME.lower():
-                            continue
-                        await self._clean_one(th)
+                    it = ch.archived_threads(limit=10)  # may return iterator or need flatten(); handle both
+                    try:
+                        threads = await it.flatten()  # type: ignore[attr-defined]
+                        for th in threads:
+                            if (th.name or "").lower() == EXCLUDED_THREAD_NAME.lower():
+                                continue
+                            await self._clean_one(th)
+                    except Exception:
+                        # fallback: async iterate if supported
+                        async for th in it:  # type: ignore
+                            if (th.name or "").lower() == EXCLUDED_THREAD_NAME.lower():
+                                continue
+                            await self._clean_one(th)
                 except Exception:
                     pass
         except Exception:
@@ -134,7 +140,6 @@ class TempDismissLog(commands.Cog):
                     continue
                 if not m.embeds or not self._matches_target(m.embeds):
                     continue
-                # hapus yang umurnya >= 60s
                 created = m.created_at
                 if created and created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
