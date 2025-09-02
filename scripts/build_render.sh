@@ -1,34 +1,20 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
-# ===== Render cached build for Python =====
-# - Uses pip cache between deploys (Render Build Cache)
-# - Skips reinstall when requirements.txt hash is unchanged
+echo "[build] Python: $(python --version 2>&1 || true)"
+echo "[build] Pip   : $(python -m pip --version 2>&1 || true)"
 
-CACHE_DIR=".pip-cache"
-REQ_HASH_FILE=".render-requirements.hash"
-
-echo "==> Python $(python --version 2>&1)"
-python -m pip install -U pip wheel >/dev/null
+echo "[build] Upgrading pip toolchain..."
+python -m pip install -U pip setuptools wheel
 
 if [[ ! -f requirements.txt ]]; then
-  echo "ERROR: requirements.txt not found at project root"
-  exit 1
+  echo "[error] requirements.txt not found!"; exit 1
 fi
 
-# compute hash of requirements.txt
-REQ_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
+echo "[build] Installing from requirements.txt (pinned, reproducible) ..."
+python -m pip install -r requirements.txt
 
-if [[ -f "${REQ_HASH_FILE}" ]] && [[ "$(cat "${REQ_HASH_FILE}")" == "${REQ_HASH}" ]]; then
-  echo "==> requirements.txt unchanged, SKIP pip install (using cache)."
-  # still ensure cache dir exists for future builds
-  mkdir -p "${CACHE_DIR}"
-else
-  echo "==> requirements.txt changed/new, installing dependencies (cached)..."
-  python -m pip install --cache-dir "${CACHE_DIR}" -r requirements.txt
-  echo "${REQ_HASH}" > "${REQ_HASH_FILE}"
-fi
+echo "[build] Verifying environment with pip check ..."
+python -m pip check || { echo "[warn] pip check reported issues"; exit 1; }
 
-# do not fail build on optional dependency warnings
-python -m pip check || true
-echo "==> Build finished (cached)."
+echo "[build] Done."
