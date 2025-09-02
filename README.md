@@ -1,113 +1,173 @@
-# SatpamBot 🚨
 
-**SatpamBot** adalah bot Discord + dashboard web untuk menjaga server dari spam & phishing secara otomatis.  
-Bot ini dilengkapi **dashboard modern** dengan **login glassmorphism + animasi**, serta kontrol keamanan yang bisa diatur realtime.
+# SatpamBot — Discord Security Bot + Dashboard
 
----
+SatpamBot is a Discord moderation/security bot with a minimal web dashboard. It focuses on **anti‑phishing**, **link/attachment heuristics**, **image phash detection**, and quality‑of‑life tools for moderators.  
+This repo also includes a **Dashboard** (theme: `gtake`) with a mini monitor and security views.
 
-## ✨ Fitur Utama
-
-- **🤖 Bot Discord**
-  - Auto-ban pengguna yang mengirim gambar phishing (pHash detection).
-  - Anti-link phishing dengan whitelist domain (Facebook, TikTok, dll).
-  - Ban log rapi di thread khusus `#log-botphishing`.
-  - Presence status sticky dengan jam lokal (Asia/Jakarta).
-  - Command `!whitelist` langsung update whitelist realtime.
-
-- **📊 Dashboard Web**
-  - Login modern (glassmorphism + animasi partikel).
-  - Tab **Security**:
-    - Toggle Autoban Phishing.
-    - Slider ambang batas pHash.
-    - Editor Whitelist Domain (realtime).
-    - Pengaturan tampilan Login (Logo, Background, Particles).
-  - Tab **Phish Lab**: drag & drop gambar untuk dites apakah terdeteksi phishing.
-  - Mini Monitor: realtime CPU, RAM, uptime.
-  - Floating ban window: animasi daftar user yang baru dibanned.
-
-- **⚙️ Konfigurasi via JSON (tanpa ENV tambahan)**
-  - `data/ui_config.json` → Logo, background, animasi login.
-  - `data/whitelist_domains.json` → daftar domain yang aman.
-  - `data/phish_config.json` → ambang pHash & toggle autoban.
+> **This README is tailored to your current setup** (Render deploy + GitHub auto‑sync for WL/BL). Adjust paths/names to your environment where needed.
 
 ---
 
-## 📥 Instalasi
+## ✨ Highlights
 
-### 1. Clone repo
-```bash
-git clone https://github.com/username/SatpamBot.git
-cd SatpamBot
+- **Anti‑Phishing Link Guard**: domain allow/deny, risky TLD thresholds, punycode flag, URL resolve, per‑user rate limits.
+- **Image Scam Detection**: pHash/aHash/dHash + optional ORB matches, auto‑ban thresholds.
+- **Whitelist/Blacklist via Threads** (no commands needed):  
+  In `#log-botphising` create 2 threads: any thread **containing** `whitelist` and another **containing** `blacklist`.  
+  Moderators can just type `domain.com` or upload `.txt/.json` to update lists.
+- **Memory Thread ("memory W*B")**: pinned embed + attachments `whitelist.txt` and `blacklist.txt`, updated automatically.
+- **GitHub Sync (optional)**: persist WL/BL changes by committing JSON/TXT files back to the repo (anti‑reset across redeploys).
+- **Does not modify** your existing `ban` / `testban` commands or the web UI.
+
+---
+
+## 🧱 Architecture (high‑level)
+
+```
+satpambot/
+  bot/
+    modules/discord_bot/
+      cogs/
+        auto_lists.py         # NEW: watch WL/BL threads, save domains, update "memory W*B"
+        ... (other cogs)
+      helpers/
+        lists_loader.py       # NEW compat: unified load/save for WL/BL
+        memory_wb.py          # NEW: create/update the "memory W*B" thread (embed + files)
+        github_sync.py        # NEW: commit files to GitHub via REST API
+  dashboard/
+    ... (web UI; untouched by this patch)
+data/
+  whitelist_domains.json      # list[str]
+  blacklist_domains.json      # list[str]
+  url_whitelist.json          # {"allow": [...]}
+  url_blocklist.json          # {"domains": [...]}
+whitelist.txt                 # mirror (1 domain/line)
+blacklist.txt
+scripts/
+  migrate_lists.py            # normalize old formats -> unified files above
+  cleanup_duplicates.py       # remove common duplicate folders (optional)
 ```
 
-### 2. Buat virtualenv (opsional tapi direkomendasikan)
-```bash
-python -m venv venv
-source venv/bin/activate   # Linux / Mac
-venv\Scripts\activate      # Windows
-```
+> Your bot’s cog loader auto‑scans `cogs/`, so `auto_lists.py` is loaded without further changes.
 
-### 3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+---
 
-### 4. Konfigurasi ENV
-Buat file `.env` di root:
-```ini
-DISCORD_TOKEN=xxx
-GUILD_ID=1234567890
-ADMIN_USER=admin
-ADMIN_PASSWORD=supersecret
-LOG_CHANNEL_ID=1234567890
-TZ=Asia/Jakarta
-```
-*(Gunakan variabel ENV lama, patch terbaru tidak menambah ENV baru)*
+## 🔐 Discord Setup
 
-### 5. Jalankan bot + dashboard
+1. In the Discord Developer Portal, **enable _Message Content Intent_**.
+2. Invite the bot with permissions to your server.
+3. In your server, ensure the bot has at least:
+   - `Send Messages`, `Read Message History`
+   - `Create/Manage Threads`
+   - `Attach Files`, `Add Reactions`
+   - *(Optional)* `Manage Messages` (to clean up old attachment messages in the memory thread)
+
+---
+
+## ⚙️ Environment Variables
+
+> Below are the **relevant** variables for this patch. Keep your existing ones for other features (OCR, NSFW, etc.).  
+> **Never commit real secrets.** Set them in Render or your host’s secret store.
+
+**Log & Memory Thread**
+- `LOG_CHANNEL_ID` — numeric ID of `#log-botphising` (preferred)
+- `LOG_CHANNEL_NAME` — fallback name (default `log-botphising`)
+- `MEMORY_WB_THREAD_NAME` — thread name for embed/files (default `memory W*B`)
+
+**GitHub Sync (optional but recommended)**
+- `AUTO_LISTS_GH_SYNC=1` — enable commit of WL/BL files back to this repo
+- `GITHUB_TOKEN` — GitHub PAT with `repo` scope
+- `GITHUB_REPO` — e.g. `yuinaz/discord-bot-railway`
+- `GITHUB_BRANCH` — e.g. `main`
+
+**Repo paths for WL/BL (override if you prefer paths in repo)**
+- `GITHUB_WHITELIST_JSON_PATH` — default `data/whitelist_domains.json` *(you customised to `satpambot/data/whitelist.json`)*
+- `GITHUB_BLACKLIST_JSON_PATH` — default `data/blacklist_domains.json` *(you customised to `satpambot/data/blacklist.json`)*
+- `GITHUB_URL_WL_JSON_PATH` — default `data/url_whitelist.json`
+- `GITHUB_URL_BL_JSON_PATH` — default `data/url_blocklist.json`
+- `GITHUB_WHITELIST_TXT_PATH` — default `whitelist.txt`
+- `GITHUB_BLACKLIST_TXT_PATH` — default `blacklist.txt`
+
+**Local file paths (used by the engine)**
+- `WHITELIST_DOMAINS_FILE` — default `data/whitelist_domains.json`
+- `BLACKLIST_DOMAINS_FILE` — default `data/blacklist_domains.json`
+- `URL_WHITELIST_JSON_FILE` — default `data/url_whitelist.json`
+- `URL_BLOCKLIST_JSON_FILE` — default `data/url_blocklist.json`
+
+> Tip: Avoid setting `PYTHONPATH` to invalid values. If present as `PYTHONPATH="="`, remove it.
+
+---
+
+## 🚀 Local Development
+
 ```bash
+# (first time) unify legacy list files -> standard
+python scripts/migrate_lists.py
+
+# run your app (example; adjust to your entrypoint)
 python main.py
-```
-Akses dashboard di:  
-👉 `http://localhost:5000`
-
----
-
-## 🖼️ Screenshot
-
-### Login Page
-![Login Page](docs/screenshots/login.png)
-
-### Dashboard
-![Dashboard](docs/screenshots/dashboard.png)
-
----
-
-## 📂 Struktur Penting
-
-```
-SatpamBot/
-├── satpambot/
-│   ├── bot/
-│   └── dashboard/
-├── data/
-│   ├── ui_config.json
-│   ├── whitelist_domains.json
-│   ├── phish_config.json
-│   └── phish_phash.json
-├── requirements.txt
-└── main.py
+# or: uvicorn/gunicorn for the web, and a worker for the bot (depending on your setup)
 ```
 
----
-
-## ⚡ Quick Config via Dashboard
-
-- **Security tab** → toggle autoban, atur ambang pHash, edit whitelist, dan ganti tampilan login.
-- **Phish Lab tab** → drag & drop gambar phishing untuk dites.
-- **UI Config** tersimpan otomatis di `data/ui_config.json`.
+**What to expect on startup**
+- Loader logs that `auto_lists` is loaded.
+- Bot ensures/creates the thread **“memory W*B”** under `#log-botphising`.
+- A pinned embed appears with counts (WL/BL), plus a message with attachments `whitelist.txt` and `blacklist.txt`.
+- If `AUTO_LISTS_GH_SYNC=1`, WL/BL edits create commits in your GitHub repo.
 
 ---
 
-## 📜 Lisensi
-MIT License © 2025
+## 🧪 Moderator Flow (No Commands)
+
+- In the **whitelist thread** (name contains `whitelist`), type:  
+  `pixiv.com` → ✅ saved to WL files + memory thread updated.
+- In the **blacklist thread** (name contains `blacklist`), type:  
+  `contoh-phish.com` → ✅ saved to BL files + memory thread updated.
+- Upload `.txt` (1 domain per line) or `.json` (list or `{allow:[]}/{domains:[]}`) to bulk update.
+
+Files updated by each change:
+- `data/whitelist_domains.json`
+- `data/blacklist_domains.json`
+- `data/url_whitelist.json`
+- `data/url_blocklist.json`
+- `whitelist.txt` / `blacklist.txt`
+
+(If GitHub sync is enabled, these are also committed to the repo on each change.)
+
+---
+
+## ☁️ Deploy to Render
+
+> Assumes a single service that runs both web + bot (your `MODE=both`).
+
+1. Add the environment variables above in Render.
+2. Ensure secrets are set (Discord token, OCR keys, etc.).
+3. Set your **Start Command** to your entrypoint, e.g.:  
+   `python main.py`
+4. Deploy.
+
+**Sanity checks on Render logs**
+- No `AttributeError` from `helpers.lists_loader`.
+- Lines indicating `auto_lists` loaded and the memory thread updated.
+- If `AUTO_LISTS_GH_SYNC=1`, look for the “update WL()/BL()” commit messages in GitHub.
+
+---
+
+## 🔒 Security Notes
+
+- **Do not paste real tokens/keys into issues or public README.** Use environment variables.
+- If a secret was exposed, **rotate it immediately** (GitHub PAT, OpenAI key, Google Safe Browsing, OCR key, metrics token, Flask secret key, etc.).
+- Limit bot permissions to what’s necessary.
+
+---
+
+## 📜 License
+
+Choose a license and place it as `LICENSE` in the repo (MIT/Apache-2.0/etc.).
+
+---
+
+## 🙌 Credits
+
+Thanks to the maintainers & contributors. Dashboard theme preset: `gtake`.  
+This README was generated to match your current configuration (Render + GitHub WL/BL sync).

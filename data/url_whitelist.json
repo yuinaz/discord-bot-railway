@@ -1,3 +1,11 @@
 {
-  "allow": []
+  "allow": [
+    "facebook.com",
+    "fb.com",
+    "l.facebook.com",
+    "lm.facebook.com",
+    "m.facebook.com",
+    "tiktok.com",
+    "vm.tiktok.com"
+  ]
 }

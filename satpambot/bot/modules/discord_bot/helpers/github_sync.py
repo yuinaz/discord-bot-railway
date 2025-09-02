@@ -1,54 +1,57 @@
-
+# -*- coding: utf-8 -*-
+"""
+helpers/github_sync.py
+Commit file via GitHub REST API.
+ENV:
+  GITHUB_TOKEN (required)
+  GITHUB_REPO  (owner/repo, required)
+  GITHUB_BRANCH (default: main)
+"""
 from __future__ import annotations
-import aiohttp, asyncio, base64, logging, os
-from typing import Optional, Tuple
+import os, base64, json, urllib.request, urllib.error
+from typing import Dict, Optional
 
-log = logging.getLogger(__name__)
+GITHUB_API = "https://api.github.com"
 
-class GitHubClient:
-    def __init__(self, token: Optional[str] = None, timeout: float = 3.5):
-        self.token = (token or os.getenv("GITHUB_TOKEN","")).strip()
-        self.timeout = aiohttp.ClientTimeout(total=timeout)
+def _headers():
+    token = os.environ["GITHUB_TOKEN"]
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "satpambot-auto-lists",
+    }
 
-    def _headers(self):
-        h = {"Accept": "application/vnd.github+json"}
-        if self.token:
-            h["Authorization"] = f"Bearer {self.token}"
-        return h
+def _repo() -> str:
+    return os.environ["GITHUB_REPO"]
 
-    async def _get(self, url: str):
-        async with aiohttp.ClientSession(timeout=self.timeout) as s:
-            async with s.get(url, headers=self._headers()) as r:
-                if r.status == 200:
-                    return await r.json()
-                return None
+def _branch() -> str:
+    return os.getenv("GITHUB_BRANCH", "main")
 
-    async def _put(self, url: str, json_body: dict):
-        async with aiohttp.ClientSession(timeout=self.timeout) as s:
-            async with s.put(url, headers=self._headers(), json=json_body) as r:
-                if r.status in (200,201):
-                    return await r.json()
-                txt = await r.text()
-                log.debug("GitHub PUT %s -> %s %s", url, r.status, txt[:300])
-                return None
+def _get_sha_if_exists(path: str) -> Optional[str]:
+    url = f"{GITHUB_API}/repos/{_repo()}/contents/{path}?ref={_branch()}"
+    req = urllib.request.Request(url, headers=_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("sha")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+    except Exception:
+        return None
 
-    async def put_file(self, repo: str, path: str, content_bytes: bytes, commit_message: str, branch: Optional[str] = None):
-        # repo in "owner/name"
-        if not repo or "/" not in repo:
-            return False, "invalid-repo"
-        b64 = base64.b64encode(content_bytes).decode("ascii")
-        url = f"https://api.github.com/repos/{repo}/contents/{path.lstrip('/')}"
-        sha = None
-        try:
-            current = await self._get(url + (f"?ref={branch}" if branch else ""))
-            if current and isinstance(current, dict) and current.get("sha"):
-                sha = current["sha"]
-        except Exception:
-            pass
-        body = {"message": commit_message, "content": b64}
-        if branch:
-            body["branch"] = branch
-        if sha:
-            body["sha"] = sha
-        data = await self._put(url, body)
-        return (data is not None), ("ok" if data else "failed")
+def _put_file(path: str, content_b: bytes, message: str, sha: Optional[str]):
+    url = f"{GITHUB_API}/repos/{_repo()}/contents/{path}"
+    payload = {"message": message, "content": base64.b64encode(content_b).decode("ascii"), "branch": _branch()}
+    if sha:
+        payload["sha"] = sha
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=_headers(), method="PUT")
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        resp.read()
+
+def commit_files(files: Dict[str, bytes], message: str):
+    for path, content in files.items():
+        sha = _get_sha_if_exists(path)
+        _put_file(path, content, message, sha)
