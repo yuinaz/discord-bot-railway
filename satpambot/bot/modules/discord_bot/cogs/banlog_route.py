@@ -1,21 +1,21 @@
 
+from __future__ import annotations
 import discord
 from discord.ext import commands
 from satpambot.bot.modules.discord_bot.helpers import banlog_thread
 
 class BanLogRoute(commands.Cog):
-    """Mirror ban events into a dedicated 'Ban Log' thread inside the log channel.
-    This cog does not change existing logging; it only adds a dedicated thread entry.
+    """Route ban events into a dedicated 'Ban Log' thread in the log channel.
+    This does NOT change other logging; it only adds a thread entry for bans.
     """
-
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
         try:
-            thread = await banlog_thread.ensure_ban_thread(guild)
-            if not thread:
+            th = await banlog_thread.ensure_ban_thread(guild)
+            if not th:
                 return
             emb = discord.Embed(
                 title="🚫 User banned",
@@ -23,12 +23,9 @@ class BanLogRoute(commands.Cog):
                 colour=discord.Colour.red(),
             )
             emb.set_footer(text="SatpamBot • Ban log")
-            await thread.send(embed=emb, allowed_mentions=discord.AllowedMentions.none())
+            await th.send(embed=emb, allowed_mentions=discord.AllowedMentions.none())
         except Exception:
             pass
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(BanLogRoute(bot))
-
-def legacy_setup(bot: commands.Bot):
-    bot.add_cog(BanLogRoute(bot))
