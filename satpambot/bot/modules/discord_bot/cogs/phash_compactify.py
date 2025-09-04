@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-phash_compactify.py (v1b - keep original)
------------------------------------------
-Context menu "Compact pHash" to convert long pHash dump message into a compact,
-paginated embed with persistent buttons. This version **NEVER deletes** the
-original message — phash stays as a log.
-
-Also provides /phash_compact_post to post a compact view from the file store.
+phash_compactify.py (v1c - context menu top-level, keep original)
+- Context menu "Compact pHash" is defined at top-level (discord.py rule).
+- Creates compact, paginated embed with persistent buttons (Next/Prev etc.).
+- Original message is NOT deleted (acts as log).
+- Slash: /phash_compact_post
 """
 from __future__ import annotations
 import re, json, io, os
@@ -176,39 +174,39 @@ class PhashPersistentView(discord.ui.View):
             ephemeral=True
         )
 
+# --- Top-level Context Menu callback (discord.py requirement) ---
+async def compact_message_handler(interaction: discord.Interaction, message: discord.Message):
+    source_text = message.content or ""
+    if not source_text and message.embeds:
+        source_text = (message.embeds[0].description or "")
+
+    blob = _extract_json_blob(source_text)
+    if not blob:
+        return await interaction.response.send_message("❌ No JSON found in that message.", ephemeral=True)
+
+    items = _parse_hashes_from_json(blob)
+    if not items:
+        return await interaction.response.send_message("❌ Could not parse a pHash list from that message.", ephemeral=True)
+
+    pages = _pages_from_items(items)
+    payload = json.dumps(items, ensure_ascii=False).encode("utf-8")
+    file = discord.File(io.BytesIO(payload), filename=ATTACH_NAME)
+
+    view = PhashPersistentView()
+    embed = _embed_for_page(pages, 0)
+    await interaction.response.send_message(
+        content=f"**pHash compact view** (from message {message.id})",
+        embed=embed,
+        view=view,
+        file=file,
+        ephemeral=False
+    )
+    # NOTE: do not delete original message (keep log)
+
 class PhashCompactify(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         bot.add_view(PhashPersistentView())
-
-    @app_commands.context_menu(name="Compact pHash")
-    async def compact_message(self, interaction: discord.Interaction, message: discord.Message):
-        source_text = message.content or ""
-        if not source_text and message.embeds:
-            source_text = (message.embeds[0].description or "")
-
-        blob = _extract_json_blob(source_text)
-        if not blob:
-            return await interaction.response.send_message("❌ No JSON found in that message.", ephemeral=True)
-
-        items = _parse_hashes_from_json(blob)
-        if not items:
-            return await interaction.response.send_message("❌ Could not parse a pHash list from that message.", ephemeral=True)
-
-        pages = _pages_from_items(items)
-        payload = json.dumps(items, ensure_ascii=False).encode("utf-8")
-        file = discord.File(io.BytesIO(payload), filename=ATTACH_NAME)
-
-        view = PhashPersistentView()
-        embed = _embed_for_page(pages, 0)
-        await interaction.response.send_message(
-            content=f"**pHash compact view** (from message {message.id})",
-            embed=embed,
-            view=view,
-            file=file,
-            ephemeral=False
-        )
-        # NOTICE: original message is intentionally NOT deleted (keep as log).
 
     @app_commands.command(name="phash_compact_post", description="Post pHash DB as a compact pager")
     async def phash_compact_post(self, interaction: discord.Interaction):
@@ -231,7 +229,13 @@ class PhashCompactify(commands.Cog):
         )
 
 async def setup(bot: commands.Bot):
+    # load cog for slash command + persistent view
     await bot.add_cog(PhashCompactify(bot))
 
-def setup_old(bot: commands.Bot):
-    bot.add_cog(PhashCompactify(bot))
+    # register Context Menu at top-level
+    gid = os.getenv("GUILD_METRICS_ID")
+    if gid and gid.isdigit():
+        ctx = app_commands.ContextMenu(name="Compact pHash", callback=compact_message_handler, guild=discord.Object(id=int(gid)))
+    else:
+        ctx = app_commands.ContextMenu(name="Compact pHash", callback=compact_message_handler)
+    bot.tree.add_command(ctx)

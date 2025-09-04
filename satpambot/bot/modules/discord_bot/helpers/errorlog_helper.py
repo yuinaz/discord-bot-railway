@@ -46,3 +46,19 @@ def _resolve_error_channel(guild: discord.Guild) -> Optional[discord.TextChannel
             except Exception:
                 continue
     return None
+
+# --- compat: add log_error_embed if missing ---
+try:
+    log_error_embed
+except NameError:
+    import discord  # type: ignore
+    async def log_error_embed(channel, title: str, description: str):
+        try:
+            emb = discord.Embed(title=title, description=description, color=0xE74C3C)
+            await channel.send(embed=emb)
+        except Exception:
+            # Fallback teks supaya tidak memutus alur
+            try:
+                await channel.send(f"[ERROR] {title}: {description}")
+            except Exception:
+                pass
