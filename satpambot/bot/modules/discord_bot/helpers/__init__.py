@@ -1,9 +1,9 @@
-
-
-# --- compat: expose stdlib re/json for legacy imports ---
+from __future__ import annotations
+# Legacy re-exports for compatibility with old imports
+import re as re
+import json as json
 try:
-    import re as _compat_re, json as _compat_json  # noqa: F401
-    re = _compat_re
-    json = _compat_json
+    from . import threadlog, static_cfg, modlog, img_hashing, lists_loader, github_sync, log_utils  # noqa: F401
 except Exception:
+    # keep init lightweight; ignore failures
     pass
