@@ -38,7 +38,6 @@ class DummyBot:
         elif callable(fn):
             fn(self)
 
-    # for metrics.py
     def get_cog(self, name: str):
         return None
 

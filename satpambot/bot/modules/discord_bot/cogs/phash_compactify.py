@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 phash_compactify.py (v1c - context menu top-level, keep original)
-- Context menu "Compact pHash" is defined at top-level (discord.py rule).
-- Creates compact, paginated embed with persistent buttons (Next/Prev etc.).
-- Original message is NOT deleted (acts as log).
+- Context menu "Compact pHash" defined at top-level (discord.py rule).
+- Produces compact, paginated embed with persistent buttons.
+- Original message is NOT deleted (keeps log).
 - Slash: /phash_compact_post
 """
 from __future__ import annotations
@@ -201,7 +201,6 @@ async def compact_message_handler(interaction: discord.Interaction, message: dis
         file=file,
         ephemeral=False
     )
-    # NOTE: do not delete original message (keep log)
 
 class PhashCompactify(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -229,10 +228,7 @@ class PhashCompactify(commands.Cog):
         )
 
 async def setup(bot: commands.Bot):
-    # load cog for slash command + persistent view
     await bot.add_cog(PhashCompactify(bot))
-
-    # register Context Menu at top-level
     gid = os.getenv("GUILD_METRICS_ID")
     if gid and gid.isdigit():
         ctx = app_commands.ContextMenu(name="Compact pHash", callback=compact_message_handler, guild=discord.Object(id=int(gid)))
