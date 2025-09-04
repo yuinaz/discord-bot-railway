@@ -68,3 +68,9 @@ async def load_all(bot):
                 log.exception("[cogs_loader] failed %s: %s", mpath, e)
     if loaded == 0:
         log.warning("[cogs_loader] no cogs loaded from roots=%s", COG_ROOTS)
+
+# added by patch
+DEFAULT_COGS = DEFAULT_COGS + ["satpambot.bot.modules.discord_bot.cogs.phash_compactify"] if "DEFAULT_COGS" in globals() else ["satpambot.bot.modules.discord_bot.cogs.phash_compactify"]
+
+# added by patch
+DEFAULT_COGS = DEFAULT_COGS + ["satpambot.bot.modules.discord_bot.cogs.temp_dismiss_log"] if "DEFAULT_COGS" in globals() else ["satpambot.bot.modules.discord_bot.cogs.temp_dismiss_log"]
