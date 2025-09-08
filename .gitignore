@@ -18,3 +18,4 @@ Thumbs.db
 # Secrets
 .env
 .env.*
+data/uploads/
