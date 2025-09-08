@@ -121,7 +121,7 @@ def _resolve_log_channel() -> discord.TextChannel | None:
 async def status_heartbeat():
     ch = _resolve_log_channel()
     if ch:
-        await upsert_status_embed_in_channel(ch, STATUS_TEXT)
+        await upsert_status_embed_in_channel(bot, ch)
 
 @status_heartbeat.before_loop
 async def _hb_before_loop():
@@ -160,7 +160,7 @@ async def on_ready():
     ch = _resolve_log_channel()
     if ch:
         try:
-            await upsert_status_embed_in_channel(ch, STATUS_TEXT)
+            await upsert_status_embed_in_channel(bot, ch)
         except Exception as e:
             logging.warning(f"[status] upsert failed: {e}")
 

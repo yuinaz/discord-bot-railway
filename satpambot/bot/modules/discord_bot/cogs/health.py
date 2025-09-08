@@ -61,7 +61,7 @@ class Health(commands.Cog):
             await ctx.message.add_reaction("❌")
             await ctx.send(f"Tidak menemukan channel log <#{LOG_CHANNEL_ID}>.", delete_after=10)
             return
-        ok = await upsert_status_embed_in_channel(log_ch, "✅ SatpamBot online dan siap berjaga.")
+        ok = await upsert_status_embed_in_channel(self.bot, log_ch)
         await ctx.message.add_reaction("✅" if ok else "❌")
         if ctx.channel.id != log_ch.id:
             await ctx.send(f"Status diperbarui di {log_ch.mention}.", delete_after=6)
@@ -90,7 +90,7 @@ class Health(commands.Cog):
         async def loop():
             while True:
                 try:
-                    await upsert_status_embed_in_channel(log_ch, "✅ SatpamBot online dan siap berjaga.")
+                    await upsert_status_embed_in_channel(self.bot, log_ch)
                     await asyncio.sleep(600)  # 10 menit
                 except asyncio.CancelledError:
                     break
