@@ -1,3 +1,8 @@
+try:
+    import sitecustomize  # force keepalive /healthz to bind $PORT when running `python main.py`
+except Exception as _e:
+    print(f"[keepalive] init failed (sitecustomize): {_e}", flush=True)
+
 # Bridge entry for MONO run: keeps existing behavior, no config changes.
 from __future__ import annotations
 import asyncio
