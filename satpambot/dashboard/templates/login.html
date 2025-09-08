@@ -33,3 +33,33 @@
   </div>
 </section>
 {% endblock %}
+
+    <!-- Live Particles Background (no config change required) -->
+    <style>
+      html, body { height: 100%; }
+      #particles-js { position: fixed; inset: 0; z-index: -1; }
+      .login-card, .login-wrapper, .auth-card { position: relative; z-index: 1; }
+    </style>
+    <div id="particles-js"></div>
+    <script src="https://cdn.jsdelivr.net/npm/tsparticles@3/tsparticles.bundle.min.js"></script>
+    <script>
+      (async () => {
+        try {
+          await tsParticles.load({
+            id: "particles-js",
+            options: {
+              background: { color: { value: "transparent" } },
+              fullScreen: { enable: false },
+              particles: {
+                number: { value: 60, density: { enable: true, area: 800 } },
+                size: { value: 2 },
+                move: { enable: true, speed: 1 },
+                links: { enable: true, distance: 130, opacity: 0.5 },
+                opacity: { value: 0.6 }
+              },
+              detectRetina: true
+            }
+          });
+        } catch(e) { console && console.warn && console.warn("particles init failed", e); }
+      })();
+    </script>
