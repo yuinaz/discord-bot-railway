@@ -1,50 +1,55 @@
-# satpambot/bot/modules/discord_bot/cogs/moderation_test.py
 from __future__ import annotations
-
 import discord
 from discord.ext import commands
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 
-# Pakai checker yang sudah ada di repo kamu
-from modules.discord_bot.helpers.permissions import is_mod_or_admin
-
+# Checker izin bawaan proyek
+from satpambot.bot.modules.discord_bot.helpers.permissions import is_mod_or_admin
+# Helper ban-log
+from satpambot.bot.modules.discord_bot.helpers.banlog_thread import get_log_channel, ensure_ban_thread
 
 class ModerationTest(commands.Cog):
-    """Cog uji fitur moderasi. Semua output embed-only (tanpa gambar/sticker)."""
+    """Perintah uji moderasi (embed-only, tanpa aksi nyata)."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name="mt_embed", help="Kirim embed uji coba")
+    @commands.guild_only()
     @commands.check(is_mod_or_admin)
-    async def mt_embed(self, ctx: commands.Context, *, reason: str = "Test embed"):
-        embed = discord.Embed(
-            title="✅ Test Embed",
-            description=reason,
-            colour=discord.Colour.green(),
-        )
-        embed.set_footer(text=f"Requested by {ctx.author}")
-        await ctx.send(embed=embed)
-
-    @commands.command(name="mt_tb", help="Simulasi testban (embed-only)")
-    @commands.check(is_mod_or_admin)
-    async def mt_tb(
-        self,
-        ctx: commands.Context,
-        member: Optional[discord.Member] = None,
-        *,
-        reason: str = "Testban",
-    ):
+    @commands.command(name="testban", help="Kirim embed simulasi ban ke channel ini dan mirror ke Ban Log (tanpa aksi nyata).")
+    async def testban(self, ctx: commands.Context, member: Optional[discord.Member] = None, *, reason: str = "kirim link NSFW / phishing"):
         target = member.mention if isinstance(member, discord.Member) else "—"
-        embed = discord.Embed(
-            title="🚧 Testban (embed-only)",
-            description=f"Target: {target}\nReason: {reason}",
-            colour=discord.Colour.orange(),
-        )
-        embed.set_footer(text=f"Requested by {ctx.author}")
-        await ctx.send(embed=embed)
 
+        # WIB time
+        wib = timezone(timedelta(hours=7))
+        ts = datetime.now(timezone.utc).astimezone(wib).strftime("%Y-%m-%d %H:%M WIB")
+
+        emb = discord.Embed(
+            title="💀 Simulasi Ban oleh SatpamBot",
+            description=(
+                f"{target} terdeteksi mengirim pesan mencurigakan.\n"
+                f"(Pesan ini hanya simulasi untuk pengujian.)\n"
+                f"Alasan mencurigakan: {reason}"
+            ),
+            colour=discord.Colour.red(),
+        )
+        emb.set_footer(text=f"Simulasi testban • Tidak ada aksi nyata yang dilakukan • {ts}")
+
+        # Kirim ke channel ini
+        try:
+            await ctx.send(embed=emb)
+        except Exception:
+            pass
+
+        # Mirror ke Ban Log
+        try:
+            ch = await get_log_channel(ctx.guild)
+            if ch:
+                th = await ensure_ban_thread(ch)
+                await th.send(embed=emb)
+        except Exception:
+            pass
 
 async def setup(bot: commands.Bot):
-    """Entry point standar untuk discord.py extensions."""
     await bot.add_cog(ModerationTest(bot))
