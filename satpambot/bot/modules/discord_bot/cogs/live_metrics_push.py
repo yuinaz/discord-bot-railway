@@ -146,7 +146,7 @@ class LiveMetricsPush(commands.Cog):
         try:
             await self.bot.wait_until_ready()
         except Exception:
-            await asyncio.sleep(5)
+            await asyncio.sleep(INTERVAL_SECONDS)
 
 async def setup(bot):
     await bot.add_cog(LiveMetricsPush(bot))
