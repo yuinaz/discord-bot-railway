@@ -68,9 +68,35 @@ async def load_all(bot):
                 log.exception("[cogs_loader] failed %s: %s", mpath, e)
     if loaded == 0:
         log.warning("[cogs_loader] no cogs loaded from roots=%s", COG_ROOTS)
+    try:
+        await _force_load(bot)
+    except Exception:
+        pass
 
 # added by patch
 DEFAULT_COGS = DEFAULT_COGS + ["satpambot.bot.modules.discord_bot.cogs.phash_compactify"] if "DEFAULT_COGS" in globals() else ["satpambot.bot.modules.discord_bot.cogs.phash_compactify"]
 
 # added by patch
 DEFAULT_COGS = DEFAULT_COGS + ["satpambot.bot.modules.discord_bot.cogs.temp_dismiss_log"] if "DEFAULT_COGS" in globals() else ["satpambot.bot.modules.discord_bot.cogs.temp_dismiss_log"]
+
+
+# === added by patch: force-load critical cogs to avoid miss ===
+FORCE_COGS = [
+    "satpambot.bot.modules.discord_bot.cogs.anti_url_phish_guard",
+    "satpambot.bot.modules.discord_bot.cogs.banlog_route",
+    "satpambot.bot.modules.discord_bot.cogs.moderation_test",
+]
+
+async def _force_load(bot):
+    for mpath in FORCE_COGS:
+        short = mpath.rsplit(".", 1)[-1]
+        if short in DISABLED_COGS:
+            continue
+        try:
+            await bot.load_extension(mpath)
+            log.info("[cogs_loader] force-loaded %s", mpath)
+        except Exception as e:
+            # ignore AlreadyLoaded; log others
+            if "already loaded" not in str(e).lower():
+                log.debug("[cogs_loader] force-load skip %s: %s", mpath, e)
+# === end patch ===

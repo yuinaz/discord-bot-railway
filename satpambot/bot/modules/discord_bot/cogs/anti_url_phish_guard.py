@@ -545,35 +545,120 @@ async def on_message(self, message: discord.Message):
 
 
     async def _post_ban_embed(self, message: discord.Message, reason: str, tag: str = "[auto-ban]", url: str | None = None):
-        """Kirim embed ban ke channel pelanggaran dan mirror ke Ban Log thread (jika ada)."""
+
+
+        """Kirim embed ban ke channel pelanggaran (WIB + alasan). Mirror Ban Log dimatikan — banlog_route menangani via on_member_ban."""
+
+
+        from datetime import datetime, timezone, timedelta
+
+
         try:
-            emb = discord.Embed(
-                title="🔨 Banned",
-                description=f"{getattr(message.author, 'mention', str(message.author))}",
-                colour=discord.Colour.red(),
-            )
-            if url:
-                emb.add_field(name="URL", value=url, inline=False)
-            emb.add_field(name="Reason", value=reason or "—", inline=False)
-            emb.set_footer(text=f"{tag} • #{getattr(message.channel, 'name', '?')}")
+
+
+            policy = self._load_policy_cached()
+
+
+            purge_days = int(policy.get("ban_delete_days", 7))
+
+
         except Exception:
-            emb = None
-        # Send to offending channel
-        if emb:
-            try:
-                await message.channel.send(embed=emb)
-            except Exception:
-                pass
-        # Mirror to Ban Log thread
+
+
+            purge_days = 7
+
+
+    
+
+
+        wib = timezone(timedelta(hours=7))
+
+
+        ts = datetime.now(timezone.utc).astimezone(wib).strftime("%Y-%m-%d %H:%M WIB")
+
+
+    
+
+
+        mention = getattr(message.author, "mention", str(message.author))
+
+
+        ch_name = getattr(message.channel, "name", "?")
+
+
+    
+
+
+        tag_l = (tag or "").lower()
+
+
+        rsn_l = (reason or "").lower()
+
+
+        category = "NSFW" if "nsfw" in tag_l or "nsfw" in rsn_l else ("Phishing/Unknown" if "invite" in tag_l or "unknown" in tag_l or (url and "discord.gg" in str(url).lower()) else "Mencurigakan")
+
+
+        default_reason = "kirim link NSFW" if category == "NSFW" else "kirim link phishing/undangan mencurigakan"
+
+
+        alasan = reason or default_reason
+
+
+    
+
+
+        lines = [f"{mention} terdeteksi mengirim pesan mencurigakan."]
+
+
+        if url: lines.append(f"URL: {url}")
+
+
+        lines.append(f"Alasan mencurigakan: {alasan} ({category})")
+
+
+        lines.append(f"Pesan telah dihapus. Pengguna telah di-ban. (Riwayat {purge_days} hari dihapus)")
+
+
+        description = "\n".join(lines)
+
+
+    
+
+
+        emb = discord.Embed(
+
+
+            title="💀 Ban Otomatis oleh SatpamBot",
+
+
+            description=description,
+
+
+            colour=discord.Colour.red(),
+
+
+        )
+
+
+        emb.set_footer(text=f"{tag} • #{ch_name} • {ts}")
+
+
+    
+
+
         try:
-            from satpambot.bot.modules.discord_bot.helpers.banlog_thread import get_log_channel, ensure_ban_thread
-            ch = await get_log_channel(message.guild)
-            if ch:
-                th = await ensure_ban_thread(ch)
-                if emb:
-                    await th.send(embed=emb)
+
+
+            await message.channel.send(embed=emb)
+
+
         except Exception:
+
+
             pass
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(AntiUrlPhishGuard(bot))
+
+    
+
+
+        # Mirror Ban Log dimatikan (hindari duplikat); banlog_route on_member_ban akan menulis log.
