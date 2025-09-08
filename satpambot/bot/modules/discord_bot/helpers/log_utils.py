@@ -157,10 +157,47 @@ async def upsert_status_embed_in_channel(bot: discord.Client, ch: discord.TextCh
     except Exception as e:
         log.warning("[status] upsert error: %s", e)
 
-async def upsert_status_embed(bot: discord.Client, guild: discord.Guild):
-    ch = await _find_channel_by_id_or_name(bot, guild)
-    if ch:
+async def upsert_status_embed(bot: discord.Client, target) -> None:
+    """Tolerant: target boleh Guild/Channel/ctx/int(str ID)/str(nama)."""
+    import discord as _d
+    guild = None
+    ch = None
+    # Normalize target types
+    if isinstance(target, _d.TextChannel):
+        ch = target
+        guild = target.guild
+    elif isinstance(target, _d.Guild):
+        guild = target
+    elif hasattr(target, 'guild'):
+        try:
+            guild = getattr(target, 'guild')
+            if hasattr(target, 'channel') and isinstance(getattr(target, 'channel'), _d.TextChannel):
+                ch = getattr(target, 'channel')
+        except Exception:
+            guild = None
+    elif isinstance(target, int):
+        ch = bot.get_channel(target)
+        if isinstance(ch, _d.TextChannel):
+            guild = ch.guild
+    elif isinstance(target, str):
+        name = target.lstrip('#').strip()
+        for g in bot.guilds:
+            cand = _d.utils.get(g.text_channels, name=name)
+            if isinstance(cand, _d.TextChannel):
+                ch = cand
+                guild = g
+                break
+    # Fallback: pick first guild
+    if ch is None:
+        if guild is None and bot.guilds:
+            guild = bot.guilds[0]
+        if guild is not None:
+            ch = await _find_channel_by_id_or_name(bot, guild)
+    if isinstance(ch, _d.TextChannel):
         await upsert_status_embed_in_channel(bot, ch)
+    else:
+        log.warning('[status] upsert skipped: cannot resolve TextChannel from target=%r', target)
+
 
 
 def log_startup_status(bot: discord.Client, guild: discord.Guild) -> None:
