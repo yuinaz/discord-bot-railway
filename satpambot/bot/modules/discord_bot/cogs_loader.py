@@ -50,3 +50,12 @@ async def load_all(bot):
 async def load_cogs(bot):
     # Alias lama (kompatibel)
     return await load_all(bot)
+
+
+# === additive: safe import helper (no config/env change) ===
+import importlib as _importlib
+def try_import(modname: str):
+    try:
+        return _importlib.import_module(modname), None
+    except Exception as e:
+        return None, f"{modname}: {e.__class__.__name__}: {e}"
