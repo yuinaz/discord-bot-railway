@@ -15,15 +15,16 @@ class TBAliasCog(commands.Cog):
         getc = getattr(self.bot, "get_command", None)
         if not callable(getc):
             return None
-        # Jangan forward ke 'tb' sendiri agar tidak rekursif
         for name in FORWARD_CANDIDATES:
             cmd = getc(name)
             if cmd is not None:
                 return cmd
         return None
 
-    @commands.command(name="tb", help="Alias legacy: tb -> tban/tempban/ban (forwarder)")
-    async def tb(self, ctx: commands.Context, *args):
+    @commands.command(name="tb", help="Alias ke tban/tempban/ban bila `!tb` belum tersedia.")
+    @commands.guild_only()
+    @commands.has_permissions(ban_members=True)
+    async def tb_alias(self, ctx: commands.Context, *args):
         target_cmd = self._resolve_target()
         if target_cmd is None:
             await ctx.reply(

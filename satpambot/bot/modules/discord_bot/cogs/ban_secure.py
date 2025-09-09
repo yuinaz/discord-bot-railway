@@ -98,7 +98,7 @@ class BanSecure(commands.Cog):
         except Exception as e:
             log.warning("Gagal tulis banlog: %s", e)
 
-    @commands.command(name="tb", aliases=["testban"], help="Simulasi ban yang aman: reply pesan atau sebut member. Contoh: !tb [@user] [alasan]")
+    @commands.command(name="_tb_secure_disabled", aliases=["testban"], help="Simulasi ban yang aman: reply pesan atau sebut member. Contoh: !tb [@user] [alasan]")
     @require_mod()
     @commands.guild_only()
     async def testban(self, ctx: commands.Context, member: Optional[discord.Member]=None, *, reason: str=""):
