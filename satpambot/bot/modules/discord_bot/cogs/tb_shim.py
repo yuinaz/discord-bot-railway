@@ -1,69 +1,104 @@
 from __future__ import annotations
 
-import datetime as _dt
+import datetime
 from typing import Optional
 
 import discord
 from discord.ext import commands
 
-WIB = _dt.timezone(_dt.timedelta(hours=7))
 
 def _wib_now_str() -> str:
-    return _dt.datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S WIB")
+    tz = datetime.timezone(datetime.timedelta(hours=7))
+    return datetime.datetime.now(tz=tz).strftime("%Y-%m-%d %H:%M:%S WIB")
 
-def _resolve_target(ctx: commands.Context) -> Optional[discord.abc.User]:
-    """Try to find a target for simulation:
-    - If command is a reply -> author of the referenced message
-    - Else first mentioned user/member
-    - Else None (still allowed)"""
-    # reply target
-    ref = ctx.message.reference
-    if ref and isinstance(ref.resolved, discord.Message) and ref.resolved.author:
-        return ref.resolved.author
-
-    # mention target
-    if ctx.message.mentions:
-        return ctx.message.mentions[0]
-
-    return None
 
 class TBShimFormatted(commands.Cog):
-    """Single-source `!tb` simulation. Always responds with a clean embed (no errors)."""
+    """Simulasi ban (tidak ada aksi nyata). Selalu tersedia sebagai `!tb`.
+    Tujuan: command ini **tidak pernah gagal**, sekalipun tanpa @user dan tanpa alasan.
+    - Target prioritas: reply target > mention pertama > ctx.author
+    - Tidak ada aksi ban sungguhan; hanya kirim embed verifikasi untuk workflow moderator.
+    """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.command(name="tb", aliases=["testban"], help="Simulasi ban (tidak ada aksi nyata).")
-    async def tb(self, ctx: commands.Context, *, reason: str = "") -> None:
-        target = _resolve_target(ctx)
-        location = f"#{ctx.channel.name} • {ctx.guild.name}" if ctx.guild and ctx.channel else "DM/Unknown"
-        alasan = reason.strip() if reason.strip() else "—"
+    @commands.command(name="tb", help="Simulasi testban: `!tb [@user] [alasan?]` (tanpa parameter pun tetap jalan).")
+    @commands.guild_only()
+    @commands.has_permissions(ban_members=True)
+    async def tb(self, ctx: commands.Context, member: Optional[discord.Member] = None, *, reason: Optional[str] = None):
+        # 1) jika reply ke pesan, pakai author pesan itu
+        if member is None:
+            try:
+                ref = ctx.message.reference
+                if ref and ref.resolved:
+                    msg = ref.resolved
+                elif ref and ref.message_id:
+                    msg = await ctx.channel.fetch_message(ref.message_id)
+                else:
+                    msg = None
+                if msg and isinstance(getattr(msg, "author", None), discord.Member):
+                    member = msg.author  # type: ignore
+            except Exception:
+                member = None
 
-        e = discord.Embed(title="💀 Simulasi Ban oleh SatpamBot")
-        if target is not None:
+        # 2) kalau belum ada, pakai mention pertama
+        if member is None and ctx.message.mentions:
+            m = ctx.message.mentions[0]
+            if isinstance(m, discord.Member):
+                member = m
+
+        # 3) fallback: gunakan moderator sendiri (agar embed tetap terkirim)
+        if member is None and isinstance(ctx.author, discord.Member):
+            member = ctx.author  # type: ignore
+
+        # Normalisasi reason
+        reason = (reason or "").strip()
+
+        # Build embed
+        def _ok_embed(target: discord.Member) -> discord.Embed:
+            title = "💀 Test Ban (Simulasi)"
             desc = (
-                f"{target.mention} terdeteksi mengirim pesan mencurigakan.\n"
-                f"(Pesan ini hanya simulasi untuk pengujian.)"
+                f"**Target:** {target.mention} ({getattr(target, 'id', '—')})\n"
+                f"**Moderator:** {ctx.author.mention}\n"
+                f"**Reason:** {reason if reason else '—'}\n\n"
+                "_Ini hanya simulasi. Tidak ada aksi ban yang dilakukan._"
             )
-        else:
-            desc = (
-                "Terjadi deteksi pesan mencurigakan.\n"
-                "(Pesan ini hanya simulasi untuk pengujian.)"
-            )
-        e.description = desc
-        e.add_field(name="Lokasi", value=location, inline=False)
-        e.add_field(name="Alasan", value=alasan, inline=False)
-        e.set_footer(text=f"Simulasi testban • Tidak ada aksi nyata yang dilakukan • {_wib_now_str()}")
+            emb = discord.Embed(title=title, description=desc, colour=discord.Colour.red())
+            # Avatar target (jika ada)
+            try:
+                av = getattr(getattr(target, "display_avatar", None), "url", None) or getattr(getattr(target, "avatar", None), "url", None)
+                if av:
+                    emb.set_thumbnail(url=av)
+            except Exception:
+                pass
+            emb.set_footer(text=f"SatpamBot • {_wib_now_str()}")
+            return emb
 
         try:
-            await ctx.reply(embed=e, mention_author=False)
-        except Exception:
-            # As a last resort, try to send normally so this never throws to user.
-            await ctx.send(embed=e)
+            await ctx.reply(embed=_ok_embed(member), mention_author=False)  # type: ignore[arg-type]
+        except Exception as e:
+            # Jika terjadi error apapun, jangan biarkan crash—balas teks biasa
+            try:
+                await ctx.reply(f"✅ TestBan (simulasi) terkirim. (note: {e})", mention_author=False)
+            except Exception:
+                pass
 
-async def setup(bot: commands.Bot):
-    # Make sure we become the single `tb` command if the runtime supports it.
-    if hasattr(bot, "remove_command") and hasattr(bot, "get_command"):
-        if bot.get_command("tb"):
-            bot.remove_command("tb")
+    @tb.error
+    async def tb_error(self, ctx: commands.Context, error: Exception) -> None:
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.reply("⚠️ Hanya moderator/admin yang bisa memakai `!tb` (butuh izin **Ban Members**).", mention_author=False)
+            return
+        # swallow error agar tidak timbul double/triple trace
+        try:
+            await ctx.reply(f"⚠️ `!tb` error: {error}", mention_author=False)
+        except Exception:
+            pass
+
+
+async def setup(bot: commands.Bot) -> None:
+    # Pastikan tidak dobel: buang 'tb' lama kalau ada lalu daftarkan versi shim
+    try:
+        bot.remove_command("tb")
+    except Exception:
+        pass
     await bot.add_cog(TBShimFormatted(bot))

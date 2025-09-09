@@ -15,32 +15,24 @@ def _avatar_url(user: discord.abc.User) -> Optional[str]:
         pass
     return None
 
-def _color_from_guild(guild: Optional[discord.Guild]) -> discord.Color:
-    try:
-        if guild and guild.me and getattr(guild.me, "color", None) and guild.me.color.value != 0:
-            return guild.me.color  # type: ignore
-    except Exception:
-        pass
-    return discord.Color.red()
+def _color_from_guild(guild: Optional[discord.Guild]) -> int:
+    # Warna merah moderate untuk ban/testban
+    return 0xED4245
 
-def reason_hash(text: str) -> str:
-    return hashlib.sha1((text or "").encode("utf-8", "ignore")).hexdigest()[:8]
+def reason_hash(guild_id: int, target_id: int, reason: str) -> str:
+    raw = f"{guild_id}:{target_id}:{reason or ''}".encode("utf-8", "ignore")
+    return hashlib.sha1(raw).hexdigest()[:12]
 
 def build_ban_embed(
-    *,
-    guild: Optional[discord.Guild],
-    moderator: discord.abc.User,
-    target: discord.abc.User,
-    reason: str,
-    marker: str,
+    guild: discord.Guild,
+    target: discord.Member | discord.User,
+    moderator: discord.Member | discord.User | None,
+    reason: str = "",
 ) -> discord.Embed:
-    """
-    Embed BAN/TestBan seragam—tanpa gambar/sticker, ringan.
-    Footer menyimpan marker untuk dedupe.
-    """
+    marker = reason_hash(getattr(guild, "id", 0), getattr(target, "id", 0), reason or "")
     desc = (
-        f"**User:** {target.mention} (`{getattr(target, 'id', 'unknown')}`)\n"
-        f"**Moderator:** {moderator.mention} (`{getattr(moderator, 'id', 'unknown')}`)\n"
+        f"**Target:** {getattr(target, 'mention', getattr(target, 'name', 'user'))} ({getattr(target, 'id', '—')})\n"
+        f"**Moderator:** {getattr(moderator, 'mention', getattr(moderator, 'name', '—'))}\n"
         f"**Reason:** {reason.strip() or '—'}"
     )
     emb = discord.Embed(
