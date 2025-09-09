@@ -1,11 +1,11 @@
 {
   "guilds": 1,
-  "members": 9927,
-  "online": 0,
+  "members": 9926,
+  "online": 1,
   "channels": 76,
   "threads": 15,
-  "latency_ms": 272,
-  "cpu_percent": 0.0,
-  "ram_mb": 12303,
-  "ts": 1757343063
+  "latency_ms": 255,
+  "cpu_percent": 17.7,
+  "ram_mb": 14100,
+  "ts": 1757351215
 }
