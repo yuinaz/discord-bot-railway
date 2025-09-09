@@ -1,29 +1,42 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from discord.ext import commands
 
-CANDIDATES = ("tempban", "tban", "ban")
+# Alias "tb" hanya aktif bila belum ada command `tb` (mis. dari tb_shim).
+# Jika tidak ada, alias ini akan mencoba meneruskan ke tban/tempban/ban.
+
+FORWARD_CANDIDATES = ("tban", "tempban", "ban")
 
 class TBAliasCog(commands.Cog):
-    """Alias legacy command: !tb -> forwards to tempban/tban/ban (first available).
-    This does NOT change config/prefix. It only re-exposes the classic '!tb' name.
-    """
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @commands.command(name="tb", help="Alias legacy: tb -> tempban/tban/ban (forwarder)")
-    @commands.guild_only()
-    async def tb(self, ctx: commands.Context, *args):
-        # Try to find an existing command to forward into
-        for name in CANDIDATES:
-            cmd = self.bot.get_command(name)
+    def _resolve_target(self):
+        getc = getattr(self.bot, "get_command", None)
+        if not callable(getc):
+            return None
+        # Jangan forward ke 'tb' sendiri agar tidak rekursif
+        for name in FORWARD_CANDIDATES:
+            cmd = getc(name)
             if cmd is not None:
-                # Reuse the target command's converters, checks, and error handling
-                return await ctx.invoke(cmd, *args)
+                return cmd
+        return None
 
-        # Nothing found: keep behavior explicit but non-fatal
-        await ctx.send("⚠️ Target command untuk 'tb' tidak ditemukan (cari: tempban/tban/ban). Cek cogs ban/moderation kamu.", delete_after=10)
+    @commands.command(name="tb", help="Alias legacy: tb -> tban/tempban/ban (forwarder)")
+    async def tb(self, ctx: commands.Context, *args):
+        target_cmd = self._resolve_target()
+        if target_cmd is None:
+            await ctx.reply(
+                "⚠️ Target command untuk 'ban' tidak ditemukan (cari: ban/tempban/tban). "
+                "Cek cogs moderasi kamu.", mention_author=False
+            )
+            return
+        await ctx.invoke(target_cmd, *args)
+
 
 async def setup(bot: commands.Bot):
+    getc = getattr(bot, "get_command", None)
+    if callable(getc) and getc("tb") is not None:
+        # Sudah ada tb (mis. tb_shim) — biarkan itu yang aktif, jangan dobel
+        return
     await bot.add_cog(TBAliasCog(bot))

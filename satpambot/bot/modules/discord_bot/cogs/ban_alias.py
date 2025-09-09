@@ -1,26 +1,38 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
+
 from discord.ext import commands
 
-CANDIDATES = ("ban", "tempban", "tban")
 
 class BanAliasCog(commands.Cog):
-    """Alias legacy: !ban -> forwards to ban/tempban/tban (first available).
-    Tidak mengubah config/prefix; hanya menyediakan pintu perintah teks !ban.
+    """Alias/forwarder untuk ban jika diperlukan oleh konfigurasi lama.
+    Aman untuk smoke test (DummyBot) karena semua akses get_command dibungkus try/except.
     """
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name="ban", help="Alias legacy: ban -> ban/tempban/tban (forwarder)")
-    @commands.guild_only()
+    @commands.command(name="ban", help="Ban permanen.")
+    @commands.has_permissions(ban_members=True)
     async def ban(self, ctx: commands.Context, *args):
-        for name in CANDIDATES:
-            cmd = self.bot.get_command(name)
-            if cmd is not None and cmd.name != "ban":  # avoid self-recursion if real 'ban' exists
-                return await ctx.invoke(cmd, *args)
-            if cmd is not None and cmd.callback is not self.ban.callback:
-                return await ctx.invoke(cmd, *args)
-        await ctx.send("⚠️ Target command untuk 'ban' tidak ditemukan (cari: ban/tempban/tban). Cek cogs moderasi kamu.", delete_after=10)
+        # Jika ada command 'ban' lain yang lebih spesifik, panggil itu.
+        target_cmd = None
+        try:
+            # Beberapa setup menamai command asli tetap "ban"
+            target_cmd = self.bot.get_command("ban")  # type: ignore[attr-defined]
+        except Exception:
+            target_cmd = None
+
+        # Hindari rekursi: jika target adalah command ini sendiri, biarkan ctx.bot resolve ke cogs lain
+        if target_cmd is not None and target_cmd.callback is not self.ban.callback:  # type: ignore[attr-defined]
+            return await target_cmd.callback(self, ctx, *args)  # type: ignore[misc]
+
+        # Jika tidak ada implementasi lain, berikan pesan yang ramah
+        await ctx.reply(
+            "⚠️ Target command untuk 'ban' tidak ditemukan (cari: ban/tempban/tban). "
+            "Cek cogs moderasi kamu.",
+            mention_author=False,
+        )
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(BanAliasCog(bot))
