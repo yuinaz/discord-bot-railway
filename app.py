@@ -3,7 +3,7 @@ Flask entry for SatpamBot (single process friendly)
 - Stable /healthz and /uptime (200)
 - Quiet logs for health endpoints
 - Registers dashboard web UI (blueprints, static alias, themes)
-- NO watchdog that kills the process
+- /botlive now uses the same live stats source as /api/live/stats (freshness-based)
 """
 from __future__ import annotations
 import os, time, logging
@@ -21,23 +21,40 @@ class _HealthAccessFilter(logging.Filter):
             msg = str(record.msg)
         return not any(s in msg for s in self.SILENT)
 
-def _probe_bot() -> Tuple[bool, Optional[int], Optional[int]]:
-    # Best-effort probe: try to import shared state if available
+def _probe_bot() -> Tuple[bool, Optional[int], Optional[float]]:
+    """
+    Determine bot liveness using the same data used by /api/live/stats.
+    Rule: consider alive if metrics 'ts' is fresh (<300s) AND (online>0 or guilds>=1).
+    Returns (alive, guilds, latency_ms)
+    """
     alive = False; guilds = None; latency_ms = None
+    now = int(time.time())
     try:
-        from satpambot.bot.modules.discord_bot import live_metrics  # type: ignore
-        st = getattr(live_metrics, "STATE", None)
-        if st and isinstance(st, dict):
-            alive = bool(st.get("alive", False))
-            guilds = st.get("guilds")
-            latency_ms = st.get("latency_ms")
+        # Import the live metrics reader used by dashboard API
+        from satpambot.dashboard.webui import _read_metrics_payload  # type: ignore
+        data = _read_metrics_payload()
+        if isinstance(data, dict):
+            ts = int(data.get("ts") or 0)
+            guilds = data.get("guilds")
+            online = data.get("online") or 0
+            latency_ms = data.get("latency_ms")
+            fresh = (now - ts) < 300 if ts else False
+            alive = bool(fresh and ((online and online > 0) or (guilds and guilds >= 1)))
     except Exception:
-        pass
+        # Fallback to optional internal state (if available)
+        try:
+            from satpambot.bot.modules.discord_bot import live_metrics  # type: ignore
+            st = getattr(live_metrics, "STATE", None)
+            if st and isinstance(st, dict):
+                guilds = st.get("guilds")
+                latency_ms = st.get("latency_ms")
+                alive = bool(st.get("alive", False))
+        except Exception:
+            pass
     return alive, guilds, latency_ms
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    # Set a trivial secret key if not present (needed by webui for session)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev")
 
     # Quiet werkzeug access log for health checks
@@ -51,7 +68,6 @@ def create_app() -> Flask:
     # ------------------- Basic routes -------------------
     @app.route("/healthz", methods=["GET", "HEAD"])
     def _healthz() -> Response:
-        # HEAD should be enough for uptime monitors; always 200
         if request.method == "HEAD":
             return Response(status=200)
         return Response("ok", status=200, mimetype="text/plain")
@@ -73,7 +89,7 @@ def create_app() -> Flask:
     def _root():
         return redirect("/dashboard", code=302)
 
-    # Optional: surface bot liveness (503 if false)
+    # Bot liveness derived from live stats freshness
     @app.get("/botlive")
     def _botlive():
         alive, guilds, latency_ms = _probe_bot()
