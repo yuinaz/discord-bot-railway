@@ -1,79 +1,92 @@
+"""
+Flask entry for SatpamBot (single process friendly)
+- Stable /healthz and /uptime (200)
+- Quiet logs for health endpoints
+- Registers dashboard web UI (blueprints, static alias, themes)
+- NO watchdog that kills the process
+"""
+from __future__ import annotations
 import os, time, logging
-from flask import Flask, Response, jsonify, request
-from satpambot.dashboard.webui import register_webui_builtin
+from typing import Optional, Tuple
+from flask import Flask, jsonify, Response, redirect, request
 
-class _HealthPathFilter(logging.Filter):
-    SILENT_PATHS = {"/healthz", "/uptime"}
+_START_TS = time.time()
+
+class _HealthAccessFilter(logging.Filter):
+    SILENT = ("/healthz", "/uptime")
     def filter(self, record: logging.LogRecord) -> bool:
-        msg = str(getattr(record, "msg", ""))
-        for p in self.SILENT_PATHS:
-            if p in msg:
-                return False
-        return True
+        try:
+            msg = record.getMessage()
+        except Exception:
+            msg = str(record.msg)
+        return not any(s in msg for s in self.SILENT)
 
-class _RateLimitFilter(logging.Filter):
-    def __init__(self, max_per_window=20, window_seconds=60):
-        super().__init__()
-        self.max = max_per_window
-        self.win = window_seconds
-        self.state = {}  # key -> [count, window_start]
-    def filter(self, record):
-        key = (record.name, getattr(record, "levelno", 20), str(getattr(record, "msg",""))[:120])
-        now = int(time.time())
-        cnt, start = self.state.get(key, (0, now))
-        if now - start >= self.win:
-            cnt, start = 0, now
-        cnt += 1
-        self.state[key] = (cnt, start)
-        return cnt <= self.max
-
-def _apply_quiet_logging(app: Flask):
-    # Silence werkzeug access logs for health paths & rate-limit spam
-    wlog = logging.getLogger("werkzeug")
-    wlog.addFilter(_HealthPathFilter())
-    wlog.addFilter(_RateLimitFilter(max_per_window=30, window_seconds=60))
-    # Tone down noisy libraries
-    logging.getLogger("discord.gateway").setLevel(logging.WARNING)
-    logging.getLogger("discord.client").setLevel(logging.INFO)
-    logging.getLogger("discord.http").setLevel(logging.WARNING)
+def _probe_bot() -> Tuple[bool, Optional[int], Optional[int]]:
+    # Best-effort probe: try to import shared state if available
+    alive = False; guilds = None; latency_ms = None
+    try:
+        from satpambot.bot.modules.discord_bot import live_metrics  # type: ignore
+        st = getattr(live_metrics, "STATE", None)
+        if st and isinstance(st, dict):
+            alive = bool(st.get("alive", False))
+            guilds = st.get("guilds")
+            latency_ms = st.get("latency_ms")
+    except Exception:
+        pass
+    return alive, guilds, latency_ms
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev")
+    # Set a trivial secret key if not present (needed by webui for session)
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev")
 
+    # Quiet werkzeug access log for health checks
     try:
-        register_webui_builtin(app)
+        wz = logging.getLogger("werkzeug")
+        wz.addFilter(_HealthAccessFilter())
+        app.logger.addFilter(_HealthAccessFilter())
     except Exception:
         pass
 
+    # ------------------- Basic routes -------------------
     @app.route("/healthz", methods=["GET", "HEAD"])
-    def _healthz():
-        return Response("OK", mimetype="text/plain", status=200)
+    def _healthz() -> Response:
+        # HEAD should be enough for uptime monitors; always 200
+        if request.method == "HEAD":
+            return Response(status=200)
+        return Response("ok", status=200, mimetype="text/plain")
 
-    _APP_START_TS = time.time()
-
-    # === IMPORTANT: keep /uptime semantics STABLE (always 200) ===
     @app.route("/uptime", methods=["GET", "HEAD"])
-    def __uptime__():
-        return jsonify({"uptime_s": int(time.time() - _APP_START_TS)}), 200
+    def _uptime():
+        if request.method == "HEAD":
+            return Response(status=200)
+        now = time.time()
+        return jsonify({
+            "uptime_s": int(now - _START_TS),
+            "pid": os.getpid(),
+            "port": int(os.environ.get("PORT", "10000")),
+            "ts": int(now)
+        })
 
-    # optional ops-only endpoint (not used by monitors)
-    @app.route("/botlive", methods=["GET"])
-    def __botlive__():
-        ok = False
-        payload = {"alive": False, "guilds": 0, "latency_ms": None}
-        try:
-            from satpambot.bot.modules.discord_bot import discord_bot as dmod
-            bot = getattr(dmod, "bot", None)
-            if bot is not None:
-                alive = not (bot.is_closed() if hasattr(bot, "is_closed") else False)
-                guilds = len(getattr(bot, "guilds", []))
-                latency = getattr(bot, "latency", 0.0) or 0.0
-                payload.update({"alive": bool(alive), "guilds": int(guilds), "latency_ms": int(latency * 1000)})
-                ok = bool(alive)
-        except Exception as e:
-            payload["error"] = str(e)
-        return jsonify(payload), (200 if ok else 503)
+    # Root -> dashboard
+    @app.route("/", methods=["GET"])
+    def _root():
+        return redirect("/dashboard", code=302)
 
-    _apply_quiet_logging(app)
+    # Optional: surface bot liveness (503 if false)
+    @app.get("/botlive")
+    def _botlive():
+        alive, guilds, latency_ms = _probe_bot()
+        return jsonify({"alive": alive, "guilds": guilds, "latency_ms": latency_ms}), (200 if alive else 503)
+
+    # ------------------- Register dashboard web UI -------------------
+    try:
+        from satpambot.dashboard.webui import register_webui_builtin  # type: ignore
+        register_webui_builtin(app)
+    except Exception as e:
+        app.logger.warning("dashboard webui not registered: %s", e)
+
     return app
+
+# WSGI entry for gunicorn or direct run
+app = create_app()

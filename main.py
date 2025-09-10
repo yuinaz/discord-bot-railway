@@ -1,56 +1,65 @@
-# Entry runner - keep config intact, ensure WEB starts (and responds) BEFORE loading cogs/bot.
+# Single-process runner for Render Free plan
+# - Starts Flask web (serves /uptime, /healthz) on PORT
+# - Runs Discord bot in a resilient restart loop (no ENV needed)
 from __future__ import annotations
 
-# Keep hooks/banner from sitecustomize (no separate server will be started)
-try:
-    import sitecustomize  # noqa: F401
-except Exception as _e:
-    print(f"[sitecustomize] note: {_e}", flush=True)
+import os, threading, time, logging, http.client, traceback
 
-import os
-import threading
-import logging
-import time
-import http.client
-
+logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 log = logging.getLogger("entry.main")
 
 def _serve_web():
-    from app import create_app
-    app = create_app()
-    log.info("[web] Flask app created via create_app()")
+    # Import here to avoid side effects at module import time
+    from app import app  # app = create_app()
     port = int(os.environ.get("PORT", "10000"))
     log.info("🌐 Serving web on 0.0.0.0:%s", port)
+    # Use Flask's built-in server; do NOT enable reloader in production
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-def _wait_web_ready(port: int, timeout: float = 30.0) -> bool:
-    # Wait until the real app answers HEAD /healthz (fallback HEAD /)
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        for path in ("/healthz", "/"):
-            try:
-                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=1.0)
-                conn.request("HEAD", path)
-                resp = conn.getresponse()
-                if resp and resp.status in (200, 301, 302, 307, 308):
-                    return True
-            except Exception:
-                pass
-        time.sleep(0.25)
+def _wait_web_ready(port: int, retries: int = 30, delay: float = 0.5):
+    for _ in range(retries):
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=1.5)
+            conn.request("GET", "/uptime")
+            resp = conn.getresponse()
+            if resp.status == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(delay)
     return False
 
+def _run_bot_once():
+    # Import late to ensure web has started (and any sitecustomize hooks ran)
+    from satpambot.bot.modules.discord_bot.discord_bot import run_bot
+    run_bot()
+
 def main():
-    # Start WEB in background thread
+    # 1) Start web in a background thread
     t = threading.Thread(target=_serve_web, name="web-serve", daemon=True)
     t.start()
 
-    # Ensure WEB is ready before starting BOT (so logs show app first)
+    # 2) Wait until web is actually serving /uptime
     port = int(os.environ.get("PORT", "10000"))
-    _wait_web_ready(port)
+    if not _wait_web_ready(port):
+        log.warning("Web not ready after wait; continuing anyway.")
+    else:
+        log.info("Web is ready on port %s", port)
 
-    # Now run the Discord bot (cogs will load after web is up)
-    from satpambot.bot.modules.discord_bot.discord_bot import run_bot as _run
-    return _run()
+    # 3) Resilient bot loop
+    backoff = 5  # seconds; doubles up to 60s
+    while True:
+        try:
+            log.info("🤖 Starting Discord bot...")
+            _run_bot_once()
+            log.warning("Bot returned gracefully; restarting in 3s...")
+            time.sleep(3)
+            backoff = 5  # reset on clean exit
+        except Exception as e:
+            log.error("Bot crashed: %s\n%s", e, traceback.format_exc())
+            log.info("Restarting in %ss...", backoff)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 60)
 
 if __name__ == "__main__":
     main()
