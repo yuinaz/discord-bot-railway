@@ -13,14 +13,13 @@ INBOX_NAME = getattr(static_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
 NOTIFY_THREAD = getattr(static_cfg, "PHISH_NOTIFY_THREAD", False)
 LOG_TTL_SECONDS = int(getattr(static_cfg, "PHISH_LOG_TTL", 0))  # 0 = keep
 LIMIT_MSGS = int(getattr(static_cfg, "PHISH_AUTO_RESEED_LIMIT", 2000))
-SLEEP_EVERY = 25
-SLEEP_SECONDS = 1
 
 def _render_db(phashes, dhashes=None, tiles=None):
-    data = {"phash": phashes}
+    data = {"phash": phashes or []}
     if dhashes: data["dhash"] = dhashes
     if tiles:   data["tphash"] = tiles
-    return f"{PHASH_DB_TITLE}\n```json\n{json.dumps(data, ensure_ascii=False)}\n```"
+    body = json.dumps(data, ensure_ascii=False, separators=(',', ':'), sort_keys=True)
+    return f"{PHASH_DB_TITLE}\n```json\n{body}\n```"
 
 def _extract_hashes_from_json_msg(msg: discord.Message):
     if not msg or not msg.content:
@@ -79,7 +78,13 @@ class PhishHashAutoReseed(commands.Cog):
         if db_msg:
             P, D, T = _extract_hashes_from_json_msg(db_msg)
             if P and D and T:
-                return  # already complete
+                # Already complete, but also re-render to normalize format (remove stray \n, spaces)
+                try:
+                    content = _render_db(P, D, T)
+                    await db_msg.edit(content=content)
+                except Exception:
+                    pass
+                return
 
         all_p, all_d, all_t = [], [], []
         scanned_msgs = scanned_atts = 0
