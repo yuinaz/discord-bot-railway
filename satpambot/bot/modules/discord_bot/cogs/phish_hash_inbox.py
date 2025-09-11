@@ -10,7 +10,7 @@ PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
 TARGET_THREAD_NAME = getattr(static_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif")
 
-# toggles (respect existing config; do not change values)
+# toggles
 NOTIFY_THREAD = getattr(static_cfg, "PHISH_NOTIFY_THREAD", False)
 LOG_TTL_SECONDS = int(getattr(static_cfg, "PHISH_LOG_TTL", 0))  # 0 = keep forever
 
@@ -28,7 +28,6 @@ def _render_db(phashes, dhashes=None, tiles=None):
         data["dhash"] = dhashes
     if tiles:
         data["tphash"] = tiles
-    # Use real newlines for Discord code block
     return f"{PHASH_DB_TITLE}\n```json\n{json.dumps(data, ensure_ascii=False)}\n```"
 
 def _extract_hashes_from_json_msg(msg: discord.Message):
@@ -56,38 +55,28 @@ class PhishHashInbox(commands.Cog):
 
     @commands.Cog.listener("on_message")
     async def on_message_inbox(self, message: discord.Message):
-        # Defensive: never raise from listener
         try:
-            # Only in target thread
             ch = message.channel
             if not isinstance(ch, discord.Thread):
                 return
             if (ch.name or "").lower() != TARGET_THREAD_NAME:
                 return
-
-            # Ignore bots / no attachments
-            if getattr(message.author, "bot", False):
-                return
-            if not message.attachments:
+            if getattr(message.author, "bot", False) or not message.attachments:
                 return
 
-            # Compute hashes
             all_p, all_d, all_t, filenames = [], [], [], []
             for att in message.attachments:
                 name = (att.filename or "").lower()
                 if not any(name.endswith(ext) for ext in IMAGE_EXTS):
                     continue
-
                 try:
                     raw = await att.read()
                 except Exception:
                     continue
                 if not raw:
                     continue
-
                 filenames.append(att.filename or "unknown")
 
-                # pHash
                 hs = img_hashing.phash_list_from_bytes(
                     raw,
                     max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 6),
@@ -97,7 +86,6 @@ class PhishHashInbox(commands.Cog):
                 if hs:
                     all_p.extend(hs)
 
-                # dHash (if helper available)
                 dh_func = getattr(img_hashing, "dhash_list_from_bytes", None)
                 if dh_func:
                     ds = dh_func(
@@ -109,7 +97,6 @@ class PhishHashInbox(commands.Cog):
                     if ds:
                         all_d.extend(ds)
 
-                # Tile pHash (if helper available)
                 t_func = getattr(img_hashing, "tile_phash_list_from_bytes", None)
                 if t_func:
                     ts = t_func(
@@ -127,7 +114,6 @@ class PhishHashInbox(commands.Cog):
 
             parent = ch.parent if hasattr(ch, "parent") else None
 
-            # Find existing DB message
             db_msg = None
             if parent:
                 try:
@@ -145,7 +131,6 @@ class PhishHashInbox(commands.Cog):
                 except Exception:
                     existing_p, existing_d, existing_t = ([], [], [])
 
-            # Merge unique
             sp, sd, st = set(existing_p), set(existing_d), set(existing_t)
             added_p, added_d, added_t = [], [], []
 
@@ -161,7 +146,6 @@ class PhishHashInbox(commands.Cog):
 
             content = _render_db(existing_p, existing_d, existing_t)
 
-            # Update/create DB message
             if db_msg:
                 try:
                     await db_msg.edit(content=content)
@@ -174,8 +158,6 @@ class PhishHashInbox(commands.Cog):
                     except Exception:
                         db_msg = None
 
-            # Notify & cleanup per config
-            # (Reply in thread only if enabled)
             if NOTIFY_THREAD:
                 try:
                     e = discord.Embed(
@@ -190,7 +172,6 @@ class PhishHashInbox(commands.Cog):
                 except Exception:
                     pass
 
-            # Always log to parent if different; auto-delete obeying TTL
             if parent and parent != ch:
                 try:
                     e2 = discord.Embed(
@@ -208,7 +189,6 @@ class PhishHashInbox(commands.Cog):
                     pass
 
         except Exception:
-            # Never crash the bot due to inbox listener
             return
 
 async def setup(bot: commands.Bot):
