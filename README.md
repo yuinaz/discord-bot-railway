@@ -1,173 +1,143 @@
+# SatpamBot — Discord Anti‑Phishing Guard (Free‑plan friendly)
 
-# SatpamBot — Discord Security Bot + Dashboard
-
-SatpamBot is a Discord moderation/security bot with a minimal web dashboard. It focuses on **anti‑phishing**, **link/attachment heuristics**, **image phash detection**, and quality‑of‑life tools for moderators.  
-This repo also includes a **Dashboard** (theme: `gtake`) with a mini monitor and security views.
-
-> **This README is tailored to your current setup** (Render deploy + GitHub auto‑sync for WL/BL). Adjust paths/names to your environment where needed.
+**SatpamBot** adalah bot Discord + dashboard ringan untuk **menangkal phishing berbasis gambar & tautan**.  
+Fokusnya: **stabil 24/7 di Render Free plan**, minim bandwidth, tanpa memaksa konfigurasi via *environment variables*.
 
 ---
 
-## ✨ Highlights
+## Fitur Utama
 
-- **Anti‑Phishing Link Guard**: domain allow/deny, risky TLD thresholds, punycode flag, URL resolve, per‑user rate limits.
-- **Image Scam Detection**: pHash/aHash/dHash + optional ORB matches, auto‑ban thresholds.
-- **Whitelist/Blacklist via Threads** (no commands needed):  
-  In `#log-botphising` create 2 threads: any thread **containing** `whitelist` and another **containing** `blacklist`.  
-  Moderators can just type `domain.com` or upload `.txt/.json` to update lists.
-- **Memory Thread ("memory W*B")**: pinned embed + attachments `whitelist.txt` and `blacklist.txt`, updated automatically.
-- **GitHub Sync (optional)**: persist WL/BL changes by committing JSON/TXT files back to the repo (anti‑reset across redeploys).
-- **Does not modify** your existing `ban` / `testban` commands or the web UI.
+- 🛡️ **Deteksi gambar mirip (approximate)**: kombinasi **pHash ≈**, **dHash ≈**, dan **Tile pHash** (per‑bagian).  
+  Kuat untuk variasi **format, crop, sudut, terang/gelap**. ORB (OpenCV) tersedia **opsional**.
+- 🧠 **Auto reseed**: saat startup, bot otomatis **scan thread** `imagephising` dan membangun/menyatu‑kan DB hash di pesan `SATPAMBOT_PHASH_DB_V1` (parent channel).
+- 🔁 **Runtime autoload**: daftar hash (pHash/dHash/tile) otomatis dimuat ke memori **saat bot siap** dan **setiap kali pesan DB di‑edit**.
+- 💬 **Log ringkas**: ringkasan update dikirim ke parent channel & **auto‑delete** sesuai TTL (hemat noise).
+- 📊 **Dashboard mini**: `/dashboard` dengan aset statis dan endpoint kesehatan:
+  - `HEAD /healthz` – health check
+  - `HEAD /uptime` – uptime probe
+  - `GET  /botlive` – status bot (JSON)
+  - `GET  /api/live/stats` – metrik ringan (guilds, online, latency, dll)
+  - `GET  /api/phish/phash` – ringkasan hash **yang sedang dimuat di runtime**
+- 🧪 **Smoke tests**: `scripts/smoketest_all.py` dan `scripts/smoke_cogs.py` untuk verifikasi cepat sebelum deploy.
 
 ---
 
-## 🧱 Architecture (high‑level)
+## Arsitektur Singkat
 
 ```
 satpambot/
-  bot/
-    modules/discord_bot/
-      cogs/
-        auto_lists.py         # NEW: watch WL/BL threads, save domains, update "memory W*B"
-        ... (other cogs)
-      helpers/
-        lists_loader.py       # NEW compat: unified load/save for WL/BL
-        memory_wb.py          # NEW: create/update the "memory W*B" thread (embed + files)
-        github_sync.py        # NEW: commit files to GitHub via REST API
-  dashboard/
-    ... (web UI; untouched by this patch)
-data/
-  whitelist_domains.json      # list[str]
-  blacklist_domains.json      # list[str]
-  url_whitelist.json          # {"allow": [...]}
-  url_blocklist.json          # {"domains": [...]}
-whitelist.txt                 # mirror (1 domain/line)
-blacklist.txt
-scripts/
-  migrate_lists.py            # normalize old formats -> unified files above
-  cleanup_duplicates.py       # remove common duplicate folders (optional)
+  bot/modules/discord_bot/
+    cogs/
+      anti_image_phash_runtime.py     # deteksi runtime (pHash + dHash + tile) + autoload DB
+      phish_hash_inbox.py             # daftar hash dari thread 'imagephising' → gabung ke DB message
+      phish_hash_autoreseed.py        # sekali saat startup: scan & seed awal
+      ... (cogs lain: link/url guard, metrics, dll)
+    helpers/
+      img_hashing.py                  # util pHash/dHash/tile (+ ORB opsional)
+      static_cfg.py                   # semua toggle/threshold di sini (no ENV diperlukan)
+app.py                                 # web app (uptime/health/dashboard)
+main.py                                # entrypoint: jalankan web + bot
 ```
 
-> Your bot’s cog loader auto‑scans `cogs/`, so `auto_lists.py` is loaded without further changes.
+**DB hash** disimpan sebagai **pesan teks** oleh bot di parent channel bernama **`SATPAMBOT_PHASH_DB_V1`** berisi JSON code‑block:
+```json
+{
+  "phash": ["...","..."],
+  "dhash": ["...","..."],
+  "tphash": ["...","..."]
+}
+```
+
+> Runtime akan **autoload** daftar ini saat startup & setiap kali pesan di‑edit.
 
 ---
 
-## 🔐 Discord Setup
+## Konfigurasi (tanpa ENV)
 
-1. In the Discord Developer Portal, **enable _Message Content Intent_**.
-2. Invite the bot with permissions to your server.
-3. In your server, ensure the bot has at least:
-   - `Send Messages`, `Read Message History`
-   - `Create/Manage Threads`
-   - `Attach Files`, `Add Reactions`
-   - *(Optional)* `Manage Messages` (to clean up old attachment messages in the memory thread)
+Semua toggle/threshold ada di `satpambot/bot/modules/discord_bot/helpers/static_cfg.py`.
 
----
+Rekomendasi **Free plan** (aman & cukup ketat):
+```python
+# Approx thresholds
+PHASH_HIT_DISTANCE = 15
+DHASH_HIT_DISTANCE  = 17
 
-## ⚙️ Environment Variables
+# Tile pHash
+TILE_GRID = 3
+TILE_HIT_MIN = 6
+TILE_PHASH_DISTANCE = 9
 
-> Below are the **relevant** variables for this patch. Keep your existing ones for other features (OCR, NSFW, etc.).  
-> **Never commit real secrets.** Set them in Render or your host’s secret store.
+# Reseed & logging
+PHISH_INBOX_THREAD = "imagephising"   # nama thread sumber contoh
+PHISH_AUTO_RESEED_LIMIT = 2000        # jumlah pesan yang di-scan saat startup
+PHISH_LOG_TTL = 30                    # auto-delete ringkasan log (detik)
+PHISH_NOTIFY_THREAD = False           # agar ringkasan tidak spam di thread
 
-**Log & Memory Thread**
-- `LOG_CHANNEL_ID` — numeric ID of `#log-botphising` (preferred)
-- `LOG_CHANNEL_NAME` — fallback name (default `log-botphising`)
-- `MEMORY_WB_THREAD_NAME` — thread name for embed/files (default `memory W*B`)
+# ORB (opsional, memakan CPU; set False untuk Free plan)
+ORB_ENABLE = False
+```
 
-**GitHub Sync (optional but recommended)**
-- `AUTO_LISTS_GH_SYNC=1` — enable commit of WL/BL files back to this repo
-- `GITHUB_TOKEN` — GitHub PAT with `repo` scope
-- `GITHUB_REPO` — e.g. `yuinaz/discord-bot-railway`
-- `GITHUB_BRANCH` — e.g. `main`
-
-**Repo paths for WL/BL (override if you prefer paths in repo)**
-- `GITHUB_WHITELIST_JSON_PATH` — default `data/whitelist_domains.json` *(you customised to `satpambot/data/whitelist.json`)*
-- `GITHUB_BLACKLIST_JSON_PATH` — default `data/blacklist_domains.json` *(you customised to `satpambot/data/blacklist.json`)*
-- `GITHUB_URL_WL_JSON_PATH` — default `data/url_whitelist.json`
-- `GITHUB_URL_BL_JSON_PATH` — default `data/url_blocklist.json`
-- `GITHUB_WHITELIST_TXT_PATH` — default `whitelist.txt`
-- `GITHUB_BLACKLIST_TXT_PATH` — default `blacklist.txt`
-
-**Local file paths (used by the engine)**
-- `WHITELIST_DOMAINS_FILE` — default `data/whitelist_domains.json`
-- `BLACKLIST_DOMAINS_FILE` — default `data/blacklist_domains.json`
-- `URL_WHITELIST_JSON_FILE` — default `data/url_whitelist.json`
-- `URL_BLOCKLIST_JSON_FILE` — default `data/url_blocklist.json`
-
-> Tip: Avoid setting `PYTHONPATH` to invalid values. If present as `PYTHONPATH="="`, remove it.
+> **Token/credential**: repo ini **tidak** menyertakan rahasia. Cara pemberian token (ENV atau file privat) disesuaikan praktik Anda sendiri. **Jangan commit rahasia ke publik.**
 
 ---
 
-## 🚀 Local Development
+## Menjalankan Lokal
+
+Prasyarat: Python 3.10+
 
 ```bash
-# (first time) unify legacy list files -> standard
-python scripts/migrate_lists.py
+python -m venv .venv
+. .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 
-# run your app (example; adjust to your entrypoint)
+# Cek
+python scripts/smoke_cogs.py
+python scripts/smoketest_all.py
+
+# Jalan-kan
 python main.py
-# or: uvicorn/gunicorn for the web, and a worker for the bot (depending on your setup)
 ```
 
-**What to expect on startup**
-- Loader logs that `auto_lists` is loaded.
-- Bot ensures/creates the thread **“memory W*B”** under `#log-botphising`.
-- A pinned embed appears with counts (WL/BL), plus a message with attachments `whitelist.txt` and `blacklist.txt`.
-- If `AUTO_LISTS_GH_SYNC=1`, WL/BL edits create commits in your GitHub repo.
+---
+
+## Deploy ke Render (Free plan)
+
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `python main.py`
+- Tidak wajib set ENV (opsional). Semua toggle ada di `static_cfg.py`.
+- **Health check & monitoring** (hemat bandwidth):
+  - UptimeRobot: `HEAD https://<app>.onrender.com/healthz` (interval ≥5m)
+  - Atau `GET https://<app>.onrender.com/botlive` dengan keyword `""alive":true"`
+
+### Verifikasi setelah deploy
+```powershell
+$B="https://<app>.onrender.com"
+(iwr "$B/uptime" -UseBasicParsing -TimeoutSec 10).Content
+$stats=(iwr "$B/api/live/stats" -UseBasicParsing -TimeoutSec 10).Content | ConvertFrom-Json
+$now=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds(); "fresh=" + ($now-[int]$stats.ts) + "s"
+(iwr "$B/botlive" -UseBasicParsing -TimeoutSec 10).StatusCode   # 200
+(iwr "$B/api/phish/phash" -UseBasicParsing -TimeoutSec 10).Content  # harus non-empty setelah autoload
+```
 
 ---
 
-## 🧪 Moderator Flow (No Commands)
+## Operasional
 
-- In the **whitelist thread** (name contains `whitelist`), type:  
-  `pixiv.com` → ✅ saved to WL files + memory thread updated.
-- In the **blacklist thread** (name contains `blacklist`), type:  
-  `contoh-phish.com` → ✅ saved to BL files + memory thread updated.
-- Upload `.txt` (1 domain per line) or `.json` (list or `{allow:[]}/{domains:[]}`) to bulk update.
-
-Files updated by each change:
-- `data/whitelist_domains.json`
-- `data/blacklist_domains.json`
-- `data/url_whitelist.json`
-- `data/url_blocklist.json`
-- `whitelist.txt` / `blacklist.txt`
-
-(If GitHub sync is enabled, these are also committed to the repo on each change.)
+- **Seeding awal**: cukup upload contoh‑contoh gambar phishing ke thread `imagephising`. Worker `phish_hash_autoreseed.py` akan meng‑**gabungkan** semuanya ke `SATPAMBOT_PHASH_DB_V1` saat startup.
+- **Penambahan contoh baru**: setiap upload baru di thread itu, `phish_hash_inbox.py` otomatis **menambah** hash (tanpa duplikasi) dan update pesan DB.
+- **Deteksi live**: runtime memuat daftar hash dan memeriksa pesan bergambar. Jika match (pHash/dHash/tile), tindakan pencegahan dilakukan sesuai kebijakan server/cog terkait.
 
 ---
 
-## ☁️ Deploy to Render
+## Troubleshooting cepat
 
-> Assumes a single service that runs both web + bot (your `MODE=both`).
-
-1. Add the environment variables above in Render.
-2. Ensure secrets are set (Discord token, OCR keys, etc.).
-3. Set your **Start Command** to your entrypoint, e.g.:  
-   `python main.py`
-4. Deploy.
-
-**Sanity checks on Render logs**
-- No `AttributeError` from `helpers.lists_loader`.
-- Lines indicating `auto_lists` loaded and the memory thread updated.
-- If `AUTO_LISTS_GH_SYNC=1`, look for the “update WL()/BL()” commit messages in GitHub.
+- `/api/phish/phash` kosong `{"phash":[]}` → runtime belum memuat DB. **Restart service** atau pastikan file runtime **autoload** aktif.
+- **Failed COG import** pada `phish_hash_inbox.py` → pastikan memakai versi *dependency-light* (tanpa `aiohttp`, gunakan `await attachment.read()`).
+- Thread `imagephising` **tidak aktif** → kirim pesan di thread supaya aktif, lalu restart agar autoreseed bisa menemukan.
 
 ---
 
-## 🔒 Security Notes
+## Lisensi
 
-- **Do not paste real tokens/keys into issues or public README.** Use environment variables.
-- If a secret was exposed, **rotate it immediately** (GitHub PAT, OpenAI key, Google Safe Browsing, OCR key, metrics token, Flask secret key, etc.).
-- Limit bot permissions to what’s necessary.
-
----
-
-## 📜 License
-
-Choose a license and place it as `LICENSE` in the repo (MIT/Apache-2.0/etc.).
-
----
-
-## 🙌 Credits
-
-Thanks to the maintainers & contributors. Dashboard theme preset: `gtake`.  
-This README was generated to match your current configuration (Render + GitHub WL/BL sync).
+Kode ini disediakan **sebagaimana adanya** untuk keperluan server pribadi. Pastikan mematuhi kebijakan Discord & hukum setempat.  
+Hak cipta gambar/tautan milik masing‑masing pemiliknya.
