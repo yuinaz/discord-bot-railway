@@ -9,11 +9,22 @@ from satpambot.bot.modules.discord_bot.helpers.static_cfg import (
     TILE_GRID, TILE_HIT_MIN, TILE_PHASH_DISTANCE,
 )
 from satpambot.bot.modules.discord_bot.helpers.img_hashing import (
-    phash_hit, hex_hit, tile_match_best,
+    phash_hit, hex_hit, tile_match_best, phash_list_from_bytes
 )
 
+# Optional helpers (if present)
+try:
+    from satpambot.bot.modules.discord_bot.helpers.img_hashing import dhash_list_from_bytes
+except Exception:
+    dhash_list_from_bytes = None
+try:
+    from satpambot.bot.modules.discord_bot.helpers.img_hashing import tile_phash_list_from_bytes
+except Exception:
+    tile_phash_list_from_bytes = None
+
 PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
-INBOX_NAME = getattr(__import__("satpambot.bot.modules.discord_bot.helpers.static_cfg", fromlist=["x"]), "PHISH_INBOX_THREAD", "imagephising").lower()
+from satpambot.bot.modules.discord_bot.helpers import static_cfg as _cfg
+INBOX_NAME = getattr(_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
 
 def _extract_hashes_from_content(s: str):
     if not s:
@@ -36,14 +47,11 @@ class AntiImagePhashRuntime(commands.Cog):
         self._phash_set = set()
         self._dhash_set = set()
         self._tile_set  = set()
-        # bootstrap load after bot ready (gives time for autoreseed to run)
         self._bootstrap.start()
 
     def cog_unload(self):
-        try:
-            self._bootstrap.cancel()
-        except Exception:
-            pass
+        try: self._bootstrap.cancel()
+        except Exception: pass
 
     def _ensure_sets(self):
         if not hasattr(self, "_phash_set"): self._phash_set = set()
@@ -54,7 +62,7 @@ class AntiImagePhashRuntime(commands.Cog):
     async def _bootstrap(self):
         try:
             await self.bot.wait_until_ready()
-            await asyncio.sleep(4)  # allow autoreseed to finish editing DB
+            await asyncio.sleep(4)
             await self._reload_from_db_all_guilds()
         except Exception:
             pass
@@ -62,17 +70,14 @@ class AntiImagePhashRuntime(commands.Cog):
     async def _reload_from_db_all_guilds(self):
         for g in list(self.bot.guilds):
             try:
-                # find thread by name
                 t = next((th for th in g.threads if (th.name or '').lower() == INBOX_NAME), None)
                 parent = getattr(t, "parent", None)
                 if not parent:
                     continue
-                # find DB message in parent
                 db_msg = None
                 async for m in parent.history(limit=50):
                     if m.author.id == self.bot.user.id and PHASH_DB_TITLE in (m.content or ""):
-                        db_msg = m
-                        break
+                        db_msg = m; break
                 if not db_msg:
                     continue
                 P, D, T = _extract_hashes_from_content(db_msg.content or "")
@@ -103,32 +108,32 @@ class AntiImagePhashRuntime(commands.Cog):
             if not message.attachments:
                 return
 
-            # Collect hashes from image bytes
-            all_hashes = getattr(__import__("satpambot.bot.modules.discord_bot.helpers.img_hashing", fromlist=["x"]), "phash_list_from_bytes")(await message.attachments[0].read())
-            all_dhashes = []
-            dhfunc = getattr(__import__("satpambot.bot.modules.discord_bot.helpers.img_hashing", fromlist=["x"]), "dhash_list_from_bytes", None)
-            if dhfunc:
-                try:
-                    all_dhashes = dhfunc(await message.attachments[0].read())
-                except Exception:
-                    all_dhashes = []
+            # Read first image (runtime check is lightweight)
+            raw = None
+            for att in message.attachments:
+                n = (att.filename or "").lower()
+                if n.endswith((".png",".jpg",".jpeg",".webp",".gif",".bmp",".tif",".tiff",".heic",".heif")):
+                    raw = await att.read(); break
+            if not raw:
+                return
 
-            # ensure sets exist (may be reloaded asynchronously)
+            all_hashes = phash_list_from_bytes(raw, max_frames=4, augment=False, augment_per_frame=0)
+            all_dhashes = dhash_list_from_bytes(raw, max_frames=4, augment=False, augment_per_frame=0) if dhash_list_from_bytes else []
+            all_tiles = tile_phash_list_from_bytes(raw, grid=TILE_GRID, max_frames=2, augment=False, augment_per_frame=0) if tile_phash_list_from_bytes else []
+
             self._ensure_sets()
 
-            # pHash approx
             hitp = phash_hit(all_hashes, self._phash_set, max_distance=HIT_DISTANCE) if all_hashes and self._phash_set else None
-            if hitp:
-                # handle match (redacted original action)
-                return
+            if hitp: return
 
-            # dHash approx
             hitd = hex_hit(all_dhashes, self._dhash_set, max_distance=DHIT_DISTANCE) if all_dhashes and self._dhash_set else None
-            if hitd:
-                # handle match
-                return
+            if hitd: return
 
-            # tile pHash (optional/grid)
-            # (redacted: calculation delegated to existing code in your original file)
+            # Optional tile — we only compute above if helper exists
+            if all_tiles and self._tile_set:
+                # will return list of matches; treat presence as hit
+                tile_hits = tile_match_best(all_tiles, self._tile_set, grid=TILE_GRID, min_tiles=TILE_HIT_MIN, per_tile_max_distance=TILE_PHASH_DISTANCE)
+                if tile_hits:
+                    return
         except Exception:
             return
