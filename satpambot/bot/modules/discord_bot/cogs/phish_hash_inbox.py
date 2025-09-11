@@ -1,55 +1,63 @@
+import asyncio
 import json
 import aiohttp
 import discord
 from discord.ext import commands
 from discord import AllowedMentions
 
-# use helpers already in project; DO NOT change config file
 from satpambot.bot.modules.discord_bot.helpers import img_hashing, static_cfg
 
 PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
 TARGET_THREAD_NAME = getattr(static_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic", ".heif")
 
-def _is_image_attachment(att: discord.Attachment) -> bool:
-    ct = (att.content_type or "").lower() if hasattr(att, "content_type") else ""
-    if ct.startswith("image/"):
-        return True
-    fn = (att.filename or "").lower()
-    return any(fn.endswith(x) for x in IMAGE_EXTS)
+# toggles
+NOTIFY_THREAD = getattr(static_cfg, "PHISH_NOTIFY_THREAD", False)
+LOG_TTL_SECONDS = int(getattr(static_cfg, "PHISH_LOG_TTL", 0))  # 0 = keep
 
-def _render_db(phashes):
+async def _autodelete(msg: discord.Message, delay: int):
+    try:
+        if delay and delay > 0:
+            await asyncio.sleep(delay)
+            await msg.delete()
+    except Exception:
+        pass
+
+def _render_db(phashes, dhashes=None, tiles=None):
     data = {"phash": phashes}
+    if dhashes:
+        data["dhash"] = dhashes
+    if tiles:
+        data["tphash"] = tiles
     return f"{PHASH_DB_TITLE}\\n```json\\n{json.dumps(data, ensure_ascii=False)}\\n```"
 
 def _extract_hashes_from_json_msg(msg: discord.Message):
     if not msg or not msg.content:
-        return []
+        return [], [], []
     s = msg.content
     i, j = s.find("{"), s.rfind("}")
     if i != -1 and j != -1 and j > i:
         try:
             obj = json.loads(s[i:j+1])
-            arr = obj.get("phash", [])
-            return [str(x).strip() for x in arr if str(x).strip()]
+            arr_p = obj.get("phash", []) or []
+            arr_d = obj.get("dhash", []) or []
+            arr_t = obj.get("tphash", []) or []
+            P = [str(x).strip() for x in arr_p if str(x).strip()]
+            D = [str(x).strip() for x in arr_d if str(x).strip()]
+            T = [str(x).strip() for x in arr_t if str(x).strip()]
+            return P, D, T
         except Exception:
-            return []
-    return []
+            return [], [], []
+    return [], [], []
 
 class PhishHashInbox(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    async def _find_db_message(self, channel: discord.TextChannel):
-        async for m in channel.history(limit=200):
-            if (m.content or "").startswith(PHASH_DB_TITLE):
-                return m
-        return None
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    @commands.Cog.listener("on_message")
+    async def on_message_inbox(self, message: discord.Message):
         try:
-            if not message or not getattr(message, "guild", None):
+            if not message or not message.guild:
                 return
             if getattr(message.author, "bot", False):
                 return
@@ -61,17 +69,23 @@ class PhishHashInbox(commands.Cog):
             if not message.attachments:
                 return
 
-            # compute multi-frame hashes per attachment
-            all_hashes, filenames = [], []
+            # compute hashes for attachments
+            all_p, all_d, all_t, filenames = [], [], [], []
             async with aiohttp.ClientSession() as session:
                 for att in message.attachments:
-                    if not _is_image_attachment(att):
+                    # skip non-images
+                    name = (att.filename or "").lower()
+                    if not any(name.endswith(ext) for ext in IMAGE_EXTS):
                         continue
                     try:
-                        async with session.get(att.url) as r:
-                            raw = await r.read()
+                        async with session.get(att.url) as resp:
+                            raw = await resp.read()
                     except Exception:
                         continue
+                    if not raw:
+                        continue
+                    filenames.append(att.filename or "unknown")
+
                     hs = img_hashing.phash_list_from_bytes(
                         raw,
                         max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 6),
@@ -79,69 +93,107 @@ class PhishHashInbox(commands.Cog):
                         augment_per_frame=getattr(static_cfg, "PHASH_AUGMENT_PER_FRAME", 5),
                     )
                     if hs:
-                        all_hashes.extend(hs)
-                        filenames.append(att.filename or "file")
+                        all_p.extend(hs)
 
-            if not all_hashes:
-                try:
-                    await message.add_reaction("❌")
-                except Exception:
-                    pass
+                    dh = getattr(img_hashing, "dhash_list_from_bytes", None)
+                    if dh:
+                        dlist = dh(
+                            raw,
+                            max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 6),
+                            augment=getattr(static_cfg, "PHASH_AUGMENT_REGISTER", True),
+                            augment_per_frame=getattr(static_cfg, "PHASH_AUGMENT_PER_FRAME", 5),
+                        )
+                        if dlist:
+                            all_d.extend(dlist)
+
+                    tlist = getattr(img_hashing, "tile_phash_list_from_bytes", None)
+                    if tlist:
+                        tiles = tlist(
+                            raw,
+                            grid=getattr(static_cfg, "TILE_GRID", 3),
+                            max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 4),
+                            augment=getattr(static_cfg, "PHASH_AUGMENT_REGISTER", True),
+                            augment_per_frame=3,
+                        )
+                        if tiles:
+                            all_t.extend(tiles)
+
+            if not (all_p or all_d or all_t):
                 return
 
-            parent = ch.parent or ch
-            db_msg = await self._find_db_message(parent)
-            existing = _extract_hashes_from_json_msg(db_msg) if db_msg else []
-            existing_set = set(existing)
-            added = []
-            for h in all_hashes:
-                if h not in existing_set:
-                    existing.append(h)
-                    existing_set.add(h)
-                    added.append(h)
+            parent = ch.parent if hasattr(ch, "parent") else None
 
-            # write back to channel JSON message (persist on Discord)
-            try:
-                content = _render_db(existing)
-                if db_msg:
-                    await db_msg.edit(content=content, allowed_mentions=AllowedMentions.none())
-                else:
-                    await parent.send(content, allowed_mentions=AllowedMentions.none())
-            except Exception:
-                pass
+            # find existing DB message in parent (latest within last 50 msgs)
+            db_msg = None
+            if parent:
+                try:
+                    async for m in parent.history(limit=50):
+                        if m.author.id == self.bot.user.id and PHASH_DB_TITLE in (m.content or ""):
+                            db_msg = m
+                            break
+                except Exception:
+                    db_msg = None
 
-            # visual feedback on the original message
-            try:
-                await message.add_reaction("✅" if added else "⚠️")
-            except Exception:
-                pass
+            existing_p, existing_d, existing_t = ([], [], [])
+            if db_msg:
+                try:
+                    existing_p, existing_d, existing_t = _extract_hashes_from_json_msg(db_msg)
+                except Exception:
+                    existing_p, existing_d, existing_t = ([], [], [])
 
-            # send summary EMBED back to the thread (reply) AND parent channel
-            try:
-                e = discord.Embed(
-                    title="📦 pHash update",
-                    description=f"Data dari thread **{TARGET_THREAD_NAME}** diproses.",
-                    colour=(discord.Colour.green() if added else discord.Colour.orange()),
-                )
-                e.add_field(name="Files", value=str(len(filenames)), inline=True)
-                e.add_field(name="Hashes added", value=str(len(added)), inline=True)
-                if added:
-                    sample = ", ".join(f"`{h[:16]}…`" for h in added[:4])
-                    e.add_field(name="Sample", value=sample, inline=False)
-                if filenames:
-                    e.add_field(name="Contoh File", value=", ".join(f"`{f}`" for f in filenames[:4]), inline=False)
-                e.set_footer(text="SatpamBot • Inbox watcher")
+            # merge without duplicates (preserve order: existing first)
+            sp, sd, st = set(existing_p), set(existing_d), set(existing_t)
+            added_p, added_d, added_t = [], [], []
+            for h in all_p:
+                if h not in sp:
+                    existing_p.append(h); sp.add(h); added_p.append(h)
+            for h in all_d:
+                if h not in sd:
+                    existing_d.append(h); sd.add(h); added_d.append(h)
+            for t in all_t:
+                if t not in st:
+                    existing_t.append(t); st.add(t); added_t.append(t)
 
-                # reply in thread
-                await message.reply(embed=e, mention_author=False, allowed_mentions=AllowedMentions.none())
-                # also echo to parent channel (for mod visibility)
-                if parent and parent != ch:
-                    await parent.send(embed=e, allowed_mentions=AllowedMentions.none())
-            except Exception:
-                pass
+            # prepare content + embed
+            content = _render_db(existing_p, existing_d, existing_t)
+
+            emb = discord.Embed(
+                title="pHash update",
+                description=f"Files: {', '.join(filenames)[:1800]}",
+                colour=0xFF8C00,
+            )
+            emb.add_field(name="Hashes added", value=str(len(added_p) + len(added_d) + len(added_t)), inline=True)
+            emb.add_field(name="pHash total", value=str(len(existing_p)), inline=True)
+            emb.add_field(name="dHash total", value=str(len(existing_d)), inline=True)
+
+            # update or create DB message in parent
+            if db_msg:
+                try:
+                    await db_msg.edit(content=content)
+                except Exception:
+                    pass
+            else:
+                if parent:
+                    try:
+                        db_msg = await parent.send(content)
+                    except Exception:
+                        db_msg = None
+
+            # notify locations
+            if NOTIFY_THREAD:
+                try:
+                    await message.reply(embed=emb, mention_author=False, allowed_mentions=AllowedMentions.none())
+                except Exception:
+                    pass
+            if parent and parent != ch:
+                try:
+                    sent = await parent.send(embed=emb, allowed_mentions=AllowedMentions.none())
+                    asyncio.create_task(_autodelete(sent, LOG_TTL_SECONDS))
+                except Exception:
+                    pass
 
         except Exception:
-            # swallow errors to avoid breaking message flow
+            # Never break message flow
             return
 
 async def setup(bot: commands.Bot):

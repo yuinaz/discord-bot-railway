@@ -7,10 +7,20 @@ import discord
 from discord.ext import commands
 
 from satpambot.bot.modules.discord_bot.helpers import static_cfg, img_hashing
+from satpambot.bot.modules.discord_bot.helpers.img_hashing import phash_hit, hex_hit, tile_match_best
 
 PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
 IMAGE_EXTS = (".png",".jpg",".jpeg",".webp",".gif",".bmp",".tif",".tiff",".heic",".heif")
 TARGET_INBOX = getattr(static_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
+HIT_DISTANCE = int(getattr(static_cfg, "PHASH_HIT_DISTANCE", 12))
+DHIT_DISTANCE = int(getattr(static_cfg, "DHASH_HIT_DISTANCE", 14))
+TILE_GRID = int(getattr(static_cfg, "TILE_GRID", 3))
+TILE_HIT_MIN = int(getattr(static_cfg, "TILE_HIT_MIN", 6))
+TILE_PHASH_DISTANCE = int(getattr(static_cfg, "TILE_PHASH_DISTANCE", 8))
+ORB_ENABLE = bool(getattr(static_cfg, "ORB_ENABLE", True))
+ORB_MIN_MATCH = int(getattr(static_cfg, "ORB_MIN_MATCH", 18))
+ORB_TRIGGER_PDIST = int(getattr(static_cfg, "ORB_TRIGGER_PDIST", 24))
+
 
 def _is_image_attachment(att: discord.Attachment) -> bool:
     ct = (att.content_type or "").lower() if hasattr(att, "content_type") else ""
@@ -122,6 +132,8 @@ class AntiImagePhashRuntime(commands.Cog):
 
         # compute pHash list
         all_hashes = []
+        all_dhashes = []
+        all_tiles = []
         async with aiohttp.ClientSession() as session:
             for att in message.attachments:
                 if not _is_image_attachment(att):
@@ -139,19 +151,78 @@ class AntiImagePhashRuntime(commands.Cog):
                 )
                 if hs:
                     all_hashes.extend(hs)
+                dh = img_hashing.dhash_list_from_bytes(
+                    raw,
+                    max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 4),
+                    augment=True,
+                    augment_per_frame=getattr(static_cfg, "PHASH_AUGMENT_PER_FRAME", 5),
+                )
+                if dh:
+                    all_dhashes.extend(dh)
+                ts = img_hashing.tile_phash_list_from_bytes(
+                    raw,
+                    grid=TILE_GRID,
+                    max_frames=getattr(static_cfg, "PHASH_MAX_FRAMES", 4),
+                    augment=True,
+                    augment_per_frame=2,
+                )
+                if ts:
+                    all_tiles.extend(ts)
 
         if not all_hashes or not self._phash_set:
             return
 
         # match and act
-        for h in all_hashes:
-            if h in self._phash_set:
-                try:
-                    await message.delete()
-                except Exception:
-                    pass
-                await self._ban_author(message, "Phishing image (pHash match)")
-                return
+        hitp = phash_hit(all_hashes, self._phash_set, max_distance=HIT_DISTANCE)
+        if hitp:
+            try: await message.delete()
+            except Exception: pass
+            await self._ban_author(message, f"Phishing image (pHash≈{hitp})")
+            return
+        hitd = hex_hit(all_dhashes, self._dhash_set, max_distance=DHIT_DISTANCE)
+        if hitd:
+            try: await message.delete()
+            except Exception: pass
+            await self._ban_author(message, f"Phishing image (dHash≈{hitd})")
+            return
+        tile_hits = tile_match_best(all_tiles, self._tile_set, grid=TILE_GRID, min_tiles=TILE_HIT_MIN, per_tile_max_distance=TILE_PHASH_DISTANCE)
+        if tile_hits >= TILE_HIT_MIN:
+            try: await message.delete()
+            except Exception: pass
+            await self._ban_author(message, f"Phishing image (tile {tile_hits}/{TILE_GRID*TILE_GRID})")
+            return
+        # ORB fallback only if enabled and phash distance indicates ambiguity
+        if ORB_ENABLE and img_hashing.cv2 is not None:
+            try:
+                # compute desc for current image (first attachment)
+                cur_desc = img_hashing.orb_descriptors_from_bytes(raw, max_frames=1, augment=False, keep_per_frame=128)
+                if cur_desc:
+                    import os, json
+                    dbp = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "data", "phish_orb.json")
+                    dbp = os.path.abspath(dbp)
+                    ORB = {}
+                    try:
+                        with open(dbp, "r", encoding="utf-8") as f: ORB = json.load(f)
+                    except Exception:
+                        ORB = {}
+                    # shortlist candidates by tile or pHash near distance
+                    cand_keys = list(self._tile_set)[:20]
+                    # evaluate match counts
+                    best = 0
+                    for k in cand_keys:
+                        desc = ORB.get(k)
+                        if not desc: continue
+                        mc = img_hashing.orb_match_count(cur_desc, desc, ratio=0.75)
+                        if mc > best: best = mc
+                        if best >= ORB_MIN_MATCH: break
+                    if best >= ORB_MIN_MATCH:
+                        try: await message.delete()
+                        except Exception: pass
+                        await self._ban_author(message, f"Phishing image (ORB≈{best})")
+                        return
+            except Exception:
+                pass
+        return
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhashRuntime(bot))
