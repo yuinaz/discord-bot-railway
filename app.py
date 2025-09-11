@@ -106,3 +106,19 @@ def create_app() -> Flask:
 
 # WSGI entry for gunicorn or direct run
 app = create_app()
+
+# --- robots.txt (lightweight; good for Free plan) ---
+try:
+    from flask import Response
+except Exception:
+    Response = None
+
+if Response is not None and 'robots_txt' not in globals():
+    @app.route("/robots.txt", methods=["GET", "HEAD"])
+    def robots_txt():
+        # Disallow crawling API/dashboard; allow root. Cache for 1 day.
+        body = "User-agent: *\nDisallow: /api/\nDisallow: /dashboard\nAllow: /\n"
+        resp = Response(body, mimetype="text/plain; charset=utf-8")
+        resp.headers.setdefault("Cache-Control", "public, max-age=86400, immutable")
+        return resp
+# --- end robots.txt ---
