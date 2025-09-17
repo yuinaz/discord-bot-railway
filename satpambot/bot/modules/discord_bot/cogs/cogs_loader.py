@@ -1,102 +1,25 @@
-import importlib, logging, pkgutil
-from typing import Iterable, List
-import os
-
-log = logging.getLogger("cogs_loader")
-
-COG_ROOTS = [
-    "satpambot.bot.modules.discord_bot.cogs",
-    "modules.discord_bot.cogs",
-    "discord_bot.cogs",
-]
-
-PRESENCE_DUPES = {"presence_sticky", "presence_clock_sticky", "status_sticky_auto"}
-
-# Allow disabling specific cogs via env or .env.local
-# default disables legacy sticky_guard to avoid double-sticky;
-# override by setting DISABLED_COGS="" (empty) or specific list separated by comma.
-DISABLED_COGS = set((os.getenv("DISABLED_COGS") or "sticky_guard").split(","))
-
-PREFER_KEEP = {"sticky_guard"}
-
-def _iter_modules(pkg_name: str) -> Iterable[str]:
+# satpambot/bot/modules/discord_bot/cogs/cogs_loader.py
+from __future__ import annotations
+import logging
+from discord.ext import commands
+log = logging.getLogger(__name__)
+EXTENSIONS = (
+    "satpambot.bot.modules.discord_bot.cogs.prefix_mod_only",
+    "satpambot.bot.modules.discord_bot.cogs.error_notifier",
+    "satpambot.bot.modules.discord_bot.cogs.reaction_allowlist_static",
+    "satpambot.bot.modules.discord_bot.cogs.status_pin_updater",
+    "satpambot.bot.modules.discord_bot.cogs.ban_local_notify",
+)
+async def _safe_load(bot: commands.Bot, name: str) -> None:
     try:
-        pkg = importlib.import_module(pkg_name)
-        if not hasattr(pkg, "__path__"):
-            return []
-        for m in pkgutil.iter_modules(pkg.__path__, pkg.__name__ + "."):
-            name = m.name.rsplit(".", 1)[-1]
-            if name.startswith("_") or name == "__pycache__":
-                continue
-            yield m.name
+        loaded = getattr(bot, "extensions", {})
+        if isinstance(loaded, dict) and name in loaded:
+            log.info("[cogs_loader] already loaded: %s", name); return
+    except Exception: pass
+    try:
+        await bot.load_extension(name); log.info("[cogs_loader] loaded: %s", name)
     except Exception as e:
-        log.debug("skip pkg %s: %s", pkg_name, e)
-        return []
-
-def _dedupe_presence(mod_names: List[str]) -> List[str]:
-    keep = []
-    seen_presence = False
-    has_sticky_guard = any(n.endswith(".sticky_guard") for n in mod_names)
-    for full in mod_names:
-        short = full.rsplit(".",1)[-1]
-        if short in PREFER_KEEP and has_sticky_guard:
-            keep.append(full); continue
-        if short in PRESENCE_DUPES:
-            if has_sticky_guard:
-                log.info("[cogs_loader] skip presence dup: %s (sticky_guard preferred)", full); continue
-            if seen_presence:
-                log.info("[cogs_loader] skip presence dup: %s", full); continue
-            seen_presence = True; keep.append(full)
-        else:
-            keep.append(full)
-    return keep
-
-async def load_all(bot):
-    loaded = 0
-    for root in COG_ROOTS:
-        mods = list(_iter_modules(root))
-        if not mods: continue
-        mods.sort()
-        mods = _dedupe_presence(mods)
-        for mpath in mods:
-            short = mpath.rsplit('.',1)[-1]
-            if short in DISABLED_COGS: log.info('[cogs_loader] skip disabled %%s', mpath); continue
-            try:
-                await bot.load_extension(mpath)
-                log.info("[cogs_loader] loaded %s", mpath); loaded += 1
-            except Exception as e:
-                log.exception("[cogs_loader] failed %s: %s", mpath, e)
-    if loaded == 0:
-        log.warning("[cogs_loader] no cogs loaded from roots=%s", COG_ROOTS)
-    try:
-        await _force_load(bot)
-    except Exception:
-        pass
-
-# added by patch
-DEFAULT_COGS = DEFAULT_COGS + ["satpambot.bot.modules.discord_bot.cogs.phash_compactify"] if "DEFAULT_COGS" in globals() else ["satpambot.bot.modules.discord_bot.cogs.phash_compactify"]
-
-# added by patch
-DEFAULT_COGS = DEFAULT_COGS + ["satpambot.bot.modules.discord_bot.cogs.temp_dismiss_log"] if "DEFAULT_COGS" in globals() else ["satpambot.bot.modules.discord_bot.cogs.temp_dismiss_log"]
-
-
-# === added by patch: force-load critical cogs to avoid miss ===
-FORCE_COGS = [
-    "satpambot.bot.modules.discord_bot.cogs.anti_url_phish_guard",
-    "satpambot.bot.modules.discord_bot.cogs.banlog_route",
-    "satpambot.bot.modules.discord_bot.cogs.moderation_test",
-]
-
-async def _force_load(bot):
-    for mpath in FORCE_COGS:
-        short = mpath.rsplit(".", 1)[-1]
-        if short in DISABLED_COGS:
-            continue
-        try:
-            await bot.load_extension(mpath)
-            log.info("[cogs_loader] force-loaded %s", mpath)
-        except Exception as e:
-            # ignore AlreadyLoaded; log others
-            if "already loaded" not in str(e).lower():
-                log.debug("[cogs_loader] force-load skip %s: %s", mpath, e)
-# === end patch ===
+        log.warning("[cogs_loader] failed to load %s: %r", name, e)
+async def setup(bot: commands.Bot) -> None:
+    for ext in EXTENSIONS:
+        await _safe_load(bot, ext)
