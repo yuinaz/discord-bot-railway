@@ -6,6 +6,7 @@ log = logging.getLogger(__name__)
 
 EXTENSIONS = (
     "satpambot.bot.modules.discord_bot.cogs.runtime_cfg_manager",
+    "satpambot.bot.modules.discord_bot.cogs.runtime_cfg_from_message",
     "satpambot.bot.modules.discord_bot.cogs.prefix_mod_only",
     "satpambot.bot.modules.discord_bot.cogs.error_notifier",
     "satpambot.bot.modules.discord_bot.cogs.reaction_allowlist_static",
