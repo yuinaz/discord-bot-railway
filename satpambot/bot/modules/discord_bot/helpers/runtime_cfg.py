@@ -14,7 +14,8 @@ DEFAULTS: Dict[str, Any] = {
         "jitter_max_s": 20
     },
     "log": { "channel_id": None, "channel_name": None },
-    "reaction_allow": { "extra_ids": [], "names": [] }
+    "reaction_allow": { "extra_ids": [], "names": [] },
+    "config_source": { "channel_id": None, "message_id": None }
 }
 
 def deep_get(d: Dict[str, Any], path: str, default: Any=None) -> Any:
@@ -38,8 +39,8 @@ class ConfigManager:
 
     def __init__(self) -> None:
         self.path = CONFIG_PATH
-        self._data = {}
-        self._mtime = 0.0
+        self._data: Dict[str, Any] = {}
+        self._mtime: float = 0.0
         self.reload()
 
     @classmethod
@@ -57,7 +58,6 @@ class ConfigManager:
             return a
         out = merge({}, DEFAULTS.copy())
         out = merge(out, data or {})
-        # ENV fallbacks
         log_id = os.getenv("LOG_CHANNEL_ID") or os.getenv("STATUS_CHANNEL_ID") or os.getenv("LOG_BOTPHISING_ID") or os.getenv("LOG_BOTPHISHING_ID")
         if log_id and str(log_id).isdigit(): out["log"]["channel_id"] = int(str(log_id))
         log_name = os.getenv("LOG_CHANNEL_NAME") or os.getenv("STATUS_CHANNEL_NAME")
@@ -96,9 +96,12 @@ class ConfigManager:
         return deep_get(self._data, path, default)
 
     def set(self, path: str, value):
-        deep_set(self._data, path, value)
+        if path:
+            deep_set(self._data, path, value)
+        else:
+            self._data = value
         try:
-            self.path.write_text(json.dumps(self._data, ensure_ascii=False, indent=2), encoding="utf-8")
-            self._mtime = self.path.stat().st_mtime
+            CONFIG_PATH.write_text(json.dumps(self._data, ensure_ascii=False, indent=2), encoding="utf-8")
+            self._mtime = CONFIG_PATH.stat().st_mtime
         except Exception:
             pass
