@@ -1,0 +1,12 @@
+{
+  "text_channels": {},
+  "threads": {},
+  "thread_join_cooldown_s": 3600,
+  "grant_on_thread_member_join": false,
+  "backfill_default_limit": 800,
+  "prune_default_days": 90,
+  "prune_sleep_ms_per_action": 300,
+  "prune_pause_ms_between_channels": 800,
+  "prune_max_actions_per_run": 150,
+  "restrict_to_role_ids": []
+}
