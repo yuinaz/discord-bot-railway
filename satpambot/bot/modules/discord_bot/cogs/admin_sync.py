@@ -1,75 +1,83 @@
 
-from __future__ import annotations
+import logging
+from typing import Optional
 
 import discord
-from discord import app_commands, Interaction
+from discord import app_commands
 from discord.ext import commands
-from typing import Literal, Optional
 
-def _has_manage(inter: Interaction) -> bool:
-    if inter.user and isinstance(inter.user, discord.Member):
-        p = inter.user.guild_permissions
-        return p.manage_guild or p.administrator
-    return False
+log = logging.getLogger(__name__)
 
 class AdminSync(commands.Cog):
-    """Slash-command sync utility.
-    Avoids naming collisions by NOT calling the handler 'sync' internally.
-    """
+    """Robust slash sync: auto/global/guild/all-guilds with copy_global_to."""
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="sync", description="Sync slash commands (default: this guild).")
-    @app_commands.describe(
-        scope="Pilih cakupan sinkronisasi",
-        guild_id="Opsional: ID guild untuk target (kalau kosong, pakai guild sekarang)",
+    @app_commands.command(name="sync", description="Sinkronisasi slash: auto/global/guild/all-guilds.")
+    @app_commands.describe(type="Tipe sync")
+    @app_commands.choices(
+        type=[
+            app_commands.Choice(name="auto", value="auto"),
+            app_commands.Choice(name="global", value="global"),
+            app_commands.Choice(name="guild", value="guild"),
+            app_commands.Choice(name="all-guilds", value="all-guilds"),
+        ]
     )
-    async def do_sync(
-        self,
-        inter: Interaction,
-        scope: Literal["guild", "global", "copy_global_to_guild", "clear_guild"] = "guild",
-        guild_id: Optional[str] = None,
-    ) -> None:
-        if not _has_manage(inter):
-            return await inter.response.send_message("❌ Kamu butuh izin Manage Guild.", ephemeral=True)
-
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def do_sync(self, inter: discord.Interaction, type: Optional[app_commands.Choice[str]] = None):
+        sel = (type.value if isinstance(type, app_commands.Choice) else "auto")
+        tree = self.bot.tree
+        # Try to defer, but don't die if already acknowledged
+        deferred = False
         try:
             await inter.response.defer(ephemeral=True, thinking=True)
-        except discord.InteractionResponded:
-            pass
+            deferred = True
+        except Exception as e:
+            log.warning("[admin_sync] defer failed: %s", e)
+
+        async def _send(msg: str):
+            if deferred:
+                await inter.followup.send(msg, ephemeral=True)
+            else:
+                try:
+                    await inter.response.send_message(msg, ephemeral=True)
+                except Exception:
+                    await inter.followup.send(msg, ephemeral=True)
+
+        if sel == "global":
+            cmds = await tree.sync()
+            await _send(f"Synced **{len(cmds)}** global command.")
+            return
+
+        if sel == "all-guilds":
+            total = 0
+            for g in list(self.bot.guilds):
+                try:
+                    tree.copy_global_to(guild=g)
+                    cmds = await tree.sync(guild=g)
+                    total += len(cmds)
+                except Exception as e:
+                    log.warning("[admin_sync] sync guild %s failed: %s", getattr(g, 'id', '?'), e)
+            await _send(f"Synced global→guild untuk **{len(self.bot.guilds)}** guild. Total entries: {total}.")
+            return
+
+        # default: current guild (auto/guild)
+        g = inter.guild
+        if g is None:
+            cmds = await tree.sync()
+            await _send(f"(No guild) Synced **{len(cmds)}** global command.")
+            return
 
         try:
-            # Tentukan target guild (kalau perlu)
-            target_guild = None
-            if scope != "global":
-                if guild_id and guild_id.isdigit():
-                    target_guild = discord.Object(id=int(guild_id))
-                elif inter.guild:
-                    target_guild = inter.guild
-                else:
-                    return await inter.followup.send("❌ Tidak ada guild context.", ephemeral=True)
-
-            if scope == "guild":
-                synced = await self.bot.tree.sync(guild=target_guild)
-                return await inter.followup.send(f"✅ Synced **{len(synced)}** command ke guild **{getattr(target_guild, 'id', '?')}**.", ephemeral=True)
-
-            if scope == "copy_global_to_guild":
-                # copy global commands ke guild lalu sync
-                self.bot.tree.copy_global_to(guild=target_guild)
-                synced = await self.bot.tree.sync(guild=target_guild)
-                return await inter.followup.send(f"✅ Copied+Synced **{len(synced)}** command ke guild **{getattr(target_guild, 'id', '?')}**.", ephemeral=True)
-
-            if scope == "clear_guild":
-                self.bot.tree.clear_commands(guild=target_guild)
-                await self.bot.tree.sync(guild=target_guild)
-                return await inter.followup.send(f"🧹 Cleared commands untuk guild **{getattr(target_guild, 'id', '?')}**.", ephemeral=True)
-
-            # scope == "global"
-            synced = await self.bot.tree.sync()
-            return await inter.followup.send(f"🌍 Synced global: **{len(synced)}** command.", ephemeral=True)
-
+            # auto: copy global into this guild, then sync
+            tree.copy_global_to(guild=g)
         except Exception as e:
-            return await inter.followup.send(f"❌ Sync gagal: `{e}`", ephemeral=True)
+            log.warning("[admin_sync] copy_global_to failed: %s", e)
+
+        cmds = await tree.sync(guild=g)
+        label = "auto" if sel == "auto" else "guild"
+        await _send(f"Synced **{len(cmds)}** command ke guild **{g.id}** ({label}).")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AdminSync(bot))
