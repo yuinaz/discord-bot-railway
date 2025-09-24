@@ -1,0 +1,22 @@
+{
+  "interval_days": 1,
+  "status": "online",
+  "activities": [
+    {
+      "type": "playing",
+      "name": "🛡️ SatpamLeina /help"
+    },
+    {
+      "type": "watching",
+      "name": "laporan phish masuk"
+    },
+    {
+      "type": "listening",
+      "name": "laporan @Staff LeinDiscord"
+    },
+    {
+      "type": "competing",
+      "name": "perburuan link palsu"
+    }
+  ]
+}
