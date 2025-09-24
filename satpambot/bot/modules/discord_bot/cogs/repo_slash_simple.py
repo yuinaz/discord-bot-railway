@@ -1,6 +1,5 @@
-
-import asyncio, json, os, io, zipfile, logging, time, pathlib, sys
-from typing import List, Dict, Any
+import asyncio, json, os, io, zipfile, logging, pathlib, shutil
+from typing import List, Dict, Any, Optional
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -31,13 +30,17 @@ def _load_remote() -> Dict[str, Any]:
         log.warning("[repo_slash_simple] cannot read %s: %s; using defaults", CONFIG_SYNC, e)
         return DEFAULT_REMOTE.copy()
 
+def _norm_slash(s: str) -> str:
+    # Windows-safe: replace backslash with forward slash
+    return s.replace("\\\\", "/").replace("\\", "/")
+
 def _allowed(rel: str, pull_sets: List[Dict[str, Any]]) -> bool:
-    rel_slash = rel.replace("\\", "/")
+    rel_slash = _norm_slash(rel)
     if rel_slash.endswith("/"):
         return False
     ext = rel_slash.rsplit(".", 1)[-1].lower() if "." in rel_slash else ""
     for spec in pull_sets:
-        includes = [p.replace("\\", "/") for p in spec.get("include", [])]
+        includes = [_norm_slash(p) for p in spec.get("include", [])]
         allow_exts = [e.lower() for e in spec.get("allow_exts", [])]
         for inc in includes:
             if rel_slash.startswith(inc):
@@ -54,12 +57,12 @@ async def _download(url: str, timeout_s: int) -> bytes:
                 resp.raise_for_status()
                 return await resp.read()
     except Exception as e:
-        log.warning("[repo_slash_simple] aiohttp download failed (%s); falling back to urllib", e)
+        log.warning("[repo_slash_simple] aiohttp download failed (%s); fallback to urllib", e)
         import urllib.request
         with urllib.request.urlopen(url, timeout=timeout_s) as r:
             return r.read()
 
-def _apply_zip(data: bytes, repo_root_prefix: str, pull_sets: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _apply_zip_filtered(data: bytes, repo_root_prefix: str, pull_sets: List[Dict[str, Any]]) -> Dict[str, Any]:
     zf = zipfile.ZipFile(io.BytesIO(data))
     total, written, skipped = 0, 0, 0
     base = repo_root_prefix
@@ -74,72 +77,151 @@ def _apply_zip(data: bytes, repo_root_prefix: str, pull_sets: List[Dict[str, Any
         if not _allowed(rel, pull_sets):
             skipped += 1
             continue
-        target = pathlib.Path(rel)
+        target = pathlib.Path(_norm_slash(rel))
         target.parent.mkdir(parents=True, exist_ok=True)
         with zf.open(zi) as src, open(target, "wb") as dst:
             dst.write(src.read())
         written += 1
     return {"total": total, "written": written, "skipped": skipped}
 
+def _safe_target_dir(s: Optional[str]) -> pathlib.Path:
+    base = pathlib.Path.cwd().resolve()
+    name = (s or "_upstream_full").strip() or "_upstream_full"
+    name = _norm_slash(name).lstrip("/")
+    # prevent path traversal
+    if ".." in name.split("/"):
+        name = name.replace("..", "")
+    target = (base / name).resolve()
+    if not str(target).startswith(str(base) + os.sep) and target != base:
+        raise RuntimeError("target path escapes workspace")
+    return target
+
+def _apply_zip_full_to_dir(data: bytes, repo_root_prefix: str, target_dir: pathlib.Path) -> Dict[str, Any]:
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    # fresh mirror
+    if target_dir.exists():
+        shutil.rmtree(target_dir, ignore_errors=True)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    total = written = 0
+    base = repo_root_prefix
+    for zi in zf.infolist():
+        name = zi.filename
+        if not name.startswith(base):
+            continue
+        rel = name[len(base):]
+        rel = _norm_slash(rel)
+        if not rel:
+            continue
+        dest = (target_dir / rel)
+        if rel.endswith("/"):
+            dest.mkdir(parents=True, exist_ok=True)
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with zf.open(zi) as src, open(dest, "wb") as dst:
+            dst.write(src.read())
+        total += 1
+        written += 1
+    return {"total": total, "written": written, "target": str(target_dir)}
+
 class RepoSlashSimple(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.group = app_commands.Group(name="repo", description="Repo maintenance (pull & restart)")
-        self.group.command(name="pull", description="Pull latest repo archive and apply safe files")(self.pull_cmd)
-        self.group.command(name="pull_and_restart", description="Pull then restart process")(self.pull_and_restart_cmd)
-        self.group.command(name="restart", description="Restart process only")(self.restart_cmd)
-        log.info("[repo_slash_simple] initialized")
+        log.info("[repo_slash_simple] init")
 
-    async def cog_load(self):
-        try:
-            self.bot.tree.add_command(self.group)
-            log.info("[repo_slash_simple] group /repo added to tree")
-        except Exception as e:
-            log.warning("[repo_slash_simple] add_command failed: %s", e)
-
-    async def cog_unload(self):
-        try:
-            self.bot.tree.remove_command(self.group.name, type=self.group.type)
-        except Exception:
-            pass
-
-    @app_commands.command(name="pull_and_restart", description="Pull latest archive and restart (alias)")
+    # ---- alias commands (top-level) ----
+    @app_commands.command(name="pull_and_restart", description="Pull latest archive (filtered) and restart (alias)")
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def pull_and_restart_alias(self, itx: discord.Interaction):
+    async def alias_pull_and_restart(self, itx: discord.Interaction):
         await self._pull_and_restart(itx)
 
-    @app_commands.command(name="repo_pull", description="Pull latest archive and apply (alias)")
+    @app_commands.command(name="repo_pull", description="Pull latest archive (filtered) and apply (alias)")
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def repo_pull_alias(self, itx: discord.Interaction):
+    async def alias_repo_pull(self, itx: discord.Interaction):
+        await self._pull_only(itx)
+
+    # ---- group callbacks (bound later) ----
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def grp_pull(self, itx: discord.Interaction):
         await self._pull_only(itx)
 
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def pull_cmd(self, itx: discord.Interaction):
-        await self._pull_only(itx)
-
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def pull_and_restart_cmd(self, itx: discord.Interaction):
+    async def grp_pull_and_restart(self, itx: discord.Interaction):
         await self._pull_and_restart(itx)
 
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def restart_cmd(self, itx: discord.Interaction):
+    async def grp_restart(self, itx: discord.Interaction):
         await itx.response.send_message("Restarting process…", ephemeral=True)
         await itx.followup.send("💤 Exiting now, Render will restart the service.", ephemeral=True)
         await asyncio.sleep(0.8)
         os._exit(0)
 
+    # NEW: /repo pull_full [target]
+    @app_commands.describe(target="Folder tujuan relatif di server (default: _upstream_full)")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def grp_pull_full(self, itx: discord.Interaction, target: Optional[str] = None):
+        r = _load_remote()
+        await itx.response.send_message(f"⬇️ Mengunduh archive full dan mengekstrak ke folder…", ephemeral=True)
+        data = await _download(r["archive"], int(r.get("timeout_s", 25)))
+        tgt = _safe_target_dir(target)
+        stats = _apply_zip_full_to_dir(data, r["repo_root_prefix"], tgt)
+        await itx.followup.send(f"✅ Full mirror siap di `{stats['target']}` (files={stats['written']}).", ephemeral=True)
+
+    async def cog_load(self):
+        # Aliases (idempotent)
+        for name in ("pull_and_restart", "repo_pull"):
+            if self.bot.tree.get_command(name) is None:
+                try:
+                    self.bot.tree.add_command(getattr(self, name))
+                    log.info("[repo_slash_simple] alias /%s added", name)
+                except Exception as e:
+                    log.warning("[repo_slash_simple] alias /%s add failed: %s", name, e)
+
+        # /repo group (attach or create)
+        existing = self.bot.tree.get_command("repo")
+        if isinstance(existing, app_commands.Group):
+            grp = existing
+            log.info("[repo_slash_simple] attach to existing /repo")
+        else:
+            grp = app_commands.Group(name="repo", description="Repo maintenance (pull & restart)")
+            try:
+                self.bot.tree.add_command(grp)
+                log.info("[repo_slash_simple] created /repo group")
+            except Exception as e:
+                log.warning("[repo_slash_simple] add /repo failed: %s", e)
+                return
+
+        # helper to add/replace
+        def _add_or_replace(group, name, callback, desc):
+            for c in list(group.commands):
+                if c.name == name:
+                    try:
+                        group.remove_command(c.name)
+                    except Exception:
+                        pass
+            try:
+                group.add_command(app_commands.Command(name=name, description=desc, callback=callback))
+                log.info("[repo_slash_simple] /repo %s registered", name)
+            except Exception as e:
+                log.warning("[repo_slash_simple] /repo %s register failed: %s", name, e)
+
+        _add_or_replace(grp, "pull", self.grp_pull, "Pull latest archive (filtered) and apply safe files")
+        _add_or_replace(grp, "pull_and_restart", self.grp_pull_and_restart, "Pull then restart process (filtered)")
+        _add_or_replace(grp, "restart", self.grp_restart, "Restart process only")
+        _add_or_replace(grp, "pull_full", self.grp_pull_full, "Pull FULL archive into a local folder (mirror)")
+
+    # ---- helpers ----
     async def _pull_only(self, itx: discord.Interaction):
         await itx.response.send_message("⬇️ Downloading and applying latest archive…", ephemeral=True)
         r = _load_remote()
         data = await _download(r["archive"], int(r.get("timeout_s", 20)))
-        stats = _apply_zip(data, r["repo_root_prefix"], r["pull_sets"])
+        stats = _apply_zip_filtered(data, r["repo_root_prefix"], r["pull_sets"])
         await itx.followup.send(f"✅ Pulled. Files total={stats['total']}, applied={stats['written']}, skipped={stats['skipped']}.", ephemeral=True)
 
     async def _pull_and_restart(self, itx: discord.Interaction):
         await itx.response.send_message("⬇️ Downloading and applying latest archive, then restarting…", ephemeral=True)
         r = _load_remote()
         data = await _download(r["archive"], int(r.get("timeout_s", 20)))
-        stats = _apply_zip(data, r["repo_root_prefix"], r["pull_sets"])
+        stats = _apply_zip_filtered(data, r["repo_root_prefix"], r["pull_sets"])
         await itx.followup.send(f"✅ Pulled (applied={stats['written']}, skipped={stats['skipped']}). Restarting…", ephemeral=True)
         await asyncio.sleep(0.8)
         os._exit(0)
