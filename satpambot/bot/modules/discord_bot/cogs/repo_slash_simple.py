@@ -1,3 +1,4 @@
+
 import asyncio, json, os, io, zipfile, logging, pathlib, shutil
 from typing import List, Dict, Any, Optional
 import discord
@@ -31,8 +32,7 @@ def _load_remote() -> Dict[str, Any]:
         return DEFAULT_REMOTE.copy()
 
 def _norm_slash(s: str) -> str:
-    # Windows-safe: replace backslash with forward slash
-    return s.replace("\\\\", "/").replace("\\", "/")
+    return s.replace("\\", "/").replace("\", "/")
 
 def _allowed(rel: str, pull_sets: List[Dict[str, Any]]) -> bool:
     rel_slash = _norm_slash(rel)
@@ -88,7 +88,6 @@ def _safe_target_dir(s: Optional[str]) -> pathlib.Path:
     base = pathlib.Path.cwd().resolve()
     name = (s or "_upstream_full").strip() or "_upstream_full"
     name = _norm_slash(name).lstrip("/")
-    # prevent path traversal
     if ".." in name.split("/"):
         name = name.replace("..", "")
     target = (base / name).resolve()
@@ -98,7 +97,6 @@ def _safe_target_dir(s: Optional[str]) -> pathlib.Path:
 
 def _apply_zip_full_to_dir(data: bytes, repo_root_prefix: str, target_dir: pathlib.Path) -> Dict[str, Any]:
     zf = zipfile.ZipFile(io.BytesIO(data))
-    # fresh mirror
     if target_dir.exists():
         shutil.rmtree(target_dir, ignore_errors=True)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -108,8 +106,7 @@ def _apply_zip_full_to_dir(data: bytes, repo_root_prefix: str, target_dir: pathl
         name = zi.filename
         if not name.startswith(base):
             continue
-        rel = name[len(base):]
-        rel = _norm_slash(rel)
+        rel = _norm_slash(name[len(base):])
         if not rel:
             continue
         dest = (target_dir / rel)
@@ -128,7 +125,6 @@ class RepoSlashSimple(commands.Cog):
         self.bot = bot
         log.info("[repo_slash_simple] init")
 
-    # ---- alias commands (top-level) ----
     @app_commands.command(name="pull_and_restart", description="Pull latest archive (filtered) and restart (alias)")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def alias_pull_and_restart(self, itx: discord.Interaction):
@@ -139,7 +135,6 @@ class RepoSlashSimple(commands.Cog):
     async def alias_repo_pull(self, itx: discord.Interaction):
         await self._pull_only(itx)
 
-    # ---- group callbacks (bound later) ----
     @app_commands.checks.has_permissions(manage_guild=True)
     async def grp_pull(self, itx: discord.Interaction):
         await self._pull_only(itx)
@@ -155,7 +150,6 @@ class RepoSlashSimple(commands.Cog):
         await asyncio.sleep(0.8)
         os._exit(0)
 
-    # NEW: /repo pull_full [target]
     @app_commands.describe(target="Folder tujuan relatif di server (default: _upstream_full)")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def grp_pull_full(self, itx: discord.Interaction, target: Optional[str] = None):
@@ -167,16 +161,19 @@ class RepoSlashSimple(commands.Cog):
         await itx.followup.send(f"✅ Full mirror siap di `{stats['target']}` (files={stats['written']}).", ephemeral=True)
 
     async def cog_load(self):
-        # Aliases (idempotent)
-        for name in ("pull_and_restart", "repo_pull"):
+        # Correct alias binding
+        alias_map = {
+            "pull_and_restart": "alias_pull_and_restart",
+            "repo_pull": "alias_repo_pull",
+        }
+        for name, meth in alias_map.items():
             if self.bot.tree.get_command(name) is None:
                 try:
-                    self.bot.tree.add_command(getattr(self, name))
+                    self.bot.tree.add_command(getattr(self, meth))
                     log.info("[repo_slash_simple] alias /%s added", name)
                 except Exception as e:
                     log.warning("[repo_slash_simple] alias /%s add failed: %s", name, e)
 
-        # /repo group (attach or create)
         existing = self.bot.tree.get_command("repo")
         if isinstance(existing, app_commands.Group):
             grp = existing
@@ -190,7 +187,6 @@ class RepoSlashSimple(commands.Cog):
                 log.warning("[repo_slash_simple] add /repo failed: %s", e)
                 return
 
-        # helper to add/replace
         def _add_or_replace(group, name, callback, desc):
             for c in list(group.commands):
                 if c.name == name:
@@ -209,7 +205,6 @@ class RepoSlashSimple(commands.Cog):
         _add_or_replace(grp, "restart", self.grp_restart, "Restart process only")
         _add_or_replace(grp, "pull_full", self.grp_pull_full, "Pull FULL archive into a local folder (mirror)")
 
-    # ---- helpers ----
     async def _pull_only(self, itx: discord.Interaction):
         await itx.response.send_message("⬇️ Downloading and applying latest archive…", ephemeral=True)
         r = _load_remote()
