@@ -1,3 +1,4 @@
+
 import asyncio, json, os, io, zipfile, logging, time, pathlib, sys
 from typing import List, Dict, Any
 import discord
@@ -23,7 +24,6 @@ def _load_remote() -> Dict[str, Any]:
     try:
         with open(CONFIG_SYNC, "r", encoding="utf-8") as f:
             data = json.load(f) or {}
-        # merge with defaults
         out = DEFAULT_REMOTE.copy()
         out.update({k: v for k, v in data.items() if v is not None})
         return out
@@ -33,10 +33,8 @@ def _load_remote() -> Dict[str, Any]:
 
 def _allowed(rel: str, pull_sets: List[Dict[str, Any]]) -> bool:
     rel_slash = rel.replace("\\", "/")
-    # Only allow files (skip dirs)
     if rel_slash.endswith("/"):
         return False
-    # ext filter
     ext = rel_slash.rsplit(".", 1)[-1].lower() if "." in rel_slash else ""
     for spec in pull_sets:
         includes = [p.replace("\\", "/") for p in spec.get("include", [])]
@@ -48,7 +46,6 @@ def _allowed(rel: str, pull_sets: List[Dict[str, Any]]) -> bool:
     return False
 
 async def _download(url: str, timeout_s: int) -> bytes:
-    # Use aiohttp to avoid blocking loop; fallback to urllib if aiohttp missing.
     try:
         import aiohttp
         timeout = aiohttp.ClientTimeout(total=timeout_s)
@@ -77,7 +74,6 @@ def _apply_zip(data: bytes, repo_root_prefix: str, pull_sets: List[Dict[str, Any
         if not _allowed(rel, pull_sets):
             skipped += 1
             continue
-        # ensure parent dir
         target = pathlib.Path(rel)
         target.parent.mkdir(parents=True, exist_ok=True)
         with zf.open(zi) as src, open(target, "wb") as dst:
@@ -89,14 +85,12 @@ class RepoSlashSimple(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.group = app_commands.Group(name="repo", description="Repo maintenance (pull & restart)")
-        # bind methods into the group
         self.group.command(name="pull", description="Pull latest repo archive and apply safe files")(self.pull_cmd)
         self.group.command(name="pull_and_restart", description="Pull then restart process")(self.pull_and_restart_cmd)
         self.group.command(name="restart", description="Restart process only")(self.restart_cmd)
         log.info("[repo_slash_simple] initialized")
 
     async def cog_load(self):
-        # Register group on load
         try:
             self.bot.tree.add_command(self.group)
             log.info("[repo_slash_simple] group /repo added to tree")
@@ -109,7 +103,6 @@ class RepoSlashSimple(commands.Cog):
         except Exception:
             pass
 
-    # Aliases as top-level commands for easy discovery
     @app_commands.command(name="pull_and_restart", description="Pull latest archive and restart (alias)")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def pull_and_restart_alias(self, itx: discord.Interaction):
@@ -120,7 +113,6 @@ class RepoSlashSimple(commands.Cog):
     async def repo_pull_alias(self, itx: discord.Interaction):
         await self._pull_only(itx)
 
-    # Group handlers
     @app_commands.checks.has_permissions(manage_guild=True)
     async def pull_cmd(self, itx: discord.Interaction):
         await self._pull_only(itx)
@@ -133,7 +125,6 @@ class RepoSlashSimple(commands.Cog):
     async def restart_cmd(self, itx: discord.Interaction):
         await itx.response.send_message("Restarting process…", ephemeral=True)
         await itx.followup.send("💤 Exiting now, Render will restart the service.", ephemeral=True)
-        # Give Discord time to send messages
         await asyncio.sleep(0.8)
         os._exit(0)
 
