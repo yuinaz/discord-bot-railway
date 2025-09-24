@@ -1,5 +1,5 @@
 
-import asyncio, json, os, io, zipfile, logging, pathlib, shutil
+import os, asyncio, json, io, zipfile, logging, pathlib, shutil
 from typing import List, Dict, Any, Optional
 import discord
 from discord import app_commands
@@ -7,8 +7,11 @@ from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
-CONFIG_SYNC = "config/remote_sync.json"
+# ---- Guild-scope config ----
+# You can override with env var SB_GUILD_ID
+GUILD_ID = int(os.getenv("SB_GUILD_ID", "761163966030151701"))
 
+CONFIG_SYNC = "config/remote_sync.json"
 DEFAULT_REMOTE = {
     "archive": "https://codeload.github.com/yuinaz/discord-bot-railway/zip/refs/heads/main",
     "repo_root_prefix": "discord-bot-railway-main/",
@@ -19,6 +22,9 @@ DEFAULT_REMOTE = {
     ],
     "timeout_s": 25
 }
+
+def _norm_slash(s: str) -> str:
+    return s.replace("\\\\", "/").replace("\\", "/")
 
 def _load_remote() -> Dict[str, Any]:
     try:
@@ -32,10 +38,6 @@ def _load_remote() -> Dict[str, Any]:
     except Exception as e:
         log.warning("[repo_slash_simple] cannot read %s: %s; using defaults", CONFIG_SYNC, e)
         return DEFAULT_REMOTE.copy()
-
-def _norm_slash(s: str) -> str:
-    # Windows-safe normalization
-    return s.replace("\\\\", "/").replace("\\", "/")
 
 def _allowed(rel: str, pull_sets: List[Dict[str, Any]]) -> bool:
     rel_slash = _norm_slash(rel)
@@ -52,9 +54,8 @@ def _allowed(rel: str, pull_sets: List[Dict[str, Any]]) -> bool:
     return False
 
 async def _download(url: str, timeout_s: int) -> bytes:
-    # Prefer aiohttp; fallback to urllib if not available
     try:
-        import aiohttp  # type: ignore
+        import aiohttp
         timeout = aiohttp.ClientTimeout(total=timeout_s)
         async with aiohttp.ClientSession(timeout=timeout) as sess:
             async with sess.get(url) as resp:
@@ -68,9 +69,7 @@ async def _download(url: str, timeout_s: int) -> bytes:
 
 def _apply_zip_filtered(data: bytes, repo_root_prefix: str, pull_sets: List[Dict[str, Any]]) -> Dict[str, Any]:
     zf = zipfile.ZipFile(io.BytesIO(data))
-    total = 0
-    written = 0
-    skipped = 0
+    total = written = skipped = 0
     base = repo_root_prefix or ""
     for zi in zf.infolist():
         name = zi.filename
@@ -128,20 +127,10 @@ def _apply_zip_full_to_dir(data: bytes, repo_root_prefix: str, target_dir: pathl
 class RepoSlashSimple(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        log.info("[repo_slash_simple] init")
+        self.guild_obj = discord.Object(id=GUILD_ID)
+        log.info("[repo_slash_simple] init guild-only for %s", GUILD_ID)
 
-    # --- alias commands (top-level; optional) ---
-    @app_commands.command(name="pull_and_restart", description="Pull latest (filtered) & restart (alias)")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def alias_pull_and_restart(self, itx: discord.Interaction):
-        await self._pull_and_restart(itx)
-
-    @app_commands.command(name="repo_pull", description="Pull latest (filtered) & apply (alias)")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def alias_repo_pull(self, itx: discord.Interaction):
-        await self._pull_only(itx)
-
-    # --- group callbacks (bound in cog_load) ---
+    # --- group callbacks ---
     @app_commands.checks.has_permissions(manage_guild=True)
     async def grp_pull(self, itx: discord.Interaction):
         await self._pull_only(itx)
@@ -153,11 +142,11 @@ class RepoSlashSimple(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def grp_restart(self, itx: discord.Interaction):
         await itx.response.send_message("Restarting process…", ephemeral=True)
-        await itx.followup.send("💤 Exiting now, Render will restart the service.", ephemeral=True)
+        await itx.followup.send("💤 Exiting now, Render akan merestart service.", ephemeral=True)
         await asyncio.sleep(0.8)
         os._exit(0)
 
-    @app_commands.describe(target="Folder tujuan relatif di server (default: _upstream_full)")
+    @app_commands.describe(target="Folder tujuan relatif (default: _upstream_full)")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def grp_pull_full(self, itx: discord.Interaction, target: Optional[str] = None):
         r = _load_remote()
@@ -168,48 +157,33 @@ class RepoSlashSimple(commands.Cog):
         await itx.followup.send(f"✅ Full mirror siap di `{stats['target']}` (files={stats['written']}).", ephemeral=True)
 
     async def cog_load(self):
-        # Register aliases idempotently
-        alias_map = {
-            "pull_and_restart": self.alias_pull_and_restart,
-            "repo_pull": self.alias_repo_pull,
-        }
-        for name, fn in alias_map.items():
-            if self.bot.tree.get_command(name) is None:
-                try:
-                    self.bot.tree.add_command(fn)
-                    log.info("[repo_slash_simple] alias /%s added", name)
-                except Exception as e:
-                    log.warning("[repo_slash_simple] alias /%s add failed: %s", name, e)
+        guild = self.guild_obj
 
-        # Ensure /repo group exists, else create
-        existing = self.bot.tree.get_command("repo")
+        # Ensure /repo group exists (guild-scoped)
+        existing = self.bot.tree.get_command("repo", guild=guild)
         if isinstance(existing, app_commands.Group):
             grp = existing
-            log.info("[repo_slash_simple] attach to existing /repo")
+            log.info("[repo_slash_simple] attach to existing /repo (guild %s)", GUILD_ID)
         else:
-            grp = app_commands.Group(name="repo", description="Repo maintenance (pull & restart)")
+            grp = app_commands.Group(name="repo", description="Repo maintenance (guild-only)")
             try:
-                self.bot.tree.add_command(grp)
-                log.info("[repo_slash_simple] created /repo group")
+                self.bot.tree.add_command(grp, guild=guild)
+                log.info("[repo_slash_simple] created /repo group (guild %s)", GUILD_ID)
             except Exception as e:
                 log.warning("[repo_slash_simple] add /repo failed: %s", e)
                 return
 
-        # Add/replace specific subcommands to /repo
         def _add_or_replace(group: app_commands.Group, name: str, callback, desc: str):
-            existing_cmd = None
+            # Guild-scoped add/replace
             for c in list(group.commands):
                 if c.name == name:
-                    existing_cmd = c
-                    break
-            if existing_cmd is not None:
-                try:
-                    group.remove_command(existing_cmd.name)
-                except Exception:
-                    pass
+                    try:
+                        group.remove_command(c.name)
+                    except Exception:
+                        pass
             try:
                 group.add_command(app_commands.Command(name=name, description=desc, callback=callback))
-                log.info("[repo_slash_simple] /repo %s registered", name)
+                log.info("[repo_slash_simple] /repo %s registered (guild %s)", name, GUILD_ID)
             except Exception as e:
                 log.warning("[repo_slash_simple] /repo %s register failed: %s", name, e)
 
@@ -218,7 +192,14 @@ class RepoSlashSimple(commands.Cog):
         _add_or_replace(grp, "restart", self.grp_restart, "Restart process only")
         _add_or_replace(grp, "pull_full", self.grp_pull_full, "Pull FULL archive into a local folder (mirror)")
 
-    # --- helpers ---
+        # Final: sync only this guild
+        try:
+            synced = await self.bot.tree.sync(guild=guild)
+            log.info("[repo_slash_simple] synced %d entries to guild %s", len(synced), GUILD_ID)
+        except Exception as e:
+            log.warning("[repo_slash_simple] guild sync failed: %s", e)
+
+    # ---- helpers ----
     async def _pull_only(self, itx: discord.Interaction):
         await itx.response.send_message("⬇️ Downloading & applying latest archive…", ephemeral=True)
         r = _load_remote()
