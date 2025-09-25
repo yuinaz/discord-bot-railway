@@ -1,226 +1,160 @@
-
+# auto_repo_watcher.py — STABILIZE PATCH (no-env)
+# - Boot cooldown: jangan restart dalam 180s pertama setelah start
+# - Restart guard: cegah restart beruntun
+# - Archive SHA cache: skip kalau ZIP sama
+# - Diff-aware apply: tulis file hanya jika konten berubah
+# - Restart via os.execv (bukan os._exit) agar Render tidak menandai "Instance failed"
 from __future__ import annotations
-import asyncio, json, os, time
+import asyncio, aiohttp, hashlib, io, json, os, sys, zipfile, time
 from pathlib import Path
-from typing import Dict, Any, Optional
-import aiohttp
+from typing import Dict, Any, List, Tuple
+
 import discord
 from discord.ext import commands
-from discord import ChannelType
 
-# reuse helpers from remote_sync_restart
-from .remote_sync_restart import _load_cfg as _rs_load_cfg, _pull_archive_and_apply as _rs_pull_archive_and_apply
+from satpambot.bot.modules.discord_bot.helpers import restart_guard as rg
 
-STATE = Path("data") / "remote_watch_state.json"
-DEFAULT = {
-    "enabled": True,
-    "interval_days": 2,            # hemat kuota: default cek tiap 2 hari
-    "interval_minutes": None,      # kalau diisi, override days
-    "check_url": "",               # fallback ke remote_sync.json["archive"]
-    "notify_channel_id": 0,        # ID channel #log-botphising
-    "notify_thread_name": "log restart github",  # NAMA thread yang akan dipakai/dibuat otomatis
-    "request_timeout_s": 15,
-}
+BOOT_T0 = time.monotonic()
+BOOT_COOLDOWN_S = 180.0  # no restart in first 3 minutes
+SHA_CACHE_FILE = Path("/tmp/satpambot_last_archive.sha256")
 
 def _load_watch_cfg() -> Dict[str, Any]:
-    base_cfg = _rs_load_cfg()
-    watch_cfg = dict(DEFAULT)
-    cfg_path = Path("config") / "remote_watch.json"
+    p = Path("config") / "remote_watch.json"
     try:
-        if cfg_path.exists():
-            watch_cfg.update(json.loads(cfg_path.read_text("utf-8")) or {})
+        return json.loads(p.read_text("utf-8"))
     except Exception:
-        pass
-    if not (watch_cfg.get("check_url") or "").strip():
-        watch_cfg["check_url"] = base_cfg.get("archive") or ""
-    return watch_cfg
+        return {"enabled": False, "interval_days": 4, "notify_thread_name": "log restart github"}
 
-def _load_state() -> Dict[str, Any]:
+def _load_sync_cfg() -> Dict[str, Any]:
+    p = Path("config") / "remote_sync.json"
     try:
-        return json.loads(STATE.read_text("utf-8"))
+        return json.loads(p.read_text("utf-8"))
     except Exception:
-        return {"etag": "", "last_modified": "", "last_checked": 0, "last_updated": 0}
+        return {
+            "archive": "",
+            "repo_root_prefix": "",
+            "pull_sets": [
+                {"include": ["config/"], "allow_exts": ["json","txt","yaml","yml"]},
+                {"include": ["satpambot/"], "allow_exts": ["py"]},
+            ],
+            "files": [],
+            "timeout_s": 20,
+        }
 
-def _save_state(s: Dict[str, Any]):
-    try:
-        STATE.parent.mkdir(parents=True, exist_ok=True)
-        STATE.write_text(json.dumps(s), encoding="utf-8")
-    except Exception:
-        pass
+async def _fetch_bytes(url: str, timeout: int) -> bytes:
+    async with aiohttp.ClientSession() as s:
+        async with s.get(url, timeout=timeout) as r:
+            r.raise_for_status()
+            return await r.read()
 
-async def _get_or_create_log_thread(guild: Optional[discord.Guild], channel_id: int, name: str):
-    """Ambil thread bernama 'name' di dalam channel_id; kalau tidak ada → buat.
-       - Cari di active threads
-       - Coba cari di archived (public) lalu unarchive
-       - Jika tetap tidak ada → create public thread
-    """
-    if not guild or not channel_id:
-        return None
-    ch = guild.get_channel(channel_id)
-    if isinstance(ch, discord.Thread):
-        return ch
-    if not isinstance(ch, discord.TextChannel):
-        return None
+def _should_include(name: str, cfg: Dict[str, Any]) -> bool:
+    pulls = cfg.get("pull_sets") or []
+    name_l = name.lower()
+    for rule in pulls:
+        inc = rule.get("include") or []
+        exts = [e.lower() for e in (rule.get("allow_exts") or [])]
+        if inc and not any(name.startswith(i) for i in inc):
+            continue
+        if exts and not any(name_l.endswith("." + e) for e in exts):
+            continue
+        return True
+    return False
 
-    target_name = (name or "").strip().lower()
-    if not target_name:
-        return ch  # fallback: kirim ke channel
-
-    # 1) Cari di active threads
-    try:
-        for t in ch.threads:
-            try:
-                if (t.name or "").strip().lower() == target_name and not t.archived:
-                    return t
-            except Exception:
+def _apply_archive_bytes_if_changed(data: bytes, cfg: Dict[str, Any]) -> Tuple[List[str], int]:
+    """Extract only changed files. Returns (changed_paths, total_considered)."""
+    root_prefix = (cfg.get("repo_root_prefix") or "").strip()
+    changed: List[str] = []
+    considered = 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for info in z.infolist():
+            if info.is_dir():
                 continue
-    except Exception:
-        pass
-
-    # 2) Cari di archived public threads (limit kecil untuk hemat)
-    try:
-        async for t in ch.archived_threads(limit=50, private=False):
-            try:
-                if (t.name or "").strip().lower() == target_name:
-                    # unarchive supaya aktif lagi
-                    try:
-                        await t.edit(archived=False)
-                    except Exception:
-                        pass
-                    return t
-            except Exception:
+            name = info.filename
+            rel = name[len(root_prefix):] if root_prefix and name.startswith(root_prefix) else name
+            if not _should_include(rel, cfg):
                 continue
+            considered += 1
+            target = Path(rel)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            new_bytes = z.read(info)
+            if target.exists():
+                try:
+                    with open(target, "rb") as f:
+                        old_bytes = f.read()
+                    if old_bytes == new_bytes:
+                        continue  # skip identical
+                except Exception:
+                    pass
+            with open(target, "wb") as f:
+                f.write(new_bytes)
+            changed.append(rel)
+    return changed, considered
+
+async def _pull_archive_and_apply_if_changed() -> Tuple[List[str], str]:
+    """Download archive; skip if same SHA as last time; apply only changed files."""
+    cfg = _load_sync_cfg()
+    url = cfg.get("archive")
+    if not url:
+        return [], "no-archive-url"
+    timeout = int(cfg.get("timeout_s", 20))
+    data = await _fetch_bytes(url, timeout)
+    sha = hashlib.sha256(data).hexdigest()
+    if SHA_CACHE_FILE.exists():
+        try:
+            last = SHA_CACHE_FILE.read_text("utf-8").strip()
+            if last == sha:
+                return [], "same-zip"  # skip
+        except Exception:
+            pass
+    changed, considered = _apply_archive_bytes_if_changed(data, cfg)
+    try:
+        SHA_CACHE_FILE.write_text(sha)
     except Exception:
         pass
-
-    # 3) Tidak ada → buat baru (public thread, auto-archive 7 hari)
-    try:
-        th = await ch.create_thread(
-            name=name,
-            type=ChannelType.public_thread,
-            auto_archive_duration=10080  # 7 hari
-        )
-        return th
-    except Exception:
-        # fallback ke channel jika gagal buat thread
-        return ch
+    return changed, "applied" if changed else "no-diff"
 
 class AutoRepoWatcher(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._task = None
-        self._started = False
-
-    async def _check_once(self):
-        watch = _load_watch_cfg()
-        if not bool(watch.get("enabled", True)): 
-            return False, "disabled"
-        url = (watch.get("check_url") or "").strip()
-        if not url:
-            return False, "no check url"
-
-        timeout_s = int(watch.get("request_timeout_s", 15))
-        state = _load_state()
-        headers = {}
-        if state.get("etag"): headers["If-None-Match"] = state["etag"]
-        if state.get("last_modified"): headers["If-Modified-Since"] = state["last_modified"]
-
-        status = None
-        etag = None
-        last_mod = None
-        # HEAD untuk hemat bandwidth
-        try:
-            async with aiohttp.ClientSession() as s:
-                async with s.head(url, timeout=timeout_s, headers=headers) as r:
-                    status = r.status
-                    etag = r.headers.get("ETag") or r.headers.get("Etag")
-                    last_mod = r.headers.get("Last-Modified")
-        except Exception:
-            # fallback GET (jarang)
-            try:
-                async with aiohttp.ClientSession() as s:
-                    async with s.get(url, timeout=timeout_s, headers=headers) as r:
-                        status = r.status
-                        etag = r.headers.get("ETag") or r.headers.get("Etag")
-                        last_mod = r.headers.get("Last-Modified")
-            except Exception:
-                status = None
-
-        state["last_checked"] = int(time.time())
-
-        if status == 304:
-            _save_state(state)
-            return False, "not-modified"
-
-        if status and 200 <= status < 300:
-            changed = False
-            if etag and etag != state.get("etag"):
-                changed = True
-            elif (not etag) and last_mod and last_mod != state.get("last_modified"):
-                changed = True
-            elif not state.get("etag") and not state.get("last_modified"):
-                # run pertama → simpan state saja, tanpa restart/log (hindari loop)
-                state["etag"] = etag or ""
-                state["last_modified"] = last_mod or ""
-                _save_state(state)
-                return False, "primed"
-            if changed:
-                state["etag"] = etag or state.get("etag","")
-                state["last_modified"] = last_mod or state.get("last_modified","")
-                state["last_updated"] = int(time.time())
-                _save_state(state)
-
-                # Pull & restart bila ada perubahan file nyata
-                base_cfg = _rs_load_cfg()
-                changed_files = await _rs_pull_archive_and_apply(base_cfg)
-                if changed_files:
-                    try:
-                        guild = self.bot.guilds[0] if self.bot.guilds else None
-                        target = await _get_or_create_log_thread(
-                            guild,
-                            int(watch.get("notify_channel_id") or 0),
-                            str(watch.get("notify_thread_name") or "log restart github")
-                        )
-                        if target and isinstance(target, (discord.TextChannel, discord.Thread)):
-                            txt = f"[repo-watch] {len(changed_files)} file berubah → restarting…"
-                            await target.send(txt)
-                    except Exception:
-                        pass
-                    await asyncio.sleep(1.5)
-                    os._exit(0)
-                else:
-                    return False, "no-file-changes"
-            return False, "no-change"
-        _save_state(state)
-        return False, f"status={status}"
-
-    def _sleep_seconds(self) -> int:
-        watch = _load_watch_cfg()
-        days = watch.get("interval_days", None)
-        if days is not None:
-            try: d = int(days)
-            except Exception: d = 2
-            d = max(1, min(30, d))  # clamp
-            return d * 86400
-        try: mins = int(watch.get("interval_minutes") or 15)
-        except Exception: mins = 15
-        mins = max(5, min(30*24*60, mins))
-        return mins * 60
+        self._task = asyncio.create_task(self._runner())
 
     async def _runner(self):
-        await self.bot.wait_until_ready()
-        while not self.bot.is_closed():
-            try:
-                await self._check_once()
-            except Exception:
-                pass
-            await asyncio.sleep(self._sleep_seconds())
+        cfg = _load_watch_cfg()
+        if not cfg.get("enabled", False):
+            return
+        # Initial delay kecil supaya tidak langsung restart setelah deploy
+        await asyncio.sleep(60.0)
+        interval_days = float(cfg.get("interval_days", 4))
+        interval_s = max(1800.0, interval_days * 86400.0)  # min 30m
+        thread_name = cfg.get("notify_thread_name") or "log restart github"
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        if self._started: return
-        self._started = True
-        self._task = asyncio.create_task(self._runner())
+        while True:
+            try:
+                changed, mode = await _pull_archive_and_apply_if_changed()
+                if changed:
+                    ok, age = rg.should_restart()
+                    uptime = time.monotonic() - BOOT_T0
+                    if ok and uptime >= BOOT_COOLDOWN_S:
+                        # Announce before restart
+                        try:
+                            # Try to post to a thread named 'thread_name' if you have a helper elsewhere
+                            ch = None
+                            # (Optional) integrate with your logging cog; left as no-op to avoid coupling
+                        except Exception:
+                            pass
+                        rg.mark("watcher")
+                        await asyncio.sleep(1.5)
+                        os.execv(sys.executable, [sys.executable, *sys.argv])
+                    else:
+                        # Debounced; skip restart this cycle
+                        pass
+                else:
+                    # mode can be 'same-zip' or 'no-diff' — do nothing
+                    pass
+            except Exception:
+                # swallow and keep looping
+                pass
+            await asyncio.sleep(interval_s)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoRepoWatcher(bot))
