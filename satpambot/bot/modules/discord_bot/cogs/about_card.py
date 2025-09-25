@@ -23,9 +23,7 @@ class AboutCard(commands.Cog):
 
     @app_commands.describe(public="Jika 'True', kirim sebagai pesan publik (default: private/ephemeral)")
     async def about(self, itx: discord.Interaction, public: bool = False):
-        # default private (ephemeral)
         ephemeral = not public
-
         user = self.bot.user
         title = "SatpamBot - Anti Phishing Discord Guard"
         desc = (
@@ -60,14 +58,13 @@ class AboutCard(commands.Cog):
 
     async def cog_load(self):
         guild = discord.Object(id=GUILD_ID)
-        # Re-register (guild only)
         try:
             exist = self.bot.tree.get_command("about", guild=guild)
             if exist:
                 self.bot.tree.remove_command("about", type=discord.AppCommandType.chat_input, guild=guild)
         except Exception: pass
         cmd = app_commands.Command(name="about", description="Tampilkan kartu info SatpamBot (guild-only).", callback=self.about)
-        self.bot.tree.add_command(cmd, guild=guild)
+        self.bot.tree.add_command(cmd, guild=guild, override=True)
         synced = await self.bot.tree.sync(guild=guild)
         log.info("[about_card] /about registered (ephemeral default) & synced to guild %s (count=%d)", GUILD_ID, len(synced))
 
