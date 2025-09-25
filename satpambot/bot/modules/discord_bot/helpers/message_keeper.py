@@ -63,6 +63,19 @@ class MessageKeeper:
                 raise
         return None
 
+    async def _edit(self, msg: discord.Message, **kwargs):
+        for tries in range(1, 6):
+            try: return await msg.edit(**kwargs)
+            except discord.HTTPException as e:
+                status = getattr(e, "status", None)
+                text = ""
+                try: text = await e.response.text() if e.response else ""
+                except Exception: pass
+                if status == 429 or ("cloudflare" in text.lower() and "1015" in text):
+                    base = 5 if "1015" in text else 1.5
+                    await asyncio.sleep(min(60, base * tries)); continue
+                raise
+
     async def update(self, channel_ref: Union[int, str, discord.abc.Messageable], key: str, *, content: str = None, embed=None, view=None):
         assert content is not None or embed is not None, "content or embed required"
         await self._load()
@@ -85,6 +98,7 @@ class MessageKeeper:
             return await msg.edit(content=header + (content or "") if content is not None else discord.utils.MISSING,
                                   embed=embed if embed is not None else discord.utils.MISSING,
                                   view=view if view is not None else discord.utils.MISSING)
+
 def get_keeper(bot: discord.Client) -> MessageKeeper:
     inst = getattr(bot, "_satpam_msg_keeper", None)
     if not isinstance(inst, MessageKeeper):

@@ -1,4 +1,4 @@
-# main.py — exact startup logs + safe login backoff (no config change)
+# main.py — exact startup logs + safe login backoff (NO config/port change)
 import logging, threading, asyncio, time, re
 from app import app
 from satpambot.bot.modules.discord_bot.shim_runner import start_bot
@@ -30,13 +30,13 @@ def _extract_ray_retry(exc: Exception):
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    # EXACT header lines you require:
+    # EXACT header lines (do not change order)
     t = threading.Thread(target=_run_web, name="web", daemon=True)
     t.start()
     log.info("Web is ready on port 10000")
     log.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
 
-    # Backoff loop (only triggers if login throws 429/1015)
+    # Backoff loop (only if login throws 429/1015)
     backoff = 10.0
     while True:
         try:

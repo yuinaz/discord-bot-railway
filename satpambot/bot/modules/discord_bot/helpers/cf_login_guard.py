@@ -1,4 +1,3 @@
-# satpambot/bot/modules/discord_bot/helpers/cf_login_guard.py
 from __future__ import annotations
 import json, time, random, pathlib, logging
 log = logging.getLogger(__name__)
