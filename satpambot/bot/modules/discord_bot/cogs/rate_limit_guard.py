@@ -1,9 +1,7 @@
-# rate_limit_guard.py — function-style monkeypatch, no bound instance
 from __future__ import annotations
 import asyncio, time, logging
 from collections import defaultdict
 from typing import Dict
-
 import discord
 from discord.ext import commands
 
@@ -42,7 +40,7 @@ def _get_bucket(ch: discord.abc.Messageable) -> _PerChannelBucket:
     cid = getattr(ch, "id", 0) or 0
     return _BUCKETS[cid]
 
-async def _patched_send(self_channel, *args, **kwargs):  # self_channel is the TextChannel/Thread/etc
+async def _patched_send(self_channel, *args, **kwargs):
     bucket = _get_bucket(self_channel)
     await bucket.acquire()
     tries = 0
@@ -64,22 +62,20 @@ async def _patched_send(self_channel, *args, **kwargs):  # self_channel is the T
                         h = e.response.headers
                         ra = h.get("Retry-After") or h.get("retry-after")
                         xra = h.get("X-RateLimit-Reset-After") or h.get("x-ratelimit-reset-after")
-                        if ra:
-                            retry_after = float(ra)
-                        elif xra:
-                            retry_after = float(xra)
+                        if ra: retry_after = float(ra)
+                        elif xra: retry_after = float(xra)
                 except Exception:
                     pass
                 if retry_after <= 0:
                     retry_after = 30.0 if "1015" in text else 2.5
                 extra = min(30.0, 1.5 ** (tries - 1))
                 wait = min(60.0, retry_after + extra)
-                log.warning("[rate_limit_guard] %s on send; sleeping %.2fs (try %d)", "1015/CF" if "1015" in text else f"HTTP {status}", wait, tries)
+                log.warning("[rate_limit_guard] %s on send; sleeping %.2fs (try %d)",
+                            "1015/CF" if "1015" in text else f"HTTP {status}", wait, tries)
                 await asyncio.sleep(wait)
                 await asyncio.sleep(0.1)
                 continue
-            else:
-                raise
+            raise
 
 class RateLimitGuard(commands.Cog):
     def __init__(self, bot: commands.Bot):
