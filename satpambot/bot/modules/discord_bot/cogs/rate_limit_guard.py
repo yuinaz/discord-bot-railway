@@ -1,4 +1,4 @@
-# rate_limit_guard.py — Global send() backoff for Discord 429/Cloudflare 1015
+# rate_limit_guard.py — function-style monkeypatch, no bound instance
 from __future__ import annotations
 import asyncio, time, logging
 from collections import defaultdict
@@ -35,65 +35,63 @@ class _PerChannelBucket:
                 wait = max(0.2, needed / self.refill_rate)
                 await asyncio.sleep(wait)
 
-class RateLimitGuard(commands.Cog):
-    _orig_send = None
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.buckets: Dict[int, _PerChannelBucket] = defaultdict(lambda: _PerChannelBucket(capacity=5, refill_rate=1.0))
+_BUCKETS: Dict[int, _PerChannelBucket] = defaultdict(lambda: _PerChannelBucket(capacity=5, refill_rate=1.0))
+_ORIG_SEND = None
 
-    def _get_bucket(self, channel: discord.abc.Messageable) -> _PerChannelBucket:
-        cid = getattr(channel, "id", 0) or 0
-        return self.buckets[cid]
+def _get_bucket(ch: discord.abc.Messageable) -> _PerChannelBucket:
+    cid = getattr(ch, "id", 0) or 0
+    return _BUCKETS[cid]
 
-    async def _safe_send(self, channel, *args, **kwargs):
-        bucket = self._get_bucket(channel)
-        await bucket.acquire()
-
-        tries = 0
-        while True:
-            tries += 1
+async def _patched_send(self_channel, *args, **kwargs):  # self_channel is the TextChannel/Thread/etc
+    bucket = _get_bucket(self_channel)
+    await bucket.acquire()
+    tries = 0
+    while True:
+        tries += 1
+        try:
+            return await _ORIG_SEND(self_channel, *args, **kwargs)  # type: ignore
+        except discord.HTTPException as e:
+            status = getattr(e, "status", None)
+            text = ""
             try:
-                return await self._orig_send(channel, *args, **kwargs)
-            except discord.HTTPException as e:
-                status = getattr(e, "status", None)
-                text = ""
+                text = await e.response.text() if e.response else ""
+            except Exception:
+                pass
+            if status == 429 or ("cloudflare" in text.lower() and "1015" in text):
+                retry_after = 0.0
                 try:
-                    text = await e.response.text() if e.response else ""
+                    if e.response:
+                        h = e.response.headers
+                        ra = h.get("Retry-After") or h.get("retry-after")
+                        xra = h.get("X-RateLimit-Reset-After") or h.get("x-ratelimit-reset-after")
+                        if ra:
+                            retry_after = float(ra)
+                        elif xra:
+                            retry_after = float(xra)
                 except Exception:
                     pass
-
-                if status == 429 or ("cloudflare" in text.lower() and "error 1015" in text.lower()):
-                    retry_after = 0.0
-                    try:
-                        if e.response:
-                            h = e.response.headers
-                            ra = h.get("Retry-After") or h.get("retry-after")
-                            xra = h.get("X-RateLimit-Reset-After") or h.get("x-ratelimit-reset-after")
-                            if ra:
-                                retry_after = float(ra)
-                            elif xra:
-                                retry_after = float(xra)
-                    except Exception:
-                        pass
-                    if retry_after <= 0:
-                        retry_after = 30.0 if "1015" in text else 2.5
-                    extra = min(30.0, 1.5 ** (tries - 1))
-                    wait = min(60.0, retry_after + extra)
-                    log.warning("[rate_limit_guard] %s on send; sleeping %.2fs (try %d)", "1015/CF" if "1015" in text else f"HTTP {status}", wait, tries)
-                    await asyncio.sleep(wait)
-                    await asyncio.sleep(0.1)
-                    continue
-                else:
-                    raise
-            except Exception:
+                if retry_after <= 0:
+                    retry_after = 30.0 if "1015" in text else 2.5
+                extra = min(30.0, 1.5 ** (tries - 1))
+                wait = min(60.0, retry_after + extra)
+                log.warning("[rate_limit_guard] %s on send; sleeping %.2fs (try %d)", "1015/CF" if "1015" in text else f"HTTP {status}", wait, tries)
+                await asyncio.sleep(wait)
+                await asyncio.sleep(0.1)
+                continue
+            else:
                 raise
+
+class RateLimitGuard(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if RateLimitGuard._orig_send is None:
-            RateLimitGuard._orig_send = discord.abc.Messageable.send
-            discord.abc.Messageable.send = self._safe_send  # type: ignore
-            log.info("[rate_limit_guard] monkeypatched Messageable.send with backoff/limiter")
+        global _ORIG_SEND
+        if _ORIG_SEND is None:
+            _ORIG_SEND = discord.abc.Messageable.send
+            discord.abc.Messageable.send = _patched_send  # type: ignore
+            log.info("[rate_limit_guard] patched Messageable.send")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(RateLimitGuard(bot))

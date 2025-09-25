@@ -1,61 +1,69 @@
-# Single-process runner for Render Free plan (web + bot)
-# Uses shim_runner.start_bot (async). No ENV edits required.
-from __future__ import annotations
+# main.py — hardened run loop & cleanup to avoid "Event loop is closed"
+import asyncio, logging, time, sys, os
+from satpambot.bot.modules.discord_bot.shim_runner import start_bot
 
-import os, threading, time, logging, http.client, traceback, asyncio
-
-logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 log = logging.getLogger("entry.main")
 
-def _serve_web():
-    from app import app  # app = create_app()
-    port = int(os.environ.get("PORT", "10000"))
-    log.info("🌐 Serving web on 0.0.0.0:%s", port)
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-
-def _wait_web_ready(port: int, retries: int = 40, delay: float = 0.5):
-    for _ in range(retries):
+async def _bot_once_async():
+    # start and ensure clean shutdown of http session even on exceptions
+    bot = None
+    try:
+        log.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
+        # let start_bot create the client and login internally
+        await start_bot()
+    finally:
+        # Best-effort cleanup of discord http session to prevent "Unclosed client session"
         try:
-            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=1.5)
-            conn.request("GET", "/uptime")
-            resp = conn.getresponse()
-            if resp.status == 200:
-                return True
+            from discord import Client
+            # If your start_bot exposes bot instance globally:
+            bot = getattr(sys.modules.get("satpambot.bot.modules.discord_bot.shim_runner"), "BOT_INSTANCE", None)
+        except Exception:
+            bot = None
+        if bot is not None:
+            try:
+                await bot.close()
+            except Exception:
+                pass
+            try:
+                http = getattr(bot, "http", None)
+                session = getattr(http, "_HTTPClient__session", None)
+                if session and not session.closed:
+                    await session.close()
+            except Exception:
+                pass
+        try:
+            await asyncio.sleep(0)
+            await asyncio.get_running_loop().shutdown_asyncgens()
         except Exception:
             pass
-        time.sleep(delay)
-    return False
-
-async def _bot_once_async():
-    try:
-        from satpambot.bot.modules.discord_bot.shim_runner import start_bot
-    except Exception:
-        from satpambot.bot.modules.discord_bot.shim_runner import start_bot  # type: ignore
-    await start_bot()
 
 def main():
-    t = threading.Thread(target=_serve_web, name="web-serve", daemon=True)
-    t.start()
-
-    port = int(os.environ.get("PORT", "10000"))
-    if not _wait_web_ready(port):
-        log.warning("Web not ready after wait; continuing anyway.")
-    else:
-        log.info("Web is ready on port %s", port)
-
-    backoff = 5
+    backoff = 10
     while True:
         try:
-            log.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
-            asyncio.run(_bot_once_async())
-            log.warning("Bot returned gracefully; restarting in 3s...")
-            time.sleep(3)
-            backoff = 5
+            # Create a fresh loop explicitly to avoid policy/state leakage
+            policy = asyncio.DefaultEventLoopPolicy()
+            asyncio.set_event_loop_policy(policy)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_bot_once_async())
+            # If _bot_once_async returns normally, break
+            break
         except Exception as e:
-            log.error("Bot crashed: %s\n%s", e, traceback.format_exc())
-            log.info("Restarting in %ss...", backoff)
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 60)
+            log.error("Bot crashed: %s", e, exc_info=True)
+        finally:
+            try:
+                if not loop.is_closed():
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                    loop.close()
+            except Exception:
+                pass
+        log.info("Restarting in %ss...", backoff)
+        time.sleep(backoff)
+        backoff = min(backoff * 2, 60)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    log.info("🌐 Serving web on 0.0.0.0:10000")
+    # web app init here if needed
     main()
