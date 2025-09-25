@@ -43,7 +43,6 @@ class StatusCheck(commands.Cog):
     @app_commands.describe(public="Jika 'True', kirim sebagai pesan publik (default: private/ephemeral)")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def status(self, itx: discord.Interaction, public: bool = False):
-        # default private (ephemeral)
         ephemeral = not public
         try:
             await itx.response.defer(ephemeral=ephemeral, thinking=True)
@@ -64,14 +63,13 @@ class StatusCheck(commands.Cog):
 
     async def cog_load(self):
         guild = discord.Object(id=GUILD_ID)
-        # Re-register (guild only)
         try:
             exist = self.bot.tree.get_command("status", guild=guild)
             if exist:
                 self.bot.tree.remove_command("status", type=discord.AppCommandType.chat_input, guild=guild)
         except Exception: pass
         cmd = app_commands.Command(name="status", description="Cek status bot & repo (guild-only).", callback=self.status)
-        self.bot.tree.add_command(cmd, guild=guild)
+        self.bot.tree.add_command(cmd, guild=guild, override=True)
         synced = await self.bot.tree.sync(guild=guild)
         log.info("[status_check] /status registered (ephemeral default) & synced to guild %s (count=%d)", GUILD_ID, len(synced))
 
