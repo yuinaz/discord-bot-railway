@@ -1,3 +1,4 @@
+# satpambot/bot/modules/discord_bot/helpers/cf_login_guard.py
 from __future__ import annotations
 import json, time, random, pathlib, logging
 log = logging.getLogger(__name__)
@@ -26,8 +27,9 @@ def suggested_sleep() -> float:
 
 def mark_429(ray_id: str | None = None, retry_after_hint: float | None = None):
     base = float(retry_after_hint or 0.0)
-    if base <= 0: base = 60.0
-    window = max(300.0, min(1800.0, base * 5.0)) + random.uniform(10.0, 60.0)
+    # Wider default window to avoid re-tripping CF 1015
+    if base <= 0: base = 600.0  # 10 min
+    window = max(600.0, min(1500.0, base * 1.5)) + random.uniform(15.0, 75.0)
     s = load_state(); s["banned_until_ts"] = _now() + window
     if ray_id: s["last_ray_id"] = ray_id
     save_state(s)

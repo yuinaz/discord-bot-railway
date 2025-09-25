@@ -1,10 +1,10 @@
-# main.py — exact startup logs + safe login backoff (NO config/port change)
-import logging, threading, asyncio, time, re
+# main.py — exact startup logs + login backoff + FORCE RETRY flag
+import logging, threading, asyncio, time, re, pathlib
 from app import app
 from satpambot.bot.modules.discord_bot.shim_runner import start_bot
 try:
     from satpambot.bot.modules.discord_bot.helpers import cf_login_guard as cfg
-except Exception:  # fallback if helper not present
+except Exception:
     cfg = None
 
 log = logging.getLogger("entry.main")
@@ -28,15 +28,27 @@ def _extract_ray_retry(exc: Exception):
         except Exception: pass
     return ray, hint
 
+def _force_flag_paths():
+    return [pathlib.Path('/data/force_login_now'), pathlib.Path('/tmp/force_login_now')]
+
+def _check_force_flag() -> bool:
+    for p in _force_flag_paths():
+        try:
+            if p.exists():
+                p.unlink(missing_ok=True)
+                return True
+        except Exception:
+            pass
+    return False
+
 def main():
     logging.basicConfig(level=logging.INFO)
-    # EXACT header lines (do not change order)
+    # EXACT header lines
     t = threading.Thread(target=_run_web, name="web", daemon=True)
     t.start()
     log.info("Web is ready on port 10000")
     log.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
 
-    # Backoff loop (only if login throws 429/1015)
     backoff = 10.0
     while True:
         try:
@@ -55,9 +67,25 @@ def main():
                     wait = max(60.0, backoff)
             else:
                 wait = max(30.0, backoff)
+
             log.error("Bot crashed: %s", e, exc_info=True)
-            log.info("Restarting in %.1fs...", min(900.0, wait))
-            time.sleep(min(900.0, wait))
+
+            # FORCE RETRY bypass (touch /data/force_login_now or /tmp/force_login_now)
+            if _check_force_flag():
+                log.info("Force flag detected → retrying immediately.")
+                continue
+
+            # bounded wait + countdown
+            wait = min(900.0, max(10.0, wait))
+            deadline = time.time() + wait
+            while True:
+                remain = deadline - time.time()
+                if remain <= 0:
+                    break
+                step = 10.0 if remain > 60 else 5.0
+                log.info("Restarting in %.1fs...", remain)
+                time.sleep(min(step, remain))
+
             backoff = min(900.0, max(backoff * 1.5, 60.0))
 
 if __name__ == "__main__":
