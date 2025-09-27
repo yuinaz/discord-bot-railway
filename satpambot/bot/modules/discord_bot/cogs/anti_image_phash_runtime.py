@@ -121,7 +121,7 @@ class AntiImagePhashRuntime(commands.Cog):
     """
     Auto-pipeline:
     - Cari thread inbox pHash (nama exact dari env atau fuzzy).
-    - Startup: muat DB dari pesan marker; lalu **BACKFILL**: scan riwayat gambar di inbox → hitung pHash → append ke DB.
+    - Startup: muat DB dari pesan marker; lalu BACKFILL: scan riwayat gambar di inbox → hitung pHash → append ke DB.
     - Jalan normal: siapa pun post gambar ke inbox → pHash otomatis ditambah ke DB.
     - Enforcement: channel mana pun → first-touchdown delete + autoban + embed.
     """
@@ -175,15 +175,15 @@ class AntiImagePhashRuntime(commands.Cog):
         for t in guild.threads:
             if not isinstance(t, discord.Thread):
                 continue
-            n = t.name.lower()
-            if n in names_l or INBOX_FUZZY.search(n):
+            n = (t.name or "").lower()
+            if n in names_l or INBOX_FUZZY.search(n or ""):
                 hits.append(t)
         # sweep through text channels for active threads
         for ch in guild.text_channels:
             try:
                 async for th in ch.threads():
-                    n = th.name.lower()
-                    if n in names_l or INBOX_FUZZY.search(n):
+                    n = (th.name or "").lower()
+                    if n in names_l or INBOX_FUZZY.search(n or ""):
                         hits.append(th)
             except Exception:
                 continue
@@ -325,7 +325,7 @@ class AntiImagePhashRuntime(commands.Cog):
     def _is_exempt(self, message: discord.Message) -> bool:
         try:
             if isinstance(message.channel, (discord.TextChannel, discord.Thread)):
-                ch_name = message.channel.name.lower()
+                ch_name = (message.channel.name or "").lower()
                 if EXEMPT_FORUM and isinstance(getattr(message.channel, "parent", None), discord.ForumChannel):
                     return True
                 if ch_name in EXEMPT_CHANNELS:
@@ -348,7 +348,7 @@ class AntiImagePhashRuntime(commands.Cog):
                 description=f"**User:** {message.author.mention}\n**Hamming:** `{dist}` (≤ `{HAMMING_THRESH}`)\n**pHash:** `{ph}`",
                 color=discord.Color.red(),
             )
-            embed.add_field(name="Channel", value=f\"#{getattr(message.channel,'name','?')}\", inline=True)
+            embed.add_field(name="Channel", value=f"#{getattr(message.channel,'name','?')}", inline=True)
             embed.add_field(name="Reason", value=BAN_REASON, inline=True)
             await message.channel.send(embed=embed)
         except Exception:
