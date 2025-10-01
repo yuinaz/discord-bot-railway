@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "always": true,
+  "only_roleless": false,
+  "exempt_staff": true,
+  "safety_required": true,
+  "phash_min_threshold": 0.9,
+  "phash_strong_threshold": 0.98,
+  "direct_ban_on_strong": false,
+  "reference_required_for_ban": true,
+  "reference_thread_name": "imagephising",
+  "reference_cache_minutes": 15,
+  "log_channel_name": "log-botphising",
+  "fp_log_thread_name": "imagephising-fp-log",
+  "ban_log_thread_name": "Ban Log",
+  "whitelist_thread_name": "whitelist",
+  "delete_message_days": 7,
+  "log_channel_id": 0
+}

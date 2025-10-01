@@ -127,7 +127,7 @@ class BanLocalNotify(commands.Cog):
         if not isinstance(emb, discord.Embed):
             emb = self._fallback_embed(guild, user, reason, mod_name, ch, message_id)
         try:
-            await ch.send(embed=emb); self._notified[user.id] = time.time()
+            await ch.send(embed=emb, delete_after=3600); self._notified[user.id] = time.time()
         except Exception as e:
             log.warning("[ban-local-notify] failed to send: %r", e)
 async def setup(bot: commands.Bot): await bot.add_cog(BanLocalNotify(bot))

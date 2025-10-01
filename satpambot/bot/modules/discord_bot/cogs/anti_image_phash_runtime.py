@@ -1,139 +1,439 @@
+from __future__ import annotations
+
 import asyncio
 import json
-from discord.ext import commands, tasks
+import os
+import re
+from io import BytesIO
+from pathlib import Path
+from typing import Any, Iterable, List, Optional, Set
+
 import discord
+from discord.ext import commands, tasks
 
-from satpambot.bot.modules.discord_bot.helpers.static_cfg import (
-    PHASH_HIT_DISTANCE as HIT_DISTANCE,
-    DHASH_HIT_DISTANCE as DHIT_DISTANCE,
-    TILE_GRID, TILE_HIT_MIN, TILE_PHASH_DISTANCE,
-)
-from satpambot.bot.modules.discord_bot.helpers.img_hashing import (
-    phash_hit, hex_hit, tile_match_best, phash_list_from_bytes
-)
-
-# Optional helpers (if present)
+# Optional deps
 try:
-    from satpambot.bot.modules.discord_bot.helpers.img_hashing import dhash_list_from_bytes
+    from PIL import Image as _PIL_Image
 except Exception:
-    dhash_list_from_bytes = None
+    _PIL_Image = None
+
 try:
-    from satpambot.bot.modules.discord_bot.helpers.img_hashing import tile_phash_list_from_bytes
+    import imagehash as _imagehash
 except Exception:
-    tile_phash_list_from_bytes = None
+    _imagehash = None
 
-PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
-from satpambot.bot.modules.discord_bot.helpers import static_cfg as _cfg
-INBOX_NAME = getattr(_cfg, "PHISH_INBOX_THREAD", "imagephising").lower()
+# Pull optional config from static_cfg when present
+try:
+    from satpambot.bot.modules.discord_bot.helpers import static_cfg as _cfg
+except Exception:
+    _cfg = None
 
-def _extract_hashes_from_content(s: str):
-    if not s:
-        return [], [], []
-    i, j = s.find("{"), s.rfind("}")
-    if i == -1 or j == -1 or j <= i:
-        return [], [], []
+def _getint(name: str, default: int) -> int:
+    v = os.getenv(name)
     try:
-        obj = json.loads(s[i:j+1])
-        P = [str(x).strip() for x in (obj.get("phash", []) or []) if str(x).strip()]
-        D = [str(x).strip() for x in (obj.get("dhash", []) or []) if str(x).strip()]
-        T = [str(x).strip() for x in (obj.get("tphash", []) or []) if str(x).strip()]
-        return P, D, T
+        return int(v) if v is not None else default
     except Exception:
-        return [], [], []
+        return default
+
+# ---- knobs (no rename; just read existing env; safe defaults) ----
+MARKER = os.getenv("PHASH_DB_MARKER", "SATPAMBOT_PHASH_DB_V1")
+# Accept multiple names separated by comma; default includes common variants used in your server
+_DEFAULT_INBOX = "imagephising,imagelogphising,image-phising,image_phising,image-phishing,image_phishing"
+INBOX_NAMES = [n.strip() for n in os.getenv("PHASH_INBOX_THREAD", _DEFAULT_INBOX).split(",") if n.strip()]
+LOG_CHANNEL_ID = _getint("PHASH_LOG_CHANNEL_ID", 0)
+AUTOBAN = (os.getenv("PHASH_AUTOBAN", "1") == "1")
+BAN_REASON = os.getenv("PHASH_BAN_REASON", "Phishing image detected (hash match)")
+
+HAMMING_THRESH = _getint("PHISH_HASH_THRESH_P", _getint("IMG_PHASH_MAX_DIST", 8))
+BAN_DELETE_DAYS = _getint("PHISH_BAN_DELETE_DAYS", int(getattr(_cfg, "BAN_DELETE_DAYS", 0) or 0))
+
+EXEMPT_CHANNELS = set([c.strip().lower() for c in (os.getenv("PHISH_EXEMPT_CHANNELS", "") or "").split(",") if c.strip()])
+EXEMPT_ROLES = set([r.strip().lower() for r in (os.getenv("PHISH_EXEMPT_ROLES", "") or "").split(",") if r.strip()])
+EXEMPT_FORUM = (os.getenv("PHISH_EXEMPT_FORUM", "0") == "1")
+
+PHASH_STORE_FILE = os.getenv("PHISH_PHASH_STORE") or os.getenv("PHASH_STORE")
+
+# Backfill controls
+BACKFILL_ON_START = (os.getenv("PHASH_BACKFILL_ON_START", "1") == "1")
+BACKFILL_MSG_LIMIT = _getint("PHASH_BACKFILL_MSG_LIMIT", 200)   # scan up to N recent messages
+BACKFILL_IMG_LIMIT = _getint("PHASH_BACKFILL_IMG_LIMIT", 120)   # max images to hash per start
+BACKFILL_SLEEP_MS = _getint("PHASH_BACKFILL_SLEEP_MS", 120)     # small delay to be gentle
+
+HEX16 = re.compile(r"^[0-9a-f]{16}$", re.I)
+BLOCK_RE = re.compile(
+    r"(?:^|\n)\s*%s\s*```(?:json)?\s*(\{.*?\})\s*```" % re.escape(MARKER),
+    re.I | re.S,
+)
+# fuzzy thread match if name not exactly provided
+INBOX_FUZZY = re.compile(r"(image.*phis?h|phish.*image|image.*phish|imagelog.*phis?h)", re.I)
+
+def _norm_hashes(obj: Any) -> List[str]:
+    out: List[str] = []
+    def push(x: Any):
+        if isinstance(x, str) and HEX16.match(x.strip()):
+            out.append(x.strip())
+    if isinstance(obj, dict):
+        if isinstance(obj.get("phash"), list):
+            for h in obj["phash"]: push(h)
+        if isinstance(obj.get("items"), list):
+            for it in obj["items"]:
+                if isinstance(it, dict): push(it.get("hash"))
+        if isinstance(obj.get("hashes"), list):
+            for h in obj["hashes"]: push(h)
+    elif isinstance(obj, list):
+        for it in obj:
+            if isinstance(it, dict): push(it.get("hash"))
+            else: push(it)
+    # unique preserve order
+    seen=set(); uniq=[]
+    for h in out:
+        if h not in seen:
+            seen.add(h); uniq.append(h)
+    return uniq
+
+def _hamming_hex(a: str, b: str) -> Optional[int]:
+    if not a or not b or len(a)!=len(b):
+        return None
+    try:
+        ia=int(a,16); ib=int(b,16)
+        return (ia ^ ib).bit_count()
+    except Exception:
+        return None
+
+def _best_distance(ph: str, db: Iterable[str]) -> Optional[int]:
+    best: Optional[int] = None
+    for d in db:
+        dist = _hamming_hex(ph, d)
+        if dist is not None:
+            best = dist if best is None else min(best, dist)
+    return best
+
+def _compute_phash(raw: bytes) -> Optional[str]:
+    if _PIL_Image is None or _imagehash is None:
+        return None
+    try:
+        im = _PIL_Image.open(BytesIO(raw)).convert("RGB")
+        return str(_imagehash.phash(im))
+    except Exception:
+        return None
 
 class AntiImagePhashRuntime(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    """
+    Auto-pipeline:
+    - Cari thread inbox pHash (nama exact dari env atau fuzzy).
+    - Startup: muat DB dari pesan marker; lalu BACKFILL: scan riwayat gambar di inbox → hitung pHash → append ke DB.
+    - Jalan normal: siapa pun post gambar ke inbox → pHash otomatis ditambah ke DB.
+    - Enforcement: channel mana pun → first-touchdown delete + autoban + embed.
+    """
+
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._phash_set = set()
-        self._dhash_set = set()
-        self._tile_set  = set()
-        self._bootstrap.start()
+        self.db_hashes: List[str] = []
+        self._ready_evt = asyncio.Event()
+        self.watch_secs = _getint("PHASH_WATCH_SECS", 20)
+        self._did_backfill = False
+        if self.watch_secs > 0:
+            self._watcher.change_interval(seconds=self.watch_secs)
+            self._watcher.start()
 
-    def cog_unload(self):
-        try: self._bootstrap.cancel()
-        except Exception: pass
-
-    def _ensure_sets(self):
-        if not hasattr(self, "_phash_set"): self._phash_set = set()
-        if not hasattr(self, "_dhash_set"): self._dhash_set = set()
-        if not hasattr(self, "_tile_set"):  self._tile_set  = set()
-
-    @tasks.loop(count=1)
-    async def _bootstrap(self):
-        try:
-            await self.bot.wait_until_ready()
-            await asyncio.sleep(4)
-            await self._reload_from_db_all_guilds()
-        except Exception:
-            pass
-
-    async def _reload_from_db_all_guilds(self):
-        for g in list(self.bot.guilds):
+    # ------------ lifecycle ------------
+    @commands.Cog.listener()
+    async def on_ready(self):
+        await self._reload_from_discord()
+        if BACKFILL_ON_START and not self._did_backfill:
             try:
-                t = next((th for th in g.threads if (th.name or '').lower() == INBOX_NAME), None)
-                parent = getattr(t, "parent", None)
-                if not parent:
+                await self._backfill_from_inbox_images()
+                self._did_backfill = True
+            except Exception:
+                pass
+        self._ready_evt.set()
+        await self._log(None, f"🔐 Runtime pHash DB loaded: {len(self.db_hashes)} entries (thresh={HAMMING_THRESH}, autoban={'ON' if AUTOBAN else 'OFF'})")
+
+    # ------------ logging ------------
+    async def _log(self, guild: Optional[discord.Guild], text: str):
+        ch = None
+        if LOG_CHANNEL_ID:
+            ch = self.bot.get_channel(LOG_CHANNEL_ID)
+            if ch is None:
+                try:
+                    ch = await self.bot.fetch_channel(LOG_CHANNEL_ID)  # type: ignore
+                except Exception:
+                    ch = None
+        if isinstance(ch, (discord.TextChannel, discord.Thread)):
+            try:
+                await ch.send(text)
+                return
+            except Exception:
+                pass
+        print("[phash-runtime]", text)
+
+    # ------------ helpers ------------
+    async def _candidate_threads(self, guild: discord.Guild) -> List[discord.Thread]:
+        names_l = {n.lower() for n in INBOX_NAMES}
+        hits: List[discord.Thread] = []
+        # active threads already cached
+        for t in guild.threads:
+            if not isinstance(t, discord.Thread):
+                continue
+            n = (t.name or "").lower()
+            if n in names_l or INBOX_FUZZY.search(n or ""):
+                hits.append(t)
+        # sweep through text channels for active threads
+        for ch in guild.text_channels:
+            try:
+                async for th in ch.threads():
+                    n = (th.name or "").lower()
+                    if n in names_l or INBOX_FUZZY.search(n or ""):
+                        hits.append(th)
+            except Exception:
+                continue
+        # dedup by id
+        ded = []
+        seen=set()
+        for t in hits:
+            if t.id not in seen:
+                seen.add(t.id); ded.append(t)
+        return ded
+
+    async def _get_or_create_db_message(self, thread: discord.Thread) -> Optional[discord.Message]:
+        # Search both thread and parent
+        for src in [thread, thread.parent]:
+            if not isinstance(src, (discord.TextChannel, discord.Thread)):
+                continue
+            try:
+                async for msg in src.history(limit=100):
+                    if isinstance(msg.content, str) and MARKER in msg.content:
+                        m = BLOCK_RE.search(msg.content)
+                        if m:
+                            return msg
+            except Exception:
+                continue
+        # Create under parent if missing
+        parent = thread.parent if isinstance(thread.parent, discord.TextChannel) else thread
+        try:
+            payload = { "phash": [] }
+            content = f"{MARKER}\n```json\n{json.dumps(payload, ensure_ascii=False)}\n```"
+            return await parent.send(content)
+        except Exception:
+            return None
+
+    async def _reload_from_discord(self):
+        for guild in self.bot.guilds:
+            try:
+                threads = await self._candidate_threads(guild)
+                if not threads:
                     continue
-                db_msg = None
-                async for m in parent.history(limit=50):
-                    if m.author.id == self.bot.user.id and PHASH_DB_TITLE in (m.content or ""):
-                        db_msg = m; break
-                if not db_msg:
-                    continue
-                P, D, T = _extract_hashes_from_content(db_msg.content or "")
-                self._ensure_sets()
-                self._phash_set = set(P)
-                self._dhash_set = set(D)
-                self._tile_set  = set(T)
+                # load DB from first found marker
+                for t in threads:
+                    msg = await self._get_or_create_db_message(t)
+                    if not isinstance(msg, discord.Message) or not isinstance(msg.content, str):
+                        continue
+                    m = BLOCK_RE.search(msg.content)
+                    if not m:
+                        continue
+                    obj = json.loads(m.group(1))
+                    hashes = _norm_hashes(obj)
+                    if hashes:
+                        self.db_hashes = hashes
+                        await self._log(guild, f"♻️ pHash DB loaded from Discord: {len(hashes)} entries (src: #{getattr(msg.channel,'name','?')})")
+                        if PHASH_STORE_FILE:
+                            try:
+                                Path(PHASH_STORE_FILE).parent.mkdir(parents=True, exist_ok=True)
+                                Path(PHASH_STORE_FILE).write_text(json.dumps({"phash": hashes}, ensure_ascii=False, indent=2), encoding="utf-8")
+                            except Exception:
+                                pass
+                        break
+                return
             except Exception:
                 continue
 
-    @commands.Cog.listener("on_message_edit")
-    async def _on_db_edit_reload(self, before: discord.Message, after: discord.Message):
+    async def _append_hashes_to_db(self, thread: discord.Thread, new_hashes: List[str]):
+        msg = await self._get_or_create_db_message(thread)
+        if not isinstance(msg, discord.Message) or not isinstance(msg.content, str):
+            return
         try:
-            if after and after.author and after.author.id == self.bot.user.id and PHASH_DB_TITLE in (after.content or ""):
-                P, D, T = _extract_hashes_from_content(after.content or "")
-                self._ensure_sets()
-                self._phash_set = set(P)
-                self._dhash_set = set(D)
-                self._tile_set  = set(T)
+            m = BLOCK_RE.search(msg.content)
+            obj = json.loads(m.group(1)) if m else {"phash": []}
+        except Exception:
+            obj = {"phash": []}
+        current = _norm_hashes(obj)
+        seen = set(current)
+        merged = current + [h for h in new_hashes if h not in seen]
+        if merged == current:
+            return
+        obj = {"phash": merged}
+        content = f"{MARKER}\n```json\n{json.dumps(obj, ensure_ascii=False)}\n```"
+        try:
+            await msg.edit(content=content)
+            self.db_hashes = merged
+            await self._log(getattr(thread, "guild", None), f"🧩 Added {len(merged)-len(current)} pHash → DB now {len(merged)} entries.")
+            if PHASH_STORE_FILE:
+                try:
+                    Path(PHASH_STORE_FILE).parent.mkdir(parents=True, exist_ok=True)
+                    Path(PHASH_STORE_FILE).write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+        except Exception:
+            return
+
+    async def _backfill_from_inbox_images(self):
+        """Scan recent images in candidate inbox threads and append missing pHashes to DB."""
+        if _PIL_Image is None or _imagehash is None:
+            return
+        total_imgs = 0
+        for guild in self.bot.guilds:
+            try:
+                threads = await self._candidate_threads(guild)
+                for t in threads:
+                    phs: List[str] = []
+                    try:
+                        async for msg in t.history(limit=BACKFILL_MSG_LIMIT):
+                            if not msg.attachments:
+                                continue
+                            imgs = [a for a in msg.attachments if isinstance(a.filename, str) and a.filename.lower().endswith((".png",".jpg",".jpeg",".webp",".gif",".bmp",".tif",".tiff",".heic",".heif"))]
+                            for att in imgs:
+                                if total_imgs >= BACKFILL_IMG_LIMIT:
+                                    break
+                                try:
+                                    raw = await att.read()
+                                    ph = _compute_phash(raw)
+                                    if ph and HEX16.match(ph):
+                                        phs.append(ph); total_imgs += 1
+                                except Exception:
+                                    continue
+                            if total_imgs >= BACKFILL_IMG_LIMIT:
+                                break
+                            # tiny sleep to be gentle
+                            await asyncio.sleep(BACKFILL_SLEEP_MS / 1000.0)
+                    except Exception:
+                        continue
+                    if phs:
+                        await self._append_hashes_to_db(t, phs)
+            except Exception:
+                continue
+
+    # watcher to refresh lightweight
+    @tasks.loop(seconds=20)
+    async def _watcher(self):
+        await self.bot.wait_until_ready()
+        try:
+            await self._reload_from_discord()
         except Exception:
             pass
 
-    @commands.Cog.listener("on_message")
+    # ------------ moderation & live index ------------
+    def _is_exempt(self, message: discord.Message) -> bool:
+        try:
+            if isinstance(message.channel, (discord.TextChannel, discord.Thread)):
+                ch_name = (message.channel.name or "").lower()
+                if EXEMPT_FORUM and isinstance(getattr(message.channel, "parent", None), discord.ForumChannel):
+                    return True
+                if ch_name in EXEMPT_CHANNELS:
+                    return True
+        except Exception:
+            pass
+        try:
+            if isinstance(message.author, discord.Member):
+                role_names = {r.name.lower() for r in message.author.roles if isinstance(r, discord.Role)}
+                if role_names & EXEMPT_ROLES:
+                    return True
+        except Exception:
+            pass
+        return False
+
+    async def _send_ban_embed(self, message: discord.Message, ph: str, dist: int):
+        try:
+            embed = discord.Embed(
+                title="🚫 Auto Ban: Phishing Image Detected",
+                description=f"**User:** {message.author.mention}\n**Hamming:** `{dist}` (≤ `{HAMMING_THRESH}`)\n**pHash:** `{ph}`",
+                color=discord.Color.red(),
+            )
+            embed.add_field(name="Channel", value=f"#{getattr(message.channel,'name','?')}", inline=True)
+            embed.add_field(name="Reason", value=BAN_REASON, inline=True)
+            await message.channel.send(embed=embed)
+        except Exception:
+            pass
+
+    @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         try:
-            if getattr(message.author, "bot", False):
+            # DB update block posted anywhere → reload
+            if isinstance(message.content, str) and MARKER in message.content:
+                m = BLOCK_RE.search(message.content)
+                if m:
+                    try:
+                        obj = json.loads(m.group(1))
+                        hashes = _norm_hashes(obj)
+                        if hashes:
+                            self.db_hashes = hashes
+                            await self._log(message.guild if hasattr(message, "guild") else None,
+                                            f"📥 pHash DB updated from message by {message.author} in #{getattr(message.channel, 'name', '?')} → {len(hashes)} entries")
+                    except Exception:
+                        pass
+
+            # Live indexer: new images in inbox threads
+            if isinstance(message.channel, discord.Thread):
+                n = message.channel.name or ""
+                if n and (n.lower() in {x.lower() for x in INBOX_NAMES} or INBOX_FUZZY.search(n)):
+                    if message.attachments:
+                        imgs = [a for a in message.attachments if isinstance(a.filename, str) and a.filename.lower().endswith((".png",".jpg",".jpeg",".webp",".gif",".bmp",".tif",".tiff",".heic",".heif"))]
+                        phs: List[str] = []
+                        for att in imgs:
+                            try:
+                                raw = await att.read()
+                                ph = _compute_phash(raw)
+                                if ph and HEX16.match(ph):
+                                    phs.append(ph)
+                            except Exception:
+                                continue
+                        if phs:
+                            await self._append_hashes_to_db(message.channel, phs)
+
+            # Enforcement
+            if not isinstance(message.channel, (discord.TextChannel, discord.Thread)):
+                return
+            if message.author.bot:
+                return
+            if self._is_exempt(message):
                 return
             if not message.attachments:
                 return
-
-            # Read first image (runtime check is lightweight)
-            raw = None
-            for att in message.attachments:
-                n = (att.filename or "").lower()
-                if n.endswith((".png",".jpg",".jpeg",".webp",".gif",".bmp",".tif",".tiff",".heic",".heif")):
-                    raw = await att.read(); break
-            if not raw:
+            imgs = [a for a in message.attachments if isinstance(a.filename, str) and a.filename.lower().endswith((".png",".jpg",".jpeg",".webp",".gif",".bmp",".tif",".tiff",".heic",".heif"))]
+            if not imgs or not self.db_hashes:
                 return
 
-            all_hashes = phash_list_from_bytes(raw, max_frames=4, augment=False, augment_per_frame=0)
-            all_dhashes = dhash_list_from_bytes(raw, max_frames=4, augment=False, augment_per_frame=0) if dhash_list_from_bytes else []
-            all_tiles = tile_phash_list_from_bytes(raw, grid=TILE_GRID, max_frames=2, augment=False, augment_per_frame=0) if tile_phash_list_from_bytes else []
+            for att in imgs:
+                try:
+                    raw = await att.read()
+                except Exception:
+                    continue
+                ph = _compute_phash(raw)
+                if not ph:
+                    continue
+                d = _best_distance(ph, self.db_hashes)
+                if d is None or d > HAMMING_THRESH:
+                    continue
 
-            self._ensure_sets()
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
 
-            hitp = phash_hit(all_hashes, self._phash_set, max_distance=HIT_DISTANCE) if all_hashes and self._phash_set else None
-            if hitp: return
+                if AUTOBAN and isinstance(message.guild, discord.Guild):
+                    try:
+                        await message.guild.ban(
+                            message.author,
+                            reason=BAN_REASON,
+                            delete_message_days=BAN_DELETE_DAYS,
+                        )
+                    except Exception as e:
+                        await self._log(message.guild, f"⚠️ Match (Hamming={d}) but failed to ban {message.author}: {e}")
+                await self._send_ban_embed(message, ph, d)
+                await self._log(message.guild if hasattr(message, "guild") else None, f"✅ Enforced (Hamming={d} ≤ {HAMMING_THRESH}) on {message.author} in #{getattr(message.channel,'name','?')}")
+                return
 
-            hitd = hex_hit(all_dhashes, self._dhash_set, max_distance=DHIT_DISTANCE) if all_dhashes and self._dhash_set else None
-            if hitd: return
-
-            # Optional tile — we only compute above if helper exists
-            if all_tiles and self._tile_set:
-                # will return list of matches; treat presence as hit
-                tile_hits = tile_match_best(all_tiles, self._tile_set, grid=TILE_GRID, min_tiles=TILE_HIT_MIN, per_tile_max_distance=TILE_PHASH_DISTANCE)
-                if tile_hits:
-                    return
         except Exception:
             return
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AntiImagePhashRuntime(bot))

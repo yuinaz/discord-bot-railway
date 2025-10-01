@@ -1,132 +1,115 @@
-
+# remote_sync_restart.py — hardened /repo (NO-ENV)
 from __future__ import annotations
-import asyncio, json, os, io, zipfile
+import asyncio, json, os, sys, io, zipfile, logging, aiohttp
 from pathlib import Path
-from typing import List, Dict, Any
-import aiohttp
+from typing import Dict, Any, List
 import discord
 from discord.ext import commands
 from discord import app_commands
+from satpambot.bot.modules.discord_bot.helpers import restart_guard as rg
 
-CFG_PATH = Path("config") / "remote_sync.json"
-DEFAULT_CFG = {
-    "base": "", "archive": "", "repo_root_prefix": "",
-    "pull_sets": [
-        {"include": ["config/"], "allow_exts": ["json","txt","yaml","yml"]},
-        {"include": ["satpambot/bot/modules/discord_bot/cogs/"], "allow_exts": ["py"]},
-        {"include": ["satpambot/bot/modules/discord_bot/helpers/"], "allow_exts": ["py"]},
-        {"include": [""], "allow_exts": ["py"]}
-    ],
-    "files": [], "timeout_s": 20
-}
+log = logging.getLogger(__name__)
+ACK_DELAY = 2.0
+
+def _reexec_inplace():
+    os.execv(sys.executable, [sys.executable, *sys.argv])
 
 def _load_cfg() -> Dict[str, Any]:
-    try:
-        return {**DEFAULT_CFG, **json.loads(Path(CFG_PATH).read_text("utf-8"))}
+    p = Path("config") / "remote_sync.json"
+    try: return json.loads(p.read_text("utf-8"))
     except Exception:
-        return dict(DEFAULT_CFG)
+        return {"archive": "", "repo_root_prefix": "", "pull_sets": [
+            {"include": ["config/"], "allow_exts": ["json","txt","yaml","yml"]},
+            {"include": ["satpambot/"], "allow_exts": ["py"]},
+        ], "files": [], "timeout_s": 20}
 
-async def _fetch_bytes(session: aiohttp.ClientSession, url: str, timeout: int = 20) -> bytes:
-    async with session.get(url, timeout=timeout) as r:
-        r.raise_for_status(); return await r.read()
+async def _fetch_bytes(url: str, timeout: int) -> bytes:
+    async with aiohttp.ClientSession() as s:
+        async with s.get(url, timeout=timeout) as r:
+            r.raise_for_status(); return await r.read()
 
-def _should_include(path: str, cfg: Dict[str, Any]) -> bool:
-    for rule in cfg.get("pull_sets", []):
-        if any(path.startswith(prefix) for prefix in rule.get("include", [])):
-            ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
-            return (ext in (rule.get("allow_exts") or [])) if rule.get("allow_exts") else True
+def _should_include(name: str, cfg: Dict[str, Any]) -> bool:
+    pulls = cfg.get("pull_sets") or []
+    name_l = name.lower()
+    for rule in pulls:
+        inc = rule.get("include") or []
+        exts = [e.lower() for e in (rule.get("allow_exts") or [])]
+        if inc and not any(name.startswith(i) for i in inc): continue
+        if exts and not any(name_l.endswith("." + e) for e in exts): continue
+        return True
     return False
 
-async def _apply_archive_bytes(data: bytes, cfg: Dict[str, Any]) -> List[str]:
+def _apply_archive_bytes(data: bytes, cfg: Dict[str, Any]) -> List[str]:
+    root_prefix = (cfg.get("repo_root_prefix") or "").strip()
     changed: List[str] = []
-    with zipfile.ZipFile(io.BytesIO(data)) as zf:
-        root = (cfg.get("repo_root_prefix") or "").strip()
-        for n in zf.namelist():
-            if root and not n.startswith(root): continue
-            rel = n[len(root):] if root else n
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for info in z.infolist():
+            if info.is_dir(): continue
+            name = info.filename
+            rel = name[len(root_prefix):] if root_prefix and name.startswith(root_prefix) else name
             if not _should_include(rel, cfg): continue
-            try:
-                b = zf.read(n)
-                os.makedirs(os.path.dirname(rel) or ".", exist_ok=True)
-                old = None
+            target = Path(rel); target.parent.mkdir(parents=True, exist_ok=True)
+            new_bytes = z.read(info)
+            if target.exists():
                 try:
-                    with open(rel, "rb") as f: old = f.read()
-                except Exception:
-                    pass
-                if old != b:
-                    with open(rel, "wb") as f: f.write(b)
-                    changed.append(rel)
-            except Exception:
-                pass
+                    if target.read_bytes() == new_bytes: continue
+                except Exception: pass
+            target.write_bytes(new_bytes); changed.append(rel)
     return changed
 
-async def _pull_archive_and_apply(cfg: Dict[str, Any]) -> List[str]:
-    url = cfg.get("archive")
+async def _pull_archive_and_apply() -> List[str]:
+    cfg = _load_cfg(); url = cfg.get("archive")
     if not url: return []
-    timeout = int(cfg.get("timeout_s", 20))
-    async with aiohttp.ClientSession() as s:
-        data = await _fetch_bytes(s, url, timeout)
-        return await _apply_archive_bytes(data, cfg)
-
-async def _pull_all_raw(cfg: Dict[str, Any]) -> List[str]:
-    base = (cfg.get("base") or "").rstrip("/") + "/"
-    files = cfg.get("files") or []
-    changed: List[str] = []
-    timeout = int(cfg.get("timeout_s", 20))
-    if not files: return []
-    async with aiohttp.ClientSession() as s:
-        for row in files:
-            try:
-                remote = row.get("remote"); local = row.get("local")
-                if not remote or not local: continue
-                url = base + remote
-                data = await _fetch_bytes(s, url, timeout)
-                os.makedirs(os.path.dirname(local) or ".", exist_ok=True)
-                old = None
-                try:
-                    with open(local, "rb") as f: old = f.read()
-                except Exception:
-                    pass
-                if old != data:
-                    with open(local, "wb") as f: f.write(data)
-                    changed.append(local)
-            except Exception:
-                pass
-    return changed
+    data = await _fetch_bytes(url, int(cfg.get("timeout_s", 20)))
+    return _apply_archive_bytes(data, cfg)
 
 class RemoteSyncRestart(commands.Cog):
     def __init__(self, bot): self.bot = bot
-
-    group = app_commands.Group(name="repo", description="Remote pull & restart (Render-friendly)")
+    group = app_commands.Group(name="repo", description="Repo ops (ZIP-friendly)")
     group_rt = app_commands.Group(name="runtime", description="Runtime ops")
 
     @group.command(name="pull")
     async def pull(self, itx: discord.Interaction):
-        if not itx.user.guild_permissions.manage_guild:
-            return await itx.response.send_message("Butuh izin Manage Server.", ephemeral=True)
         await itx.response.defer(ephemeral=True, thinking=True)
-        cfg = _load_cfg()
-        try: changed = await _pull_archive_and_apply(cfg)
-        except Exception as e: return await itx.followup.send(f"Gagal pull: `{e}`", ephemeral=True)
-        await itx.followup.send(f"Selesai. File yang berubah: {changed}", ephemeral=True)
+        changed = await _pull_archive_and_apply()
+        await itx.followup.send(f"✅ Changed: {len(changed)} file(s).", ephemeral=True)
 
     @group.command(name="pull_and_restart")
     async def pull_and_restart(self, itx: discord.Interaction):
-        if not itx.user.guild_permissions.manage_guild:
-            return await itx.response.send_message("Butuh izin Manage Server.", ephemeral=True)
         await itx.response.defer(ephemeral=True, thinking=True)
-        cfg = _load_cfg()
-        try: changed = await _pull_archive_and_apply(cfg)
-        except Exception as e: return await itx.followup.send(f"Gagal pull: `{e}`", ephemeral=True)
-        await itx.followup.send(f"Berubah: {changed}. Restarting…", ephemeral=True)
-        await asyncio.sleep(2.0); os._exit(0)
+        ok, age = rg.should_restart()
+        if not ok:
+            return await itx.followup.send(f"⏱️ Restart triggered {int(age or 0)}s ago — skipped.", ephemeral=True)
+        changed = await _pull_archive_and_apply()
+        rg.mark("pull_and_restart")
+        await itx.followup.send(f"✅ Changed: {len(changed)}. Restarting in {ACK_DELAY:.1f}s…", ephemeral=True)
+        async def _delay():
+            try: await asyncio.sleep(ACK_DELAY)
+            except Exception: pass
+            _reexec_inplace()
+        asyncio.create_task(_delay())
 
     @group_rt.command(name="restart")
     async def rt_restart(self, itx: discord.Interaction):
-        if not itx.user.guild_permissions.manage_guild:
-            return await itx.response.send_message("Butuh izin Manage Server.", ephemeral=True)
-        await itx.response.send_message("Restarting dalam 2 detik…", ephemeral=True)
-        await asyncio.sleep(2.0); os._exit(0)
+        await itx.response.send_message(f"🔁 Restarting in {ACK_DELAY:.1f}s…", ephemeral=True)
+        async def _d(): 
+            try: await asyncio.sleep(ACK_DELAY)
+            except Exception: pass
+            _reexec_inplace()
+        asyncio.create_task(_d())
+
+async def _sync_all_guilds_once(bot: commands.Bot):
+    await bot.wait_until_ready()
+    try:
+        for g in bot.guilds:
+            try: await bot.tree.sync(guild=g)
+            except Exception: pass
+    except Exception: pass
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(RemoteSyncRestart(bot))
+    cog = RemoteSyncRestart(bot)
+    await bot.add_cog(cog)
+    # Register as the authoritative /repo (override any earlier)
+    bot.tree.add_command(cog.group, override=True)
+    bot.tree.add_command(cog.group_rt, override=True)
+    asyncio.create_task(_sync_all_guilds_once(bot))
