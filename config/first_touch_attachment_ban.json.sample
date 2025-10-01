@@ -14,6 +14,17 @@
   "fp_log_thread_name": "imagephising-fp-log",
   "ban_log_thread_name": "Ban Log",
   "whitelist_thread_name": "whitelist",
-  "delete_message_days": 7,
-  "log_channel_id": 0
+  "log_channel_id": 0,
+  "whitelist_file": "config/image_whitelist_sha256.json",
+  "skip_logging_if_whitelisted": true,
+  "auto_whitelist_enabled": true,
+  "auto_whitelist_if_phash_below": 0.85,
+  "auto_whitelist_log_to_thread": true,
+  "auto_delete_logs_enabled": true,
+  "auto_delete_logs_seconds": 600,
+  "auto_delete_fp_thread": true,
+  "auto_delete_whitelist_thread": true,
+  "auto_delete_ban_thread": false,
+  "auto_delete_parent_log_channel": false,
+  "delete_message_days": 7
 }
