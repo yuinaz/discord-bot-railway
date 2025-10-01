@@ -1,21 +1,11 @@
-
 # -*- coding: utf-8 -*-
 """
-First-touch Attachment Ban — v9 (NO ENV)
-Focus: **reference thread "imagephising" exact-match** to avoid false positives.
-Still pHash + Safety aware, with thread bindings.
+First-touch Attachment Ban — v11.1.1 (NO ENV)
+- Selective auto-delete: default HANYA di threads "fp" & "whitelist".
+- Tidak auto-delete di "Ban Log" & parent log channel.
+- Tetap: exact-match ke thread `imagephising` → ban via Safety; pHash rendah → auto-whitelist tanpa spam.
 
-Flow:
-1) First attachment from a user → check **exact SHA256 match** against attachments in the
-   reference thread (default name: "imagephising" under "log-botphising").
-   - If exact match found → forward ban request to Safety (AutobanSafetyInterceptor/BanQueueWatcher).
-   - If not found → proceed to pHash quick check:
-       • strong (>= threshold) → forward to Safety (label "phash_strong")
-       • suspected → forward to Safety (label "phash_suspected")
-       • no signal → only log to FP thread (review), no ban request.
-2) If Safety pipeline not present and safety_required=True ⇒ SKIP (anti FP).
-
-No ENV. Names & thresholds can be changed in optional JSON config.
+Jika config lama (v11.1) dipakai, nilai default HARD di bawah akan aktif.
 """
 from __future__ import annotations
 
@@ -27,7 +17,6 @@ from typing import Optional, Set, Dict, Any
 import discord
 from discord.ext import commands
 
-# ------------------- HARD DEFAULTS -------------------
 HARD = {
     "enabled": True,
     "always": True,
@@ -43,10 +32,10 @@ HARD = {
     "safety_required": True,
     "phash_min_threshold": 0.90,
     "phash_strong_threshold": 0.98,
-    "direct_ban_on_strong": False,     # only used when safety_required=False
+    "direct_ban_on_strong": False,
 
-    # Reference thread strategy
-    "reference_required_for_ban": True,   # require exact match in reference thread for ban request
+    # Reference
+    "reference_required_for_ban": True,
     "reference_thread_name": "imagephising",
     "reference_cache_minutes": 15,
 
@@ -56,6 +45,23 @@ HARD = {
     "ban_log_thread_name": "Ban Log",
     "whitelist_thread_name": "whitelist",
     "log_channel_id": 0,
+
+    # Whitelist
+    "whitelist_file": "config/image_whitelist_sha256.json",
+    "skip_logging_if_whitelisted": True,
+
+    # Auto-whitelist
+    "auto_whitelist_enabled": True,
+    "auto_whitelist_if_phash_below": 0.85,
+    "auto_whitelist_log_to_thread": True,
+
+    # Auto-delete (selective)
+    "auto_delete_logs_enabled": True,
+    "auto_delete_logs_seconds": 600,
+    "auto_delete_fp_thread": True,
+    "auto_delete_whitelist_thread": True,
+    "auto_delete_ban_thread": False,
+    "auto_delete_parent_log_channel": False,
 }
 
 CFG_PATH = os.path.join(
@@ -107,11 +113,12 @@ class FirstTouchAttachmentBan(commands.Cog):
         self.phash_strong_threshold = float(_cfg_get(cfg, "phash_strong_threshold"))
         self.direct_ban_on_strong = bool(_cfg_get(cfg, "direct_ban_on_strong"))
 
-        # reference & bindings
+        # reference
         self.reference_required_for_ban = bool(_cfg_get(cfg, "reference_required_for_ban"))
         self.reference_thread_name = str(_cfg_get(cfg, "reference_thread_name"))
         self.reference_cache_minutes = int(_cfg_get(cfg, "reference_cache_minutes"))
 
+        # bindings
         lcid = int(_cfg_get(cfg, "log_channel_id") or 0)
         self._log_channel_id = lcid if lcid > 0 else None
         self.log_channel_name = str(_cfg_get(cfg, "log_channel_name") or "").strip()
@@ -119,36 +126,50 @@ class FirstTouchAttachmentBan(commands.Cog):
         self.ban_log_thread_name = str(_cfg_get(cfg, "ban_log_thread_name") or "").strip()
         self.whitelist_thread_name = str(_cfg_get(cfg, "whitelist_thread_name") or "").strip()
 
+        # whitelist
+        self.whitelist_file = str(_cfg_get(cfg, "whitelist_file"))
+        self.skip_logging_if_whitelisted = bool(_cfg_get(cfg, "skip_logging_if_whitelisted"))
+
+        # auto-whitelist
+        self.auto_whitelist_enabled = bool(_cfg_get(cfg, "auto_whitelist_enabled"))
+        self.auto_whitelist_if_phash_below = float(_cfg_get(cfg, "auto_whitelist_if_phash_below"))
+        self.auto_whitelist_log_to_thread = bool(_cfg_get(cfg, "auto_whitelist_log_to_thread"))
+
+        # auto-delete logs
+        self.auto_delete_logs_enabled = bool(_cfg_get(cfg, "auto_delete_logs_enabled"))
+        self.auto_delete_logs_seconds = int(_cfg_get(cfg, "auto_delete_logs_seconds"))
+        self.auto_delete_fp_thread = bool(_cfg_get(cfg, "auto_delete_fp_thread"))
+        self.auto_delete_whitelist_thread = bool(_cfg_get(cfg, "auto_delete_whitelist_thread"))
+        self.auto_delete_ban_thread = bool(_cfg_get(cfg, "auto_delete_ban_thread"))
+        self.auto_delete_parent_log_channel = bool(_cfg_get(cfg, "auto_delete_parent_log_channel"))
+
         # internals
-        self._banning: Set[int] = set()
-        self._seen_once: Set[int] = set()
-        self._ref_cache: Dict[int, Dict[str, Any]] = {}  # guild_id -> {"hashes": set(str), "ts": datetime}
+        self._ref_cache: Dict[int, Dict[str, Any]] = {}   # guild_id -> {"hashes": set(str), "ts": datetime}
+        self._wl_cache: Set[str] = set()
 
-    # ------------------- helpers -------------------
-    def _is_staff(self, member: discord.Member) -> bool:
-        p = member.guild_permissions
-        return p.administrator or p.manage_guild or p.ban_members
+        self._load_whitelist()
 
-    def _is_roleless(self, member: discord.Member) -> bool:
-        return sum(1 for r in getattr(member, "roles", []) if not getattr(r, "is_default", False)) == 0
+    # ------------- whitelist file -------------
+    def _load_whitelist(self):
+        try:
+            with open(self.whitelist_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    self._wl_cache = {str(x) for x in data}
+                elif isinstance(data, dict) and "sha256" in data:
+                    self._wl_cache = {str(x) for x in data.get("sha256", [])}
+        except Exception:
+            self._wl_cache = set()
 
-    def _is_exempt_by_role(self, member: discord.Member) -> bool:
-        names = {getattr(r, "name", "").lower() for r in getattr(member, "roles", [])}
-        if self.exempt_role_names & names:
-            return True
-        ids = {getattr(r, "id", 0) for r in getattr(member, "roles", [])}
-        if self.exempt_role_ids & ids:
-            return True
-        return False
+    def _save_whitelist(self):
+        try:
+            os.makedirs(os.path.dirname(self.whitelist_file), exist_ok=True)
+            with open(self.whitelist_file, "w", encoding="utf-8") as f:
+                json.dump(sorted(list(self._wl_cache)), f, indent=2)
+        except Exception:
+            pass
 
-    def _within_window(self, member: discord.Member) -> bool:
-        if self.always:
-            return True
-        if not member.joined_at:
-            return False
-        return (_utcnow() - member.joined_at).total_seconds() <= max(0, self.window_min) * 60
-
-    # ---------- Channel / Thread resolution ----------
+    # ------------- helpers -------------
     def _resolve_log_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
         if self._log_channel_id:
             ch = guild.get_channel(self._log_channel_id)
@@ -179,19 +200,31 @@ class FirstTouchAttachmentBan(commands.Cog):
             pass
         return None
 
-    async def _send_log(self, guild: discord.Guild, embed: discord.Embed, *, thread: Optional[discord.Thread]=None):
+    def _delete_after_for(self, tag: str) -> Optional[float]:
+        """tag: 'fp' | 'whitelist' | 'ban' | 'parent'"""
+        if not self.auto_delete_logs_enabled:
+            return None
+        flags = {
+            "fp": self.auto_delete_fp_thread,
+            "whitelist": self.auto_delete_whitelist_thread,
+            "ban": self.auto_delete_ban_thread,
+            "parent": self.auto_delete_parent_log_channel,
+        }
+        return float(self.auto_delete_logs_seconds) if flags.get(tag, False) else None
+
+    async def _send_log(self, guild: discord.Guild, embed: discord.Embed, *, thread: Optional[discord.Thread]=None, delete_after: Optional[float]=None):
         ch = self._resolve_log_channel(guild)
         if not ch:
-            return
+            return None
         try:
             if thread:
-                await thread.send(embed=embed)
+                return await thread.send(embed=embed, delete_after=delete_after) if delete_after else await thread.send(embed=embed)
             else:
-                await ch.send(embed=embed)
+                return await ch.send(embed=embed, delete_after=delete_after) if delete_after else await ch.send(embed=embed)
         except Exception:
-            pass
+            return None
 
-    # ------------------- Reference index (exact SHA256) -------------------
+    # ------------- reference index -------------
     async def _build_reference_index(self, guild: discord.Guild) -> Dict[str, Any]:
         parent = self._resolve_log_channel(guild)
         ref_thread = self._find_thread(guild, parent, self.reference_thread_name)
@@ -213,7 +246,7 @@ class FirstTouchAttachmentBan(commands.Cog):
         return {"hashes": hashes, "count": len(hashes)}
 
     async def _get_reference_index(self, guild: discord.Guild) -> Dict[str, Any]:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         entry = self._ref_cache.get(guild.id)
         if entry and (now - entry["ts"]).total_seconds() <= self.reference_cache_minutes * 60:
@@ -229,7 +262,7 @@ class FirstTouchAttachmentBan(commands.Cog):
         except Exception:
             return None
 
-    # ------------------- pHASH QUICK CHECK -------------------
+    # ------------- pHash -------------
     async def _phash_quick_check(self, message: discord.Message) -> Dict[str, Any]:
         details = []; best = 0.0
         cog_names = ("AntiImagePhashRuntime", "PhashAutoBan", "AntiImagePhishAdvanced", "AntiImagePhishGuard")
@@ -267,8 +300,7 @@ class FirstTouchAttachmentBan(commands.Cog):
             else:
                 best = max(best, float(score_for_this))
                 details.append({"attachment": info, "confidence": float(score_for_this), "source": "cog"})
-        strong = best >= self.phash_strong_threshold
-        return {"best_conf": best, "details": details, "strong": strong}
+        return {"best_conf": best, "details": details}
 
     def _interpret_phash_result(self, res: Any) -> Optional[float]:
         try:
@@ -285,7 +317,7 @@ class FirstTouchAttachmentBan(commands.Cog):
             return None
         return None
 
-    # ------------------- SAFETY PIPELINE -------------------
+    # ------------- safety pipeline -------------
     async def _submit_via_pipeline(self, member: discord.Member, message: discord.Message, reason: str, meta: Dict[str, Any]) -> bool:
         for cog_name in ("AutobanSafetyInterceptor", "BanQueueWatcher"):
             cog = self.bot.get_cog(cog_name)
@@ -324,20 +356,20 @@ class FirstTouchAttachmentBan(commands.Cog):
         except Exception:
             raise
 
-    # ------------------- MAIN ACTION -------------------
+    # ------------- main -------------
     async def _act(self, member: discord.Member, message: discord.Message):
         guild = member.guild
         parent = self._resolve_log_channel(guild)
         fp_thread = self._find_thread(guild, parent, self.fp_log_thread_name)
         ban_thread = self._find_thread(guild, parent, self.ban_log_thread_name)
-        ref_thread = self._find_thread(guild, parent, self.reference_thread_name)
+        wl_thread = self._find_thread(guild, parent, self.whitelist_thread_name)
 
-        # Reference index
         ref = await self._get_reference_index(guild)
         ref_count = ref["count"]; ref_hashes = ref["hashes"]
 
-        # Compute SHA256 for incoming attachments
-        exact_hit = False; sha_list = []
+        # sha list
+        sha_list = []
+        exact_hit = False
         for att in message.attachments:
             h = await self._sha256_of_attachment(att)
             if h:
@@ -345,99 +377,101 @@ class FirstTouchAttachmentBan(commands.Cog):
                 if h in ref_hashes:
                     exact_hit = True
 
-        # Build base embed
+        # skip if already whitelisted
+        whitelisted = any(h in self._wl_cache for h in sha_list)
+        if whitelisted and self.skip_logging_if_whitelisted:
+            return
+
+        # exact → ban
+        if exact_hit or not self.reference_required_for_ban:
+            base = discord.Embed(
+                title="First-touch detected",
+                description=(f"User: {member.mention} (`{member.id}`)\n"
+                             f"Channel: {message.channel.mention}\n"
+                             f"RefThread='{self.reference_thread_name}' entries={ref_count} | exact_hit={exact_hit}\n"
+                             f"SafetyRequired={self.safety_required} | RefRequiredForBan={self.reference_required_for_ban}"),
+                color=0x3498DB, timestamp=_utcnow(),
+            )
+            base.set_footer(text="SatpamBot • FirstTouchAttachmentBan v11.1.1")
+            base.url = getattr(message, "jump_url", discord.Embed.Empty)
+            await self._send_log(guild, base, thread=ban_thread, delete_after=self._delete_after_for("ban"))
+
+            meta = {
+                "trigger": "first_touch_attachment",
+                "match": "reference_exact" if exact_hit else "no_reference",
+                "sha256": sha_list,
+                "mode": "ALWAYS" if self.always else "JOIN_WINDOW",
+                "delete_message_days": self.delete_message_days,
+                "message_id": getattr(message, "id", None),
+                "channel_id": getattr(message.channel, "id", None),
+                "author_id": getattr(member, "id", None),
+                "guild_id": getattr(member.guild, "id", None),
+                "attachments": [{
+                    "filename": a.filename,
+                    "content_type": a.content_type,
+                    "size": getattr(a, "size", None),
+                    "url": getattr(a, "url", None),
+                    "proxy_url": getattr(a, "proxy_url", None),
+                } for a in message.attachments],
+                "ts": _utcnow().isoformat(),
+                "labels": ["first_touch","attachment","reference_exact" if exact_hit else "no_reference","no_env_cog","v11.1.1"],
+            }
+            submitted = await self._submit_via_pipeline(member, message, "First-touch attachment policy", meta)
+            if submitted:
+                ack = discord.Embed(title="Sent to Safety", description="Autoban request (exact match) masuk pipeline.", color=0x2980B9, timestamp=_utcnow())
+                await self._send_log(guild, ack, thread=ban_thread, delete_after=self._delete_after_for("ban"))
+                return
+            if not self.safety_required:
+                e = discord.Embed(title="Direct BAN (no safety)", description="Pipeline tidak ada dan safety_required=False.", color=0xE74C3C, timestamp=_utcnow())
+                await self._send_log(guild, e, thread=ban_thread, delete_after=self._delete_after_for("ban"))
+                await self._ban_member_direct(member)
+                return
+            warn = discord.Embed(title="SKIPPED (no safety)", description="Safety pipeline tidak ada.", color=0xF1C40F, timestamp=_utcnow())
+            await self._send_log(guild, warn, thread=fp_thread, delete_after=self._delete_after_for("fp"))
+            return
+
+        # not exact → evaluate pHash
+        ph = await self._phash_quick_check(message)
+        best = float(ph.get("best_conf") or 0.0)
+
+        # AUTO-WHITELIST
+        if self.auto_whitelist_enabled and best < self.auto_whitelist_if_phash_below:
+            added = 0
+            for h in sha_list:
+                if h not in self._wl_cache:
+                    self._wl_cache.add(h); added += 1
+            if added:
+                self._save_whitelist()
+
+            if self.auto_whitelist_log_to_thread:
+                emb = discord.Embed(
+                    title="Auto-whitelist (non-phish)",
+                    description=(f"pHash best_conf={best:.3f} < {self.auto_whitelist_if_phash_below:.2f}\n"
+                                 f"Origin: {getattr(message,'jump_url','n/a')}"),
+                    color=0x2ECC71, timestamp=_utcnow(),
+                )
+                await self._send_log(guild, emb, thread=wl_thread, delete_after=self._delete_after_for("whitelist"))
+            return
+
+        # otherwise → FP review (no ban)
         base = discord.Embed(
             title="First-touch detected",
             description=(f"User: {member.mention} (`{member.id}`)\n"
                          f"Channel: {message.channel.mention}\n"
-                         f"RefThread='{self.reference_thread_name}' entries={ref_count} | exact_hit={exact_hit}\n"
+                         f"RefThread='{self.reference_thread_name}' entries={ref_count} | exact_hit=False\n"
                          f"SafetyRequired={self.safety_required} | RefRequiredForBan={self.reference_required_for_ban}"),
             color=0x3498DB, timestamp=_utcnow(),
         )
-        base.set_footer(text="SatpamBot • FirstTouchAttachmentBan v9")
-        await self._send_log(guild, base, thread=(ban_thread if exact_hit else fp_thread))
+        base.set_footer(text="SatpamBot • FirstTouchAttachmentBan v11.1.1")
+        base.url = getattr(message, "jump_url", discord.Embed.Empty)
+        await self._send_log(guild, base, thread=fp_thread, delete_after=self._delete_after_for("fp"))
 
-        # Decision tree
-        if self.reference_required_for_ban and not exact_hit:
-            # No exact match → try pHash to assist review; DO NOT request ban
-            ph = await self._phash_quick_check(message)
-            best = ph["best_conf"]; label = "unknown"
-            if best >= self.phash_strong_threshold: label = "phash_strong"
-            elif best >= self.phash_min_threshold: label = "phash_suspected"
-            note = discord.Embed(
-                title="Skip ban: no exact match in reference thread",
-                description=f"pHash best_conf={best:.3f} label={label}. Dikirim ke FP thread untuk review.",
-                color=0xF1C40F, timestamp=_utcnow(),
-            )
-            await self._send_log(guild, note, thread=fp_thread)
-            return
-
-        # Exact match (or ref not required) → build metadata and submit
-        meta = {
-            "trigger": "first_touch_attachment",
-            "match": "reference_exact" if exact_hit else "no_reference",
-            "sha256": sha_list,
-            "mode": "ALWAYS" if self.always else "JOIN_WINDOW",
-            "delete_message_days": self.delete_message_days,
-            "message_id": getattr(message, "id", None),
-            "channel_id": getattr(message.channel, "id", None),
-            "author_id": getattr(member, "id", None),
-            "guild_id": getattr(member.guild, "id", None),
-            "attachments": [{
-                "filename": a.filename,
-                "content_type": a.content_type,
-                "size": getattr(a, "size", None),
-                "url": getattr(a, "url", None),
-                "proxy_url": getattr(a, "proxy_url", None),
-            } for a in message.attachments],
-            "ts": _utcnow().isoformat(),
-            "labels": ["first_touch", "attachment", "reference_exact" if exact_hit else "no_reference", "no_env_cog", "v9"],
-        }
-
-        submitted = await self._submit_via_pipeline(member, message, "First-touch attachment policy", meta)
-        if submitted:
-            ack = discord.Embed(title="Sent to Safety", description=f"Autoban request (match={'exact' if exact_hit else 'none'}) masuk pipeline.", color=0x2980B9, timestamp=_utcnow())
-            await self._send_log(guild, ack, thread=(ban_thread if exact_hit else fp_thread))
-            return
-
-        # No safety
-        if exact_hit and not self.safety_required:
-            e = discord.Embed(title="Direct BAN (exact reference match, no safety)",
-                              description="Pipeline tidak ada dan safety_required=False.", color=0xE74C3C, timestamp=_utcnow())
-            await self._send_log(guild, e, thread=ban_thread)
-            await self._ban_member_direct(member)
-            return
-
-        warn = discord.Embed(title="SKIPPED (no safety)", description="Safety pipeline tidak ada dan safety_required=True.", color=0xF1C40F, timestamp=_utcnow())
-        await self._send_log(guild, warn, thread=fp_thread)
-
-    # ------------------- listener -------------------
-    @commands.Cog.listener("on_message")
-    async def _on_message(self, message: discord.Message):
-        if not self.enabled or not message.guild:
-            return
-        if message.author.bot or not message.attachments:
-            return
-        member = message.author if isinstance(message.author, discord.Member) else message.guild.get_member(message.author.id)
-        if not isinstance(member, discord.Member):
-            return
-
-        # exemptions
-        if self.exempt_staff and self._is_staff(member):
-            return
-        if self._is_exempt_by_role(member):
-            return
-        if (getattr(message.channel, "name", "") or "").lower() in self.whitelist_channels:
-            return
-        if member.id in self._seen_once:
-            return
-        if self.only_roleless and not self._is_roleless(member):
-            return
-        if not self._within_window(member):
-            return
-
-        self._seen_once.add(member.id)
-        await self._act(member, message)
+        note = discord.Embed(
+            title="Skip ban: no exact match in reference thread",
+            description=(f"pHash best_conf={best:.3f}. Review manual jika diperlukan."),
+            color=0xF1C40F, timestamp=_utcnow(),
+        )
+        await self._send_log(guild, note, thread=fp_thread, delete_after=self._delete_after_for("fp"))
 
 async def setup(bot: commands.Bot):
     if bot.get_cog("FirstTouchAttachmentBan") is None:
