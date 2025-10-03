@@ -7,7 +7,7 @@ class MessageEditRescan(commands.Cog):
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         # THREAD/FORUM EXEMPTION — auto-inserted
-        ch = getattr(message, "channel", None)
+        ch = getattr(after, "channel", None)
         if ch is not None:
             try:
                 import discord
