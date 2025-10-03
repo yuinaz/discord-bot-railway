@@ -4,17 +4,17 @@
   "only_roleless": false,
   "exempt_staff": true,
   "safety_required": true,
-  "phash_min_threshold": 0.9,
-  "phash_strong_threshold": 0.98,
-  "direct_ban_on_strong": false,
   "reference_required_for_ban": true,
   "reference_thread_name": "imagephising",
   "reference_cache_minutes": 15,
+  "phash_min_threshold": 0.9,
+  "phash_strong_threshold": 0.93,
+  "direct_ban_on_strong": true,
   "log_channel_name": "log-botphising",
+  "log_channel_id": 0,
   "fp_log_thread_name": "imagephising-fp-log",
   "ban_log_thread_name": "Ban Log",
   "whitelist_thread_name": "whitelist",
-  "log_channel_id": 0,
   "whitelist_file": "config/image_whitelist_sha256.json",
   "skip_logging_if_whitelisted": true,
   "auto_whitelist_enabled": true,
@@ -26,5 +26,34 @@
   "auto_delete_whitelist_thread": true,
   "auto_delete_ban_thread": false,
   "auto_delete_parent_log_channel": false,
-  "delete_message_days": 7
+  "preemptive_timeout_enabled": true,
+  "preemptive_timeout_seconds": 300,
+  "delete_message_days": 7,
+  "pattern_pack_ban_enabled": true,
+  "pattern_pack_direct_ban": true,
+  "pattern_pack_min_attachments": 3,
+  "pattern_pack_digits": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "pattern_pack_allow_image_prefix": true,
+  "pattern_pack_exts": [
+    "jpg",
+    "jpeg",
+    "png",
+    "webp"
+  ],
+  "mime_sniff_enabled": true,
+  "mime_direct_ban_enabled": true,
+  "mime_direct_ban_min_mismatches": 2,
+  "image_kinds": [
+    "jpeg",
+    "png",
+    "webp",
+    "gif"
+  ]
 }
