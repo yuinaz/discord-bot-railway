@@ -2,9 +2,10 @@
 """
 apply_thread_exempt.py
 ---------------------------------
-Unified patcher:
-  1) FIX existing guards (marker-based) that mistakenly reference `message`
-     by rebinding to the actual handler parameter name.
+Unified & robust patcher:
+  1) FIX existing guards that reference the wrong variable (e.g., 'message')
+     by rebinding to the actual handler parameter name — for ALL matching
+     functions in the file (not just the first).
   2) INSERT guard if missing, using the correct parameter name per function.
 
 Scope:
@@ -15,7 +16,7 @@ Scope:
 Usage:
     python patches/apply_thread_exempt.py
     python scripts/smoke_cogs.py
-    git add -A && git commit -m "Hotfix: thread/forum exempt guard (unified)" && git push
+    git add -A && git commit -m "Hotfix: thread/forum exempt guard (robust)" && git push
 """
 from __future__ import annotations
 import re, sys
@@ -70,7 +71,6 @@ def pick_param(func_name: str, args_str: str) -> str:
         return names[0]
 
     if func_name == "on_message_edit":
-        # most cogs: (before, after) — prefer "after"
         for cand in ("after", "message_after", "new", "updated", "message", "msg", "m"):
             if cand in names:
                 return cand
@@ -81,11 +81,11 @@ def pick_param(func_name: str, args_str: str) -> str:
 def build_guard(indent: str, var: str) -> str:
     return GUARD_TEMPLATE.format(indent=indent, var=var, mark=GUARD_MARK)
 
-def insert_guard_once(content: str, func_name: str) -> tuple[str, bool]:
-    # Find function header and first body indent
+def insert_guard_once_in_func(text: str, func_name: str) -> tuple[str, bool]:
+    # Insert guard inside the FIRST occurrence of the function (per file) only.
     pat = re.compile(
         rf"(async\s+def\s+{func_name}\s*\((?P<args>.*?)\)\s*:\s*\n)(?P<indent>\s+)",
-        re.S,
+        re.S
     )
     def _repl(m):
         header = m.group(1)
@@ -94,63 +94,50 @@ def insert_guard_once(content: str, func_name: str) -> tuple[str, bool]:
         var = pick_param(func_name, args_str)
         guard = build_guard(indent, var)
         return f"{header}{guard}{indent}"
-    new_content, n = pat.subn(_repl, content, count=1)
-    return new_content, (n == 1)
+    new_text, n = pat.subn(_repl, text, count=1)
+    return new_text, (n == 1)
 
-def fix_existing_guard(content: str, func_name: str) -> tuple[str, bool]:
-    # Capture the whole function body to know its indent and args
-    func_pat = re.compile(
+def fix_existing_guards_in_file(text: str, func_name: str) -> tuple[str, int]:
+    # Iterate ALL functions with this name in the file
+    func_iter = list(re.finditer(
         rf"""
         (async\s+def\s+{func_name}\s*\((?P<args>.*?)\)\s*:\s*\n)  # header
         (?P<body>(?:[ \t]+.*\n)*)                                        # body (simple)
-        """, re.S | re.X
-    )
-    m = func_pat.search(content)
-    if not m:
-        return content, False
+        """, text, re.S | re.X
+    ))
+    fixed = 0
+    for m in reversed(func_iter):  # reverse to keep offsets stable while replacing
+        args_str = m.group("args")
+        body = m.group("body")
+        # find our marker in this body
+        marker = re.search(rf"^(?P<indent>[ \t]+)# {re.escape(GUARD_MARK)}\s*$", body, re.M)
+        if not marker:
+            continue
+        indent = marker.group("indent")
+        var = pick_param(func_name, args_str)
 
-    args_str = m.group("args")
-    body = m.group("body")
-
-    # Our marker line with leading indent
-    marker_pat = re.compile(rf"^(?P<indent>[ \t]+)# {re.escape(GUARD_MARK)}\s*$", re.M)
-    mm = marker_pat.search(body)
-    if not mm:
-        return content, False
-
-    indent = mm.group("indent")
-    var = pick_param(func_name, args_str)
-    new_guard = build_guard(indent, var)
-
-    # Replace the entire old guard block (from marker until a matching 'pass' at same indent)
-    guard_block_pat = re.compile(
-        rf"""
-        ^{re.escape(indent)}#\ {re.escape(GUARD_MARK)}\s*\n  # marker
-        (?:^{re.escape(indent)}.*\n)*?                         # lines inside guard
-        ^{re.escape(indent)}pass\s*\n                         # closing pass at same indent
-        """, re.M
-    )
-    new_body, n = guard_block_pat.subn(new_guard, body, count=1)
-    if n == 0:
-        # fallback: adjust getattr(var, "channel", ...) near marker
-        near_range_pat = re.compile(
+        # operate on a small window after the marker (max ~40 lines) to be safe
+        window_pat = re.compile(
             rf"""
             (^{re.escape(indent)}#\ {re.escape(GUARD_MARK)}\s*\n
-            (?:^{re.escape(indent)}.*\n){{0,30}})
+            (?P<win>(?:^{re.escape(indent)}.*\n){{0,60}}))
             """, re.M
         )
-        mm2 = near_range_pat.search(body)
-        if mm2:
-            seg = mm2.group(1)
-            import re as _re
-            seg2 = _re.sub(r'getattr\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*"channel"', f'getattr({var}, "channel"', seg)
-            new_body = body.replace(seg, seg2, 1)
-            content = content[:m.start("body")] + new_body + content[m.end("body"):]
-            return content, (seg != seg2)
-        return content, False
-
-    content = content[:m.start("body")] + new_body + content[m.end("body"):]
-    return content, True
+        w = window_pat.search(body)
+        if not w:
+            continue
+        win = w.group("win")
+        # Replace any getattr(<ident>, "channel", ...) to use the correct 'var'
+        win_new = re.sub(
+            r'getattr\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*"channel"',
+            f'getattr({var}, "channel"',
+            win
+        )
+        if win_new != win:
+            new_body = body[:w.start("win")] + win_new + body[w.end("win"):]
+            text = text[:m.start("body")] + new_body + text[m.end("body"):]
+            fixed += 1
+    return text, fixed
 
 def patch_file(path: Path) -> tuple[bool, list[str]]:
     try:
@@ -160,19 +147,20 @@ def patch_file(path: Path) -> tuple[bool, list[str]]:
     changed = False
     touched = []
 
-    # First try to FIX existing guards (if present)
+    # FIX phase: adjust any wrong variable names inside guards, for ALL matching functions
+    total_fixed = 0
     for fn in FUNC_NAMES:
-        src2, did_fix = fix_existing_guard(src, fn)
-        if did_fix:
+        src, nfixed = fix_existing_guards_in_file(src, fn)
+        if nfixed:
             changed = True
+            total_fixed += nfixed
             if fn not in touched:
                 touched.append(fn)
-            src = src2
 
-    # Then, if not present at all, INSERT new guard
+    # INSERT phase: only if file has no guard marker at all
     if GUARD_MARK not in src:
         for fn in FUNC_NAMES:
-            src2, did_ins = insert_guard_once(src, fn)
+            src2, did_ins = insert_guard_once_in_func(src, fn)
             if did_ins:
                 changed = True
                 if fn not in touched:

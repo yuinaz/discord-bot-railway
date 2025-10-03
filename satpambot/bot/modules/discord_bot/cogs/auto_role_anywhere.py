@@ -269,7 +269,7 @@ class AutoRoleAnywhere(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message):
         # THREAD/FORUM EXEMPTION — auto-inserted
-        ch = getattr(message, "channel", None)
+        ch = getattr(msg, "channel", None)
         if ch is not None:
             try:
                 import discord
