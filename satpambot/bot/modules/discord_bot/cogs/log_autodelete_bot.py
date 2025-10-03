@@ -61,6 +61,25 @@ class LogAutoDeleteBot(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        # THREAD/FORUM EXEMPTION — auto-inserted
+        ch = getattr(message, "channel", None)
+        if ch is not None:
+            try:
+                import discord
+                # Exempt true Thread objects
+                if isinstance(ch, getattr(discord, "Thread", tuple())):
+                    return
+                # Exempt thread-like channel types (public/private/news threads)
+                ctype = getattr(ch, "type", None)
+                if ctype in {
+                    getattr(discord.ChannelType, "public_thread", None),
+                    getattr(discord.ChannelType, "private_thread", None),
+                    getattr(discord.ChannelType, "news_thread", None),
+                }:
+                    return
+            except Exception:
+                # If discord import/type checks fail, do not block normal flow
+                pass
         # Only consider the bot's own messages
         if message.author.id != self.bot.user.id:
             return
