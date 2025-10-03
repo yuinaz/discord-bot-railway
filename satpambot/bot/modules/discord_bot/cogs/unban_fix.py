@@ -1,104 +1,77 @@
+
 # -*- coding: utf-8 -*-
 """
-Cog: UnbanFix
-- Memperbaiki parsing argumen untuk command prefix "unban".
-- Menerima ID murni, mention <@...>, atau ID yang ketempel karakter lain (misal ")" atau ",").
-- Aman untuk smoke test: tidak mengakses method yang tidak ada di DummyBot.
+unban_fix.py
+------------
+Command aman untuk unban ID, memperbaiki error konversi & iterator ban.
+
+Gunakan:
+  !unbanid 123456789012345678
+  !unbanid <@123456789012345678>
+  !unbanid well... (123456789012345678)
+
+Tidak mengubah command "unban" lama; ini berdampingan.
 """
+
 from __future__ import annotations
 
 import re
 import logging
-from typing import Optional
-
 import discord
 from discord.ext import commands
 
-log = logging.getLogger(__name__)
-
-ID_RE = re.compile(r'\d{15,20}')
-
-def _extract_user_id(arg: str) -> Optional[int]:
-    if not arg:
-        return None
-    m = ID_RE.search(arg)
-    if m:
-        try:
-            return int(m.group(0))
-        except Exception:
-            return None
-    return None
+LOG = logging.getLogger(__name__)
+ID_RE = re.compile(r"(\d{15,25})")
 
 class UnbanFix(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name="unban")
+    @commands.command(name="unbanid", aliases=["unban_safe", "unbanfix"])
     @commands.guild_only()
     @commands.has_permissions(ban_members=True)
-    async def unban_cmd(self, ctx: commands.Context, *, user_ref: str):
-        """
-        Unban by user ID / mention / string yang mengandung ID.
-        Contoh:
-          .unban 1331765056974753934
-          .unban <@1331765056974753934>
-          .unban 1331765056974753934)
-        """
-        user_id = _extract_user_id(user_ref)
-        if user_id is None:
-            return await ctx.reply("❌ Gagal membaca user ID. Contoh: `.unban 1331765056974753934`", mention_author=False)
+    async def unbanid(self, ctx: commands.Context, *, raw: str):
+        """Unban berdasarkan ID/mention/string yang mengandung ID."""
+        m = ID_RE.search(raw or "")
+        if not m:
+            return await ctx.send("❌ Tidak menemukan ID di argumen. Contoh: `!unbanid 123456789012345678`")
 
-        # Cari entry ban dulu
+        uid = int(m.group(1))
+
+        # Jalur cepat: langsung unban dengan Object
         try:
-            bans = await ctx.guild.bans(limit=None)
-        except Exception as e:
-            log.exception("Gagal mengambil daftar ban: %r", e)
-            return await ctx.reply("❌ Tidak bisa mengambil daftar ban (cek izin bot).", mention_author=False)
-
-        target_entry = None
-        for entry in bans:
-            if entry.user.id == user_id:
-                target_entry = entry
-                break
-
-        if target_entry is None:
-            # user object mungkin belum ada. Coba Object minimal
-            try:
-                await ctx.guild.unban(discord.Object(id=user_id), reason=f"manual by {ctx.author} via UnbanFix")
-                return await ctx.reply(f"✅ Unbanned (ID saja) `{user_id}`.", mention_author=False)
-            except discord.NotFound:
-                return await ctx.reply(f"ℹ️ User `{user_id}` tidak ada di daftar ban.", mention_author=False)
-            except discord.Forbidden:
-                return await ctx.reply("❌ Bot tidak punya izin unban.", mention_author=False)
-            except Exception as e:
-                log.exception("Error unban raw id: %r", e)
-                return await ctx.reply("❌ Terjadi error saat unban.", mention_author=False)
-
-        try:
-            await ctx.guild.unban(target_entry.user, reason=f"manual by {ctx.author} via UnbanFix")
-            return await ctx.reply(f"✅ Unbanned {target_entry.user} (`{target_entry.user.id}`).", mention_author=False)
+            user_obj = discord.Object(id=uid)
+            await ctx.guild.unban(user_obj, reason=f"UnbanFix by {ctx.author}")
+            return await ctx.send(f"✅ Unbanned ID `{uid}` (jalur cepat).")
+        except discord.NotFound:
+            # Tidak ada di banlist; mungkin sudah ter-unban
+            return await ctx.send(f"ℹ️ ID `{uid}` tidak ada di daftar ban.")
         except discord.Forbidden:
-            return await ctx.reply("❌ Bot tidak punya izin unban.", mention_author=False)
+            return await ctx.send("❌ Bot tidak punya izin unban.")
         except Exception as e:
-            log.exception("Error unban target: %r", e)
-            return await ctx.reply("❌ Terjadi error saat unban.", mention_author=False)
+            LOG.warning("Jalur cepat unban gagal: %r — lanjut cek daftar ban", e)
+
+        # Fallback: iterasi daftar ban dengan async for
+        target_entry = None
+        try:
+            async for ban_entry in ctx.guild.bans(limit=None):
+                if int(ban_entry.user.id) == uid:
+                    target_entry = ban_entry
+                    break
+        except Exception as e:
+            LOG.exception("Gagal mengambil daftar ban: %r", e)
+            return await ctx.send("❌ Gagal mengambil daftar ban (lihat log).")
+
+        if not target_entry:
+            return await ctx.send(f"ℹ️ ID `{uid}` tidak ditemukan di daftar ban.")
+
+        try:
+            await ctx.guild.unban(target_entry.user, reason=f"UnbanFix by {ctx.author}")
+            return await ctx.send(f"✅ Unbanned **{target_entry.user}** (`{uid}`).")
+        except Exception as e:
+            LOG.exception("Gagal unban: %r", e)
+            return await ctx.send("❌ Unban gagal (lihat log).")
 
 async def setup(bot: commands.Bot):
-    """
-    Saat setup:
-    - Kalau bot mendukung remove_command, hapus 'unban' lama agar tidak bentrok.
-    - Selalu add_cog agar smoke test lulus.
-    """
-    # Hapus command lama kalau method tersedia
-    if hasattr(bot, "remove_command"):
-        try:
-            bot.remove_command("unban")
-        except Exception:
-            pass
-
-    # Daftarkan Cog
-    if hasattr(bot, "add_cog"):
-        await bot.add_cog(UnbanFix(bot))
-    else:
-        # fallback aman untuk DummyBot yang tidak punya add_cog
-        log.warning("Bot tidak mendukung add_cog; UnbanFix tidak terpasang penuh.")
+    await bot.add_cog(UnbanFix(bot))
+    LOG.info("[unban-fix] command siap (unbanid/unban_safe/unbanfix)")

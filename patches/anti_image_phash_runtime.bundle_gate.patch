@@ -1,0 +1,79 @@
+diff --git a/satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py b/satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py
+index 1111111..2222222 100644
+--- a/satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py
++++ b/satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py
+@@ -1,12 +1,30 @@
+ import asyncio
+ import logging
+ import os
+ import re
+ from typing import List
+ 
+ import discord
+ 
+ log = logging.getLogger(__name__)
+ 
++# === PATCH: bundle/MIME guard toggles (via ENV) ===
++PHASH_RUNTIME_AUTOBAN_BUNDLE_ONLY = os.getenv("PHASH_RUNTIME_AUTOBAN_BUNDLE_ONLY", "1") == "1"
++PHASH_RUNTIME_REQUIRE_NAMESET = os.getenv("PHASH_RUNTIME_REQUIRE_NAMESET", "1") == "1"
++BUNDLE_NAME_RE = re.compile(r"^(?:[1-4])\.(?:jpe?g|png|webp)$", re.I)
++
++def _looks_like_bundle(attachments: List[discord.Attachment]) -> bool:
++    if len(attachments) != 4:
++        return False
++    names = [a.filename.lower() for a in attachments]
++    if PHASH_RUNTIME_REQUIRE_NAMESET:
++        needed = {"1.jpg","2.jpg","3.jpg","4.jpg","1.jpeg","2.jpeg","3.jpeg","4.jpeg"}
++        if not set(names).issubset(needed) or not all(n.split('.')[0] in {'1','2','3','4'} for n in names):
++            return False
++    return True
++
++def _ext_is_jpeg(name: str) -> bool:
++    return name.lower().endswith((".jpg",".jpeg"))
++
+ class AntiImagePhashRuntime(discord.Cog):
+     """Runtime pHash matcher & autoban."""
+ 
+@@ -60,6 +78,34 @@ class AntiImagePhashRuntime(discord.Cog):
+         if not message.attachments:
+             return
+ 
++        # --- PATCH: Gate autoban to bundle-like posts or MIME-mismatch ---
++        gate_ok = True
++
++        if PHASH_RUNTIME_AUTOBAN_BUNDLE_ONLY:
++            # Allow autoban only if it's the 4-file bundle (optionally require names)
++            gate_ok = _looks_like_bundle(message.attachments)
++
++        # Extra allowance: if any .jpg actually contains WEBP bytes, still allow autoban.
++        # We cheaply sniff only the first few bytes we already download for hashing.
++        try:
++            if not gate_ok:
++                for att in message.attachments:
++                    if _ext_is_jpeg(att.filename):
++                        # Read first 16 bytes only
++                        b = await att.read(use_cached=True)
++                        head = b[:16] if isinstance(b, (bytes, bytearray)) else bytes(b)[:16]
++                        # WEBP magic = "RIFF....WEBP"
++                        if head.startswith(b"RIFF") and b"WEBP" in head[:16]:
++                            gate_ok = True
++                            break
++        except Exception:
++            # If we cannot sniff, keep the current gate_ok
++            pass
++
++        if PHASH_RUNTIME_AUTOBAN_BUNDLE_ONLY and not gate_ok:
++            log.debug("[phash-runtime] skip autoban — not bundle/mismatch: %s", [a.filename for a in message.attachments])
++            # Continue to index/log but do NOT autoban
++            self._autoban_enabled = False
++        else:
++            self._autoban_enabled = True
++
+         # (existing logic that computes pHash and decides…)
+         # The decision method must check self._autoban_enabled before banning.
+         # For example:
+         #
+         #   if match and self._autoban_enabled:
+         #       await self._do_ban(...)
+         #   else:
+         #       await self._log_only(...)
