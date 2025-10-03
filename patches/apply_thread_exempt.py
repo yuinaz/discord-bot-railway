@@ -1,36 +1,29 @@
 #!/usr/bin/env python3
 """
-apply_thread_exempt.py
+apply_thread_exempt_v2.py
 ---------------------------------
-Hotfix patcher to EXEMPT any Thread/Forum messages from *autoban* paths.
-- Safe: idempotent (won't double-insert).
-- No ENV required.
-- Targets any cog that implements `async def on_message(...)` or `async def on_message_edit(...)`.
-- Inserts an early-return guard for discord Threads (and thread channel types).
+Improved inserter that detects the actual parameter name in each handler and uses it in the guard.
+This prevents NameError when the function doesn't use 'message' as the parameter.
+
 Usage:
-    python patches/apply_thread_exempt.py
-    python scripts/smoke_cogs.py   # optional check
-    git add -A && git commit -m "Hotfix: exempt thread/forum from autoban (no-ENV)" && git push
+    python patches/apply_thread_exempt_v2.py
+    python scripts/smoke_cogs.py
 """
-import re
-import sys
-import os
+from __future__ import annotations
+import re, sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COGS_DIR = REPO_ROOT / "satpambot" / "bot" / "modules" / "discord_bot" / "cogs"
-
 GUARD_MARK = "THREAD/FORUM EXEMPTION — auto-inserted"
 
-GUARD_BLOCK_TEMPLATE = """{indent}# {mark}
-{indent}ch = getattr(message, "channel", None)
+GUARD_TEMPLATE = """{indent}# {mark}
+{indent}ch = getattr({var}, "channel", None)
 {indent}if ch is not None:
 {indent}    try:
 {indent}        import discord
-{indent}        # Exempt true Thread objects
 {indent}        if isinstance(ch, getattr(discord, "Thread", tuple())):
 {indent}            return
-{indent}        # Exempt thread-like channel types (public/private/news threads)
 {indent}        ctype = getattr(ch, "type", None)
 {indent}        if ctype in {{
 {indent}            getattr(discord.ChannelType, "public_thread", None),
@@ -39,88 +32,94 @@ GUARD_BLOCK_TEMPLATE = """{indent}# {mark}
 {indent}        }}:
 {indent}            return
 {indent}    except Exception:
-{indent}        # If discord import/type checks fail, do not block normal flow
 {indent}        pass
 """
 
 FUNC_NAMES = ("on_message", "on_message_edit")
 
-def insert_guard_once(content: str, func_name: str) -> tuple[str, bool]:
+def pick_param(func_name: str, args_str: str) -> str:
+    names = []
+    for raw in args_str.split(","):
+        tok = raw.strip()
+        if not tok:
+            continue
+        base = tok.split(":", 1)[0].split("=", 1)[0].strip().lstrip("*")
+        if base in ("self", "cls"):
+            continue
+        if base:
+            names.append(base)
+    if not names:
+        return "message"
+    if func_name == "on_message":
+        for cand in ("message", "msg", "m"):
+            if cand in names:
+                return cand
+        return names[0]
+    if func_name == "on_message_edit":
+        for cand in ("after", "message_after", "new", "updated", "message", "msg", "m"):
+            if cand in names:
+                return cand
+        return names[-1]
+    return names[0]
+
+def insert_guard(content: str, func_name: str) -> tuple[str, bool]:
     if GUARD_MARK in content:
+        # already inserted; skip (v2 is meant for fresh insertions)
         return content, False
 
-    # Match the start of the async handler function and capture the first line's indentation
-    pattern = re.compile(
-        rf"(async\s+def\s+{func_name}\s*\(.*?\):\s*\n)(\s+)",
-        flags=re.S
+    # capture header then body indent
+    pat = re.compile(
+        rf"(async\s+def\s+{func_name}\s*\((?P<args>.*?)\):\s*\n)(?P<indent>\s+)",
+        re.S
     )
-
     def _repl(m: re.Match) -> str:
-        header = m.group(1)  # 'async def ...:\n'
-        indent = m.group(2)  # indentation of first line in function body
-        guard = GUARD_BLOCK_TEMPLATE.format(indent=indent, mark=GUARD_MARK)
-        # Put header back, then the guard, then restore the original indent
+        header = m.group(1)
+        indent = m.group("indent")
+        args_str = m.group("args")
+        var = pick_param(func_name, args_str)
+        guard = GUARD_TEMPLATE.format(indent=indent, var=var, mark=GUARD_MARK)
         return f"{header}{guard}{indent}"
-
-    new_content, n = pattern.subn(_repl, content, count=1)
+    new_content, n = pat.subn(_repl, content, count=1)
     return new_content, (n == 1)
 
 def patch_file(path: Path) -> tuple[bool, list[str]]:
-    changed = False
-    applied_to = []
     try:
-        original = path.read_text(encoding="utf-8")
+        src = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        original = path.read_text(encoding="utf-8", errors="ignore")
-
-    content = original
+        src = path.read_text(encoding="utf-8", errors="ignore")
+    changed = False
+    touched = []
     for fn in FUNC_NAMES:
-        content, did = insert_guard_once(content, fn)
+        src2, did = insert_guard(src, fn)
         if did:
             changed = True
-            applied_to.append(fn)
-
+            touched.append(fn)
+            src = src2
     if changed:
-        path.write_text(content, encoding="utf-8", newline="\n")
-    return changed, applied_to
+        path.write_text(src, encoding="utf-8", newline="\n")
+    return changed, touched
 
 def main() -> int:
     if not COGS_DIR.exists():
-        print(f"[ERROR] COGS directory not found: {COGS_DIR}")
+        print(f"[ERROR] COGS dir not found: {COGS_DIR}")
         return 2
-
-    total_files = 0
-    modified_files = 0
-    changes_detail = []
-
-    # Search broadly: any .py under cogs that likely process messages
-    candidates = list(COGS_DIR.rglob("*.py"))
-    # Prefer cogs that look like guards/antispam/anti-image/phish/autoban
-    def _score(p: Path) -> int:
-        n = p.name.lower()
-        keywords = ["anti", "guard", "ban", "phish", "image", "invite", "nsfw", "link"]
-        return sum(k in n for k in keywords)
-    candidates.sort(key=_score, reverse=True)
-
-    for p in candidates:
+    files = list(COGS_DIR.rglob("*.py"))
+    total = 0
+    mod = 0
+    detail = []
+    for p in files:
         if p.name == "__init__.py":
             continue
-        total_files += 1
-        changed, applied_to = patch_file(p)
-        if changed:
-            modified_files += 1
-            changes_detail.append((p, applied_to))
-
-    print(f"[OK] Scanned {total_files} files in {COGS_DIR}")
-    if modified_files:
-        print(f"[OK] Patched {modified_files} file(s):")
-        for path, funcs in changes_detail:
-            print(f"  - {path.relative_to(REPO_ROOT)}  (inserted guard in: {', '.join(funcs)})")
-        print(f"[TIP] Run: python scripts/smoke_cogs.py")
-        return 0
-    else:
-        print("[INFO] No changes needed (guard already present or no matching handlers).")
-        return 0
+        total += 1
+        ch, touched = patch_file(p)
+        if ch:
+            mod += 1
+            detail.append((p, touched))
+    print(f"[OK] Scanned {total} files in {COGS_DIR}")
+    print(f"[OK] Patched {mod} file(s)")
+    for p, fns in detail:
+        print(f"  - {p.relative_to(REPO_ROOT)} ({', '.join(fns)})")
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
