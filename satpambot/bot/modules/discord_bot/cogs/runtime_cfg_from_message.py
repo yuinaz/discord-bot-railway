@@ -1,27 +1,32 @@
-import asyncio
+from __future__ import annotations
+
 import discord
 from discord.ext import commands
+
 
 class RuntimeCfgFromMessage(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     async def _apply(self):
-        # Panggil helper kalau ada; kalau tidak, no-op (aman)
-        helper = (globals().get('_apply_config_from_message')
-                  or globals().get('_apply'))
-        if callable(helper):
-            try:
-                res = helper(self)
-                if asyncio.iscoroutine(res):
-                    await res
-            except Exception:
-                # Jangan ganggu event loop di prod
-                pass
+        """
+        Panggil helper _apply(self) di level modul kalau ada.
+        Aman untuk fungsi sync/async.
+        """
+        fn = globals().get("_apply")
+        if callable(fn):
+            r = fn(self)
+            if getattr(r, "__await__", None):
+                await r
 
     @commands.Cog.listener()
     async def on_ready(self):
-        await self._apply()
+        # Apply sekali saat boot saja — hindari spam di setiap pesan/edit
+        try:
+            await self._apply()
+        except Exception:
+            # Jangan biarkan error di _apply ngeruntuhin cog
+            pass
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -29,8 +34,10 @@ class RuntimeCfgFromMessage(commands.Cog):
         ch = getattr(message, "channel", None)
         if ch is not None:
             try:
+                # Exempt objek Thread asli
                 if isinstance(ch, getattr(discord, "Thread", tuple())):
                     return
+                # Exempt tipe channel thread-like
                 ctype = getattr(ch, "type", None)
                 if ctype in {
                     getattr(discord.ChannelType, "public_thread", None),
@@ -39,12 +46,15 @@ class RuntimeCfgFromMessage(commands.Cog):
                 }:
                     return
             except Exception:
+                # Kalau import/type check discord gagal, jangan block alur normal
                 pass
-        await self._apply()
+        # SENGAJA tidak memanggil self._apply() di sini — biar tidak spam.
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        await self._apply()
+        # Jangan apply di edit — supaya tidak spam
+        return
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(RuntimeCfgFromMessage(bot))
