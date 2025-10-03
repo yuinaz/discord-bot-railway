@@ -1,0 +1,62 @@
+*** Begin Patch
+*** Update File: satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py
+@@
+-import logging
++import logging
++import asyncio
++import hashlib
++import os
+@@
+-logger = logging.getLogger("phash-runtime")
++logger = logging.getLogger("phash-runtime")
++# Allow overriding log level via ENV (default INFO)
++_lvl = os.getenv("PHASH_RUNTIME_LOG_LEVEL")
++if _lvl:
++    try:
++        logger.setLevel(getattr(logging, _lvl.upper()))
++    except Exception:
++        pass
++
++# Global flag to avoid starting duplicate background tasks
++_GLOBAL_FLAG = "satpambot_phash_rt_started"
+@@
+-    def __init__(self, bot):
+-        self.bot = bot
+-        self.task = self.bot.loop.create_task(self._bootstrap())
++    def __init__(self, bot):
++        self.bot = bot
++        self._lock = asyncio.Lock()
++        self._refresh_task = None
++        self._prev_sig = None  # signature of last loaded db
++        # start once per process
++        if not getattr(bot, _GLOBAL_FLAG, False):
++            setattr(bot, _GLOBAL_FLAG, True)
++            self._refresh_task = self.bot.loop.create_task(self._bootstrap())
++        else:
++            logger.debug("bootstrap skipped (already started)")
+@@
+-    def cog_unload(self):
+-        if self.task:
+-            self.task.cancel()
++    def cog_unload(self):
++        if getattr(self, "_refresh_task", None) and not self._refresh_task.done():
++            self._refresh_task.cancel()
++        setattr(self.bot, _GLOBAL_FLAG, False)
+@@
+-    async def _refresh_from_discord(self):
+-        entries = await self._fetch_entries()
+-        logger.info("pHash DB loaded from Discord: %d entries (src: #%s)", len(entries), self.src_name)
++    async def _refresh_from_discord(self):
++        async with self._lock:
++            entries = await self._fetch_entries()
++            # De-duplicate logs: compute a stable signature of the DB content
++            try:
++                sig = hashlib.sha1("".join(sorted(entries)).encode("utf-8")).hexdigest()
++            except Exception:
++                sig = None
++            if sig and sig == getattr(self, "_prev_sig", None):
++                logger.debug("pHash DB unchanged (%d entries) — suppress log.", len(entries))
++                return
++            self._prev_sig = sig
++            logger.info("pHash DB loaded from Discord: %d entries (src: #%s)", len(entries), self.src_name)
+*** End Patch
