@@ -1,100 +1,107 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import re
 from pathlib import Path
 
-TARGET = Path('satpambot/bot/modules/discord_bot/cogs/runtime_cfg_from_message.py')
+MARK = 'THREAD/FORUM EXEMPTION — auto-inserted'
+FILE = Path('satpambot/bot/modules/discord_bot/cogs/runtime_cfg_from_message.py')
 
-def read(path: Path) -> str:
-    return path.read_text(encoding='utf-8')
 
-def write(path: Path, s: str) -> None:
-    path.write_text(s, encoding='utf-8', newline='\n')
+def _find_func_block(src: str, name: str):
+    m = re.search(rf'^([ \t]*)async\s+def\s+{name}\s*\([^)]*\):\s*\n', src, flags=re.M)
+    if not m:
+        return None
+    base_indent = m.group(1)
+    start = m.end()
 
-def cleanup_noise(s: str) -> str:
-    # Remove standalone 'low' lines or obvious duplicates from accidental merges
-    lines = s.splitlines(True)
-    out = []
-    for ln in lines:
-        if ln.strip() == "low":
-            continue
-        out.append(ln)
-    return "".join(out)
+    # Determine body indent from first non-empty line
+    m2 = re.search(r'^(?P<i>[ \t]+)\S', src[start:], flags=re.M)
+    if not m2:
+        return start, start
+    body_indent = m2.group('i')
 
-def fix_guard_for_func(s: str, func_name: str, want_var: str) -> tuple[str, bool]:
-    \"\"\"
-    Find function 'func_name', then find the first guard marker line in its body.
-    Within the next ~100 lines at the same indent (guard window), rewrite any
-    getattr(<ident>, "channel", ...) to getattr(want_var, "channel", ...)
-    \"\"\"
-    changed = False
-    # iterate over all functions named func_name (safety)
-    func_pat = re.compile(rf'^([ \t]*)async\s+def\s+{func_name}\s*\([^)]*\):\s*\r?\n', re.M)
+    # Find end of this function by dedent
+    rel = src[start:]
     pos = 0
-    while True:
-        m = func_pat.search(s, pos)
-        if not m:
+    end = start + len(rel)
+    for ln in rel.splitlines(True):
+        if ln.strip() and not ln.startswith(body_indent):
+            end = start + pos
             break
-        base_indent = m.group(1)
-        fn_start = m.end()
-        # function end: until next def/class at same or less indent
-        tail = s[fn_start:]
-        end_pat = re.compile(rf'^(?:{base_indent}@|\s*async\s+def|\s*class)\b', re.M)
-        m_end = end_pat.search(tail)
-        fn_end = fn_start + (m_end.start() if m_end else len(s) - fn_start)
-        body = s[fn_start:fn_end]
+        pos += len(ln)
+    return start, end
 
-        # find guard marker
-        mark_pat = re.compile(r'^([ \t]+)# THREAD/FORUM EXEMPTION — auto-inserted\s*$', re.M)
-        mm = mark_pat.search(body)
-        if not mm:
-            pos = fn_end
-            continue  # nothing to fix in this func
 
-        indent = mm.group(1)
-        after = body[mm.end():]
-        # Build guard window (max 100 lines, stop when dedent out of indent)
-        lines = after.splitlines(True)
-        win_len = 0
-        kept = []
-        for ln in lines:
-            if ln.strip() and not ln.startswith(indent):
-                break
-            kept.append(ln)
-            win_len += len(ln)
-            if len(kept) >= 100:
-                break
-        win = "".join(kept)
-        # Rewrite any getattr(<ident>, "channel" ...) to want_var
-        new_win = re.sub(
-            r'getattr\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*\"channel\"',
-            f'getattr({want_var}, "channel"',
-            win
+def _rewrite_guard_var(body: str, want: str) -> tuple[str, bool]:
+    # Locate the marker line (same indent tracked)
+    m = re.search(rf'^([ \t]+)# {re.escape(MARK)}\s*$', body, flags=re.M)
+    if not m:
+        return body, False
+    ind = m.group(1)
+
+    lines = body.splitlines(True)
+    # Find start index (first line *after* marker)
+    start_idx = None
+    for i, ln in enumerate(lines):
+        if re.match(rf'^{re.escape(ind)}# {re.escape(MARK)}\s*$', ln):
+            start_idx = i + 1
+            break
+    if start_idx is None:
+        return body, False
+
+    # Guard block ends when we dedent (line not starting with same indent)
+    end_idx = len(lines)
+    for j in range(start_idx, len(lines)):
+        ln = lines[j]
+        if ln.strip() and not ln.startswith(ind):
+            end_idx = j
+            break
+
+    changed = False
+    for j in range(start_idx, end_idx):
+        old = lines[j]
+        lines[j] = re.sub(
+            r'getattr\(\s*\w+\s*,\s*"channel"',
+            f'getattr({want}, "channel"',
+            lines[j],
         )
-        if new_win != win:
+        if lines[j] != old:
             changed = True
-            # stitch back
-            new_body = body[:mm.end()] + new_win + body[mm.end()+len(win):]
-            s = s[:fn_start] + new_body + s[fn_end:]
-            # update slicing positions based on delta
-            delta = len(new_body) - len(body)
-            fn_end += delta
 
-        pos = fn_end
+    return ''.join(lines), changed
 
-    return s, changed
 
-def main():
-    s = read(TARGET)
-    orig = s
-    s = cleanup_noise(s)
-    s, a = fix_guard_for_func(s, 'on_message', 'message')
-    s, b = fix_guard_for_func(s, 'on_message_edit', 'after')
+def main() -> int:
+    if not FILE.exists():
+        print('[WARN] target file not found')
+        return 0
 
-    if s != orig:
-        write(TARGET, s)
-        print(f"Updated {TARGET} (on_message fixed={a}, on_message_edit fixed={b})")
+    src = FILE.read_text(encoding='utf-8', errors='ignore')
+
+    any_change = False
+    for name, want in (('on_message', 'message'), ('on_message_edit', 'after')):
+        rng = _find_func_block(src, name)
+        if not rng:
+            print(f'[WARN] {name} not found')
+            continue
+        start, end = rng
+        body = src[start:end]
+        new_body, changed = _rewrite_guard_var(body, want)
+        if changed:
+            any_change = True
+            src = src[:start] + new_body + src[end:]
+            print(f'[OK] updated guard var in {name} -> {want}')
+        else:
+            print(f'[OK] no change needed in {name}')
+
+    if any_change:
+        FILE.write_text(src, encoding='utf-8', newline='\n')
+        print('[OK] file updated')
     else:
-        print("No changes needed.")
+        print('[OK] nothing to update')
+    return 0
 
-if __name__ == "__main__":
-    main()
+
+if __name__ == '__main__':
+    raise SystemExit(main())
