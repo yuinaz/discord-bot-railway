@@ -1,83 +1,97 @@
-\
-#!/usr/bin/env python3
-# apply_no_dev_server_guard.py
-from __future__ import annotations
-"""
-In-place guard: wrap Flask dev-server `app.run(...)` calls so they only run
-when RUN_LOCAL_DEV=1 (for local development). In production (Render Free Plan)
-these lines are skipped, preventing port conflicts and duplicate servers.
-"""
-import os, re, pathlib
+# patches/apply_no_dev_server_guard.py
+from pathlib import Path
+import re
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]  # repo root (assumes this file in /patches)
+ROOT = Path(__file__).resolve().parents[1]
+FILES = [
+    ROOT / "satpambot" / "dashboard" / "app_dashboard.py",
+    ROOT / "satpambot" / "helpers" / "web_safe_start.py",
+]
 
-def patch_app_dashboard(p: pathlib.Path) -> bool:
-    s = p.read_text(encoding="utf-8")
-    if 'RUN_LOCAL_DEV' in s and 'app.run(' in s and '__name__' in s:
-        return False
-    pat = re.compile(r'^(?P<ind>[ \\t]*)app\\.run\\(\\s*host\\s*=\\s*"0\\.0\\.0\\.0"\\s*,\\s*port\\s*=\\s*_satp_port\\s*,\\s*debug\\s*=\\s*False\\s*\\)\\s*$', re.M)
-    m = pat.search(s)
-    if not m:
-        return False
-    ind = m.group('ind')
-    repl = (
-        f'{ind}# Hanya jalankan Flask dev server saat LOCAL DEV.\\n'
-        f'{ind}import os\\n'
-        f'{ind}if os.getenv("RUN_LOCAL_DEV", "0") == "1" and __name__ == "__main__":\\n'
-        f'{ind}    app.run(host="0.0.0.0", port=_satp_port, debug=False)\\n'
-    )
-    s = s[:m.start()] + repl + s[m.end():]
-    p.write_text(s, encoding="utf-8", newline="\\n")
-    return True
+def ensure_import(src: str, mod: str) -> str:
+    # sisipkan "import <mod>" kalau belum ada
+    if re.search(rf'^\s*import\s+{re.escape(mod)}\b', src, re.M):
+        return src
+    # taruh setelah future/encoding/header imports
+    lines = src.splitlines(True)
+    insert_at = 0
+    while insert_at < len(lines) and (
+        lines[insert_at].lstrip().startswith("#!") or
+        lines[insert_at].lstrip().startswith("# -*-") or
+        lines[insert_at].lstrip().startswith("from __future__")
+    ):
+        insert_at += 1
+    # Lewati block import yang sudah ada
+    while insert_at < len(lines) and lines[insert_at].strip().startswith(("import ", "from ")):
+        insert_at += 1
+    lines.insert(insert_at, f"import {mod}\n")
+    return "".join(lines)
 
-def patch_web_safe_start(p: pathlib.Path) -> bool:
-    s = p.read_text(encoding="utf-8")
-    if 'RUN_LOCAL_DEV' in s and 'skip app.run(); prod web server handled by main.py.' in s:
-        return False
-    if 'import logging' not in s:
-        s = s.replace('import os', 'import os, logging') if 'import os' in s else 'import os, logging\\n' + s
-    pat = re.compile(r'^(?P<ind>[ \\t]*)app\\.run\\(\\s*host\\s*=\\s*host\\s*,\\s*port\\s*=\\s*port\\s*,\\s*use_reloader\\s*=\\s*False\\s*\\)\\s*$', re.M)
-    m = pat.search(s)
-    if not m:
-        return False
-    ind = m.group('ind')
-    repl = (
-        f'{ind}if os.getenv("RUN_LOCAL_DEV", "0") == "1":\\n'
-        f'{ind}    app.run(host=host, port=port, use_reloader=False)\\n'
-        f'{ind}else:\\n'
-        f'{ind}    logging.getLogger(__name__).info(\\n'
-        f'{ind}        "[web-safe-start] RUN_LOCAL_DEV!=1 -> skip app.run(); prod web server handled by main.py."\\n'
-        f'{ind}    )\\n'
-    )
-    s = s[:m.start()] + repl + s[m.end():]
-    p.write_text(s, encoding="utf-8", newline="\\n")
-    return True
+def guard_single_line_app_run(src: str, with_else_log: bool=False) -> str:
+    """
+    Bungkus baris `app.run(...)` satu baris dengan:
+        if os.getenv("RUN_LOCAL_DEV","0") == "1":
+            app.run(...)
+    Jika with_else_log=True, tambahkan else dengan log info.
+    """
+    # kalau sudah pernah diguard, lewati
+    if "RUN_LOCAL_DEV" in src and "app.run(" in src:
+        return src
 
-def main() -> int:
-    repo = ROOT
-    a = repo / "satpambot" / "dashboard" / "app_dashboard.py"
-    b = repo / "satpambot" / "helpers" / "web_safe_start.py"
-
-    changed = False
-    if a.exists():
-        if patch_app_dashboard(a):
-            print(f"[OK] patched: {a}")
-            changed = True
+    pat = re.compile(r'^(?P<ind>[ \t]*)app\.run\((?P<args>[^()\n]*(?:\([^()\n]*\)[^()\n]*)*)\)\s*$',
+                     re.M)
+    def repl(m):
+        ind = m.group("ind")
+        args = m.group("args")
+        if with_else_log:
+            return (
+                f'{ind}if os.getenv("RUN_LOCAL_DEV", "0") == "1":\n'
+                f'{ind}    app.run({args})\n'
+                f'{ind}else:\n'
+                f'{ind}    import logging\n'
+                f'{ind}    logging.getLogger(__name__).info('
+                f'"[web-safe-start] RUN_LOCAL_DEV!=1 -> skip dev server (handled by main.py)")'
+            )
         else:
-            print(f"[SKIP] nothing to patch or already patched: {a}")
+            return (
+                f'{ind}if os.getenv("RUN_LOCAL_DEV", "0") == "1":\n'
+                f'{ind}    app.run({args})'
+            )
+
+    new_src, n = pat.subn(repl, src, count=1)
+    return new_src if n else src
+
+def patch_file(p: Path) -> bool:
+    if not p.exists():
+        print(f"[SKIP] missing: {p}")
+        return False
+    s = p.read_text(encoding="utf-8")
+    orig = s
+
+    s = ensure_import(s, "os")
+
+    # app_dashboard.py -> guard sederhana tanpa else
+    if p.name == "app_dashboard.py":
+        s = guard_single_line_app_run(s, with_else_log=False)
+
+    # web_safe_start.py -> guard + else log (biar jelas di prod)
+    elif p.name == "web_safe_start.py":
+        s = guard_single_line_app_run(s, with_else_log=True)
+
+    if s != orig:
+        p.write_text(s, encoding="utf-8", newline="\n")
+        print(f"[OK] Patched: {p}")
+        return True
     else:
-        print(f"[MISS] not found: {a}")
-    if b.exists():
-        if patch_web_safe_start(b):
-            print(f"[OK] patched: {b}")
-            changed = True
-        else:
-            print(f"[SKIP] nothing to patch or already patched: {b}")
-    else:
-        print(f"[MISS] not found: {b}")
-    if not changed:
-        print("[NOTE] No changes were made.")
-    return 0
+        print(f"[OK] Already safe: {p}")
+        return False
+
+def main():
+    any_change = False
+    for f in FILES:
+        any_change |= patch_file(f)
+    if not any_change:
+        print("[OK] Tidak ada perubahan (sudah aman).")
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

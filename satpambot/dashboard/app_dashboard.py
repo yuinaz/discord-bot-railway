@@ -170,7 +170,8 @@ except NameError:
 if __name__ == "__main__":
     try:
         _satp_port = int(_satp_os.getenv("PORT", "10000"))
-        app.run(host="0.0.0.0", port=_satp_port, debug=False)
+        if os.getenv("RUN_LOCAL_DEV", "0") == "1":
+            app.run(host="0.0.0.0", port=_satp_port, debug=False)
     except Exception:
         pass
 # === END PATCH ===
