@@ -1,5 +1,10 @@
 
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
+import os
+import time
+
 """
 AntiImagePhashRuntime (STRICT)
 --------------------------------
@@ -19,7 +24,6 @@ File ini TIDAK menghapus file/konfigurasi lain; cukup tambahkan sebagai cog baru
 Kalau sudah puas, Anda bisa mengganti cog lama "anti_image_phash_runtime" dengan ini.
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
@@ -27,6 +31,36 @@ from typing import Iterable, Optional, Set, Tuple
 
 import discord
 from discord.ext import commands, tasks
+# DAILY LIMIT GLOBALS — auto-inserted
+import time, os
+
+# === pHash daily gate helper (auto-inserted) ===
+try:
+    _PHASH_REFRESH_SECONDS
+except NameError:
+    import os
+_PHASH_REFRESH_SECONDS = int(os.getenv("PHASH_REFRESH_SECONDS", "86400"))  # default: 24 jam
+
+try:
+    _PHASH_LAST
+except NameError:
+    _PHASH_LAST = {}
+
+def _phash_daily_gate(guild_id: int):
+    try:
+        import time
+        now = time.time()
+    except Exception:
+        return True  # fallback: jangan blok
+    last = _PHASH_LAST.get(guild_id, 0.0)
+    if now - last < _PHASH_REFRESH_SECONDS:
+        return False
+    _PHASH_LAST[guild_id] = now
+    return True
+# === end helper ===
+
+_PHASH_LAST_REFRESH: dict[int, float] = {}
+
 
 # === KONFIGURASI ===
 THRESHOLD = 5                 # Hamming distance maksimum agar dianggap match

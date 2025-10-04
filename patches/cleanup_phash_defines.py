@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""
+cleanup_phash_defines.py
+- Deduplicate `_PHASH_REFRESH_SECONDS = int(os.getenv("PHASH_REFRESH_SECONDS", "86400"))`
+  so each target file has it defined exactly once.
+- Ensure `import os` and `import time` exist.
+- Idempotent: safe to run multiple times.
+
+USAGE:
+  python patches/cleanup_phash_defines.py
+"""
+
+from __future__ import annotations
+import re
+from pathlib import Path
+
+TARGETS = [
+    "satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py",
+    "satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime_strict.py",
+]
+
+DEFINE_RE = re.compile(
+    r'^\s*_PHASH_REFRESH_SECONDS\s*=\s*int\(\s*os\.getenv\(\s*"PHASH_REFRESH_SECONDS"\s*,\s*"[0-9]+"\s*\)\s*\)\s*(?:#.*)?$'
+)
+
+IMPORT_OS_RE   = re.compile(r'^\s*import\s+os\b')
+IMPORT_TIME_RE = re.compile(r'^\s*import\s+time\b')
+
+CANON_LINE = '_PHASH_REFRESH_SECONDS = int(os.getenv("PHASH_REFRESH_SECONDS", "86400"))  # default: 24 jam'
+
+def dedupe_defines(text: str) -> tuple[str, bool]:
+    lines = text.splitlines()
+    seen = False
+    changed = False
+    new_lines = []
+    for ln in lines:
+        if DEFINE_RE.match(ln):
+            if not seen:
+                seen = True
+                new_lines.append(CANON_LINE)
+                if ln != CANON_LINE:
+                    changed = True
+            else:
+                # drop duplicate
+                changed = True
+                continue
+        else:
+            new_lines.append(ln)
+    return ("\n".join(new_lines) + ("\n" if text.endswith("\n") else "")), changed
+
+def ensure_imports(text: str) -> tuple[str, bool]:
+    # Insert missing imports after the first block of imports (or at top if none)
+    has_os = bool(IMPORT_OS_RE.search(text))
+    has_time = bool(IMPORT_TIME_RE.search(text))
+    if has_os and has_time:
+        return text, False
+    lines = text.splitlines()
+    # find top import block end
+    idx = 0
+    while idx < len(lines) and (lines[idx].startswith("from ") or lines[idx].startswith("import ") or lines[idx].strip()=="" or lines[idx].startswith("#")):
+        idx += 1
+    ins = []
+    if not has_os:
+        ins.append("import os")
+    if not has_time:
+        ins.append("import time")
+    if ins:
+        lines[idx:idx] = ins + [""]
+        return ("\n".join(lines) + ("\n" if text.endswith("\n") else "")), True
+    return text, False
+
+def main() -> int:
+    root = Path(".").resolve()
+    any_changed = False
+    for rel in TARGETS:
+        p = (root / rel)
+        if not p.exists():
+            print(f"[SKIP] {rel} (not found)")
+            continue
+        src = p.read_text(encoding="utf-8")
+        before = src
+
+        src, ch1 = ensure_imports(src)
+        src, ch2 = dedupe_defines(src)
+
+        if src != before:
+            p.write_text(src, encoding="utf-8", newline="\n")
+            print(f"[OK] Cleaned: {rel}")
+            any_changed = True
+        else:
+            print(f"[OK] No change: {rel}")
+    if not any_changed:
+        print("[DONE] Nothing to clean.")
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
