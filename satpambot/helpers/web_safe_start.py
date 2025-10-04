@@ -35,7 +35,11 @@ def run_web_safely(app, host: str = "0.0.0.0", port: Optional[int] = None, max_w
     while True:
         try:
             # Werkzeug/Flask dev server
-            app.run(host=host, port=port, use_reloader=False)
+            if os.getenv("RUN_LOCAL_DEV", "0") == "1":
+                app.run(host=host, port=port, use_reloader=False)
+            else:
+                import logging
+                logging.getLogger(__name__).info("[web-safe-start] RUN_LOCAL_DEV!=1 -> skip dev server (handled by main.py)")
             break
         except OSError as e:
             if getattr(e, "errno", None) in (errno.EADDRINUSE, 98, 10048):
