@@ -10,6 +10,39 @@ from typing import Any, Iterable, List, Optional, Set
 
 import discord
 from discord.ext import commands, tasks
+# DAILY LIMIT GLOBALS — auto-inserted
+import time, os
+
+# === pHash daily gate helper (auto-inserted) ===
+import os
+import time
+
+try:
+    _PHASH_REFRESH_SECONDS
+except NameError:
+    import os
+_PHASH_REFRESH_SECONDS = int(os.getenv("PHASH_REFRESH_SECONDS", "86400"))  # default: 24 jam
+
+try:
+    _PHASH_LAST
+except NameError:
+    _PHASH_LAST = {}
+
+def _phash_daily_gate(guild_id: int):
+    try:
+        import time
+        now = time.time()
+    except Exception:
+        return True  # fallback: jangan blok
+    last = _PHASH_LAST.get(guild_id, 0.0)
+    if now - last < _PHASH_REFRESH_SECONDS:
+        return False
+    _PHASH_LAST[guild_id] = now
+    return True
+# === end helper ===
+
+_PHASH_LAST_REFRESH: dict[int, float] = {}
+
 
 # Optional deps
 try:
@@ -217,7 +250,16 @@ class AntiImagePhashRuntime(commands.Cog):
         except Exception:
             return None
 
-    async def _reload_from_discord(self):
+    async def _reload_from_discord(self):        # DAILY LIMIT — auto-inserted
+        # Batasi reload pHash: maksimal sekali setiap _PHASH_REFRESH_SECONDS per guild
+        gid = int(getattr(locals().get('guild', None), 'id', 0) or 0)
+        if gid:
+            last = _PHASH_LAST_REFRESH.get(gid, 0.0)
+            now = time.time()
+            if now - last < _PHASH_REFRESH_SECONDS:
+                return  # sudah refresh baru-baru ini — skip untuk cegah spam/log
+            _PHASH_LAST_REFRESH[gid] = now
+
         for guild in self.bot.guilds:
             try:
                 threads = await self._candidate_threads(guild)
@@ -235,6 +277,13 @@ class AntiImagePhashRuntime(commands.Cog):
                     hashes = _norm_hashes(obj)
                     if hashes:
                         self.db_hashes = hashes
+                        # pHash daily gate (auto-inserted)
+                        try:
+                            gid = int(getattr(guild, 'id', getattr(getattr(locals().get('msg', None), 'guild', None), 'id', 0)) or 0)
+                        except Exception:
+                            gid = 0
+                        if not _phash_daily_gate(gid):
+                            return
                         await self._log(guild, f"♻️ pHash DB loaded from Discord: {len(hashes)} entries (src: #{getattr(msg.channel,'name','?')})")
                         if PHASH_STORE_FILE:
                             try:
