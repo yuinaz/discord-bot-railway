@@ -1,91 +1,59 @@
 #!/usr/bin/env python3
-"""
-Fix anti_image_phash_runtime_strict.py so it has:
-- imports: os, time
-- a single `_PHASH_REFRESH_SECONDS` definition (default 86400)
-- a module-level `_last_phash_refresh` dict
-- a `_phash_daily_gate(guild_id:int)` helper
-
-This does NOT change logic elsewhere (no log injection). Idempotent.
-"""
 from __future__ import annotations
+
 import re
 from pathlib import Path
 
-TARGET = Path("satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime_strict.py")
+TARGET = Path('satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime_strict.py')
 
-HEADER_BLOCK = (
-    "import os\n"
-    "import time\n\n"
-    "# pHash daily refresh window (env override-able)\n"
-    "_PHASH_REFRESH_SECONDS = int(os.getenv(\"PHASH_REFRESH_SECONDS\", \"86400\"))  # default: 24 jam\n"
-    "_last_phash_refresh: dict[int, float] = {}\n"
-    "def _phash_daily_gate(guild_id: int) -> bool:\n"
-    "    \"\"\"Return True if a refresh is allowed for this guild, at most once per _PHASH_REFRESH_SECONDS.\"\"\"\n"
-    "    try:\n"
-    "        now = time.time()\n"
-    "    except Exception:\n"
-    "        return True  # if time fails, never block\n"
-    "    last = _last_phash_refresh.get(int(guild_id), 0.0)\n"
-    "    if now - last < _PHASH_REFRESH_SECONDS:\n"
-    "        return False\n"
-    "    _last_phash_refresh[int(guild_id)] = now\n"
-    "    return True\n"
-)
 
-def ensure_header_bits(src: str) -> str:
-    # 1) Ensure `import os` and `import time`
-    lines = src.splitlines(True)
-    insert_at = 0
+def _insert_future_after_preamble(text: str) -> str:
+    """
+    Ensure a single `from __future__ import annotations` exists right after the
+    (optional) module docstring and/or encoding line. Remove duplicates elsewhere.
+    """
+    # Drop every occurrence first
+    text_wo_future, _ = re.subn(
+        r'^\s*from\s+__future__\s+import\s+annotations\s*\n',
+        '',
+        text,
+        flags=re.M,
+    )
 
-    # Skip shebang at very top
-    if insert_at < len(lines) and lines[insert_at].lstrip().startswith("#!"):
-        insert_at += 1
-    # Skip encoding
-    if insert_at < len(lines) and "coding" in lines[insert_at]:
-        insert_at += 1
-    # Skip leading triple-double-quote docstring if present
-    if insert_at < len(lines) and lines[insert_at].lstrip().startswith(\"\"\"\"):
-        quote = \"\"\"\"
-        insert_at += 1
-        while insert_at < len(lines):
-            if lines[insert_at].rstrip().endswith(quote):
-                insert_at += 1
-                break
-            insert_at += 1
+    pos = 0
+    # Shebang at very top
+    m = re.match(r'^#!.*\n', text_wo_future)
+    if m:
+        pos = m.end()
 
-    # Remove any existing conflicting definitions to avoid duplicates
-    src = re.sub(r'(?m)^\s*_PHASH_REFRESH_SECONDS\s*=.*\n', '', src)
-    src = re.sub(r'(?ms)^\s*_last_phash_refresh\s*:\s*dict\[int,\s*float\]\s*=\s*\{\}\s*\n', '', src)
-    src = re.sub(r'(?ms)^\s*def\s+_phash_daily_gate\s*\(\s*guild_id\s*:\s*int\s*\)\s*->\s*bool\s*:\s*.*?\n(?=^\S|\Z)', '', src)
+    # Encoding comment (PEP 263) — allowed before docstring
+    m = re.match(r'^[ \t]*#.*coding[:=]\s*[-\w.]+\s*\n', text_wo_future[pos:])
+    if m:
+        pos += m.end()
 
-    # Ensure import os/time exist somewhere; we'll add in header block anyway, then dedupe
-    new_src = "".join(lines[:insert_at]) + HEADER_BLOCK + "\n\n" + "".join(lines[insert_at:])
+    # Optional top-level docstring
+    m = re.match(r'^[ \t]*([\'"]{3})(?:.|\n)*?\1\s*\n', text_wo_future[pos:])
+    if m:
+        pos += m.end()
 
-    # De-duplicate simple duplicate import lines
-    seen = set()
-    deduped_lines = []
-    for ln in new_src.splitlines(True):
-        if ln.strip() in ("import os", "import time"):
-            key = ln.strip()
-            if key in seen:
-                continue
-            seen.add(key)
-        deduped_lines.append(ln)
-    return "".join(deduped_lines)
+    return text_wo_future[:pos] + 'from __future__ import annotations\n' + text_wo_future[pos:]
 
-def main():
+
+def main() -> int:
     if not TARGET.exists():
-        print(f"[ERROR] File not found: {TARGET}")
-        return 2
-    src = TARGET.read_text(encoding="utf-8")
-    new_src = ensure_header_bits(src)
-    if new_src != src:
-        TARGET.write_text(new_src, encoding="utf-8", newline="\n")
-        print(f"[OK] Patched: {TARGET.as_posix()}")
+        print(f'[WARN] target not found: {TARGET}')
+        return 0
+
+    src = TARGET.read_text(encoding='utf-8', errors='ignore')
+    fixed = _insert_future_after_preamble(src)
+
+    if fixed != src:
+        TARGET.write_text(fixed, encoding='utf-8', newline='\n')
+        print(f'[OK] fixed __future__ import position in: {TARGET}')
     else:
-        print("[OK] No change needed (already OK).")
+        print(f'[OK] no changes needed: {TARGET}')
     return 0
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     raise SystemExit(main())
