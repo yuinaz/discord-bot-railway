@@ -1,150 +1,1202 @@
-import asyncio, json, os, time, logging
-from typing import Optional, List
+import asyncio
+import json
+import logging
+import os
+import time
+from typing import List, Optional
+
 import discord
 from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 TAG = "[satpambot:auto_prune_state]"
+
+
+
+
+
+
+
 DEFAULT_THREAD_NAME = "log restart github"
+
+
+
+
+
+
+
 CONFIG_REMOTE_WATCH = "config/remote_watch.json"
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def _load_thread_name() -> str:
+
+
+
+
+
+
+
     try:
+
+
+
+
+
+
+
         with open(CONFIG_REMOTE_WATCH, "r", encoding="utf-8") as f:
+
+
+
+
+
+
+
             data = json.load(f)
+
+
+
+
+
+
+
         name = (data or {}).get("notify_thread_name")
+
+
+
+
+
+
+
         if isinstance(name, str) and name.strip():
+
+
+
+
+
+
+
             return name.strip()
+
+
+
+
+
+
+
     except Exception:
+
+
+
+
+
+
+
         pass
+
+
+
+
+
+
+
     return DEFAULT_THREAD_NAME
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class AutoPruneEditMode(commands.Cog):
+
+
+
+
+
+
+
     """Keep a single auto_prune_state message by editing in place; no import-time tasks."""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def __init__(self, bot: commands.Bot):
+
+
+
+
+
+
+
         self.bot = bot
+
+
+
+
+
+
+
         self.thread_name = _load_thread_name()
+
+
+
+
+
+
+
         self._task = None
+
+
+
+
+
+
+
         self._started = False
+
+
+
+
+
+
+
         log.info("[auto_prune_edit_mode] init; thread_name=%r", self.thread_name)
+
+
+
+
+
+
+
         # Do NOT start background tasks here; smoketest imports cogs without a running loop.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def cog_load(self):
+
+
+
+
+
+
+
         # Called by discord.py when the cog is fully loaded.
+
+
+
+
+
+
+
         self._maybe_start()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     @commands.Cog.listener()
+
+
+
+
+
+
+
     async def on_ready(self):
+
+
+
+
+
+
+
         # Ensure started when bot becomes ready.
+
+
+
+
+
+
+
         self._maybe_start()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def _maybe_start(self):
+
+
+
+
+
+
+
         if self._started:
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             loop = asyncio.get_running_loop()
+
+
+
+
+
+
+
         except RuntimeError:
+
+
+
+
+
+
+
             # No running loop; defer.
+
+
+
+
+
+
+
             log.info("[auto_prune_edit_mode] no running loop yet; deferred start")
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
         if not loop.is_running():
+
+
+
+
+
+
+
             log.info("[auto_prune_edit_mode] loop not running; deferred start")
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
         self._task = loop.create_task(self._runner(), name="auto_prune_edit_mode_runner")
+
+
+
+
+
+
+
         self._started = True
+
+
+
+
+
+
+
         log.info("[auto_prune_edit_mode] background task started")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def _runner(self):
+
+
+
+
+
+
+
         await self.bot.wait_until_ready()
+
+
+
+
+
+
+
         # Run twice to avoid races.
+
+
+
+
+
+
+
         await self._ensure_singleton_message()
+
+
+
+
+
+
+
         await asyncio.sleep(15)
+
+
+
+
+
+
+
         await self._ensure_singleton_message()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     async def _get_log_channel(self) -> Optional[discord.TextChannel]:
+
+
+
+
+
+
+
         channel_id_raw = os.getenv("LOG_CHANNEL_ID") or os.getenv("LOG_CHANNEL") or ""
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             cid = int(channel_id_raw)
+
+
+
+
+
+
+
         except Exception:
+
+
+
+
+
+
+
             cid = 0
+
+
+
+
+
+
+
         if not cid:
+
+
+
+
+
+
+
             log.warning("[auto_prune_edit_mode] LOG_CHANNEL_ID is not set")
+
+
+
+
+
+
+
             return None
+
+
+
+
+
+
+
         ch = self.bot.get_channel(cid)
+
+
+
+
+
+
+
         if ch is None:
+
+
+
+
+
+
+
             try:
+
+
+
+
+
+
+
                 ch = await self.bot.fetch_channel(cid)
+
+
+
+
+
+
+
             except Exception:
+
+
+
+
+
+
+
                 ch = None
+
+
+
+
+
+
+
         if not isinstance(ch, discord.TextChannel):
+
+
+
+
+
+
+
             log.warning("[auto_prune_edit_mode] channel id=%s not a TextChannel", cid)
+
+
+
+
+
+
+
             return None
+
+
+
+
+
+
+
         return ch
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def _get_or_create_thread(self, ch: discord.TextChannel) -> Optional[discord.Thread]:
+
+
+
+
+
+
+
         # Try to find existing thread by name in active threads
+
+
+
+
+
+
+
         for th in ch.threads:
+
+
+
+
+
+
+
             if (th.name or "").strip().lower() == self.thread_name.lower():
+
+
+
+
+
+
+
                 return th
+
+
+
+
+
+
+
         # Search archived threads (best-effort; may raise without perms)
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             async for th in ch.archived_threads(limit=50):
+
+
+
+
+
+
+
                 if (th.name or "").strip().lower() == self.thread_name.lower():
+
+
+
+
+
+
+
                     return th
+
+
+
+
+
+
+
         except Exception:
+
+
+
+
+
+
+
             pass
+
+
+
+
+
+
+
         # Create thread
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             th = await ch.create_thread(name=self.thread_name, type=discord.ChannelType.public_thread)
+
+
+
+
+
+
+
             return th
+
+
+
+
+
+
+
         except Exception as e:
+
+
+
+
+
+
+
             log.warning("[auto_prune_edit_mode] cannot create thread %r in #%s: %s", self.thread_name, ch, e)
+
+
+
+
+
+
+
             return None
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def _ensure_singleton_message(self):
+
+
+
+
+
+
+
         ch = await self._get_log_channel()
+
+
+
+
+
+
+
         if not ch:
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
         th = await self._get_or_create_thread(ch)
+
+
+
+
+
+
+
         if not th:
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         matches: List[discord.Message] = []
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             async for m in th.history(limit=100):
+
+
+
+
+
+
+
                 if m.author.id == self.bot.user.id and isinstance(m.content, str) and m.content.startswith(TAG):
+
+
+
+
+
+
+
                     matches.append(m)
+
+
+
+
+
+
+
         except Exception as e:
+
+
+
+
+
+
+
             log.warning("[auto_prune_edit_mode] history fetch failed: %s", e)
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         now_payload = json.dumps({"deploy_epoch": time.time()})
+
+
+
+
+
+
+
         new_content = f"{TAG} {now_payload}"
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         if not matches:
+
+
+
+
+
+
+
             try:
+
+
+
+
+
+
+
                 await th.send(new_content)
+
+
+
+
+
+
+
                 log.info("[auto_prune_edit_mode] posted first %s", TAG)
+
+
+
+
+
+
+
             except Exception as e:
+
+
+
+
+
+
+
                 log.warning("[auto_prune_edit_mode] send failed: %s", e)
+
+
+
+
+
+
+
             return
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         # Keep newest, delete old
-        matches.sort(key=lambda m: m.created_at, reverse=True)
+
+
+
+
+
+
+
+        matches.sort(key=lambda m: m.created_at, reverse=True)  # noqa: E731
+
+
+
+
+
+
+
         keeper = matches[0]
+
+
+
+
+
+
+
         to_delete = matches[1:]
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             if keeper.content != new_content:
+
+
+
+
+
+
+
                 await keeper.edit(content=new_content)
+
+
+
+
+
+
+
                 log.info("[auto_prune_edit_mode] edited keeper message for %s", TAG)
+
+
+
+
+
+
+
         except Exception as e:
+
+
+
+
+
+
+
             log.warning("[auto_prune_edit_mode] edit failed: %s", e)
+
+
+
+
+
+
+
         for m in to_delete[:20]:
+
+
+
+
+
+
+
             try:
+
+
+
+
+
+
+
                 await m.delete()
+
+
+
+
+
+
+
             except Exception:
+
+
+
+
+
+
+
                 pass
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def setup(bot: commands.Bot):
+
+
+
+
+
+
+
     await bot.add_cog(AutoPruneEditMode(bot))
+
+
+
+
+
+
+

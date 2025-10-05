@@ -1,89 +1,650 @@
-
 # satpambot/bot/modules/discord_bot/cogs/anti_image_phish_guard.py
+
+
+
+
+
+
+
 from __future__ import annotations
 
 import asyncio
 import json
 import os
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 
 import discord
 from discord.ext import commands
 
 # Keep existing import (as in your repo)
+
+
+
+
+
+
+
 try:
+
+
+
+
+
+
+
     from ..helpers import guard_state  # type: ignore
+
+
+
+
+
+
+
 except Exception:
+
+
+
+
+
+
+
     guard_state = None  # fallback if not present
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 PHASH_DB_TITLE = "SATPAMBOT_PHASH_DB_V1"
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class AntiImagePhishGuard(commands.Cog):
+
+
+
+
+
+
+
     """Loads persisted pHash DB from #log-botphising JSON message at startup.
+
+
+
+
+
+
+
     This replacement is syntax-safe and does not change any configs/ENV.
+
+
+
+
+
+
+
     """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def __init__(self, bot: commands.Bot):
+
+
+
+
+
+
+
         self.bot = bot
+
+
+
+
+
+
+
         # simple in-memory set for fast membership checks
+
+
+
+
+
+
+
         self._phash_entries = set()  # type: ignore[assignment]
+
+
+
+
+
+
+
         # throttle reload lock
+
+
+
+
+
+
+
         self._reload_lock = asyncio.Lock()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def _extract_hashes_from_msg_content(self, content: str) -> List[str]:
+
+
+
+
+
+
+
         try:
+
+
+
+
+
+
+
             i, j = content.find("{"), content.rfind("}")
+
+
+
+
+
+
+
             if i != -1 and j != -1 and j > i:
-                data = json.loads(content[i:j+1])
+
+
+
+
+
+
+
+                data = json.loads(content[i : j + 1])
+
+
+
+
+
+
+
                 arr = data.get("phash") if isinstance(data, dict) else None
+
+
+
+
+
+
+
                 if isinstance(arr, list):
+
+
+
+
+
+
+
                     return [str(x).strip() for x in arr if str(x).strip()]
+
+
+
+
+
+
+
         except Exception:
+
+
+
+
+
+
+
             pass
+
+
+
+
+
+
+
         return []
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def _get_log_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
+
+
+
+
+
+
+
         # Avoid touching static_cfg; use common default
+
+
+
+
+
+
+
         cname = os.getenv("LOG_CHANNEL_NAME", "log-botphising")
+
+
+
+
+
+
+
         ch = discord.utils.get(guild.text_channels, name=cname)
+
+
+
+
+
+
+
         if ch is None:
+
+
+
+
+
+
+
             # fallback: system channel if any
+
+
+
+
+
+
+
             ch = guild.system_channel
+
+
+
+
+
+
+
         return ch  # may be None
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     async def _reload_once(self) -> None:
+
+
+
+
+
+
+
         if self._reload_lock.locked():
+
+
+
+
+
+
+
             return
+
+
+
+
+
+
+
         async with self._reload_lock:
+
+
+
+
+
+
+
             new_entries = set()
+
+
+
+
+
+
+
             try:
+
+
+
+
+
+
+
                 for g in getattr(self.bot, "guilds", []):
+
+
+
+
+
+
+
                     ch = await self._get_log_channel(g)
+
+
+
+
+
+
+
                     if not ch:
+
+
+
+
+
+
+
                         continue
+
+
+
+
+
+
+
                     async for m in ch.history(limit=200):
+
+
+
+
+
+
+
                         if (m.content or "").startswith(PHASH_DB_TITLE):
+
+
+
+
+
+
+
                             arr = await self._extract_hashes_from_msg_content(m.content or "")
+
+
+
+
+
+
+
                             for h in arr:
+
+
+
+
+
+
+
                                 new_entries.add(h)
+
+
+
+
+
+
+
                             break  # use the first found
+
+
+
+
+
+
+
             except Exception:
+
+
+
+
+
+
+
                 # don't crash cog if history fetch fails
+
+
+
+
+
+
+
                 pass
+
+
+
+
+
+
+
             if new_entries:
+
+
+
+
+
+
+
                 self._phash_entries = new_entries
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     # -------------- lifecycle hooks --------------
-    @commands.Cog.listener()
-    async def on_ready(self):
-        await self._reload_once()
+
+
+
+
+
+
 
     @commands.Cog.listener()
-    async def on_guild_available(self, guild: discord.Guild):
+
+
+
+
+
+
+
+    async def on_ready(self):
+
+
+
+
+
+
+
         await self._reload_once()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    @commands.Cog.listener()
+
+
+
+
+
+
+
+    async def on_guild_available(self, guild: discord.Guild):
+
+
+
+
+
+
+
+        await self._reload_once()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # -------------- detection stubs --------------
+
+
+
+
+
+
+
     # Your existing detection logic in other cogs can read self._phash_entries.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def setup(bot: commands.Bot):
+
+
+
+
+
+
+
     await bot.add_cog(AntiImagePhishGuard(bot))
+
+
+
+
+
+
+

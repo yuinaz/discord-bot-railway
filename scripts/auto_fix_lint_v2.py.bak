@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Auto-fix common strict Ruff errors without changing repo config:
+- E701: multiple statements on one line (colon)
+- E702: multiple statements on one line (semicolon)
+- EOF newline missing
+Strategy:
+- For lines like `if cond: stmt`, `for ...: stmt`, etc -> expand to block with proper indent.
+- Split top-level semicolons into multiple lines (safe when not inside strings).
+- Skip files in venv/.* cache.
+Creates .bak backups next to each modified file.
+Usage:
+  python scripts/auto_fix_lint_v2.py /path/to/repo
+"""
+from __future__ import annotations
+import sys, os, re, io, pathlib
+
+CLAUSES = ("if","elif","else","for","while","try","except","finally","with")
+CLAUSE_RE = re.compile(
+    r"^(\s*)(" + "|".join(CLAUSES) + r")\b([^:]*):\s*(\S.*)$"  # indent, keyword, head, tail-stmt
+)
+
+def _split_semicolons_safely(line: str) -> list[str]:
+    """Split by ';' only when outside quotes (# comment already stripped)."""
+    out, cur, in_s, esc = [], [], None, False
+    for ch in line:
+        if in_s:
+            cur.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == in_s:
+                in_s = None
+            continue
+        if ch in ("'", '"'):
+            in_s = ch; cur.append(ch); continue
+        if ch == ";":
+            out.append("".join(cur).rstrip())
+            cur = []
+            continue
+        cur.append(ch)
+    out.append("".join(cur).rstrip())
+    return out
+
+def expand_colon_oneliner(line: str) -> list[str] | None:
+    m = CLAUSE_RE.match(line)
+    if not m:
+        return None
+    indent, kw, head, tail = m.groups()
+    # Allow `pass` to remain one-liner (already fine), but strict E701 may still reject; expand anyway
+    body_stmt = tail.rstrip()
+    # keep inline comment if any
+    if "#" in body_stmt:
+        stmt, _, comment = body_stmt.partition("#")
+        comment = "#" + comment
+    else:
+        stmt, comment = body_stmt, ""
+    if not stmt.strip():
+        return None
+    # Build block
+    new = [f"{indent}{kw}{head}:\n", f"{indent}    {stmt.strip()}\n"]
+    if comment and comment.strip() != "#":
+        # place comment above to avoid trailing-lint
+        new.insert(1, f"{indent}    {comment.strip()}\n")
+    return new
+
+def process_text(text: str) -> str:
+    lines = text.splitlines(True)
+    changed = False
+    out_lines: list[str] = []
+    for raw in lines:
+        ln = raw.rstrip("\n")
+        # Handle semicolons (before colon expansion): ignore comments
+        if ";" in ln and not ln.lstrip().startswith("#"):
+            stripped, _, cmt = ln.partition("#")
+            parts = _split_semicolons_safely(stripped)
+            if len(parts) > 1:
+                ind = re.match(r"^(\s*)", ln).group(1)
+                for i, p in enumerate(parts):
+                    if not p.strip():
+                        continue
+                    out_lines.append(f"{ind}{p.rstrip()}\n")
+                if cmt:
+                    out_lines.append(f"{ind}{('#'+cmt) if not cmt.startswith('#') else cmt}\n")
+                changed = True
+                continue
+        # Handle colon one-liners
+        ex = expand_colon_oneliner(ln)
+        if ex:
+            out_lines.extend(ex)
+            changed = True
+            continue
+        # default keep
+        out_lines.append(raw if raw.endswith("\n") else (raw + "\n"))
+    # Ensure EOF newline
+    if out_lines and not out_lines[-1].endswith("\n"):
+        out_lines[-1] += "\n"; changed = True
+    return "".join(out_lines), changed
+
+def should_skip(path: pathlib.Path) -> bool:
+    parts = path.parts
+    sk = any(p.startswith((".", "__pycache__", "venv", "env", "site-packages")) for p in parts)
+    return sk
+
+def main():
+    base = pathlib.Path(sys.argv[1] if len(sys.argv)>1 else ".").resolve()
+    changed_files = 0
+    for p in base.rglob("*.py"):
+        if should_skip(p):
+            continue
+        try:
+            src = p.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        new, changed = process_text(src)
+        if changed:
+            bak = p.with_suffix(p.suffix + ".bak")
+            try:
+                bak.write_text(src, encoding="utf-8")
+            except Exception:
+                pass
+            p.write_text(new, encoding="utf-8")
+            changed_files += 1
+            print("[fix]", p)
+    print(f"Done. Files changed: {changed_files}")
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
