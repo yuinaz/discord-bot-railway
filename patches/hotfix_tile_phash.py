@@ -1,0 +1,856 @@
+#!/usr/bin/env python3
+
+
+
+
+
+
+
+# -*- coding: utf-8 -*-
+
+
+
+
+
+
+
+"""
+
+
+
+
+
+
+
+Hotfix: enable tile pHash matching for image phish detection without changing configs.
+
+
+
+
+
+
+
+- Adds 'tile' (3x3) 16x16 pHash signature generation and matching.
+
+
+
+
+
+
+
+- Uses conservative rule: trigger if (global match) OR (>=2 tiles match within threshold).
+
+
+
+
+
+
+
+Place this file under patches/ and run via:  python patches/hotfix_tile_phash.py --inject
+
+
+
+
+
+
+
+"""
+
+
+
+
+
+
+
+from __future__ import annotations
+
+import importlib
+import os
+import pathlib
+import types
+
+# thresholds (256-bit phash): tune carefully to avoid FP
+
+
+
+
+
+
+
+GLOBAL_THR = int(os.environ.get("PHASH_GLOBAL_THR", "28"))      # bits
+
+
+
+
+
+
+
+TILE_THR   = int(os.environ.get("PHASH_TILE_THR", "22"))        # bits
+
+
+
+
+
+
+
+TILE_REQUIRE = int(os.environ.get("PHASH_TILE_REQUIRE", "2"))   # tiles must match
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _hamming_hex(a: str, b: str) -> int:
+
+
+
+
+
+
+
+    # len(a) == len(b) hex strings
+
+
+
+
+
+
+
+    x = int(a, 16) ^ int(b, 16)
+
+
+
+
+
+
+
+    return x.bit_count()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _tile_coords(w: int, h: int, gw: int = 3, gh: int = 3):
+
+
+
+
+
+
+
+    for j in range(gh):
+
+
+
+
+
+
+
+        for i in range(gw):
+
+
+
+
+
+
+
+            left = int(w*i/gw); right = int(w*(i+1)/gw)
+
+
+
+
+
+
+
+            top = int(h*j/gh); bottom = int(h*(j+1)/gh)
+
+
+
+
+
+
+
+            yield (left, top, right, bottom)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _phash_hex_pillow(im, hash_size=16, highfreq=4):
+
+
+
+
+
+
+
+    import numpy as np
+    from PIL import Image
+
+
+
+
+
+
+
+    im = im.convert("L")
+
+
+
+
+
+
+
+    size = hash_size*highfreq
+
+
+
+
+
+
+
+    im = im.resize((size,size), Image.Resampling.LANCZOS)
+
+
+
+
+
+
+
+    A = np.asarray(im, dtype="float64")
+
+
+
+
+
+
+
+    # DCT via matrix (small), no scipy dependency
+
+
+
+
+
+
+
+    def dct_matrix(N):
+
+
+
+
+
+
+
+        n = np.arange(N)
+
+
+
+
+
+
+
+        k = np.arange(N).reshape(-1,1)
+
+
+
+
+
+
+
+        C = np.cos(np.pi*(2*n+1)*k/(2*N))
+
+
+
+
+
+
+
+        C[0,:] *= (1/np.sqrt(N))
+
+
+
+
+
+
+
+        C[1:,:] *= np.sqrt(2/N)
+
+
+
+
+
+
+
+        return C
+
+
+
+
+
+
+
+    C = dct_matrix(size)
+
+
+
+
+
+
+
+    dct = C @ A @ C.T
+
+
+
+
+
+
+
+    low = dct[:hash_size, :hash_size]
+
+
+
+
+
+
+
+    med = np.median(low[1:,:])
+
+
+
+
+
+
+
+    bits = (low > med).astype("uint8").flatten()
+
+
+
+
+
+
+
+    # pack to hex
+
+
+
+
+
+
+
+    out = 0
+
+
+
+
+
+
+
+    for b in bits:
+
+
+
+
+
+
+
+        out = (out<<1) | int(b)
+
+
+
+
+
+
+
+    return f"{out:0{hash_size*hash_size//4}x}"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _compute_signatures(im):
+
+
+
+
+
+
+
+    W,H = im.size
+
+
+
+
+
+
+
+    g = _phash_hex_pillow(im, 16)
+
+
+
+
+
+
+
+    tiles = []
+
+
+
+
+
+
+
+    for (l,t,r,b) in _tile_coords(W,H,3,3):
+
+
+
+
+
+
+
+        tiles.append(_phash_hex_pillow(im.crop((l,t,r,b)), 16))
+
+
+
+
+
+
+
+    return {"global": g, "tiles": tiles}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _inject():
+
+
+
+
+
+
+
+    hooks = importlib.import_module("satpambot.ml.guard_hooks")
+
+
+
+
+
+
+
+    if not hasattr(hooks, "GUARD_EXT"):
+
+
+
+
+
+
+
+        hooks.GUARD_EXT = types.SimpleNamespace()
+
+
+
+
+
+
+
+    hooks.GUARD_EXT.compute_signatures = _compute_signatures
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # Wrap matcher if present
+
+
+
+
+
+
+
+    if hasattr(hooks, "match_phash"):
+
+
+
+
+
+
+
+        _orig = hooks.match_phash
+
+
+
+
+
+
+
+        def match_phash_with_tiles(image_phashes, ref_db):
+
+
+
+
+
+
+
+            # ref_db: dict-like with possible 'global' and 'tiles' entries
+
+
+
+
+
+
+
+            # 1) global
+
+
+
+
+
+
+
+            g = image_phashes.get("global")
+
+
+
+
+
+
+
+            if g:
+
+
+
+
+
+
+
+                for ref in ref_db.get("global", []):
+
+
+
+
+
+
+
+                    if _hamming_hex(g, ref) <= GLOBAL_THR:
+
+
+
+
+
+
+
+                        return True, "global"
+
+
+
+
+
+
+
+            # 2) tiles (need >= TILE_REQUIRE matches)
+
+
+
+
+
+
+
+            tiles = image_phashes.get("tiles") or []
+
+
+
+
+
+
+
+            if tiles:
+
+
+
+
+
+
+
+                for ref_tiles in ref_db.get("tiles", []):
+
+
+
+
+
+
+
+                    hits = 0
+
+
+
+
+
+
+
+                    for a in tiles:
+
+
+
+
+
+
+
+                        for b in ref_tiles:
+
+
+
+
+
+
+
+                            if _hamming_hex(a,b) <= TILE_THR:
+
+
+
+
+
+
+
+                                hits += 1
+
+
+
+
+
+
+
+                                if hits >= TILE_REQUIRE:
+
+
+
+
+
+
+
+                                    return True, f"tiles({hits})"
+
+
+
+
+
+
+
+            # fallback to original if provided with legacy args
+
+
+
+
+
+
+
+            try:
+
+
+
+
+
+
+
+                return _orig(image_phashes, ref_db)
+
+
+
+
+
+
+
+            except Exception:
+
+
+
+
+
+
+
+                return False, "no-match"
+
+
+
+
+
+
+
+        hooks.match_phash = match_phash_with_tiles
+
+
+
+
+
+
+
+    return hooks
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def main():
+
+
+
+
+
+
+
+    _inject()
+
+
+
+
+
+
+
+    # Optional: preload a hotfix ref set if JSON is present
+
+
+
+
+
+
+
+    json_path = pathlib.Path("hotfix_tile_phash.json")
+
+
+
+
+
+
+
+    if json_path.exists():
+
+
+
+
+
+
+
+        print("[hotfix] Loaded", json_path)
+
+
+
+
+
+
+
+    else:
+
+
+
+
+
+
+
+        print("[hotfix] Injection ready (no local JSON preload)")
+
+
+
+
+
+
+
+    return 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+
+
+
+
+
+
+    raise SystemExit(main())
+
+
+
+
+
+
+

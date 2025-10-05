@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Auto-inject guard hooks into image-related cogs.
+- Idempotent (won't double-inject)
+- Skips URL guards (anti_url_phish_guard*.py)
+- Injects call to satpambot.ml.guard_hooks.guard_on_message(ctx/msg) inside async on_message
+Usage:
+  python patches/auto_inject_guard_hooks.py
+"""
+from __future__ import annotations
+import os, re, sys, pathlib
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]  # repo root
+COGS_DIR = ROOT / "satpambot" / "bot" / "modules" / "discord_bot" / "cogs"
+
+EXCLUDE_BASENAMES = {
+    "anti_url_phish_guard.py",
+    "anti_url_phish_guard_bootstrap.py",
+}
+
+TARGET_HINTS = ("image", "phash", "attach", "ocr", "phish_hash")
+INJECT_MARK = "# [AUTO-INJECT] guard_on_message"
+
+IMPORT_LINE = "from satpambot.ml import guard_hooks as _guard_hooks  " + INJECT_MARK + "\n"
+CALL_BLOCK = (
+    "try:\n"
+    "    await _guard_hooks.guard_on_message(message)\n"
+    "except Exception:\n"
+    "    pass  # " + INJECT_MARK + "\n"
+)
+
+def file_needs_injection(text: str) -> bool:
+    if INJECT_MARK in text: return False
+    if "async def on_message" not in text: return False
+    low = text.lower()
+    if not any(h in low for h in TARGET_HINTS): return False
+    return True
+
+def inject_file(path: pathlib.Path) -> bool:
+    src = path.read_text(encoding="utf-8", errors="ignore")
+    if not file_needs_injection(src): return False
+
+    # Insert import after initial imports (or at top if none)
+    lines = src.splitlines(True)
+    out = []
+    inserted_import = False
+    seen_non_import = False
+    for ln in lines:
+        if not inserted_import and not seen_non_import:
+            if re.match(r"^(from\s+[\w\.]+\s+import\s+.*|import\s+\w+)", ln):
+                out.append(ln); continue
+            else:
+                out.append(IMPORT_LINE)
+                inserted_import = True
+                seen_non_import = True
+        out.append(ln)
+    if not inserted_import:
+        # file had only imports? ensure import is at top
+        src2 = IMPORT_LINE + "".join(lines)
+    else:
+        src2 = "".join(out)
+
+    # Inject call into on_message (after its first indented line)
+    res = []
+    in_sig = False
+    inserted_call = False
+    for ln in src2.splitlines(True):
+        res.append(ln)
+        if re.match(r"^\s*async\s+def\s+on_message\s*\(", ln):
+            in_sig = True
+            continue
+        if in_sig and re.match(r"^\s+", ln):
+            indent = re.match(r"^(\s*)", ln).group(1)
+            call = "".join([indent + "    " + x + "\n" for x in CALL_BLOCK.splitlines()])
+            res.append(call)
+            inserted_call = True
+            in_sig = False
+    if not inserted_call:
+        return False
+    path.write_text("".join(res), encoding="utf-8")
+    return True
+
+def main():
+    if not COGS_DIR.exists():
+        print("Cogs dir not found:", COGS_DIR); return 1
+    changed = 0
+    for p in COGS_DIR.rglob("*.py"):
+        if p.name in EXCLUDE_BASENAMES: continue
+        if inject_file(p):
+            changed += 1
+            print("Injected:", p.name)
+    print("Done. Files injected:", changed)
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
