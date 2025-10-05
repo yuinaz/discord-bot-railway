@@ -1,546 +1,70 @@
 #!/usr/bin/env python3
-
-
-
-
-
-
-
 # -*- coding: utf-8 -*-
-
-
-
-
-
-
-
-"""Main entry for Render (`python main.py`)
-
-
-
-
-
-
-
-- tiny HTTP server bound to $PORT
-
-
-
-
-
-
-
-- endpoints: /, /healthz, /ping -> 'ok'; /uptime -> JSON
-
-
-
-
-
-
-
-- quiet logs
-
-
-
-
-
-
-
-- runs module: satpambot.bot
-
-
-
-
-
-
-
-"""
-
-
-
-
-
-
-
 from __future__ import annotations
 
-import json
-import logging
 import os
-import runpy
+import logging
 import threading
-import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
-# ---- logging (quiet) ----
-
-
-
-
-
-
-
-logging.basicConfig(level=logging.WARNING, format="%(message)s")
-
-
-
-
-
-
-
-logging.getLogger("discord").setLevel(logging.WARNING)
-
-
-
-
-
-
-
-logging.getLogger("discord.http").setLevel(logging.ERROR)
-
-
-
-
-
-
-
-logging.getLogger("aiohttp").setLevel(logging.WARNING)
-
-
-
-
-
-
-
-logging.getLogger("websockets").setLevel(logging.WARNING)
-
-
-
-
-
-
-
-logging.getLogger("asyncio").setLevel(logging.WARNING)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-PORT: int = int(os.environ.get("PORT", "10000"))
-
-
-
-
-
-
-
-ENTRY: str = "satpambot.bot"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class Handler(BaseHTTPRequestHandler):
-
-
-
-
-
-
-
-    def _ok_text(self) -> None:
-
-
-
-
-
-
-
-        self.send_response(200)
-
-
-
-
-
-
-
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
-
-
-
-
-
-
-
-        self.end_headers()
-
-
-
-
-
-
-
-        self.wfile.write(b"ok")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def _ok_json(self) -> None:
-
-
-
-
-
-
-
-        payload = {"status": "ok", "ts": int(time.time())}
-
-
-
-
-
-
-
-        data = json.dumps(payload).encode("utf-8")
-
-
-
-
-
-
-
-        self.send_response(200)
-
-
-
-
-
-
-
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-
-
-
-
-
-
-
-        self.end_headers()
-
-
-
-
-
-
-
-        self.wfile.write(data)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def do_HEAD(self) -> None:  # type: ignore[override]
-
-
-
-
-
-
-
-        if self.path in ("/", "/healthz", "/ping", "/uptime"):
-
-
-
-
-
-
-
-            self.send_response(200)
-
-
-
-
-
-
-
-            self.end_headers()
-
-
-
-
-
-
-
-            return
-
-
-
-
-
-
-
-        self.send_response(404)
-
-
-
-
-
-
-
-        self.end_headers()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def do_GET(self) -> None:  # type: ignore[override]
-
-
-
-
-
-
-
-        if self.path in ("/", "/healthz", "/ping"):
-
-
-
-
-
-
-
-            self._ok_text()
-
-
-
-
-
-
-
-            return
-
-
-
-
-
-
-
-        if self.path == "/uptime":
-
-
-
-
-
-
-
-            self._ok_json()
-
-
-
-
-
-
-
-            return
-
-
-
-
-
-
-
-        self.send_response(404)
-
-
-
-
-
-
-
-        self.end_headers()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def log_message(self, fmt: str, *args) -> None:  # type: ignore[override]
-
-
-
-
-
-
-
-        # suppress per-request logs to avoid Render log spam
-
-
-
-
-
-
-
+import asyncio
+
+# ------------------------------------------------------------------
+# Logging config — keep the format the user expects:
+# "INFO:entry.main:..."
+# ------------------------------------------------------------------
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(levelname)s:%(name)s:%(message)s",
+)
+log = logging.getLogger("entry.main")
+
+# Import Flask app from your existing app.py (Flask app variable must be named `app`)
+from app import app  # noqa: E402
+
+HOST = os.getenv("HOST", "0.0.0.0")
+PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", "10000")))
+WEB_THREADS = int(os.getenv("WEB_THREADS", "8"))
+WEB_LOG_LEVEL = os.getenv("WEB_LOG_LEVEL", "WARNING").upper()
+
+def _serve_web():
+    """
+    Serve the Flask app without the noisy Flask dev banner.
+    Try waitress first (quiet), fallback to wsgiref (also quiet).
+    Runs in a dedicated background thread.
+    """
+    # Prefer waitress (production-friendly, quiet)
+    try:
+        from waitress import serve as waitress_serve  # type: ignore
+        logging.getLogger("waitress").setLevel(getattr(logging, WEB_LOG_LEVEL, logging.WARNING))
+        waitress_serve(app, host=HOST, port=PORT, threads=WEB_THREADS)
         return
+    except Exception:
+        # Fallback: built-in wsgiref (quiet)
+        from wsgiref.simple_server import make_server, WSGIRequestHandler
 
+        class QuietHandler(WSGIRequestHandler):
+            def log_message(self, fmt, *args):
+                # Access logs are silenced unless WEB_LOG_LEVEL=DEBUG
+                if WEB_LOG_LEVEL == "DEBUG":
+                    super().log_message(fmt, *args)
 
+        httpd = make_server(HOST, PORT, app, handler_class=QuietHandler)
+        httpd.serve_forever()
 
+def main():
+    # Start web (unless disabled)
+    if os.getenv("RUN_WEB", "1") != "0":
+        log.info(f"🌐 Serving web on {HOST}:{PORT}")
+        t = threading.Thread(target=_serve_web, name="web", daemon=True)
+        t.start()
+        log.info(f"Web is ready on port {PORT}")
+    else:
+        log.info("🌐 Web disabled by RUN_WEB=0")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def _serve_forever() -> None:
-
-
-
-
-
-
-
-    httpd = HTTPServer(("", PORT), Handler)
-
-
-
-
-
-
-
-    httpd.serve_forever()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    # Then start the Discord bot as usual
+    log.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
+    from satpambot.bot.modules.discord_bot import shim_runner
+    asyncio.run(shim_runner.start_bot())
 
 if __name__ == "__main__":
-
-
-
-
-
-
-
-    thread = threading.Thread(target=_serve_forever, daemon=True)
-
-
-
-
-
-
-
-    thread.start()
-
-
-
-
-
-
-
-    runpy.run_module(ENTRY, run_name="__main__")
-
-
-
-
-
-
-
+    main()

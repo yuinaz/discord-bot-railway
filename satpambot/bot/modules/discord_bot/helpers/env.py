@@ -6,9 +6,7 @@
 
 import os
 import re
-
 import discord
-
 
 # ---------- helpers ----------
 def _first(*keys, default: str | None = None) -> str | None:
@@ -18,12 +16,10 @@ def _first(*keys, default: str | None = None) -> str | None:
             return v
     return default
 
-
 def _bool(x: str | None, default=False) -> bool:
     if x is None:
         return default
     return str(x).strip().lower() in ("1", "true", "yes", "on")
-
 
 def _to_int(x: str | None, default: int = 0) -> int:
     """Parse int safely; remove quotes & non-digits so '\"1400...\"' works."""
@@ -37,14 +33,12 @@ def _to_int(x: str | None, default: int = 0) -> int:
     except Exception:
         return default
 
-
 # ---------- tokens / intents / basic ----------
 # Keep BOT_TOKEN available for old paths; prefer local-friendly order
 BOT_TOKEN = _first("BOT_TOKEN", "DISCORD_TOKEN", "DISCORD_BOT_TOKEN", "DISCORD_BOT_TOKEN_LOCAL")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")  # optional mirror
 BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
 FLASK_ENV = os.getenv("FLASK_ENV", "production")
-
 
 def build_intents() -> discord.Intents:
     intents = discord.Intents.default()
@@ -53,25 +47,23 @@ def build_intents() -> discord.Intents:
     intents.guilds = True
     return intents
 
-
 BOT_INTENTS = build_intents()
 
 # ---------- legacy feature toggles (required by some cogs) ----------
-NSFW_INVITE_AUTOBAN = _bool(os.getenv("NSFW_INVITE_AUTOBAN", "true"), default=True)
+NSFW_INVITE_AUTOBAN  = _bool(os.getenv("NSFW_INVITE_AUTOBAN", "true"), default=True)
 URL_AUTOBAN_CRITICAL = _bool(os.getenv("URL_AUTOBAN_CRITICAL", "true"), default=True)
-URL_RESOLVE_ENABLED = _bool(os.getenv("URL_RESOLVE_ENABLED", "true"), default=True)
-OCR_SCAM_STRICT = _bool(os.getenv("OCR_SCAM_STRICT", "true"), default=True)
-OCR_LANG = os.getenv("OCR_LANG", "eng+ind")
+URL_RESOLVE_ENABLED  = _bool(os.getenv("URL_RESOLVE_ENABLED", "true"), default=True)
+OCR_SCAM_STRICT      = _bool(os.getenv("OCR_SCAM_STRICT", "true"), default=True)
+OCR_LANG             = os.getenv("OCR_LANG", "eng+ind")
 
 # ---------- log channels (ID and/or NAME) ----------
-LOG_CHANNEL_ID_RAW = os.getenv("LOG_CHANNEL_ID", "0").strip()
-LOG_CHANNEL_NAME = os.getenv("LOG_CHANNEL_NAME", "log-botphising").strip()
+LOG_CHANNEL_ID_RAW     = os.getenv("LOG_CHANNEL_ID", "0").strip()
+LOG_CHANNEL_NAME       = os.getenv("LOG_CHANNEL_NAME", "log-botphising").strip()
 BAN_LOG_CHANNEL_ID_RAW = os.getenv("BAN_LOG_CHANNEL_ID", "0").strip()
-BAN_LOG_CHANNEL_NAME = os.getenv("BAN_LOG_CHANNEL_NAME", "").strip()
+BAN_LOG_CHANNEL_NAME   = os.getenv("BAN_LOG_CHANNEL_NAME", "").strip()
 
-LOG_CHANNEL_ID = _to_int(LOG_CHANNEL_ID_RAW, 0)
+LOG_CHANNEL_ID   = _to_int(LOG_CHANNEL_ID_RAW, 0)
 BAN_LOG_CHANNEL_ID = _to_int(BAN_LOG_CHANNEL_ID_RAW, 0)
-
 
 async def resolve_log_channel(guild: discord.Guild):
     """Try ID, else exact NAME in text channels."""
@@ -86,7 +78,6 @@ async def resolve_log_channel(guild: discord.Guild):
                 return ch
     return None
 
-
 async def resolve_ban_log_channel(guild: discord.Guild):
     if BAN_LOG_CHANNEL_ID:
         ch = guild.get_channel(BAN_LOG_CHANNEL_ID)
@@ -100,7 +91,7 @@ async def resolve_ban_log_channel(guild: discord.Guild):
     # fallback to general log channel
     return await resolve_log_channel(guild)
 
-
 # ---------- debug helper ----------
 def env_log_summary() -> str:
-    return f"LOG_CHANNEL_ID_RAW='{LOG_CHANNEL_ID_RAW}' parsed={LOG_CHANNEL_ID} LOG_CHANNEL_NAME='{LOG_CHANNEL_NAME}'"
+    return (f"LOG_CHANNEL_ID_RAW='{LOG_CHANNEL_ID_RAW}' parsed={LOG_CHANNEL_ID} "
+            f"LOG_CHANNEL_NAME='{LOG_CHANNEL_NAME}'")

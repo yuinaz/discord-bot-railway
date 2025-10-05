@@ -2,9 +2,7 @@
 # Supports .env.local for local testing and .env.prod for production (Render)
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
-
 
 def load_env():
     profile = os.getenv("ENV_PROFILE")  # "local" | "prod" | None
@@ -15,7 +13,7 @@ def load_env():
     # Explicit profile
     if profile == "local":
         if local_file.exists():
-            load_dotenv(local_file, override=True)  # local should win during dev
+            load_dotenv(local_file, override=True)   # local should win during dev
         return "local"
     if profile == "prod":
         if prod_file.exists():
@@ -30,6 +28,6 @@ def load_env():
 
     # Local default
     if local_file.exists():
-        load_dotenv(local_file, override=True)  # local values should apply
+        load_dotenv(local_file, override=True)      # local values should apply
         return "local"
     return "none"

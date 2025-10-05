@@ -1,5 +1,3 @@
 {
-  "warns": [
-    "login.html: particles background not found"
-  ]
+  "warns": []
 }
