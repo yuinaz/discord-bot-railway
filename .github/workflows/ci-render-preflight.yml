@@ -1,11 +1,9 @@
 name: render-preflight
-
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-
 jobs:
   preflight:
     runs-on: ubuntu-latest
@@ -13,11 +11,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'   # <- penting: PyWavelets 1.9.0 butuh >=3.11
-          cache: 'pip'
+          python-version: '3.11'
       - name: Install deps
         run: |
-          python -m pip install -U pip wheel setuptools
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Run predeploy checks
         run: python scripts/predeploy_render_free_check.py
