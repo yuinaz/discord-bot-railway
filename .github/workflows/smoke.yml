@@ -1,13 +1,21 @@
 name: Smoke
+
 on:
   push:
   pull_request:
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: '3.11' }
-      - run: pip install -r requirements.txt || true
-      - run: python scripts/smoke_all.py
+        with:
+          python-version: '3.11'   # <- samakan dgn Render
+          cache: 'pip'
+      - name: Install deps
+        run: |
+          python -m pip install -U pip wheel setuptools
+          pip install -r requirements.txt
+      - name: Smoke tests
+        run: python scripts/smoke_all.py
