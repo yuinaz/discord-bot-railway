@@ -1,0 +1,18 @@
+{
+  "PRESENCE_ROTATOR_ENABLE": true,
+  "PRESENCE_ROTATOR_INTERVAL_S": 300,
+  "PRESENCE_ROTATOR_ACTIVITIES": [
+    {
+      "type": "playing",
+      "name": "jaga server"
+    },
+    {
+      "type": "watching",
+      "name": "log-botphising"
+    },
+    {
+      "type": "listening",
+      "name": "permintaan /help"
+    }
+  ]
+}

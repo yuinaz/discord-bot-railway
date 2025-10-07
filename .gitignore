@@ -1,26 +1,6 @@
-# Python cache
-__pycache__/
-*.py[cod]
-*.egg-info/
 
-# Virtual env
-.venv/
-venv/
-
-# OS junk
-.DS_Store
-Thumbs.db
-
-# Logs & artifacts
-*.log
-*.zip
-
-# Secrets
-.env
-.env.*
-data/uploads/
-
-satpambot_config.local.json
-secrets/
+# === SatpamBot secrets (added by patch) ===
 SatpamBot.env
-
+satpambot/config/99_env_override.json
+*.env
+.env
