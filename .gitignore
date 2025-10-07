@@ -13,3 +13,6 @@ __pycache__/
 .env.local
 SatpamBot.env
 satpambot/config/99_env_override.json
+.env.local
+SatpamBot.env
+satpambot/config/99_env_override.json
