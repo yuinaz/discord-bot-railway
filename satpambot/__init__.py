@@ -1,0 +1,1 @@
+# SatpamBot package marker

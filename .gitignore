@@ -19,3 +19,8 @@ Thumbs.db
 .env
 .env.*
 data/uploads/
+
+satpambot_config.local.json
+secrets/
+SatpamBot.env
+
