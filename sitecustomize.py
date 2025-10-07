@@ -1,42 +1,25 @@
-# Lightweight hooks (no config change). Does NOT start its own Flask server.
-import logging
-
-# Quieten health/ping access logs
-class _HealthFilter(logging.Filter):
-    def filter(self, record):
-        try:
-            msg = record.getMessage()
-        except Exception:
-            msg = str(record.msg)
-        return ("/healthz" not in msg) and ("/ping" not in msg)
-
+# Auto-loaded if present on sys.path (repo root). Keeps env 'attached' to the bot.
+import os
+def _set_default(k, v):
+    if os.environ.get(k) in (None, ''):
+        os.environ[k] = str(v)
 try:
-    logging.getLogger("werkzeug").addFilter(_HealthFilter())
-    logging.getLogger("gunicorn.access").addFilter(_HealthFilter())
+    from dotenv import load_dotenv, find_dotenv
+    for cand in ('.env', '.env.local', 'config.env'):
+        if os.path.exists(cand):
+            load_dotenv(dotenv_path=cand, override=False)
+    load_dotenv(find_dotenv(), override=False)
 except Exception:
     pass
-
-# Print the same banner once the real app responds to HEAD /
-def _banner_probe():
-    import os, time, http.client
-    host = "127.0.0.1"
-    port = int(os.environ.get("PORT", "10000"))
-    deadline = time.time() + 30.0
-    while time.time() < deadline:
-        try:
-            conn = http.client.HTTPConnection(host, port, timeout=1.0)
-            conn.request("HEAD", "/")
-            resp = conn.getresponse()
-            if resp and resp.status in (200, 301, 302, 307, 308):
-                print("==> Your service is live 🎉", flush=True)
-                return
-        except Exception:
-            pass
-        time.sleep(0.4)
-    # If not reachable, stay silent; do not crash the app.
-
-try:
-    import threading
-    threading.Thread(target=_banner_probe, name="ready-banner", daemon=True).start()
-except Exception:
-    pass
+_set_default('STICKER_ENABLE','0')
+_set_default('DISABLED_COGS','name_wake_autoreply')
+_set_default('BOOT_DM_ONLINE','0')
+_set_default('OPENAI_TIMEOUT_S','20')
+_set_default('SELF_LEARNING_ENABLE','1')
+_set_default('SELF_LEARNING_SAFETY','conservative')
+_set_default('PORT','10000')
+_set_default('UPDATE_DM_OWNER','1')
+_set_default('MAINTENANCE_AUTO','1')
+_set_default('MAINT_HALF_CPU','85')
+_set_default('MAINT_RESUME_CPU','50')
+_set_default('COMMANDS_OWNER_ONLY','1')

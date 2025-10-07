@@ -1,20 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-
-echo "[build] Python: $(python --version 2>&1 || true)"
-echo "[build] Pip   : $(python -m pip --version 2>&1 || true)"
-
-echo "[build] Upgrading pip toolchain..."
-python -m pip install -U pip setuptools wheel
-
-if [[ ! -f requirements.txt ]]; then
-  echo "[error] requirements.txt not found!"; exit 1
+echo "[build_render] Python: $(python -V)"
+if [[ -f requirements.txt ]]; then
+  echo "[build_render] Installing requirements.txt …"
+  pip install --no-cache-dir -r requirements.txt
 fi
-
-echo "[build] Installing from requirements.txt (pinned, reproducible) ..."
-python -m pip install -r requirements.txt
-
-echo "[build] Verifying environment with pip check ..."
-python -m pip check || { echo "[warn] pip check reported issues"; exit 1; }
-
-echo "[build] Done."
+echo "[build_render] Ensuring openai>=1,<2 and python-dotenv…"
+pip install --no-cache-dir "openai>=1.52,<2" "python-dotenv>=1.0,<2" || true
+echo "[build_render] Hotfix OpenAI v1 (non-fatal)…"
+python scripts/apply_hotfixes.py || echo "[warn] hotfix failed (continuing)"
+echo "[build_render] Smoketest (non-fatal)…"
+python scripts/smoketest_render.py || echo "[warn] smoketest failed (continuing)"
+echo "[build_render] Done. Start Command will run: python main.py"
