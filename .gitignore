@@ -10,3 +10,6 @@ __pycache__/
 .venv/
 .env
 .DS_Store
+.env.local
+SatpamBot.env
+satpambot/config/99_env_override.json
