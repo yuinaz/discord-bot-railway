@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import asyncio
 import discord
@@ -5,7 +6,7 @@ from discord.ext import commands
 from discord import app_commands
 from satpambot.config.runtime import cfg, set_cfg
 
-DEFAULT_NAME = 'log-botphising'  # fallback channel name
+DEFAULT_NAME = 'log-botphising'
 
 def _mk(title, desc, color=0x3498db):
     return discord.Embed(title=title, description=desc, color=color)
@@ -28,7 +29,7 @@ async def resolve_destination(bot: commands.Bot):
     name = cfg('SELF_HEAL_CHANNEL_NAME', DEFAULT_NAME) or DEFAULT_NAME
     ch = _find_text_channel_by_name(bot, name)
     if ch:
-        set_cfg('SELF_HEAL_CHANNEL_ID', str(ch.id))
+        set_cfg('SELF_HEAL_CHANNEL_ID', str(ch.id)); set_cfg('SELF_HEAL_CHANNEL_NAME', ch.name)
         return ch
     owner_id = cfg('OWNER_USER_ID')
     if owner_id:
@@ -47,14 +48,12 @@ class SelfHealRouter(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        await asyncio.sleep(1)
-        await resolve_destination(self.bot)
+        await asyncio.sleep(1); await resolve_destination(self.bot)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot: return
-        txt = message.content.strip()
-        low = txt.lower()
+        txt = message.content.strip(); low = txt.lower()
 
         if low == 'selfheal here':
             ch = message.channel

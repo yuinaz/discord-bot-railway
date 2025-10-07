@@ -1,24 +1,53 @@
-# SatpamBot — Flat Patch (Render Free compatible, migration-ready)
+# SatpamBot — Translator Patch
 
-- **Build Command:** `bash scripts/build_render.sh` (unchanged)
-- **Start Command:** `python main.py` (unchanged)
-- **No nested patch folders.** Drop these files in repo root.
+**Date:** 2025-10-07 14:05:32
 
-What this gives you
-- Works on Render **and** off-Render (MiniPC, local) via `sitecustomize.py` that auto-loads `.env` and applies safe defaults.
-- Ensures OpenAI Python SDK **1.x** is installed during build.
-- Lightweight smoke checks (non-fatal).
+This patch fixes the `No module named 'satpambot'` error in `scripts/smoke_translator.py` and
+adds a safe, import-only translator Cog and utility.
 
-Files
-- `sitecustomize.py` — auto-runs on Python startup. Loads `.env` (if present) and sets safe defaults so the bot runs even without Render env.
-- `.env.sample` — template for local/offline use. **Do not** commit secrets.
-- `neuro_lite.toml` — conservative defaults (mention-only, no DM).
-- `scripts/build_render.sh` — installs deps (`requirements.txt` + openai 1.x + python-dotenv) and runs smoke.
-- `scripts/smoketest_render.py` — quick import checks.
+## What’s inside
 
-Notes
-- If environment variables exist (Render), they override `.env` and defaults.
-- If `.env` exists (MiniPC/local), it is loaded automatically.
-- If neither exists, safe defaults apply (stickers off, no DM).
+```
+satpambot/
+  __init__.py
+  utils/
+    __init__.py
+    translate_utils.py
+  bot/modules/discord_bot/cogs/
+    __init__.py
+    translator.py
+scripts/
+  smoke_translator.py
+```
 
-Rollback: just remove these files.
+## How to apply
+
+1. **Extract** the zip at the **repository root** (same folder that contains `satpambot/` and `scripts/`).  
+2. (Optional but recommended) Install/ensure deps:
+   - `googletrans-py>=4.0.0`
+   - `deep-translator>=1.11.4`
+
+   ```bash
+   python -m pip install -U googletrans-py deep-translator
+   ```
+
+3. **Run the smoke test** from repo root:
+
+   ```bash
+   python scripts/smoke_translator.py
+   ```
+
+   You should see:
+   ```
+   [OK] satpambot.utils.translate_utils: import ok
+   [OK] satpambot.bot.modules.discord_bot.cogs.translator: import ok
+   -- OK if both above show [OK]
+   ```
+
+4. **Load the Cog** (when you actually run the bot) like your other cogs (e.g. via your dynamic loader). The Cog is safe on import and won’t do anything until added to the bot.
+
+## Notes
+
+- `translate_utils.translate_text(text, target_lang="id", source_lang="auto")` lazily imports providers and
+  falls back between `googletrans` and `deep_translator` so your import-based smoke tests remain fast and offline‑friendly.
+- If you still see `No module named 'satpambot'`, ensure you are running commands **from the repo root** or that the root is on `PYTHONPATH`.

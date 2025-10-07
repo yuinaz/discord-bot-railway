@@ -1,8 +1,9 @@
+
 from __future__ import annotations
 import os, time, asyncio
 import discord
 from discord.ext import commands
-from typing import Dict, List, Any
+from typing import Dict, List
 
 try:
     from satpambot.ai.openai_v1_adapter import get_client  # optional
@@ -47,13 +48,12 @@ class ChatNeuroLite(commands.Cog):
         self.last_ts: Dict[int, float] = {}
 
     async def cog_load(self):
-        # Auto-config defaults (only if keys are missing)
         if _get_flag('CHAT_AUTOCONFIG', True):
             defaults = {
                 'CHAT_ENABLE': True,
                 'CHAT_ALLOW_DM': True,
                 'CHAT_ALLOW_GUILD': True,
-                'CHAT_MENTIONS_ONLY': False,   # allow chat without mention
+                'CHAT_MENTIONS_ONLY': False,
                 'CHAT_MIN_INTERVAL_S': 8,
                 'OPENAI_CHAT_MODEL': 'gpt-5-mini',
                 'CHAT_MODEL': 'gpt-5-mini',
@@ -66,7 +66,7 @@ class ChatNeuroLite(commands.Cog):
                     set_cfg(k, dv)
                     applied.append(f"{k}={dv}")
             if applied:
-                await _selfheal(self.bot, 'Chat Auto-Config', 'Applied defaults:\\n- ' + '\\n- '.join(applied))
+                await _selfheal(self.bot, 'Chat Auto-Config', 'Applied defaults:\n- ' + '\n- '.join(applied))
 
     def _should_handle(self, message: discord.Message) -> bool:
         if message.author.bot: return False
@@ -105,13 +105,10 @@ class ChatNeuroLite(commands.Cog):
         key = os.getenv('OPENAI_API_KEY') or str(cfg('OPENAI_API_KEY') or '') or None
 
         if _HAS_ADAPTER:
-            try:
-                client = get_client(api_key=key, base_url=base, timeout_s=timeout_s)
-                resp = await asyncio.to_thread(lambda: client.chat.completions.create(
-                    model=model, messages=messages, max_tokens=max_tokens, temperature=0.6))
-                return (resp.choices[0].message.content or '').strip()
-            except Exception as e:
-                raise
+            client = get_client(api_key=key, base_url=base, timeout_s=timeout_s)
+            resp = await asyncio.to_thread(lambda: client.chat.completions.create(
+                model=model, messages=messages, max_tokens=max_tokens, temperature=0.6))
+            return (resp.choices[0].message.content or '').strip()
 
         from openai import OpenAI
         client = OpenAI(api_key=key, base_url=base)
@@ -127,7 +124,7 @@ class ChatNeuroLite(commands.Cog):
     async def on_message(self, message: 'discord.Message'):
         if not self._should_handle(message):
             return
-        ch_id = message.channel.id if hasattr(message.channel, 'id') else 0
+        ch_id = getattr(message.channel, 'id', 0)
         if not self._ratelimit_ok(ch_id):
             return
 

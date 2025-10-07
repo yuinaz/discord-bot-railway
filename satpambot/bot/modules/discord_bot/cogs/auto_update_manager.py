@@ -1,10 +1,10 @@
+
 from __future__ import annotations
 import asyncio, json, subprocess, sys, os, time
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
-from satpambot.config.runtime import cfg, set_cfg
+from satpambot.config.runtime import cfg
 from .selfheal_router import send_selfheal
 
 def _is_render_env() -> bool:
@@ -25,15 +25,11 @@ def _approved_once() -> set[str]:
     arr = cfg('UPD_APPROVE_ONCE', []) or []
     return set([str(x).lower() for x in arr])
 
-def _push_approved(name: str):
-    arr = list(_approved_once()); arr.append(name.lower())
-    set_cfg('UPD_APPROVE_ONCE', arr); set_cfg('UPD_APPROVE_TS', int(time.time()))
-
 def _classify(outdated: List[Dict[str, Any]]):
     crucial = _crucial_set(); approved = _approved_once()
     ts = int(cfg('UPD_APPROVE_TS', 0) or 0)
     if ts and (time.time() - ts) > 3600:
-        set_cfg('UPD_APPROVE_ONCE', []); set_cfg('UPD_APPROVE_TS', 0); approved = set()
+        cfg('UPD_APPROVE_ONCE', []); cfg('UPD_APPROVE_TS', 0); approved = set()
     cand, held = [], []
     for i in outdated:
         name = i['name']; lname = name.lower()
@@ -80,18 +76,5 @@ class AutoUpdateManager(commands.Cog):
             ('Total Outdated', str(len(outs)), True),
         ])
         await send_selfheal(self.bot, em)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: 'discord.Message'):
-        if message.author.bot: return
-        if not isinstance(message.channel, (discord.DMChannel, discord.GroupChannel)): return
-        if str(message.content).strip().lower().startswith('update check'):
-            outs = pip_list_outdated(); cand, held = _classify(outs)
-            em = _mk_embed('Manual — Update Check', '', 0x3498db, [
-                ('Apply candidates', '\n- ' + '\n- '.join(cand or ['(none)']), False),
-                ('Held updates', '\n- ' + '\n- '.join(held or ['(none)']), False),
-                ('Total Outdated', str(len(outs)), True),
-            ])
-            await message.channel.send(embed=em)
 
 async def setup(bot): await bot.add_cog(AutoUpdateManager(bot))

@@ -423,3 +423,16 @@ class LearningProgress(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningProgress(bot))
+
+
+# --- Compat patch: ensure _slang_counts returns 4 values ---
+try:
+    _orig__slang_counts = _slang_counts
+    def _slang_counts(*a, **k):
+        res = _orig__slang_counts(*a, **k)
+        if isinstance(res, tuple) and len(res) == 3:
+            t,p,n = res
+            return t,p,n,False
+        return res
+except Exception:
+    pass

@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import json, re
 import discord
@@ -20,12 +21,7 @@ def _to_snake(name: str) -> str:
         name = name[:-3]
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     snake = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-    aliases = {
-        'stickerfeedback': 'sticker_feedback',
-        'sticker_textfeedback': 'sticker_text_feedback',
-        'banlogger': 'ban_logger',
-        'autoupdatemanager': 'auto_update_manager',
-    }
+    aliases = {'stickerfeedback': 'sticker_feedback','sticker_textfeedback': 'sticker_text_feedback','banlogger': 'ban_logger','autoupdatemanager': 'auto_update_manager'}
     core = aliases.get(snake.replace('_',''), snake)
     return COGS_PREFIX + core
 
@@ -40,7 +36,6 @@ class ConfigManager(commands.Cog):
         content = message.content.strip()
         low = content.lower()
 
-        # Auto-claim OWNER on first DM
         if isinstance(message.channel, (discord.DMChannel, discord.GroupChannel)) and cfg('OWNER_USER_ID') is None:
             set_cfg('OWNER_USER_ID', str(message.author.id))
             em = discord.Embed(title='Owner claimed', description='This user is now set as OWNER_USER_ID.', color=0x2ecc71)
@@ -65,7 +60,6 @@ class ConfigManager(commands.Cog):
         if not _is_owner(message.author):
             return
 
-        # Cog controls
         if low in ('cog list','cogs','cog status'):
             loaded = sorted(self.bot.extensions.keys())
             names = [m.replace(COGS_PREFIX,'') for m in loaded if m.startswith(COGS_PREFIX)]
@@ -131,7 +125,7 @@ class ConfigManager(commands.Cog):
             set_cfg('IMPORTED_ENV_NOTIFY', True)
             await message.channel.send(embed=discord.Embed(
                 title='ENV Import',
-                description=f"Imported from `{path}`: cfg={c_cfg}, secrets={c_sec}. Report will be DM\'d.",
+                description=f"Imported from `{path}`: cfg={c_cfg}, secrets={c_sec}. Report will be DM'd.",
                 color=0x3498db
             ))
 

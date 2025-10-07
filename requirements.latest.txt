@@ -1,0 +1,6 @@
+# Overlay deps for translation features
+googletrans-py>=4.0.0
+deep-translator>=1.11.4
+langdetect>=1.0.9
+# Windows-only timezone DB (prevents ZoneInfoNotFoundError)
+tzdata>=2025.1; sys_platform == "win32"

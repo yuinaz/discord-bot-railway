@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import asyncio
 import discord
@@ -20,9 +21,7 @@ class SelfMaintenanceManager(commands.Cog):
     @tasks.loop(minutes=30)
     async def loop(self):
         await send_selfheal(self.bot, _mk('Maintenance', 'Heartbeat ok'))
-        # Example safe reload of a small list of extensions, if configured
-        exts = []  # keep empty by default
-        for ext in exts:
+        for ext in []:
             try:
                 await self._maybe_await(self.bot.unload_extension(ext)); self.unloaded.append(ext)
             except Exception: pass

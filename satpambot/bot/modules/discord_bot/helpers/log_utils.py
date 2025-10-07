@@ -1,10 +1,36 @@
 from __future__ import annotations
-# --- Timezone helpers (WIB) ---
+
+# --- Timezone helpers (WIB with robust fallback) ---
+from datetime import datetime, timezone, timedelta
+import asyncio, logging, os, time, hashlib
+from typing import Optional, Tuple
+
 try:
-    from zoneinfo import ZoneInfo
-except Exception:  # Py<3.9 fallback
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # Py>=3.9
+except Exception:  # pragma: no cover
+    # For very old Pythons, rely on backports if available
     from backports.zoneinfo import ZoneInfo  # type: ignore
-ASIA_JAKARTA_TZ = ZoneInfo("Asia/Jakarta")
+    try:
+        from backports.zoneinfo import ZoneInfoNotFoundError  # type: ignore
+    except Exception:  # pragma: no cover
+        class ZoneInfoNotFoundError(Exception):  # minimal shim
+            pass
+
+def _jakarta_tz():
+    """Return Asia/Jakarta tzinfo if available; otherwise try tzdata; else fallback to fixed UTC+7 (WIB)."""
+    try:
+        return ZoneInfo("Asia/Jakarta")
+    except ZoneInfoNotFoundError:
+        try:
+            # Ensure tz database is available in Windows/Py310 environments
+            import tzdata  # noqa: F401  (imported for side-effect of providing IANA tzdb)
+            return ZoneInfo("Asia/Jakarta")
+        except Exception:
+            # Final fallback: fixed-offset timezone (no DST) — good enough for WIB
+            return timezone(timedelta(hours=7), name="WIB")
+
+ASIA_JAKARTA_TZ = _jakarta_tz()
+
 def _fmt_wib(ts=None):
     import datetime as _dt
     if ts is None:
@@ -15,9 +41,10 @@ def _fmt_wib(ts=None):
         ts = ts.replace(tzinfo=ASIA_JAKARTA_TZ)
     return ts.strftime("%d %b %Y %H:%M WIB")
 
-import asyncio, logging, os, time, hashlib
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Tuple
+def _wib_now() -> datetime:
+    # Correct: get 'now' in Asia/Jakarta, not UTC shifted
+    return datetime.now(ASIA_JAKARTA_TZ)
+
 import discord
 from satpambot.bot.modules.discord_bot.utils import sticky_store
 
@@ -25,9 +52,6 @@ log = logging.getLogger(__name__)
 
 _STATUS_MARKER = "SATPAMBOT_STATUS_V1"
 _lock = asyncio.Lock()
-
-def _wib_now() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(hours=7)
 
 def _uptime_human(bot: discord.Client) -> str:
     start = getattr(bot, "start_time", None)
@@ -62,6 +86,7 @@ def _embed_and_content(bot: discord.Client) -> Tuple[discord.Embed, str]:
         title="SatpamBot Status",
         description=f"Status ringkas bot.",
         colour=0x3BA55D,
+        # Discord expects UTC timestamps; convert explicitly
         timestamp=_wib_now().astimezone(timezone.utc),
     )
     e.add_field(name="Akun", value=str(bot.user), inline=False)
@@ -198,8 +223,6 @@ async def upsert_status_embed(bot: discord.Client, target) -> None:
     else:
         log.warning('[status] upsert skipped: cannot resolve TextChannel from target=%r', target)
 
-
-
 def log_startup_status(bot: discord.Client, guild: discord.Guild) -> None:
     """Print INFO logs showing how status/log channel is resolved (for diagnostics)."""
     raw_status_id = os.getenv("STATUS_CHANNEL_ID", "")
@@ -245,7 +268,6 @@ async def _pin_if_needed(msg):
             await msg.pin(reason="SatpamBot sticky status")
     except Exception:
         pass
-
 
 async def _find_existing_status_message(bot, ch):
     marker = _STATUS_MARKER
