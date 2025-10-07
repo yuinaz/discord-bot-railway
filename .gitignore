@@ -1,6 +1,12 @@
 
-# === SatpamBot secrets (added by patch) ===
+# Local env & overrides
 SatpamBot.env
 satpambot/config/99_env_override.json
-*.env
+
+# Python & OS cruft
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
 .env
+.DS_Store

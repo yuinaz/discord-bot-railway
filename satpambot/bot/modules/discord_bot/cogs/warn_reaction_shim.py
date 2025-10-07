@@ -1,29 +1,42 @@
 
-import os, asyncio, logging
-import discord
+# Shim: hide warn (⚠️) reaction without disabling any learning features.
+# This cog monkey-patches the underlying call that adds the warning reaction.
+# If the project uses a helper like add_warn_reaction(msg), we intercept it.
+from __future__ import annotations
+import os
+from discord.ext import commands
 
-log = logging.getLogger(__name__)
+FILTER = os.getenv("REACT_WARN_FILTER", "⚠")
+ENABLE = os.getenv("REACT_WARN_ENABLE", "false").lower() not in ("0","false","no","off")
 
-REACT_OK = os.getenv("REACT_WARN_ENABLE", "false").lower() in ("1","true","yes","on")
+def _should_filter(emoji: str) -> bool:
+    return ENABLE and (emoji == FILTER or emoji.startswith(FILTER))
 
-_patched = getattr(discord.Message, "_patched_by_warn_shim", False)
+class WarnReactionShim(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        # Try to patch common helpers dynamically
+        # If helper not found, we patch Message.add_reaction via a wrapper
+        import discord
 
-if not _patched and not REACT_OK:
-    _orig_add = discord.Message.add_reaction
-    async def _add_reaction_patched(self, emoji, *args, **kwargs):
-        try:
-            if str(emoji) in ("⚠️", "⚠"):
-                # swallow this reaction silently
-                log.debug("[warn_reaction_shim] blocked warn reaction on message id=%s", getattr(self, "id", "?"))
-                await asyncio.sleep(0)
-                return
-        except Exception:
-            pass
-        return await _orig_add(self, emoji, *args, **kwargs)
-    discord.Message.add_reaction = _add_reaction_patched
-    discord.Message._patched_by_warn_shim = True
-    log.info("[warn_reaction_shim] patch active (REACT_WARN_ENABLE=%s)", REACT_OK)
+        orig_add_reaction = discord.Message.add_reaction
 
-async def setup(bot):
-    # This is a shim-only cog; nothing to add, but presence ensures loader imports us.
-    log.info("[warn_reaction_shim] setup() completed")
+        async def add_reaction_wrapper(self, emoji):
+            try:
+                if _should_filter(str(emoji)):
+                    # Swallow silently
+                    return
+            except Exception:
+                pass
+            return await orig_add_reaction(self, emoji)
+
+        # Monkey-patch once
+        discord.Message.add_reaction = add_reaction_wrapper
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        # just to log once
+        print("[warn_reaction_shim] aktif; filter:", FILTER, "enabled:", ENABLE)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(WarnReactionShim(bot))
