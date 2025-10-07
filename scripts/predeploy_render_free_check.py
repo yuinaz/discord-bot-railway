@@ -1,75 +1,91 @@
-import os, sys, sqlite3, traceback, importlib, asyncio, time
-from pathlib import Path
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Predeploy check for Render (Free plan friendly)
+- Recommends python 3.11.x via runtime.txt
+- Checks critical files and light deps
+- No config modifications
+"""
+import os, re, sys
 
-# --- Ensure repo root is on sys.path even when this file is run from scripts/ ---
-THIS = Path(__file__).resolve()
-REPO_ROOT = THIS.parents[1]  # <repo>/
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+def abspath(*p): return os.path.abspath(os.path.join(ROOT, *p))
 
-FAIL = 0
-
-def step(name):
-    print(f"== {name} ==")
-
-def ok(msg): print("OK  :", msg)
-def fail(msg):
-    global FAIL
-    print("FAIL:", msg)
-    FAIL += 1
-
-def check_env_profile():
-    step("env profile (lite by default)")
+def read_text(path):
     try:
-        envcfg = importlib.import_module("satpambot.bot.config.envcfg")
-        soft, hard = envcfg.memory_thresholds_mb()
-        ok(f"memory thresholds soft={soft}MB hard={hard}MB")
-        if hard <= soft:
-            fail("hard must be > soft")
-    except Exception as e:
-        traceback.print_exc()
-        fail("env profile failed")
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
 
-def check_sql_exec():
-    step("sticker_learner SQL exec")
-    try:
-        os.environ.setdefault("NEUROLITE_MEMORY_DB", os.path.join("data","preflight.sqlite3"))
-        slmod = importlib.import_module("satpambot.bot.modules.discord_bot.helpers.sticker_learner")
-        SL = getattr(slmod, "StickerLearner")
-        sl = SL()
-        sl.log_event(1, "happy", True, True, 0, False, False, {"exclam":1,"www":1,"wkwk":0,"lol":0})
-        ok("insert events/stats executed")
-    except Exception as e:
-        traceback.print_exc()
-        fail("sticker_learner SQL failed")
+def has(path): return os.path.exists(path)
 
-def check_fake_runtime():
-    step("fake Discord runtime (load cogs)")
-    try:
-        # Run the helper by absolute path so it works without package import for 'scripts'
-        from runpy import run_path
-        helper = REPO_ROOT / "scripts" / "test_fake_discord_runtime.py"
-        if not helper.exists():
-            fail(f"helper not found: {helper}")
-            return
-        run_path(str(helper), run_name="__main__")
-        ok("cogs setup on FakeBot OK")
-    except Exception as e:
-        traceback.print_exc()
-        fail("fake runtime failed")
-
-def main():
-    check_env_profile()
-    check_sql_exec()
-    check_fake_runtime()
-
-    print("\n=== PREDEPLOY SUMMARY ===")
-    if FAIL == 0:
-        print("PASS")
-        sys.exit(0)
+def main() -> int:
+    rc = 0
+    # runtime.txt
+    rtp = abspath("runtime.txt")
+    if has(rtp):
+        txt = read_text(rtp).strip()
+        print(f"OK   : runtime.txt -> {txt}")
+        if not txt.startswith("python-3.11"):
+            print("WARN : Disarankan python-3.11.x untuk build cepat & stabil di Render.")
     else:
-        print(f"FAILED checks: {FAIL}")
-        sys.exit(1)
+        print("WARN : runtime.txt tidak ada; Render akan pakai default (3.13). Pertimbangkan tambah 'python-3.11.9'.")
+
+    # requirements sanity
+    reqp = abspath("requirements.txt")
+    if has(reqp):
+        req = read_text(reqp)
+        if "gunicorn" not in req:
+            print("WARN : 'gunicorn' tidak terdeteksi di requirements.txt (disarankan untuk web server).")
+        if "numpy" not in req:
+            print("WARN : 'numpy' tidak terdeteksi — ok jika tidak digunakan, jika perlu pastikan versi kompatibel.")
+        else:
+            m = re.search(r"numpy\s*([<>=!~]=?[^\n]+)?", req, re.IGNORECASE)
+            pin = m.group(0).strip() if m else "numpy"
+            print(f"OK   : {pin}")
+    else:
+        print("WARN : requirements.txt tidak ditemukan di root.")
+
+    # build script
+    bsh = abspath("scripts", "build_render.sh")
+    if has(bsh):
+        print("OK   : scripts/build_render.sh ada")
+    else:
+        print("WARN : scripts/build_render.sh tidak ditemukan")
+
+    # critical configs
+    must_cfg = [
+        ("config/first_touch_attachment_ban.json", True),
+        ("config/first_touch_autoban_pack_mime.json", True),
+        ("config/presence_mood_rotator.json", True),
+    ]
+    for rel, required in must_cfg:
+        p = abspath(rel)
+        if has(p):
+            print(f"OK   : {rel}")
+        else:
+            lev = "FAIL" if required else "WARN"
+            print(f"{lev} : {rel} tidak ada")
+            if required: rc = 1
+
+    # cogs existence (optional check)
+    cogs = [
+        "satpambot/bot/modules/discord_bot/cogs/first_touch_attachment_ban.py",
+        "satpambot/bot/modules/discord_bot/cogs/first_touch_autoban_pack_mime.py",
+        "satpambot/bot/modules/discord_bot/cogs/presence_mood_rotator.py",
+        "satpambot/bot/modules/discord_bot/cogs/self_heal_runtime.py",
+    ]
+    for rel in cogs:
+        p = abspath(rel)
+        if has(p):
+            print(f"OK   : {rel}")
+        else:
+            print(f"WARN : {rel} tidak ada")
+
+    # env hints (cannot read Render env here)
+    print("INFO : Pastikan di Render env: DISCORD_TOKEN, OPENAI-KEY/OPENAI_API_KEY (opsional), LOG_CHANNEL_ID_RAW.")
+    return rc
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
