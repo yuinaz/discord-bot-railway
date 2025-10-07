@@ -65,7 +65,10 @@ class ChatNeuroLite(commands.Cog):
 
         self.mem.add(uid, "user", text)
         past = self.mem.recent(uid, limit=6)
-        history = "".join(f"{role}: {content}\n" for _,role,content in past)
+        history = "".join(
+            f"{(t[1] if len(t)==3 else t[0])}: {(t[2] if len(t)==3 else t[1])}\n"
+            for t in past if isinstance(t,(list,tuple)) and len(t)>=2
+        )
 
         try:
             async with message.channel.typing():
