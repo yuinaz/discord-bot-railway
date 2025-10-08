@@ -1,46 +1,47 @@
-"""Discord translator Cog.
-Safe on import: no network calls or heavy side effects at import time.
-"""
+
 from __future__ import annotations
+import os
+import discord
+from discord.ext import commands
+from typing import Optional
 
-import typing as _t
+from satpambot.utils import translate_utils as tu
 
-try:
-    import discord
-    from discord.ext import commands
-except Exception:  # pragma: no cover
-    # Allow import to succeed in environments without discord.py (smoke/import only)
-    discord = None  # type: ignore
-    commands = object  # type: ignore
+DEFAULT_TARGET = os.getenv("TRANSLATE_DEFAULT_TARGET", "en")
+DEFAULT_PROVIDER = os.getenv("TRANSLATE_PROVIDER", "auto")  # auto|deep|googletrans
 
-# Import lazily inside commands to avoid provider import during smoke
-# (translate_utils already lazy-loads providers).
-from satpambot.utils.translate_utils import translate_text
+class Translator(commands.Cog):
+    """Message translator via context menu & slash command.
+    Minimal footprint, works without OpenAI.
+    """
 
-
-class Translator(commands.Cog if hasattr(commands, 'Cog') else object):  # type: ignore
-    """Adds a /translate command (hybrid)."""
-
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    if hasattr(commands, 'hybrid_command'):
-        @commands.hybrid_command(name="translate", with_app_command=True, description="Translate text (default to Indonesian)")
-        async def translate_cmd(self, ctx, *, text: str):
-            """/translate <text> -> Indonesian (id) by default.
-            Use: /translate text:"hello"
-            """
-            try:
-                translated = translate_text(text, target_lang="id", source_lang="auto")
-            except Exception as e:
-                translated = f"[Translator error] {e}"
-            if hasattr(discord, 'Embed'):
-                embed = discord.Embed(title="Translation", description=translated)  # type: ignore
-                embed.set_footer(text="SatpamBot Translator")
-                await ctx.reply(embed=embed)  # type: ignore
-            else:
-                await ctx.reply(translated)  # type: ignore
+    # Context menu: right click -> Apps -> Translate
+    @discord.app_commands.context_menu(name="Translate")
+    async def translate_context(self, interaction: discord.Interaction, message: discord.Message):
+        target = DEFAULT_TARGET
+        provider = DEFAULT_PROVIDER
+        text = message.content or ""
+        if not text.strip():
+            await interaction.response.send_message("Tidak ada teks untuk diterjemahkan.", ephemeral=True)
+            return
+        out = tu.translate_text(text, target=target, provider=provider)
+        detected = tu.detect_lang(text)
+        embed = discord.Embed(title=f"Translate -> {target}", description=out)
+        embed.set_footer(text=f"detected: {detected} • provider: {provider}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-async def setup(bot):
-    if hasattr(commands, 'Cog'):
-        await bot.add_cog(Translator(bot))  # type: ignore
+    @discord.app_commands.command(name="translate", description="Terjemahkan teks dengan cepat")
+    @discord.app_commands.describe(text="Teks sumber", target="Kode bahasa tujuan (mis. en, id, ja, zh-CN)")
+    async def translate_slash(self, interaction: discord.Interaction, text: str, target: Optional[str] = None):
+        tgt = (target or DEFAULT_TARGET).strip() or "en"
+        out = tu.translate_text(text, target=tgt, provider=DEFAULT_PROVIDER)
+        detected = tu.detect_lang(text)
+        embed = discord.Embed(title=f"Translate -> {tgt}", description=out)
+        embed.set_footer(text=f"detected: {detected} • provider: {DEFAULT_PROVIDER}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Translator(bot))

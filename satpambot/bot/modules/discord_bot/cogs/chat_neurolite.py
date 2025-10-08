@@ -1,3 +1,4 @@
+from satpambot.ai.llm_client import make_client
 
 from __future__ import annotations
 import os, time, asyncio
@@ -6,7 +7,7 @@ from discord.ext import commands
 from typing import Dict, List
 
 try:
-    from satpambot.ai.openai_v1_adapter import get_client  # optional
+    from satpambot.ai.satpambot.ai.llm_client_v1_adapter import get_client  # optional
     _HAS_ADAPTER = True
 except Exception:
     _HAS_ADAPTER = False
@@ -97,7 +98,7 @@ class ChatNeuroLite(commands.Cog):
         self.last_ts[channel_id] = now
         return True
 
-    async def _call_openai(self, messages: List[Dict[str, str]]) -> str:
+    async def _call_satpambot.ai.llm_client(self, messages: List[Dict[str, str]]) -> str:
         model = str(_get_flag('CHAT_MODEL', _get_flag('OPENAI_CHAT_MODEL', 'gpt-5-mini')))
         max_tokens = int(_get_flag('CHAT_MAX_TOKENS', 256))
         timeout_s = int(_get_flag('OPENAI_TIMEOUT_S', 20))
@@ -110,7 +111,7 @@ class ChatNeuroLite(commands.Cog):
                 model=model, messages=messages, max_tokens=max_tokens, temperature=0.6))
             return (resp.choices[0].message.content or '').strip()
 
-        from openai import OpenAI
+        from satpambot.ai.llm_client import OpenAI
         client = OpenAI(api_key=key, base_url=base)
         resp = client.chat.completions.create(
             model=model,
@@ -141,7 +142,7 @@ class ChatNeuroLite(commands.Cog):
         ]
 
         try:
-            reply = await self._call_openai(msgs)
+            reply = await self._call_satpambot.ai.llm_client(msgs)
             if not reply:
                 return
             allowed = discord.AllowedMentions(everyone=False, users=[message.author], roles=False, replied_user=False)

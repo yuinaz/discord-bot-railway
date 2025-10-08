@@ -1,77 +1,87 @@
-"""Lightweight translation helper with multi-provider fallback.
-Safe to import in smoke tests (no heavy imports at module level).
-"""
 
 from __future__ import annotations
-from typing import Optional
 
-# Lazy import providers to keep import safe for smoke tests.
-def _try_googletrans(text: str, target: str, source: str) -> Optional[str]:
+"""
+Lightweight translation utilities for SatpamBot.
+
+Providers:
+- deep-translator (GoogleTranslator)  -> default
+- googletrans-py                       -> fallback/optional
+
+This module has zero runtime dependency on OpenAI.
+"""
+
+from typing import Optional, Literal
+
+try:
+    # googletrans-py package uses the import name "googletrans"
+    from googletrans import Translator as _GTTranslator  # type: ignore
+    _HAS_GOOGLETRANS = True
+except Exception:  # pragma: no cover
+    _HAS_GOOGLETRANS = False
+    _GTTranslator = None  # type: ignore
+
+try:
+    from deep_translator import GoogleTranslator as _DTGoogleTranslator  # type: ignore
+except Exception as e:  # pragma: no cover
+    raise RuntimeError("deep-translator is required for translate_utils") from e
+
+try:
+    from langdetect import detect as _detect_lang  # type: ignore
+except Exception:  # pragma: no cover
+    def _detect_lang(text: str) -> str:
+        # minimal heuristic fallback
+        return "en"
+
+
+Provider = Literal["auto", "deep", "googletrans"]
+
+
+def detect_lang(text: str) -> str:
+    """Detect language code (very fast, best-effort)."""
     try:
-        from googletrans import Translator  # type: ignore
+        return _detect_lang(text)
     except Exception:
-        return None
-    try:
-        t = Translator()
-        res = t.translate(text, src=source, dest=target)
-        return getattr(res, "text", None)
-    except Exception:
-        return None
+        # default to English if detector fails
+        return "en"
 
 
-def _try_deeptranslator(text: str, target: str, source: str) -> Optional[str]:
-    try:
-        from deep_translator import GoogleTranslator  # type: ignore
-    except Exception:
-        return None
-    try:
-        # deep_translator uses 'source/target' naming and expects 'auto' or lang codes
-        return GoogleTranslator(source=source, target=target).translate(text)
-    except Exception:
-        return None
-
-
-_LANG_ALIAS = {
-    "bahasa": "id",
-    "indonesian": "id",
-    "jp": "ja",
-    "jpn": "ja",
-    "zh": "zh-CN",
-    "cn": "zh-CN",
-    "zh-cn": "zh-CN",
-    "zh-tw": "zh-TW",
-    "en-us": "en",
-    "en-gb": "en",
-}
-
-def _norm_lang(code: str) -> str:
-    code = (code or "").strip()
-    if not code:
-        return "auto"
-    key = code.lower()
-    return _LANG_ALIAS.get(key, code)
-
-
-def translate_text(text: str, target_lang: str = "id", source_lang: str = "auto") -> str:
-    """Translate *text* to *target_lang*, falling back across providers.
-    Raises RuntimeError if all providers fail.
+def translate_text(
+    text: str,
+    target: str = "en",
+    provider: Provider = "auto",
+    source: Optional[str] = None,
+) -> str:
     """
-    if not isinstance(text, str):
-        raise TypeError("text must be str")
-    text = text.strip()
+    Translate `text` to `target` using selected provider.
+    - provider="auto" picks googletrans if available, else deep-translator
+    - source=None means auto-detect
+    """
+    text = (text or "").strip()
     if not text:
         return ""
 
-    target = _norm_lang(target_lang)
-    source = _norm_lang(source_lang)
+    selected: Provider = provider
+    if provider == "auto":
+        selected = "googletrans" if _HAS_GOOGLETRANS else "deep"
 
-    # Provider order: googletrans -> deep_translator
-    for provider in (_try_googletrans, _try_deeptranslator):
-        out = provider(text, target, source)
-        if isinstance(out, str) and out.strip():
-            return out
+    if selected == "googletrans":
+        if not _HAS_GOOGLETRANS:
+            # silently fall back to deep if googletrans not installed
+            selected = "deep"
+        else:
+            try:
+                tr = _GTTranslator()
+                res = tr.translate(text, dest=target, src=source or "auto")
+                return getattr(res, "text", str(res))
+            except Exception:
+                # if googletrans fails at runtime, fall back
+                selected = "deep"
 
-    raise RuntimeError("No translation provider available or all failed")
-
-
-__all__ = ["translate_text"]
+    # deep-translator path
+    src = source if (source and source != "auto") else "auto"
+    try:
+        return _DTGoogleTranslator(source=src, target=target).translate(text)
+    except Exception as e:
+        # don't explode—return original text as last resort
+        return text

@@ -1,0 +1,1 @@
+Put secrets files here if you don't use ENV. Example: openai_api_key.txt\n

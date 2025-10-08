@@ -1,20 +1,19 @@
-# Offline-friendly smoke test to verify imports only.
-# Ensures repository root is on sys.path so `satpambot` package can be found.
 
-import sys, pathlib, importlib
+import importlib, sys, pathlib
 
+# ensure repo root on sys.path (scripts/ -> root)
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-def _try(modname: str) -> None:
+def check(modname: str):
     try:
         importlib.import_module(modname)
-        print(f"[OK] {modname}: import ok")
+        print(f"[OK] import: {modname}")
     except Exception as e:
         print(f"[FAIL] {modname}: {e}")
 
-_try("satpambot.utils.translate_utils")
-_try("satpambot.bot.modules.discord_bot.cogs.translator")
-
-print("-- OK if both above show [OK]")
+check("satpambot.utils.translate_utils")
+check("satpambot.bot.modules.discord_bot.cogs.translator")
+check("satpambot.bot.modules.discord_bot.cogs.warn_reaction_blocker")
+print("-- OK if translate modules show [OK]")
