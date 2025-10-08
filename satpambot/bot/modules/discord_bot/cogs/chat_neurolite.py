@@ -4,16 +4,12 @@ import discord
 from discord.ext import commands
 from typing import Dict, List
 
+# Prefer Groq (if installed)
 try:
-    # Prefer Groq (detached from groq by default)
     from groq import Groq
     _HAS_GROQ = True
 except Exception:
     _HAS_GROQ = False
-
-try:
-    # Optional groq fallback only if present
-except Exception:
 
 from satpambot.config.runtime import cfg, set_cfg
 
@@ -55,7 +51,6 @@ def _map_model_alias(model: str) -> str:
     # Keep config untouched; transparently map common aliases to Groq defaults
     alias = {
         'llama-3.1-8b-instant': 'llama-3.1-8b-instant',   # cheap/fast text model
-        'llama-3.1-8b-instant': 'llama-3.1-8b-instant',
         'llama-3.3-70b-versatile': 'llama-3.3-70b-versatile',
     }
     return alias.get(str(model), str(model))
@@ -74,10 +69,10 @@ class ChatNeuroLite(commands.Cog):
                 'CHAT_ALLOW_GUILD': True,
                 'CHAT_MENTIONS_ONLY': False,
                 'CHAT_MIN_INTERVAL_S': 8,
-                'GROQ_CHAT_MODEL': 'llama-3.1-8b-instant',
+                'GROQ_MODEL': 'llama-3.1-8b-instant',
                 'CHAT_MODEL': 'llama-3.1-8b-instant',
                 'CHAT_MAX_TOKENS': 256,
-                'GROQ_TIMEOUT_S': 20,
+                'LLM_TIMEOUT_S': 20,
             }
             applied = []
             for k, dv in defaults.items():
@@ -119,18 +114,17 @@ class ChatNeuroLite(commands.Cog):
         return True
 
     async def _call_llm_client(self, messages: List[Dict[str, str]]) -> str:
-        # Prefer GROQ if available; otherwise optional groq fallback
+        # GROQ first
         model = str(_get_flag('GROQ_MODEL', _get_flag('CHAT_MODEL', 'llama-3.1-8b-instant')))
         model = _map_model_alias(model)
         max_tokens = int(_get_flag('CHAT_MAX_TOKENS', 256))
         timeout_s = int(_get_flag('LLM_TIMEOUT_S', 20))
 
-        # GROQ first
         groq_key = os.getenv('GROQ_API_KEY') or (cfg('GROQ_API_KEY') or None)
         groq_base = os.getenv('GROQ_BASE_URL') or (cfg('GROQ_BASE_URL') or None)
 
         if _HAS_GROQ and groq_key:
-            client = Groq(api_key=groq_key, base_url=groq_base)
+            client = Groq(api_key=groq_key, base_url=groq_base, timeout=timeout_s)
             resp = await asyncio.to_thread(
                 lambda: client.chat.completions.create(
                     model=model,
@@ -141,18 +135,7 @@ class ChatNeuroLite(commands.Cog):
             )
             return (resp.choices[0].message.content or '').strip()
 
-        # Optional groq fallback (kept for compatibility if present)
-# PURGED: groq base url
-# PURGED: groq api key
-            resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.6
-            )
-            return (resp.choices[0].message.content or '').strip()
-
-        raise RuntimeError("No LLM client available (need GROQ_API_KEY or groq client installed).")
+        raise RuntimeError("No LLM client available (need GROQ_API_KEY and groq package installed).")
 
     @commands.Cog.listener()
     async def on_message(self, message: 'discord.Message'):
