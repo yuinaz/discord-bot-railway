@@ -9,7 +9,7 @@ from . import runtime as _rt
 
 # Heuristic prefixes that we consider as config-ish when harvesting env keys
 _PREFIXES = (
-    "CHAT_", "OPENAI_", "GROQ_", "MAINT_", "NAP_", "STICKER_", "OWNER_", "SELF_", "BOOT_", "BAN_", "METRICS_", "LOG_",
+    "CHAT_",  "GROQ_", "MAINT_", "NAP_", "STICKER_", "OWNER_", "SELF_", "BOOT_", "BAN_", "METRICS_", "LOG_",
     "DASH_", "FAST_GUARD_", "PHISH_", "THREAD_", "COG_", "PORT", "IMPORTED_ENV_NOTIFY"
 )
 

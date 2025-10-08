@@ -5,18 +5,15 @@ from discord.ext import commands
 from typing import Dict, List
 
 try:
-    # Prefer Groq (detached from OpenAI by default)
+    # Prefer Groq (detached from groq by default)
     from groq import Groq
     _HAS_GROQ = True
 except Exception:
     _HAS_GROQ = False
 
 try:
-    # Optional OpenAI fallback only if present
-    from openai import OpenAI as _OpenAI
-    _HAS_OPENAI = True
+    # Optional groq fallback only if present
 except Exception:
-    _HAS_OPENAI = False
 
 from satpambot.config.runtime import cfg, set_cfg
 
@@ -57,9 +54,9 @@ def _clean_content(s: str, bot: commands.Bot) -> str:
 def _map_model_alias(model: str) -> str:
     # Keep config untouched; transparently map common aliases to Groq defaults
     alias = {
-        'gpt-5-mini': 'llama-3.1-8b-instant',   # cheap/fast text model
-        'gpt-4o-mini': 'llama-3.1-8b-instant',
-        'gpt-4o': 'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant': 'llama-3.1-8b-instant',   # cheap/fast text model
+        'llama-3.1-8b-instant': 'llama-3.1-8b-instant',
+        'llama-3.3-70b-versatile': 'llama-3.3-70b-versatile',
     }
     return alias.get(str(model), str(model))
 
@@ -77,10 +74,10 @@ class ChatNeuroLite(commands.Cog):
                 'CHAT_ALLOW_GUILD': True,
                 'CHAT_MENTIONS_ONLY': False,
                 'CHAT_MIN_INTERVAL_S': 8,
-                'OPENAI_CHAT_MODEL': 'gpt-5-mini',
-                'CHAT_MODEL': 'gpt-5-mini',
+                'GROQ_CHAT_MODEL': 'llama-3.1-8b-instant',
+                'CHAT_MODEL': 'llama-3.1-8b-instant',
                 'CHAT_MAX_TOKENS': 256,
-                'OPENAI_TIMEOUT_S': 20,
+                'GROQ_TIMEOUT_S': 20,
             }
             applied = []
             for k, dv in defaults.items():
@@ -122,11 +119,11 @@ class ChatNeuroLite(commands.Cog):
         return True
 
     async def _call_llm_client(self, messages: List[Dict[str, str]]) -> str:
-        # Prefer GROQ if available; otherwise optional OpenAI fallback
-        model = str(_get_flag('CHAT_MODEL', _get_flag('OPENAI_CHAT_MODEL', 'gpt-5-mini')))
+        # Prefer GROQ if available; otherwise optional groq fallback
+        model = str(_get_flag('GROQ_MODEL', _get_flag('CHAT_MODEL', 'llama-3.1-8b-instant')))
         model = _map_model_alias(model)
         max_tokens = int(_get_flag('CHAT_MAX_TOKENS', 256))
-        timeout_s = int(_get_flag('OPENAI_TIMEOUT_S', 20))
+        timeout_s = int(_get_flag('LLM_TIMEOUT_S', 20))
 
         # GROQ first
         groq_key = os.getenv('GROQ_API_KEY') or (cfg('GROQ_API_KEY') or None)
@@ -144,11 +141,9 @@ class ChatNeuroLite(commands.Cog):
             )
             return (resp.choices[0].message.content or '').strip()
 
-        # Optional OpenAI fallback (kept for compatibility if present)
-        if _HAS_OPENAI:
-            base = os.getenv('OPENAI_BASE_URL') or str(cfg('OPENAI_BASE_URL') or '') or None
-            key = os.getenv('OPENAI_API_KEY') or str(cfg('OPENAI_API_KEY') or '') or None
-            client = _OpenAI(api_key=key, base_url=base, timeout=timeout_s)
+        # Optional groq fallback (kept for compatibility if present)
+# PURGED: groq base url
+# PURGED: groq api key
             resp = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -157,7 +152,7 @@ class ChatNeuroLite(commands.Cog):
             )
             return (resp.choices[0].message.content or '').strip()
 
-        raise RuntimeError("No LLM client available (need GROQ_API_KEY or OpenAI client installed).")
+        raise RuntimeError("No LLM client available (need GROQ_API_KEY or groq client installed).")
 
     @commands.Cog.listener()
     async def on_message(self, message: 'discord.Message'):

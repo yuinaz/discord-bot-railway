@@ -1,4 +1,3 @@
-
 import os, sys
 name = os.getenv("AI_PROVIDER", "groq")
 key = os.getenv("GROQ_API_KEY")
@@ -8,4 +7,4 @@ if not key:
     print("[ERR] GROQ_API_KEY belum di-set.")
     sys.exit(2)
 print("[OK] GROQ_API_KEY terdeteksi (panjang:", len(key), ")")
-print("[OK] Lingkungan siap ke Groq (OpenAI-compatible client).")
+print("[OK] Lingkungan siap ke Groq (HTTP-compatible client).")

@@ -18,7 +18,7 @@ def pip_list_outdated() -> List[Dict[str, Any]]:
         return []
 
 def _crucial_set() -> set[str]:
-    base = set([x.strip().lower() for x in str(cfg('CRUCIAL_PACKAGES', 'openai,discord.py,numpy,pandas,Pillow')).split(',') if x.strip()])
+    base = set([x.strip().lower() for x in str(cfg('CRUCIAL_PACKAGES', 'groq,discord.py,numpy,pandas,Pillow')).split(',') if x.strip()])
     return base
 
 def _approved_once() -> set[str]:
@@ -36,12 +36,12 @@ def _classify(outdated: List[Dict[str, Any]]):
         cur = i.get('version','?'); new = i.get('latest_version','?')
         reason = None
         if _is_render_env(): reason = 'render-report-only'
-        if lname == 'openai' and (str(new).split('.')[0] != '1'): reason = 'major-pin (openai v1 adapter)'
+        if lname == 'groq' and (str(new).split('.')[0] != '1'): reason = 'major-pin (groq v1 adapter)'
         if lname in crucial and lname not in approved: reason = (reason + ', crucial') if reason else 'crucial'
         if reason:
             held.append(f"{name}: {cur} → {new}  [{reason}]")
         else:
-            cand.append('openai>=1,<2' if lname == 'openai' else f"{name}=={new}")
+            cand.append('groq>=1,<2' if lname == 'groq' else f"{name}=={new}")
     return cand, held
 
 def _mk_embed(title: str, desc: str = '', color: int = 0x3498db, fields=None):

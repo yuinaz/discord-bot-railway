@@ -1,21 +1,14 @@
 # satpambot/config/runtime.py
-# Unified runtime config with precedence: ENV > LOCAL > DEFAULTS
-# Provides: cfg, set_cfg, get_secret, all_cfg, set_secret
 from __future__ import annotations
-
 import os, json
 from pathlib import Path
 from typing import Any, Dict
 
-# Location of local config & secrets folder
 ROOT = Path(__file__).resolve().parents[2]
 CFG_PATH = ROOT / "satpambot_config.local.json"
 SECRETS_DIR = ROOT / "secrets"
 
-# Keep defaults minimal to avoid overriding ENV/LOCAL unintentionally.
-# Add more as needed; ENV & LOCAL take precedence anyway.
 DEFAULTS: Dict[str, Any] = {
-    # conservative defaults (safe fallbacks)
     "PORT": 10000,
     "CHAT_ENABLE": True,
     "CHAT_ALLOW_DM": True,
@@ -26,7 +19,6 @@ DEFAULTS: Dict[str, Any] = {
     "IMPORTED_ENV_NOTIFY": False,
 }
 
-# ------------- I/O helpers -------------
 def _read_json(path: Path) -> Dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -44,19 +36,18 @@ def _write_json(path: Path, data: Dict[str, Any]) -> None:
 
 _LOCAL = _read_json(CFG_PATH)
 
-# ------------- coercions -------------
-def _parse_bool(v: Any) -> bool:
-    if isinstance(v, bool): return v
-    s = str(v).strip().lower()
-    return s in ("1","true","yes","on","y")
-
-_INT_KEYS = {"PORT","OPENAI_TIMEOUT_S","CHAT_MAX_TOKENS","CHAT_MIN_INTERVAL_S"}
 _BOOL_KEYS = {
     "COMMANDS_OWNER_ONLY","UPDATE_DM_OWNER","MAINTENANCE_AUTO","NAP_ENABLE","NAP_DM_NOTIF",
     "STICKER_ENABLE","BOOT_DM_ONLINE","SELF_LEARNING_ENABLE","CHAT_ENABLE","CHAT_ALLOW_DM",
     "CHAT_ALLOW_GUILD","CHAT_MENTIONS_ONLY","IMPORTED_ENV_NOTIFY"
 }
+_INT_KEYS = {"PORT","CHAT_MAX_TOKENS","CHAT_MIN_INTERVAL_S","LLM_TIMEOUT_S"}
 _FLOAT_KEYS = {"NAP_CPU_LOW","NAP_CPU_HIGH","NAP_MSG_LOW","NAP_MSG_HIGH","NAP_ADAPT_ALPHA","MAINT_HALF_CPU","MAINT_RESUME_CPU"}
+
+def _parse_bool(v: Any) -> bool:
+    if isinstance(v, bool): return v
+    s = str(v).strip().lower()
+    return s in ("1","true","yes","on","y")
 
 def _coerce(k: str, v: Any) -> Any:
     try:
@@ -67,9 +58,7 @@ def _coerce(k: str, v: Any) -> Any:
         return v
     return v
 
-# ------------- public API -------------
 def cfg(key: str, default: Any = None) -> Any:
-    # ENV > LOCAL > DEFAULTS
     if key in os.environ:
         return _coerce(key, os.environ[key])
     if key in _LOCAL:
@@ -83,14 +72,12 @@ def set_cfg(key: str, value: Any) -> None:
     _write_json(CFG_PATH, _LOCAL)
 
 def get_secret(name: str) -> str | None:
-    # Read from CFG secrets first
     try:
         sec = (_read_json(CFG_PATH).get("secrets") or {})
         if name in sec and sec[name]:
             return str(sec[name])
     except Exception:
         pass
-    # Fallback to secrets dir
     try:
         SECRETS_DIR.mkdir(parents=True, exist_ok=True)
         cand = SECRETS_DIR / f"{name.lower()}.txt"
@@ -98,13 +85,11 @@ def get_secret(name: str) -> str | None:
             return cand.read_text(encoding="utf-8").strip()
     except Exception:
         pass
-    # Finally env
     return os.getenv(name)
 
-# keys harvester for all_cfg
 _PREFIXES = (
-    "CHAT_", "OPENAI_", "GROQ_", "MAINT_", "NAP_", "STICKER_", "OWNER_", "SELF_", "BOOT_", "BAN_", "METRICS_", "LOG_",
-    "DASH_", "FAST_GUARD_", "PHISH_", "THREAD_", "COG_", "PORT", "IMPORTED_ENV_NOTIFY"
+    "CHAT_", "GROQ_", "MAINT_", "NAP_", "STICKER_", "OWNER_", "SELF_", "BOOT_", "BAN_", "METRICS_", "LOG_",
+    "DASH_", "FAST_GUARD_", "PHISH_", "THREAD_", "COG_", "PORT", "IMPORTED_ENV_NOTIFY", "LLM_"
 )
 
 def _env_keys() -> set[str]:
@@ -122,7 +107,6 @@ def _local_keys() -> set[str]:
         return set()
 
 def all_cfg() -> Dict[str, Any]:
-    """Merged view of config with values resolved via cfg(): ENV > LOCAL > DEFAULTS."""
     keys = set(DEFAULTS.keys()) | _local_keys() | _env_keys()
     out: Dict[str, Any] = {}
     for k in sorted(keys):
