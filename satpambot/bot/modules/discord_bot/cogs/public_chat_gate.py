@@ -14,32 +14,33 @@ from satpambot.shared.progress_gate import ProgressGate
 
 log = logging.getLogger(__name__)
 
-
 STORE_PATH = Path("data/progress_gate.json")
 REPORT_THREAD_NAME = "progress-reports"
 MENTION_REQUIRED_WHEN_ALLOWED = True
-
+LOCK_ON_BOOT = True  # ensure start in shadow-mode
 
 def _tz_jakarta() -> dt.tzinfo:
     try:
-        import zoneinfo  # py3.9+
+        import zoneinfo
         return zoneinfo.ZoneInfo("Asia/Jakarta")
     except Exception:
         return dt.timezone(dt.timedelta(hours=7))
-
 
 def _is_dm(ctx_or_channel) -> bool:
     ch = getattr(ctx_or_channel, "channel", ctx_or_channel)
     return isinstance(ch, (discord.DMChannel, discord.GroupChannel, discord.PartialMessageable))
 
-
 class PublicChatGate(commands.Cog):
-    """Two-phase public chat gate (TK -> SD). DM-only controls. Reports daily/weekly/monthly.
-    Fail-safe: deletes bot messages in public when still locked.
+    """Multi-level gate:
+    - TK (2 levels) must complete -> then SD (6 levels) must complete -> then owner can unlock public.
     """
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.gate = ProgressGate(STORE_PATH)
+        if LOCK_ON_BOOT:
+            with contextlib.suppress(Exception):
+                self.gate.lock_public()
+                log.info("PublicChatGate: gate force-locked on boot.")
         self._owner_id: Optional[int] = None
         self._report_message_id: Optional[int] = None
         self._report_channel_id: Optional[int] = None
@@ -51,31 +52,26 @@ class PublicChatGate(commands.Cog):
         self._tick_reports.start()
         self._tick_prompt_owner.start()
 
-        # Install a global check *safely* when the bot supports it.
         add_check = getattr(self.bot, "add_check", None)
         if callable(add_check):
             add_check(self._global_gate_check)  # type: ignore[arg-type]
         else:
             log.warning("PublicChatGate: bot has no add_check(); global gate check disabled in this runtime.")
 
-    # ---------- Global check predicate ----------
     async def _global_gate_check(self, ctx: commands.Context) -> bool:
         if _is_dm(ctx):
-            return True  # DM always allowed
-        # Owner is always allowed
+            return True
         try:
             if await self._is_owner(ctx.author):
                 return True
         except Exception:
             pass
-        # Gate logic
         if not self.gate.is_public_allowed():
-            return False  # block commands in guilds when locked
+            return False
         if MENTION_REQUIRED_WHEN_ALLOWED and ctx.message and self.bot.user:
             return self.bot.user in ctx.message.mentions
         return True
 
-    # ---------- Helpers ----------
     async def _is_owner(self, user: discord.abc.User) -> bool:
         try:
             if self._owner_id is None:
@@ -172,7 +168,7 @@ class PublicChatGate(commands.Cog):
                 user = await self.bot.fetch_user(self._owner_id)
                 if user:
                     msg = (
-                        "✅ **Progress complete** (TK=100%, SD=100%).\n"
+                        "✅ **Belajar selesai**: TK L1–L2 100% & SD L1–L6 100%.\n"
                         "Ketik **`!gate unlock`** di DM ini untuk membuka _Public Chat_.\n"
                         "Ketik **`!gate status`** untuk melihat status saat ini, atau **`!gate lock`** untuk kembali ke silent mode."
                     )
@@ -207,7 +203,6 @@ class PublicChatGate(commands.Cog):
             return
         with contextlib.suppress(discord.HTTPException, discord.Forbidden):
             await message.delete()
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PublicChatGate(bot))

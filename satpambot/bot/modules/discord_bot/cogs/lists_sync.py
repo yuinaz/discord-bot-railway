@@ -180,6 +180,19 @@ class ListsSync(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        # --- PublicChatGate pre-send guard (auto-injected) ---
+        gate = None
+        try:
+            gate = self.bot.get_cog("PublicChatGate")
+        except Exception:
+            pass
+        try:
+            if message.guild and gate and hasattr(gate, "should_allow_public_reply") and not gate.should_allow_public_reply(message):
+                return
+        except Exception:
+            pass
+        # --- end guard ---
+
         # THREAD/FORUM EXEMPTION — auto-inserted
         ch = getattr(message, "channel", None)
         if ch is not None:
