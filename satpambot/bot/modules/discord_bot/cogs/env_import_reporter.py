@@ -62,4 +62,10 @@ class EnvImportReporter(commands.Cog):
             set_cfg('IMPORTED_ENV_NOTIFY', False)
 
 async def setup(bot):
+    try:
+        from satpambot.config.runtime import cfg
+        if not bool(cfg('IMPORTED_ENV_NOTIFY', False)):
+            return
+    except Exception:
+        return
     await bot.add_cog(EnvImportReporter(bot))

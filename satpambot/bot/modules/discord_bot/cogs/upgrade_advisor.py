@@ -4,10 +4,15 @@ import os, logging, time, sqlite3, asyncio
 from typing import Optional, List
 import discord
 from discord.ext import commands, tasks
+from satpambot.config.runtime import cfg
 
 from ..helpers import upgrade_rules
 
 log = logging.getLogger(__name__)
+
+# Diet DM defaults
+PROPOSAL_DM = bool(cfg('AUTO_UPDATE_PROPOSAL_DM', False))
+CRITICAL_ONLY = bool(cfg('AUTO_UPDATE_CRITICAL_ONLY', True))
 
 DEFAULT_OWNER_ID = 228126085160763392  # fallback if env OWNER_USER_ID not set
 
@@ -98,7 +103,9 @@ class UpgradeAdvisor(commands.Cog):
         if not dm:
             return
 
-        # Kirim satu DM berisi beberapa proposal ringkas
+        if CRITICAL_ONLY:
+            proposals = [p for p in proposals if p.get('critical')]
+# Kirim satu DM berisi beberapa proposal ringkas
         lines = ["**Neuro-Lite Upgrade Advisor** (auto)\n"]
         for p in proposals[:5]:  # batasi 5 item per DM
             sent_key = f"upgrade_sent:{p['key']}"
