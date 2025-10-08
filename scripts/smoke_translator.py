@@ -1,10 +1,10 @@
 
-import importlib, sys, pathlib
+# Offline smoketest for translator & warn blocker
+import sys, os, pathlib, importlib
 
-# ensure repo root on sys.path (scripts/ -> root)
+# add repo root to sys.path
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT))
 
 def check(modname: str):
     try:

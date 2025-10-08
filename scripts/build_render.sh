@@ -1,21 +1,28 @@
+
 #!/usr/bin/env bash
 set -euo pipefail
 
-PY_BIN="${PY_BIN:-python}"
-if command -v py >/dev/null 2>&1; then PY_BIN="py -3"; fi
-if command -v python3 >/dev/null 2>&1; then PY_BIN="python3"; fi
+PY="python"
 
-if [[ -f requirements.latest.txt ]]; then
-  echo "[build_render] installing requirements.latest.txt"
-  $PY_BIN -m pip install --upgrade pip
-  $PY_BIN -m pip install -r requirements.latest.txt
-elif [[ -f requirements.txt ]]; then
-  echo "[build_render] installing requirements.txt"
-  $PY_BIN -m pip install -r requirements.txt
+# Prefer requirements.latest.txt if present
+REQ="requirements.txt"
+if [[ -f "requirements.latest.txt" ]]; then
+  REQ="requirements.latest.txt"
 fi
 
-echo "[build_render] smoke checks"
-$PY_BIN scripts/smoke_env.py || true
-$PY_BIN scripts/smoke_translator.py || true
-$PY_BIN scripts/smoke_warn_blocker.py || true
-echo "[build_render] done"
+echo "[build] using $REQ"
+$PY -m pip install --upgrade pip setuptools wheel
+$PY -m pip install -r "$REQ"
+
+# show brief env
+$PY - <<'PYCODE'
+import importlib, pkgutil, sys
+mods = ["discord", "flask", "aiohttp", "httpx", "groq", "numpy", "psutil", "PIL"]
+for m in mods:
+    try:
+        mod = importlib.import_module(m)
+        ver = getattr(mod, "__version__", getattr(getattr(mod, "version", None), "__version__", "unknown"))
+        print(f"{m:<10} : {ver}")
+    except Exception as e:
+        print(f"{m:<10} : ERR({e.__class__.__name__})")
+PYCODE

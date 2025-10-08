@@ -1,47 +1,76 @@
 
 from __future__ import annotations
+
 import os
+from typing import Optional, Literal
+
 import discord
+from discord import app_commands, Interaction
 from discord.ext import commands
-from typing import Optional
 
-from satpambot.utils import translate_utils as tu
+# --- Simple translation backend (deep-translator then googletrans as fallback) ---
+def _translate(text: str, target: str) -> str:
+    target = (target or "en").lower()
+    # First try deep-translator (lightweight, no API key)
+    try:
+        from deep_translator import GoogleTranslator  # type: ignore
+        return GoogleTranslator(source="auto", target=target).translate(text)
+    except Exception:
+        pass
+    # Fallback: googletrans-py
+    try:
+        from googletrans import Translator  # type: ignore
+        gt = Translator()
+        res = gt.translate(text, dest=target)
+        return res.text
+    except Exception:
+        # Last resort: just echo
+        return text
 
-DEFAULT_TARGET = os.getenv("TRANSLATE_DEFAULT_TARGET", "en")
-DEFAULT_PROVIDER = os.getenv("TRANSLATE_PROVIDER", "auto")  # auto|deep|googletrans
+LANG_ALIASES = {
+    "en": "English",
+    "id": "Indonesian",
+    "ja": "Japanese",
+    "zh": "Chinese (Simplified)",
+}
+
+# Slash group: /translate to <en|id|ja|zh> <text>
+translate = app_commands.Group(name="translate", description="Translate text/messages")
+
+@translate.command(name="to", description="Translate to a specific language")
+@app_commands.describe(language="Target language", text="Text to translate")
+async def translate_to(interaction: Interaction,
+                       language: Literal["en","id","ja","zh"],
+                       text: str) -> None:
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    out = _translate(text, language)
+    label = LANG_ALIASES.get(language, language)
+    await interaction.followup.send(f"**{label}:** {discord.utils.escape_markdown(out)}", ephemeral=True)
+
+# Message context menu: Translate 🔤 (target controlled by env, default EN)
+async def _ctx_translate(interaction: Interaction, message: discord.Message) -> None:
+    target = os.getenv("TRANSLATE_DEFAULT_LANG", "en").lower()
+    out = _translate(message.content or "", target)
+    label = LANG_ALIASES.get(target, target)
+    await interaction.response.send_message(f"**{label}:** {discord.utils.escape_markdown(out)}", ephemeral=True)
+
+CTX_TRANSLATE = app_commands.ContextMenu(name="Translate 🔤", callback=_ctx_translate)
 
 class Translator(commands.Cog):
-    """Message translator via context menu & slash command.
-    Minimal footprint, works without OpenAI.
-    """
-
+    """Lightweight translator commands & context menu."""
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    # Context menu: right click -> Apps -> Translate
-    @discord.app_commands.context_menu(name="Translate")
-    async def translate_context(self, interaction: discord.Interaction, message: discord.Message):
-        target = DEFAULT_TARGET
-        provider = DEFAULT_PROVIDER
-        text = message.content or ""
-        if not text.strip():
-            await interaction.response.send_message("Tidak ada teks untuk diterjemahkan.", ephemeral=True)
-            return
-        out = tu.translate_text(text, target=target, provider=provider)
-        detected = tu.detect_lang(text)
-        embed = discord.Embed(title=f"Translate -> {target}", description=out)
-        embed.set_footer(text=f"detected: {detected} • provider: {provider}")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.app_commands.command(name="translate", description="Terjemahkan teks dengan cepat")
-    @discord.app_commands.describe(text="Teks sumber", target="Kode bahasa tujuan (mis. en, id, ja, zh-CN)")
-    async def translate_slash(self, interaction: discord.Interaction, text: str, target: Optional[str] = None):
-        tgt = (target or DEFAULT_TARGET).strip() or "en"
-        out = tu.translate_text(text, target=tgt, provider=DEFAULT_PROVIDER)
-        detected = tu.detect_lang(text)
-        embed = discord.Embed(title=f"Translate -> {tgt}", description=out)
-        embed.set_footer(text=f"detected: {detected} • provider: {DEFAULT_PROVIDER}")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
+    # Add cog (even though it has no listeners; keeps parity with other cogs).
     await bot.add_cog(Translator(bot))
+    # Register slash group and context menu on load.
+    try:
+        bot.tree.add_command(translate)
+    except Exception:
+        # already added by hot-reload
+        pass
+    try:
+        bot.tree.add_command(CTX_TRANSLATE)
+    except Exception:
+        pass
