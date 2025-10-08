@@ -1,66 +1,53 @@
-
-import os
-import time
-import asyncio
+from __future__ import annotations
 import logging
+from typing import AsyncIterator
 from discord.ext import commands
+from discord.abc import Messageable
 
-# Throttle every page fetch of channel.history() to avoid GET /messages 429s
-_log = logging.getLogger(__name__)
-_original_next = None
-_lock = asyncio.Lock()
-_last_call = 0.0
+log = logging.getLogger(__name__)
 
-def _get_min_interval():
-    try:
-        return float(os.getenv("RL_SHIM_HISTORY_MIN_INTERVAL", "0.85"))
-    except Exception:
-        return 0.85
+_ORIG_HISTORY = None
 
-async def _throttle():
-    global _last_call
-    async with _lock:
-        now = time.monotonic()
-        delay = _get_min_interval() - (now - _last_call)
-        if delay > 0:
-            await asyncio.sleep(delay)
-        _last_call = time.monotonic()
+async def _history_proxy(self: Messageable, *args, **kwargs) -> AsyncIterator["discord.Message"]:
+    async for m in _ORIG_HISTORY(self, *args, **kwargs):
+        try:
+            cog = getattr(self, "bot", None) and self.bot.get_cog("RLShimHistory")
+            if cog and hasattr(cog, "_record"):
+                await cog._record(m)
+        except Exception:
+            pass
+        yield m
 
 class RLShimHistory(commands.Cog):
-    """Monkeypatch discord.iterators.HistoryIterator.next to add a small delay.
-    This reduces Discord 429s caused by concurrent history() calls during startup.
-    Controlled by env RL_SHIM_HISTORY_MIN_INTERVAL (seconds). Default 0.85s.
-    """
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     async def cog_load(self):
-        global _original_next
-        if _original_next is not None:
-            return
+        global _ORIG_HISTORY
         try:
-            import discord.iterators as iters
-            _original_next = iters.HistoryIterator.next
-
-            async def patched_next(self_, *args, **kwargs):
-                await _throttle()
-                return await _original_next(self_, *args, **kwargs)
-
-            iters.HistoryIterator.next = patched_next  # type: ignore[attr-defined]
-            _log.info("[rl_shim_history] patched HistoryIterator.next (min_interval=%ss)", _get_min_interval())
-        except Exception:
-            _log.exception("[rl_shim_history] patch failed")
+            if _ORIG_HISTORY is None and hasattr(Messageable, "history"):
+                _ORIG_HISTORY = Messageable.history
+                if not getattr(Messageable, "_rlshim_patched", False):
+                    Messageable.history = _history_proxy
+                    setattr(Messageable, "_rlshim_patched", True)
+                    log.info("[rl_shim_history] history() patched on Messageable")
+        except Exception as e:
+            log.warning("[rl_shim_history] patch skipped: %s", e)
 
     async def cog_unload(self):
-        global _original_next
-        if _original_next is not None:
-            try:
-                import discord.iterators as iters
-                iters.HistoryIterator.next = _original_next  # type: ignore[attr-defined]
-                _original_next = None
-                _log.info("[rl_shim_history] unpatched HistoryIterator.next")
-            except Exception:
-                _log.exception("[rl_shim_history] unpatch failed")
+        global _ORIG_HISTORY
+        try:
+            if _ORIG_HISTORY and getattr(Messageable, "_rlshim_patched", False):
+                Messageable.history = _ORIG_HISTORY
+                setattr(Messageable, "_rlshim_patched", False)
+                _ORIG_HISTORY = None
+                log.info("[rl_shim_history] history() unpatched")
+        except Exception:
+            pass
 
-async def setup(bot):
+    async def _record(self, message: "discord.Message"):
+        # optional hook for history consumption
+        return
+
+async def setup(bot: commands.Bot):
     await bot.add_cog(RLShimHistory(bot))

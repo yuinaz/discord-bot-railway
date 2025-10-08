@@ -48,9 +48,8 @@ def _clean_content(s: str, bot: commands.Bot) -> str:
 
 
 def _map_model_alias(model: str) -> str:
-    # Keep config untouched; transparently map common aliases to Groq defaults
     alias = {
-        'llama-3.1-8b-instant': 'llama-3.1-8b-instant',   # cheap/fast text model
+        'llama-3.1-8b-instant': 'llama-3.1-8b-instant',
         'llama-3.3-70b-versatile': 'llama-3.3-70b-versatile',
     }
     return alias.get(str(model), str(model))
@@ -79,7 +78,8 @@ class ChatNeuroLite(commands.Cog):
                 if cfg(k) is None:
                     set_cfg(k, dv)
                     applied.append(f"{k}={dv}")
-            if applied:
+            # DIET-DM: jangan DM Auto-Config kecuali diminta
+            if applied and bool(_get_flag('CHAT_AUTOCONFIG_NOTIFY', False)):
                 await _selfheal(self.bot, 'Chat Auto-Config', 'Applied defaults:\\n- ' + '\\n- '.join(applied))
 
     def _should_handle(self, message: discord.Message) -> bool:
@@ -114,7 +114,6 @@ class ChatNeuroLite(commands.Cog):
         return True
 
     async def _call_llm_client(self, messages: List[Dict[str, str]]) -> str:
-        # GROQ first
         model = str(_get_flag('GROQ_MODEL', _get_flag('CHAT_MODEL', 'llama-3.1-8b-instant')))
         model = _map_model_alias(model)
         max_tokens = int(_get_flag('CHAT_MAX_TOKENS', 256))
@@ -177,7 +176,7 @@ class ChatNeuroLite(commands.Cog):
             allowed = discord.AllowedMentions(everyone=False, users=[message.author], roles=False, replied_user=False)
             await message.reply(reply[:1900], mention_author=False, allowed_mentions=allowed)
         except Exception as e:
-            # Jangan kirim reaction warning sama sekali (sesuai permintaan)
+            # Tahan DM error—cukup lapor ke selfheal (tanpa spam)
             await _selfheal(self.bot, 'Chat Error', f'{type(e).__name__}: {e}', color=0xe67e22)
 
 
