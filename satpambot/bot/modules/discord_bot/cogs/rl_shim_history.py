@@ -46,7 +46,6 @@ class RLShimHistory(commands.Cog):
             pass
 
     async def _record(self, message: "discord.Message"):
-        # optional hook for history consumption
         return
 
 async def setup(bot: commands.Bot):
