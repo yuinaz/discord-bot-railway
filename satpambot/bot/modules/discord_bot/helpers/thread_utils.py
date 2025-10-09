@@ -1,14 +1,12 @@
 from __future__ import annotations
-import os, asyncio, logging
+import os, logging, contextlib
 from typing import Optional
 import discord
 
 log = logging.getLogger(__name__)
-
 DEFAULT_THREAD_NAME = "neuro-lite progress"
 
 async def find_log_channel(bot: discord.Client) -> Optional[discord.TextChannel]:
-    # 1) Exact by LOG_CHANNEL_ID
     raw = os.getenv("LOG_CHANNEL_ID", "") or os.getenv("SELFHEAL_THREAD_CHANNEL_ID", "")
     try:
         cid = int(str(raw).strip()) if raw else 0
@@ -22,14 +20,11 @@ async def find_log_channel(bot: discord.Client) -> Optional[discord.TextChannel]
         if isinstance(ch, discord.TextChannel):
             return ch
 
-    # 2) Fallback by name heuristic
     for g in getattr(bot, "guilds", []):
-        # prefer "log-botphising"
-        for name in ("log-botphising", "log-botphising", "log-botphishing", "logs", "bot-logs"):
+        for name in ("log-botphising", "log-botphishing", "logs", "bot-logs"):
             ch = discord.utils.get(g.text_channels, name=name)
             if isinstance(ch, discord.TextChannel):
                 return ch
-    # 3) Last resort: first text channel
     for g in getattr(bot, "guilds", []):
         for ch in g.text_channels:
             if isinstance(ch, discord.TextChannel):
@@ -38,14 +33,12 @@ async def find_log_channel(bot: discord.Client) -> Optional[discord.TextChannel]
 
 async def find_thread_by_name(ch: discord.TextChannel, name: str = DEFAULT_THREAD_NAME) -> Optional[discord.Thread]:
     name_l = (name or "").strip().lower()
-    # Active threads
     try:
         for th in getattr(ch, "threads", []):
             if (th.name or "").strip().lower() == name_l:
                 return th
     except Exception:
         pass
-    # Archived threads (best-effort)
     try:
         async for th in ch.archived_threads(limit=100):
             if (th.name or "").strip().lower() == name_l:
@@ -62,7 +55,6 @@ async def ensure_neuro_thread(bot: discord.Client, name: str = DEFAULT_THREAD_NA
     th = await find_thread_by_name(ch, name=name)
     if th:
         return th
-    # create if still not found
     try:
         if hasattr(ch, "create_thread"):
             th = await ch.create_thread(name=name, type=discord.ChannelType.public_thread, auto_archive_duration=10080)

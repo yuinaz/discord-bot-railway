@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import logging, types, asyncio
-from typing import Optional
-import discord
 from discord.ext import commands
-
 from satpambot.bot.modules.discord_bot.helpers.thread_utils import ensure_neuro_thread, DEFAULT_THREAD_NAME
 
 log = logging.getLogger(__name__)
@@ -14,27 +11,23 @@ class ProgressThreadReuseShim(commands.Cog):
         self.bot = bot
 
     async def cog_load(self) -> None:
-        # Late-bind after all cogs load
         await asyncio.sleep(0.5)
         inst = self.bot.get_cog("LearningProgress")
         if not inst:
             log.info("[reuse_shim] LearningProgress not loaded; nothing to patch")
             return
-
         orig = getattr(inst, "ensure_thread", None)
         if not orig or not callable(orig):
             log.info("[reuse_shim] no ensure_thread on LearningProgress")
             return
 
         async def wrapped_ensure_thread():
-            # First, try to reuse existing by name. Only if not found, fallback to original behavior.
             th = await ensure_neuro_thread(self.bot, DEFAULT_THREAD_NAME)
             if th:
                 log.info("[reuse_shim] reused existing neuro thread: #%s (%s)", getattr(th, "name", "?"), getattr(th, "id", "?"))
                 return th
             return await orig()
 
-        # bind to instance
         inst.ensure_thread = types.MethodType(lambda _self: wrapped_ensure_thread(), inst)
         log.info("[reuse_shim] LearningProgress.ensure_thread patched to reuse by name first")
 

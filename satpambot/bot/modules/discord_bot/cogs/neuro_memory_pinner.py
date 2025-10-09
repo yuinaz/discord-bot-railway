@@ -2,7 +2,7 @@
 from __future__ import annotations
 import asyncio, json, logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import discord
 from discord.ext import commands, tasks
@@ -12,24 +12,34 @@ from satpambot.bot.modules.discord_bot.helpers.message_keeper import get_keeper
 
 log = logging.getLogger(__name__)
 
-MEM_PATHS = [
+DEFAULT_MEM_FILES: List[Path] = [
     Path("data/learn_progress_junior.json"),
-    # Add more state files here if needed (e.g., data/memory_state.json)
+    Path("data/learn_progress_senior.json"),
 ]
+EXTRA_GLOBS = ["data/learn_progress_*.json"]
 KEEPER_KEY = "[neuro-lite:memory]"
+
+def _discover_mem_paths() -> List[Path]:
+    paths = list(DEFAULT_MEM_FILES)
+    for pat in EXTRA_GLOBS:
+        for p in sorted(Path(".").glob(pat)):
+            if p not in paths:
+                paths.append(p)
+    return paths
 
 def _load_memory_json() -> str:
     merged = {}
-    for p in MEM_PATHS:
+    any_found = False
+    for p in _discover_mem_paths():
         try:
             if p.exists():
+                any_found = True
                 d = json.loads(p.read_text(encoding="utf-8"))
                 merged[p.name] = d
         except Exception as e:
             merged[p.name] = {"error": str(e)}
-    if not merged:
-        merged = {"status": "no memory files found"}
-    # Pretty JSON in a code fence so it's readable
+    if not any_found:
+        merged = {"status": "no memory files found", "expected": [str(x) for x in DEFAULT_MEM_FILES]}
     return "```json\n" + json.dumps(merged, ensure_ascii=False, indent=2) + "\n```"
 
 class NeuroLiteMemoryPinner(commands.Cog):
@@ -53,7 +63,6 @@ class NeuroLiteMemoryPinner(commands.Cog):
         blob = _load_memory_json()
         try:
             msg = await keeper.update(th, key=KEEPER_KEY, content="**NEURO-LITE MEMORY**\n" + blob)
-            # Pin it (ignore if already pinned or perms missing)
             try:
                 await msg.pin(reason="Neuro-Lite memory keeper")
             except Exception:
