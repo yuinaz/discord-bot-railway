@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""log_autodelete_scoped.py
+"""log_autodelete_scoped.py (v3)
 Auto-delete pesan di channel log HANYA dari sesi saat ini (session-scope).
 - Hanya hapus pesan buatan bot sendiri (author == me)
 - Tidak menyentuh pinned
 - Tidak menyentuh keeper markers ("presence::keeper", "neuro-memory::keeper")
+- Tidak menyentuh pesan yang berisi LOG_PROTECT_MARKERS (di content / embed title/footer)
 - TTL dikontrol ENV LOG_AUTODELETE_TTL (default 900 detik)
 - Scan periodik ENV LOG_AUTODELETE_SCAN_EVERY (default 30 detik)
 - Channel = LOG_CHANNEL_ID (wajib)
@@ -32,6 +33,7 @@ STARTUP_TS = int(time.time())
 TTL = _env_int("LOG_AUTODELETE_TTL", 900)
 SCAN_EVERY = _env_int("LOG_AUTODELETE_SCAN_EVERY", 30)
 ENABLED = _env_bool("LOG_AUTODELETE_ENABLE", True)
+LOG_PROTECT_MARKERS = [s.strip() for s in (os.getenv("LOG_PROTECT_MARKERS") or "SATPAMBOT_PHASH_DB_V1,SATPAMBOT_STATUS_V1").split(",") if s.strip()]
 
 def _int_env(name: str):
     v = (os.getenv(name) or "").strip()
@@ -41,6 +43,22 @@ def _int_env(name: str):
         return None
 
 LOG_CH_ID = _int_env("LOG_CHANNEL_ID")
+
+def _has_marker(msg: discord.Message) -> bool:
+    try:
+        content = (getattr(msg, "content", "") or "")
+        for m in LOG_PROTECT_MARKERS:
+            if m and m in content:
+                return True
+        for e in (msg.embeds or []):
+            ttl = (getattr(e, "title", "") or "")
+            ftxt = (getattr(getattr(e, "footer", None), "text", "") or "")
+            for m in LOG_PROTECT_MARKERS:
+                if m in ttl or m in ftxt:
+                    return True
+    except Exception:
+        pass
+    return False
 
 class LogAutoDeleteScoped(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -73,6 +91,8 @@ class LogAutoDeleteScoped(commands.Cog):
                 if getattr(m, "pinned", False):
                     continue
                 if me and m.author.id != me.id:
+                    continue
+                if _has_marker(m):
                     continue
                 if ("presence::keeper" in (m.content or "")) or ("neuro-memory::keeper" in (m.content or "")):
                     continue
