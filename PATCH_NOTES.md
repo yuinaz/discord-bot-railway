@@ -1,21 +1,35 @@
-# Patch: hourly miners smoke-safe + memory-safe
+# Patch: await `bot.add_cog(...)` in hourly miners
 
-This patch replaces two cogs:
-- `slang_hourly_miner.py`
-- `phish_text_hourly_miner.py`
-
-Key fixes:
-1) **async setup(bot)** so smoke tools that `await setup()` won't error.
-2) **sync `cog_load`** (no `async def`) so smoke doesn't complain about "coroutine was never awaited".
-3) Start loops on **on_ready** with jitter, not during import.
-4) Use `upsert_pinned_memory(bot, payload)` for writes. Body size is handled by your patched `memory_upsert.py` (attachment fallback for >4k).
-5) Never delete any messages or pinned items.
-
-Drop these files into:
-`satpambot/bot/modules/discord_bot/cogs/`
-
-Then:
+## Why
+You saw warnings like:
 ```
-git add -A
-git commit -m "fix(cogs): hourly miners async setup + safe memory upsert"
+RuntimeWarning: coroutine 'BotBase.add_cog' was never awaited
 ```
+from:
+- `cogs/phish_text_hourly_miner.py` (line ~144)
+- `cogs/slang_hourly_miner.py` (line ~142)
+
+In discord.py≥2.x `Bot.add_cog` is **async** when your cog defines `cog_load` or other async hooks. So `setup(bot)` must be `async` **and** call `await bot.add_cog(...)`.
+
+## What this patch does
+The included `quick_patcher.py` will, in-place, update both files to:
+```py
+async def setup(bot):
+    await bot.add_cog(YourCog(bot))
+```
+It preserves everything else.
+
+## How to apply
+From your repo root (same level as `satpambot/`):
+
+```bash
+python quick_patcher.py
+# optional: verify
+python verify_snippet.py
+# then test
+python scripts/smoke_deep.py
+```
+
+## Files
+- `quick_patcher.py` – edits the two target files safely.
+- `verify_snippet.py` – prints whether the awaited add_cog is present.

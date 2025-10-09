@@ -139,4 +139,4 @@ class SlangHourlyMiner(commands.Cog):
 
 async def setup(bot: commands.Bot):
     # async setup to be compatible with smoke tools awaiting it
-    bot.add_cog(SlangHourlyMiner(bot))
+    await bot.add_cog(SlangHourlyMiner(bot))

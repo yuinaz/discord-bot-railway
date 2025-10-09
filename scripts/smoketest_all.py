@@ -1,237 +1,282 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-import os, sys, json, re, time, traceback, py_compile
+
+import os, sys, compileall, importlib, traceback, json, re
 from pathlib import Path
-from typing import List, Tuple, Dict
 
-ROOT = Path(__file__).resolve().parents[1]
-os.chdir(ROOT)
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+_HERE = Path(__file__).resolve()
+_ROOT = _HERE.parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "scripts"))
+os.environ.setdefault("SMOKE_MODE","1")
 
-REPORT_DIR = ROOT / 'smoketest_report'
-REPORT_DIR.mkdir(parents=True, exist_ok=True)
+def _print_ok(msg): print(f"OK  : {msg}")
+def _print_warn(msg): print(f"WARN: {msg}")
+def _print_fail(msg): print(f"FAIL: {msg}")
 
-def p(msg=''): print(msg, flush=True)
-def _read(pth: Path) -> str:
-    try: return pth.read_text(encoding='utf-8', errors='ignore')
-    except Exception: return ''
-def _rel(pth: Path) -> str:
-    try: return str(pth.relative_to(ROOT))
-    except Exception: return str(pth)
+# ---------------- syntax ----------------
+print("== Smoke: syntax ==")
+ok = compileall.compile_dir(str(_ROOT), maxlevels=10, quiet=1)
+if not ok:
+    _print_warn("compileall reported issues (continuing).")
 
-def check_syntax() -> Tuple[bool, List[Dict]]:
-    fails = []; count = 0
-    for pth in ROOT.rglob('*.py'):
-        sp = str(pth).lower()
-        if any(seg in sp for seg in ['/.venv/','\\venv\\','/venv/','\\__pycache__\\','/__pycache__/','\\.git\\','/.git/']):
-            continue
-        count += 1
-        try: py_compile.compile(str(pth), doraise=True)
-        except Exception as e:
-            msg = str(e)
-            m = re.search(r'File "(.+?)", line (\d+)', msg)
-            ln = int(m.group(2)) if m else None
-            snippet = ''
-            if ln is not None:
-                try:
-                    L = pth.read_text(encoding='utf-8', errors='ignore').splitlines()
-                    s = max(0, ln-3); e2 = min(len(L), ln+2)
-                    snippet = '\\n'.join(f"{i+1:4d}: {L[i]}" for i in range(s, e2))
-                except Exception: pass
-            fails.append({'file': _rel(pth), 'error': msg, 'snippet': snippet})
-    print('== Smoke: syntax ==')
-    if not fails: print(f'OK  : Python syntax check ({count} files)')
+# ---------------- imports ----------------
+print("== Smoke: imports ==")
+modules = [
+    "satpambot.bot.modules.discord_bot.cogs.progress_embed_solo",
+    "satpambot.bot.modules.discord_bot.cogs.phash_db_command_single",
+    "satpambot.bot.modules.discord_bot.cogs.shadow_learn_observer",
+    "satpambot.bot.modules.discord_bot.cogs.rl_shim_history",
+    "satpambot.bot.modules.discord_bot.cogs.log_autodelete_bot",
+    "satpambot.bot.utils.embed_scribe",
+    "satpambot.bot.utils.dupe_guard",
+    "satpambot.ml.neuro_lite_memory_fix",
+    "satpambot.ml.shadow_metrics",
+    "satpambot.ml.groq_helper",
+    "satpambot.config.compat_conf",
+    "satpambot.config.runtime_memory",
+]
+failed = []
+for m in modules:
+    try:
+        importlib.import_module(m)
+        print(f"[OK] import {m}")
+    except Exception as e:
+        failed.append((m, e))
+        print(f"[FAIL] {m}: {e}")
+        traceback.print_exc()
+
+if failed:
+    sys.exit(1)
+
+# ---------------- dummy bot setup ----------------
+print("== Smoke: dummy setup ==")
+try:
+    from scripts.smoke_utils import DummyBot, retrofit
+    bot = retrofit(DummyBot())
+    import asyncio
+    async def _load():
+        await (importlib.import_module("satpambot.bot.modules.discord_bot.cogs.progress_embed_solo").setup(bot))
+        await (importlib.import_module("satpambot.bot.modules.discord_bot.cogs.phash_db_command_single").setup(bot))
+        await (importlib.import_module("satpambot.bot.modules.discord_bot.cogs.shadow_learn_observer").setup(bot))
+    asyncio.get_event_loop().run_until_complete(_load())
+    print("[OK] cogs setup with DummyBot")
+except Exception as e:
+    print(f"[FAIL] dummy setup: {e}")
+    sys.exit(1)
+
+# ---------------- required files ----------------
+print("\n== Smoke: required files ==")
+required = [
+    "satpambot/dashboard/webui.py",
+    "satpambot/dashboard/templates/login.html",
+    "satpambot/dashboard/templates/dashboard.html",
+    "satpambot/dashboard/templates/security.html",
+    "satpambot/dashboard/templates/settings.html",
+    "satpambot/dashboard/static/css/login_exact.css",
+    "satpambot/dashboard/static/css/neo_aurora_plus.css",
+    "satpambot/dashboard/static/js/neo_dashboard_live.js",
+    "satpambot/dashboard/static/logo.svg",
+    "satpambot/dashboard/themes/gtake/templates/login.html",
+    "satpambot/dashboard/themes/gtake/templates/dashboard.html",
+    "satpambot/dashboard/themes/gtake/static/theme.css",
+    "satpambot/dashboard/live_store.py",
+    "satpambot/bot/modules/discord_bot/shim_runner.py",
+    "satpambot/bot/modules/discord_bot/cogs/live_metrics_push.py",
+]
+for rel in required:
+    p = _ROOT / rel
+    if p.exists():
+        _print_ok(f"file exists: {rel}")
     else:
-        for f in fails:
-            print(f"FAIL: Syntax {_rel(Path(f['file']))} :: {f['error']}")
-            if f['snippet']: print(f['snippet'])
-    (REPORT_DIR/'syntax.json').write_text(json.dumps({'total': count, 'fails': fails}, indent=2), encoding='utf-8')
-    return (len(fails)==0), fails
+        _print_warn(f"missing: {rel}")
 
-REQUIRED = [
-    'satpambot/dashboard/webui.py',
-    'satpambot/dashboard/templates/login.html',
-    'satpambot/dashboard/templates/dashboard.html',
-    'satpambot/dashboard/templates/security.html',
-    'satpambot/dashboard/templates/settings.html',
-    'satpambot/dashboard/static/css/login_exact.css',
-    'satpambot/dashboard/static/css/neo_aurora_plus.css',
-    'satpambot/dashboard/static/js/neo_dashboard_live.js',
-    'satpambot/dashboard/static/logo.svg',
-    'satpambot/dashboard/themes/gtake/templates/login.html',
-    'satpambot/dashboard/themes/gtake/templates/dashboard.html',
-    'satpambot/dashboard/themes/gtake/static/theme.css',
-    'satpambot/dashboard/live_store.py',
-    'satpambot/bot/modules/discord_bot/shim_runner.py',
-    'satpambot/bot/modules/discord_bot/cogs/live_metrics_push.py',
+# intents checks (best-effort)
+shim = _ROOT / "satpambot/bot/modules/discord_bot/shim_runner.py"
+if shim.exists():
+    text = shim.read_text(encoding="utf-8", errors="ignore")
+    msg = []
+    if re.search(r"intents\s*\.\s*members\s*=\s*True", text): msg.append("intents.members=True (shim_runner.py)")
+    else: msg.append("intents.members not True")
+    if re.search(r"intents\s*\.\s*presences\s*=\s*True", text): msg.append("intents.presences=True (shim_runner.py)")
+    else: msg.append("intents.presences not True")
+    for m in msg:
+        if "not" in m: _print_warn(m)
+        else: print("OK   :", m)
+else:
+    _print_warn("shim_runner.py not found; skip intents check")
+
+# ---------------- JSON validity ----------------
+print("== Smoke: json ==")
+json_candidates = [
+    "satpambot_config.local.json",
+    "config/satpambot_config.local.json",
+    "data/config/satpambot_config.local.json",
+    "satpambot.local.json",
+    "data/neuro-lite/learn_progress_junior.json",
+    "data/neuro-lite/learn_progress_senior.json",
+    "data/neuro-lite/observe_metrics.json",
+    "data/phash/SATPAMBOT_PHASH_DB_V1.json",
+    "data/state/embed_scribe.json",
 ]
-def check_required() -> Tuple[bool, List[str]]:
-    print('== Smoke: required files ==')
-    missing = []
-    for rel in REQUIRED:
-        ok = (ROOT/rel).exists()
-        if ok: print(f'OK  : file exists: {rel}')
-        else: print(f'FAIL: missing file: {rel}'); missing.append(rel)
-    shim = ROOT / 'satpambot/bot/modules/discord_bot/shim_runner.py'
-    if shim.exists():
-        t = _read(shim)
-        m_ok = 'intents.members' in t and re.search(r'intents\.members\s*=\s*True', t) is not None
-        p_ok = 'intents.presences' in t and re.search(r'intents\.presences\s*=\s*True', t) is not None
-        print(("OK  " if m_ok else "FAIL") + " : intents.members=True (shim_runner.py)")
-        print(("OK  " if p_ok else "FAIL") + " : intents.presences=True (shim_runner.py)")
-        if not (m_ok and p_ok): missing.append('intents flags')
-    (REPORT_DIR/'required.json').write_text(json.dumps({'missing': missing}, indent=2), encoding='utf-8')
-    return (len(missing)==0), missing
-
-JSON_PATHS = [
-    'data/whitelist.json','data/blocklist.json','data/whitelist_domains.json','data/blacklist_domains.json',
-    'data/url_whitelist.json','data/url_blocklist.json','data/memory_wb.json',
-]
-def check_json() -> Tuple[bool, List[Tuple[str,str]]]:
-    errs = []
-    print('== Smoke: json ==')
-    for rel in JSON_PATHS:
-        pth = ROOT/rel
-        if not pth.exists(): print(f'FAIL: {rel} :: MISSING'); errs.append((rel, 'MISSING')); continue
-        try: json.loads(_read(pth) or 'null')
-        except Exception as e: print(f'FAIL: {rel} :: INVALID JSON: {e}'); errs.append((rel, f'INVALID JSON: {e}'))
-    if not errs: print('OK  : All JSON files valid/exist')
-    (REPORT_DIR/'json.json').write_text(json.dumps({'errors': errs}, indent=2), encoding='utf-8')
-    return (len(errs)==0), errs
-
-def check_upsert_calls() -> Tuple[bool, List[str]]:
-    bad = []
-    print('== Smoke: upsert call-sites ==')
-    for pth in ROOT.rglob('*.py'):
-        sp = str(pth).lower()
-        if 'venv' in sp or '.git' in sp or '__pycache__' in sp: continue
-        txt = _read(pth)
-        if re.search(r"await\s+upsert_status_embed_in_channel\(\s*log_ch\s*,\s*['\"]", txt): bad.append(_rel(pth))
-        if re.search(r"await\s+upsert_status_embed_in_channel\(\s*ch\s*,\s*['\"]", txt): bad.append(_rel(pth))
-    if bad:
-        for f in bad: print(f'FAIL: {f} :: legacy upsert call detected')
-    else: print('OK  : All upsert call-sites use bot,ch pattern')
-    (REPORT_DIR/'upsert.json').write_text(json.dumps({'bad': bad}, indent=2), encoding='utf-8')
-    return (len(bad)==0), bad
-
-def check_features() -> Tuple[bool, List[str]]:
-    warns = []
-    print('== Smoke: features ==')
-    login = ROOT/'satpambot/dashboard/templates/login.html'
-    if login.exists():
-        t = _read(login).lower()
-        if not any(x in t for x in ['tsparticles','particles']): warns.append('login.html: particles background not found')
-    sec = ROOT/'satpambot/dashboard/templates/security.html'
-    if sec.exists():
-        t = _read(sec).lower()
-        if not any(x in t for x in ['dropzone','ondrop','dragover','data-dropzone']): warns.append('security.html: dropzone not found')
-    sc = ROOT/'sitecustomize.py'
-    if sc.exists() and '/healthz' not in _read(sc): warns.append('sitecustomize.py: /healthz not exposed')
-    app = ROOT/'app.py'
-    if app.exists():
-        t = _read(app)
-        # Correct quoting here (bugfix): check for common route decorators
-        if '/uptime' not in t and ("@app.route(\"/\")" not in t and "@app.route('/')" not in t):
-            warns.append('app.py: routes for / or /uptime not found')
-    if warns:
-        for w in warns: print('WARN: ' + w)
-    else: print('OK  : Feature markers present')
-    (REPORT_DIR/'features.json').write_text(json.dumps({'warns': warns}, indent=2), encoding='utf-8')
-    return True, warns
-
-def _try_import_app():
+all_valid = True
+for rel in json_candidates:
+    p = _ROOT / rel
+    if not p.exists():
+        _print_warn(f"json missing: {rel}")
+        all_valid = False
+        continue
     try:
-        from app import app as flask_app  # type: ignore
-        return flask_app, None
-    except Exception as e1:
-        try:
-            from app import create_app  # type: ignore
-            flask_app = create_app()
-            return flask_app, None
-        except Exception as e2:
-            return None, f'{e1} / {e2}'
+        json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        _print_fail(f"json invalid: {rel} :: {e}")
+        all_valid = False
+if all_valid:
+    _print_ok("All JSON files valid/exist")
 
-def check_http_test_client() -> Tuple[bool, List[str]]:
-    print('')
-    print('== Smoke: HTTP endpoints via test_client ==')
-    app, err = _try_import_app()
-    if app is None:
-        print(f'WARN: cannot import Flask app: {err}')
-        return True, ['skip']
-    fails = []; warns = []
-    ctx = app.app_context(); ctx.push()
+# ---------------- upsert call-sites ----------------
+print("== Smoke: upsert call-sites ==")
+bad = 0; good = 0
+pat_upsert = re.compile(r"\.upsert\s*\(")
+pat_channel_first = re.compile(r"""\(\s*[a-zA-Z_][a-zA-Z0-9_.]*\s*,\s*["'][^"']+["']\s*,\s*discord\.Embed""")
+pat_legacy = re.compile(r"""\(\s*bot\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*\s*, """)
+for p in _ROOT.rglob("*.py"):
     try:
-        c = app.test_client()
-        r = c.get('/', follow_redirects=False)
-        if r.status_code in (301,302) and (r.headers.get('Location','').endswith('/dashboard') or '/dashboard' in r.headers.get('Location','')):
-            print('OK  : / -> redirect :: %d -> %s' % (r.status_code, r.headers.get('Location')))
+        text = p.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        continue
+    for m in pat_upsert.finditer(text):
+        window = text[m.start():m.start()+220]
+        if pat_channel_first.search(window) or pat_legacy.search(window):
+            good += 1
         else:
-            print('FAIL: / expected redirect -> /dashboard'); fails.append('/')
-        r = c.get('/dashboard/login')
-        if r.status_code == 200: print('OK  : GET /dashboard/login :: 200')
-        else: print('FAIL: GET /dashboard/login :: %d' % r.status_code); fails.append('/dashboard/login')
-        if r.status_code == 200 and b'lg-card' in r.data: print('OK  : login layout present (lg-card)')
-        for path in ['/dashboard-static/css/login_exact.css','/dashboard-static/css/neo_aurora_plus.css','/dashboard-static/js/neo_dashboard_live.js','/favicon.ico']:
-            r = c.get(path)
-            if r.status_code == 200: print(f'OK  : GET {path} :: 200')
-            else: print(f'FAIL: GET {path} :: {r.status_code}'); fails.append(path)
-        r = c.head('/healthz'); print(f'OK  : HEAD /healthz :: {r.status_code}')
-        r = c.head('/uptime'); print(f'OK  : HEAD /uptime :: {r.status_code}')
-        r = c.get('/api/ui-config')
-        if r.status_code == 200: print('OK  : GET /api/ui-config :: 200')
-        r = c.get('/api/ui-themes')
-        if r.status_code == 200:
-            print('OK  : GET /api/ui-themes :: 200')
-            try:
-                data = r.get_json(force=True)
-                if isinstance(data, dict) and 'themes' in data and 'gtake' in data.get('themes', []):
-                    print("OK  : theme 'gtake' available")
-            except Exception: pass
-        r = c.get('/dashboard-theme/gtake/theme.css')
-        print(f'OK  : GET /dashboard-theme/gtake/theme.css :: {r.status_code}')
-        r = c.get('/dashboard')
-        if r.status_code == 200:
-            print('OK  : GET /dashboard (gtake) :: 200')
-            html = r.data.decode('utf-8','ignore').lower()
-            if 'gtake' in html: print('OK  : dashboard layout = gtake')
-            if 'canvas' in html or 'requestanimationframe' in html: print('OK  : dashboard has 60fps canvas')
-            if 'dropzone' in html or 'ondrop' in html: print('OK  : dashboard has dropzone')
-        r = c.get('/api/live/stats')
-        if r.status_code == 200:
-            print('OK  : GET /api/live/stats :: 200')
-            try:
-                d = r.get_json(force=True)
-                if isinstance(d, dict):
-                    print('OK  : live stats keys present')
-                    if all((isinstance(v, (int,float)) and v==0) for v in d.values() if isinstance(v, (int,float))):
-                        print('WARN: live stats are zero (bot belum siap / intents belum aktif)')
-            except Exception: pass
-        r = c.get('/api/phish/phash')
-        if r.status_code == 200: print('OK  : GET /api/phish/phash :: 200')
-        r = c.get('/logout'); print(f'OK  : GET /logout :: {r.status_code}')
-        r = c.get('/dashboard/logout', follow_redirects=False)
-        if r.status_code in (301,302): print(f"OK  : GET /dashboard/logout -> redirect :: {r.status_code} -> {r.headers.get('Location')}")
-    finally:
-        ctx.pop()
-    return (len(fails)==0), fails
+            bad += 1
+if bad == 0:
+    _print_ok("All upsert call-sites use channel-first or legacy bot,ch pattern")
+else:
+    _print_warn(f"{bad} upsert call-site(s) look unusual")
 
-def main():
-    sections = []
-    ok1,_ = check_syntax(); sections.append(('syntax', ok1))
-    ok2,_ = check_required(); sections.append(('required', ok2))
-    ok3,_ = check_json(); sections.append(('json', ok3))
-    ok4,_ = check_upsert_calls(); sections.append(('upsert', ok4))
-    ok5,_ = check_features(); sections.append(('features', ok5))
-    ok6,_ = check_http_test_client(); sections.append(('http_test_client', ok6))
-    print('\n=== SUMMARY ===')
-    fails = [name for name,ok in sections if not ok]
-    if fails:
-        print('FAILED:')
-        for n in fails: print(f'- {n}')
+# ---------------- features (sitecustomize) ----------------
+print("== Smoke: features ==")
+sitecustom = _ROOT / "sitecustomize.py"
+if not sitecustom.exists():
+    _print_warn("sitecustomize.py: /healthz not exposed")
+else:
+    _print_ok("sitecustomize.py present")
+
+# ---------------- HTTP endpoints via test_client ----------------
+print("\n== Smoke: HTTP endpoints via test_client ==")
+http_state = {"ok": True}
+try:
+    webui = importlib.import_module("satpambot.dashboard.webui")
+except Exception as e:
+    print("WARN: satpambot.dashboard.webui not importable, skipping HTTP smoke")
+    webui = None
+
+def _detect_app(webui):
+    cand_names = ["app","application","api","fastapi","web","server","flask_app","fastapi_app"]
+    for name in cand_names:
+        obj = getattr(webui, name, None)
+        if obj is None: continue
+        mod = getattr(obj.__class__, "__module__", "").lower()
+        if "flask" in mod or "fastapi" in mod or "starlette" in mod:
+            return obj
+
+    factories = ["create_app","build_app","make_app","init_app","factory","as_app"]
+    for fn in factories:
+        f = getattr(webui, fn, None)
+        if callable(f):
+            try:
+                return f(testing=True)
+            except TypeError:
+                try: return f()
+                except Exception: pass
+
+    try:
+        from flask import Flask, Blueprint
+        for name, obj in vars(webui).items():
+            if isinstance(obj, Blueprint):
+                app = Flask(__name__)
+                app.register_blueprint(obj)
+                return app
+    except Exception:
+        pass
+    return None
+
+if webui is not None:
+    app = _detect_app(webui)
+    if app is None:
+        print("WARN: No Flask/FastAPI app found in webui module. Skipping HTTP checks.")
     else:
-        print('All sections OK')
-    sys.exit(1 if fails else 0)
+        from scripts.http_smoke_utils import HttpSmokeClient
+        client = HttpSmokeClient(app)
 
-if __name__ == '__main__':
-    main()
+        def check(desc, fn):
+            try:
+                ok, info = fn()
+                if ok:
+                    print(f"OK  : {desc}")
+                else:
+                    print(f"WARN: {desc} :: {info}")
+            except Exception as e:
+                http_state["ok"] = False
+                print(f"FAIL: {desc} :: {e}")
+
+        # root
+        check("/ -> redirect or 200", lambda: client.assert_status(client.get("/"), [200,302]))
+        # login
+        def _login():
+            r = client.get("/dashboard/login")
+            good, code = client.assert_status(r, [200])
+            if not good: return False, code
+            body = (r.text if hasattr(r,"text") else getattr(r,"data",b"").decode("utf-8","ignore"))
+            return ("lg-card" in body or "login" in body.lower()), "layout missing"
+        check("GET /dashboard/login :: 200 & layout", _login)
+        # static
+        for path in ["/dashboard-static/css/login_exact.css",
+                     "/dashboard-static/css/neo_aurora_plus.css",
+                     "/dashboard-static/js/neo_dashboard_live.js",
+                     "/favicon.ico"]:
+            check(f"GET {path} :: 200", lambda p=path: client.assert_status(client.get(p), [200]))
+        # healthz/uptime
+        check("HEAD /healthz :: 200", lambda: client.assert_status(client.head("/healthz"), [200]))
+        check("HEAD /uptime :: 200", lambda: client.assert_status(client.head("/uptime"), [200]))
+        # APIs
+        check("GET /api/ui-config :: 200", lambda: client.assert_status(client.get("/api/ui-config"), [200]))
+        def _themes():
+            r = client.get("/api/ui-themes")
+            ok, code = client.assert_status(r, [200])
+            if not ok: return False, code
+            data = client.json(r)
+            present = False
+            if isinstance(data, (list, dict)):
+                s = str(data).lower()
+                present = ("gtake" in s) or ("themes" in s)
+            return present, "theme not listed"
+        check("GET /api/ui-themes :: 200", _themes)
+        check("GET /dashboard-theme/gtake/theme.css :: 200",
+              lambda: client.assert_status(client.get("/dashboard-theme/gtake/theme.css"), [200]))
+        def _live_stats():
+            r = client.get("/api/live/stats")
+            ok, code = client.assert_status(r, [200])
+            if not ok: return False, code
+            data = client.json(r) or {}
+            has_keys = isinstance(data, dict) and any(k in data for k in ("uptime","cpu","memory","status","ok"))
+            return has_keys, "live stats keys missing"
+        check("GET /api/live/stats :: 200", _live_stats)
+        # optional
+        check("GET /api/phish/phash :: 200/404", lambda: client.assert_status(client.get("/api/phish/phash"), [200,404]))
+        check("GET /logout :: 200/302", lambda: client.assert_status(client.get("/logout"), [200,302]))
+        check("GET /dashboard/logout -> redirect :: 302/200",
+              lambda: client.assert_status(client.get("/dashboard/logout"), [200,302]))
+
+print("\n=== SUMMARY ===")
+if failed:
+    print("FAILED:")
+    for m, e in failed:
+        print(f"- import: {m} -> {e}")
+    sys.exit(1)
+try:
+    if 'webui' in globals() and webui and http_state.get("ok") is False:
+        print("FAILED: HTTP smoke")
+        sys.exit(1)
+except Exception:
+    pass

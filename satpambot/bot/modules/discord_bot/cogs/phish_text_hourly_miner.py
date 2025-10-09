@@ -141,4 +141,4 @@ class PhishTextHourlyMiner(commands.Cog):
         return found
 
 async def setup(bot: commands.Bot):
-    bot.add_cog(PhishTextHourlyMiner(bot))
+    await bot.add_cog(PhishTextHourlyMiner(bot))
