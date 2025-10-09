@@ -1,49 +1,42 @@
 from __future__ import annotations
 
-import logging
+# Minimal, safe AntiUrlPhishGuard to pass smoke test and run on Render Free Plan.
+# - Keeps env parsing (_norm_domain defined before use)
+# - Does NOT create threads/DMs by itself (quiet by default)
+# - Class name and setup() preserved for bootstrap compatibility
+
 import os
-from typing import Iterable, Set
+from typing import List
 from discord.ext import commands
 
-log = logging.getLogger(__name__)
+def _norm_domain(p: str) -> str:
+    return p.strip().lower().lstrip(".")
 
+def _parse_csv_env(name: str, *, normalize_domain: bool = False) -> List[str]:
+    raw = os.getenv(name, "") or ""
+    items = [s.strip() for s in raw.split(",") if s.strip()]
+    if normalize_domain:
+        items = [_norm_domain(p) for p in items]
+    return items
 
-def _norm_domain(d: str) -> str:
-    d = (d or "").strip().lower()
-    # strip scheme and path if given
-    if d.startswith("http://") or d.startswith("https://"):
-        try:
-            from urllib.parse import urlparse
-            d = urlparse(d).hostname or d
-        except Exception:
-            pass
-    return d.lstrip(".")
-
-
-def _parse_csv_env(key: str, *, normalize_domain: bool = False) -> Set[str]:
-    raw = os.getenv(key, "") or ""
-    out: Set[str] = set()
-    for part in (p.strip() for p in raw.split(",") if p.strip()):
-        out.add(_norm_domain(part) if normalize_domain else part)
-    return out
-
+# Env-driven lists (kept minimal for compatibility; extend later as needed)
+NSFW_SOFT_DOMAINS = _parse_csv_env("NSFW_SOFT_DOMAINS", normalize_domain=True)
+URL_ALLOWLIST = _parse_csv_env("URL_ALLOWLIST", normalize_domain=True)
+URL_BLOCKLIST = _parse_csv_env("URL_BLOCKLIST", normalize_domain=True)
 
 class AntiUrlPhishGuard(commands.Cog):
-    """Lightweight placeholder for anti-url guard (TKSD-stable hotfix).
-    - Keeps import/setup stable for smoke tests and runtime.
-    - Reads optional envs for future use but performs no message filtering here.
+    """Lightweight guard placeholder. Intended to be compatible with existing bootstrap.
+    It sets up basic structures and can be extended by the NGovernor patch later.
     """
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.enabled = (os.getenv("ANTI_URL_GUARD_ENABLE", "0").lower() not in {"0", "false", "no"})
-        self.block_domains = _parse_csv_env("BLOCK_DOMAINS", normalize_domain=True)
-        self.allow_domains = _parse_csv_env("ALLOW_DOMAINS", normalize_domain=True)
-        log.info(
-            "[anti_url_phish_guard] ready (enabled=%s, block=%d, allow=%d)",
-            self.enabled, len(self.block_domains), len(self.allow_domains)
-        )
+        self.nsfw_soft_domains = set(NSFW_SOFT_DOMAINS)
+        self.url_allowlist = set(URL_ALLOWLIST)
+        self.url_blocklist = set(URL_BLOCKLIST)
 
+    # Intentionally quiet: no auto-thread/DM creation here to suit Render Free Plan.
+    # Actual URL scanning & enforcement is handled by existing guards; this cog is a safe loader.
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiUrlPhishGuard(bot))
