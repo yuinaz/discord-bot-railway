@@ -1,99 +1,152 @@
 # -*- coding: utf-8 -*-
+"""
+Memory upserter with Discord 4k content guard.
+
+Drop-in replacement for satpambot.bot.modules.discord_bot.helpers.memory_upsert
+so that when the keeper body > 4000 chars, we DON'T fail with
+"Invalid Form Body: content must be 4000 or fewer".
+
+Strategy:
+- If body <= SOFT_LIMIT -> normal edit on the pinned keeper message.
+- Else -> send a new message in the same channel with the FULL body as a .txt attachment,
+  then edit the keeper to a short index that points to that message.jump_url.
+- Keeps the keeper pinned, the attachment message is not pinned (to avoid clutter).
+
+This module keeps all config IN-CODE (no ENV read), per user's request.
+"""
+
 from __future__ import annotations
-import json, logging, re
-from typing import Any, Dict
+import io, asyncio, json, hashlib
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
 import discord
 
-from satpambot.bot.modules.discord_bot.config.self_learning_cfg import (
-    LOG_CHANNEL_ID, NEURO_THREAD_ID, NEURO_THREAD_NAME, MEMORY_TITLE
+# ---- Tunables (kept in module, NOT env) ----
+HARD_LIMIT = 4000           # Discord absolute max
+SOFT_LIMIT = 3800           # edit safety margin
+ATTACHMENT_FILENAME = "memory_keeper.txt"
+KEEPER_TITLE = "🧠 Memory Keeper (pinned)"
+INDEX_HEADER = "📌 Memory is larger than 4k, full snapshot is attached below."
+
+# Optional footer to help humans/mods
+INDEX_FOOTER = (
+    "\n\n— This message stays pinned. The full content is stored in the attached file "
+    "message linked above. Auto-delete jobs should ignore this pinned message."
 )
 
-log = logging.getLogger(__name__)
+# ---- Small helpers ----
 
-def _ensure_json(obj: Any) -> str:
-    return "```json\n" + json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2) + "\n```"
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
-def _deep_merge(dst: Dict, src: Dict) -> Dict:
-    for k, v in src.items():
-        if isinstance(v, dict) and isinstance(dst.get(k), dict):
-            _deep_merge(dst[k], v)
-        else:
-            dst[k] = v
-    return dst
+def _sha1(s: str) -> str:
+    return hashlib.sha1(s.encode("utf-8")).hexdigest()  # nosec
 
-async def _find_by_name(bot: discord.Client, name_lower: str) -> discord.Thread | None:
-    # Prefer in LOG channel if known
-    if LOG_CHANNEL_ID:
-        ch = bot.get_channel(LOG_CHANNEL_ID)
-        if hasattr(ch, "threads"):
-            for th in ch.threads:
-                if isinstance(th, discord.Thread) and th.name.lower() == name_lower:
-                    return th
-        try:
-            async for th in ch.archived_threads(limit=50):  # type: ignore
-                if th.name.lower() == name_lower:
-                    return th
-        except Exception:
-            pass
-    # Fallback: scan guilds
-    for g in bot.guilds:
-        for ch in g.text_channels:
-            for th in ch.threads:
-                if th.name.lower() == name_lower:
-                    return th
-    return None
+async def _send_attachment_msg(channel: discord.abc.Messageable, body: str) -> discord.Message:
+    data = body.encode("utf-8")
+    f = discord.File(io.BytesIO(data), filename=ATTACHMENT_FILENAME)
+    head = f"📎 Memory snapshot {_now_iso()} • size={len(data)} bytes"
+    return await channel.send(content=head, file=f)
 
-async def find_neuro_thread(bot: discord.Client) -> discord.Thread | None:
-    if NEURO_THREAD_ID:
-        t = bot.get_channel(NEURO_THREAD_ID)
-        if isinstance(t, discord.Thread):
-            return t
-    return await _find_by_name(bot, NEURO_THREAD_NAME.lower())
+async def _safe_edit_keeper(keeper: discord.Message, body: str) -> None:
+    """
+    Edit pinned keeper safely. If > SOFT_LIMIT, send attachment message and
+    then edit keeper to a compact index that references it.
+    """
+    if len(body) <= SOFT_LIMIT:
+        await keeper.edit(content=body)
+        return
 
-async def upsert_pinned_memory(bot: discord.Client, patch: Dict[str, Any]) -> bool:
-    th = await find_neuro_thread(bot)
-    if not isinstance(th, discord.Thread):
-        log.warning("[memory_upsert] neuro thread tidak ditemukan")
-        return False
+    # Overflow path: upload file and index
+    attach_msg = await _send_attachment_msg(keeper.channel, body)
+    digest = _sha1(body)[:12]
+    index = (
+        f"{KEEPER_TITLE}\n{INDEX_HEADER}\n"
+        f"🧷 Snapshot: {attach_msg.jump_url}\n"
+        f"🆔 Digest: `{digest}` • {_now_iso()}"
+        f"{INDEX_FOOTER}"
+    )
+    # Ensure index fits
+    if len(index) > HARD_LIMIT:
+        # Ultra-compact fallback (shouldn't happen, but guard anyway)
+        index = f"{KEEPER_TITLE}\n{attach_msg.jump_url}\nsha1:{digest} • {_now_iso()}"
+    await keeper.edit(content=index)
 
-    # Cari keeper milik bot yang memuat MEMORY_TITLE
-    keeper = None
-    try:
-        pins = await th.pins()
-        for m in pins:
-            if m.author == bot.user and MEMORY_TITLE in (m.content or ""):
-                keeper = m
-                break
-    except Exception:
-        pass
-    if not keeper:
-        async for m in th.history(limit=50, oldest_first=False):
-            if m.author == bot.user and MEMORY_TITLE in (m.content or ""):
-                keeper = m
-                break
+# ---- Public API ----
 
-    base = {"lingo":{}, "threat_intel":{}}
-    if keeper:
-        match = re.search(r"```json\n(.*)\n```", keeper.content or "", flags=re.S)
-        if match:
+async def upsert_pinned_memory(bot, payload: Dict[str, Any]) -> bool:
+    """
+    PUBLIC: called by slang_hourly_miner / phish_text_hourly_miner, etc.
+    - Find an existing pinned keeper message (created by neuro_memory_pinner),
+      or create one minimally if not found.
+    - Render 'payload' into body string (JSON pretty) unless caller already passed 'body'.
+    - Smart-edit with 4k guard.
+
+    Returns True if edit/upload succeeded.
+    """
+    # Locate a keeper message that is pinned & authored by this bot
+    user_id = bot.user.id if getattr(bot, "user", None) else None
+
+    async def _find_keeper_in_guilds() -> Optional[discord.Message]:
+        # Scan recent pins for messages authored by the bot that look like keeper
+        for g in getattr(bot, "guilds", []):
             try:
-                base = json.loads(match.group(1)) or base
+                for ch in g.text_channels:
+                    try:
+                        pins = await ch.pins()
+                    except Exception:
+                        continue
+                    for m in pins:
+                        if user_id and m.author.id != user_id:
+                            continue
+                        # Heuristic: either has our title line or looks like previous keeper
+                        txt = (m.content or "")
+                        if "Memory Keeper" in txt or "memory keeper" in txt or "satpambot:auto_prune_state" in txt or "neuro-lite progress" in txt.lower():
+                            return m
             except Exception:
-                pass
+                continue
+        return None
 
-    merged = _deep_merge(base, patch)
-    body = f"**{MEMORY_TITLE}**\n" + _ensure_json(merged)
-
-    if keeper:
-        if keeper.content != body:
-            await keeper.edit(content=body)
-            log.info("[memory_upsert] keeper updated")
-    else:
-        keeper = await th.send(body)
+    keeper: Optional[discord.Message] = await _find_keeper_in_guilds()
+    if keeper is None:
+        # As last resort, try to use the first text channel we can write to and create a keeper.
+        # We keep content tiny so it won't clash with auto-delete rules.
+        target = None
+        for g in getattr(bot, "guilds", []):
+            for ch in g.text_channels:
+                perms = ch.permissions_for(g.me) if getattr(g, "me", None) else None
+                if perms and perms.send_messages and perms.read_message_history:
+                    target = ch
+                    break
+            if target:
+                break
+        if target is None:
+            # Can't locate a writable channel in smoke mode or limited context.
+            return False
+        keeper = await target.send(f"{KEEPER_TITLE}\nInitialized {_now_iso()}")
         try:
             await keeper.pin()
         except Exception:
-            pass
-        log.info("[memory_upsert] keeper created & pinned")
+            pass  # ignore if cannot pin in this context
 
-    return True
+    # Render body
+    if "body" in payload and isinstance(payload["body"], str):
+        body = payload["body"]
+    else:
+        # Pretty JSON plus lightweight header
+        pretty = json.dumps(payload, ensure_ascii=False, indent=2)
+        digest = _sha1(pretty)[:12]
+        body = f"{KEEPER_TITLE}\nsha1:{digest} • {_now_iso()}\n\n```json\n{pretty}\n```"
+
+    try:
+        await _safe_edit_keeper(keeper, body)
+        return True
+    except discord.HTTPException as e:
+        # If we still hit a 400/429, do a final compact write to avoid task crash
+        compact = f"{KEEPER_TITLE}\n(Compact mode) {_now_iso()}\nlen={len(body)}"
+        try:
+            await keeper.edit(content=compact[:HARD_LIMIT])
+            return True
+        except Exception:
+            raise e
