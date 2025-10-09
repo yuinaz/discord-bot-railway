@@ -1,1 +1,0 @@
-# See repository for usage. This patch adds a 2-phase public chat gate.
