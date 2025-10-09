@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Hotfix v2: make Message.delete safe + **protect neuro thread messages**.
-- Swallow NotFound(10008)/Forbidden.
-- If the message is inside thread "neuro-lite progress" OR looks like our keeper
-  (NEURO-LITE MEMORY / NEURO-LITE GATE STATUS / key prefix "[neuro-lite:"), ignore deletion.
+"""delete_safe_shim v3
+- Idempotent delete (swallow NotFound/Forbidden/10008).
+- Protect messages in thread "neuro-lite progress" and keeper-like messages
+  from accidental deletion by other cogs.
+- **NEW**: allowlist API `allow_delete_for(message_id: int)` so trusted cog
+  (e.g., neuro_memory_pinner) can cleanup duplicates safely.
 """
 import logging
 import discord
@@ -10,6 +12,15 @@ from discord.ext import commands
 from satpambot.bot.modules.discord_bot.helpers.thread_utils import DEFAULT_THREAD_NAME
 
 log = logging.getLogger(__name__)
+
+_ALLOWED_DELETE_IDS = set()
+
+def allow_delete_for(message_id: int):
+    """Permit a single deletion for the given message id."""
+    try:
+        _ALLOWED_DELETE_IDS.add(int(message_id))
+    except Exception:
+        pass
 
 def _in_neuro_thread(msg: discord.Message) -> bool:
     try:
@@ -32,10 +43,14 @@ def _is_keeper(msg: discord.Message) -> bool:
 def _install_safe_delete_wrapper():
     original_delete = discord.Message.delete
     async def _safe_delete(self: discord.Message, *args, **kwargs):
+        mid = int(getattr(self, "id", 0) or 0)
+        if mid in _ALLOWED_DELETE_IDS:
+            _ALLOWED_DELETE_IDS.discard(mid)
+            return await original_delete(self, *args, **kwargs)
         try:
             # PROTECT: neuro thread & keeper messages
             if _in_neuro_thread(self) or _is_keeper(self):
-                log.info("[delete_safe_shim] ignore delete for protected message in #%s", getattr(getattr(self, "channel", None), "name", "?"))
+                log.debug("[delete_safe_shim] ignore delete for protected message in #%s", getattr(getattr(self, "channel", None), "name", "?"))
                 return None
             return await original_delete(self, *args, **kwargs)
         except discord.NotFound:
@@ -49,13 +64,9 @@ def _install_safe_delete_wrapper():
                 log.debug("[delete_safe_shim] ignore HTTP 10008 Unknown Message (msg_id=%s)", getattr(self, "id", "?"))
                 return None
             raise
-    if getattr(discord.Message.delete, "__name__", "") != "_safe_delete":
-        discord.Message.delete = _safe_delete
-        log.info("[delete_safe_shim] Message.delete patched to be idempotent/safe (v2, with neuro protection).")
-    else:
-        # If already wrapped by older version, re-wrap to ensure our protection applies
-        discord.Message.delete = _safe_delete
-        log.info("[delete_safe_shim] Message.delete re-wrapped (v2).")
+    # Always wrap to ensure latest behavior
+    discord.Message.delete = _safe_delete
+    log.info("[delete_safe_shim] Message.delete patched (v3, neuro protect + allowlist).")
 
 class DeleteSafeShim(commands.Cog):
     def __init__(self, bot: commands.Bot):
