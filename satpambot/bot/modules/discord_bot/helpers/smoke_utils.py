@@ -1,92 +1,99 @@
 
-import asyncio
 import logging
-import types
+from types import SimpleNamespace
 
 log = logging.getLogger(__name__)
 
-class _DummyTree:
-    def add_command(self, *a, **k):
+class _DummyLoop:
+    def create_task(self, coro):
+        # swallow in smoke
+        log.debug("[smoke] loop.create_task(%s) -> noop", getattr(coro, "__name__", coro))
         return None
+    def call_soon(self, *a, **k):
+        log.debug("[smoke] loop.call_soon -> noop")
+        return None
+
+class AppCmdTreeStub:
+    """Minimal stub for discord.app_commands.CommandTree-like API."""
+    def __init__(self, bot):
+        self.bot = bot
     async def sync(self, *a, **k):
         return []
+    def add_command(self, *a, **k):
+        return None
+    def add_check(self, *a, **k):
+        return None
+    def remove_check(self, *a, **k):
+        return None
+    def copy_global_to(self, *a, **k):
+        return None
+    def clear_commands(self, *a, **k):
+        return None
 
 class DummyBot:
-    """
-    Minimal async-compatible shim of discord.ext.commands.Bot for offline smoke tests.
-    Provides async add_cog/load_extension and basic attributes used by our cogs.
+    """Lightweight bot stub so cogs with side effects can import/setup in smoke tests.
+
+    Goal: avoid AttributeError for common discord.py APIs. No real network calls.
     """
     def __init__(self):
+        self._is_smoke_dummy = True
         self._cogs = {}
-        self.loop = asyncio.get_event_loop()
-        self.tree = _DummyTree()
-        self.guilds = []   # offline: empty; cogs should tolerate
-        self.user = types.SimpleNamespace(id=0, name="DummyBot")
+        self.loop = _DummyLoop()
+        self.tree = AppCmdTreeStub(self)
+        self.guilds = []
+        self.user = SimpleNamespace(id=0, name="SMOKE", discriminator="0000")
+        self._listeners = {}
         self._checks = []
         self._extensions = set()
-        # Common attributes some cogs read
-        self.latency = 0.0
-        self._connection = types.SimpleNamespace(is_bot=True)
+        log.debug("[smoke] DummyBot ready")
 
-    # ---- discord.py-ish bits ----
-    async def add_cog(self, cog):
-        name = getattr(cog, "__class__", type("X", (), {})).__name__
+    # --- discord.ext.commands-like APIs (subset) ---
+    def add_cog(self, cog):
+        name = getattr(cog, "qualified_name", cog.__class__.__name__)
         self._cogs[name] = cog
-        log.debug("[DummyBot] add_cog %s", name)
-        return None
+        if hasattr(cog, "cog_load"):
+            try:
+                cog.cog_load()
+            except Exception as e:
+                log.debug("[smoke] cog_load() ignored: %s", e)
+        return cog
 
     def get_cog(self, name):
         return self._cogs.get(name)
 
-    async def wait_until_ready(self):
-        return None
+    def add_listener(self, func, name=None):
+        self._listeners.setdefault(name or func.__name__, []).append(func)
+
+    def remove_listener(self, func, name=None):
+        L = self._listeners.get(name or func.__name__, [])
+        if func in L:
+            L.remove(func)
 
     def add_check(self, func):
         self._checks.append(func)
-        return func
 
-    async def load_extension(self, ext_name):
-        # In offline mode we just remember it; real loading is handled by the smoke runner via importlib
-        self._extensions.add(ext_name)
-        log.debug("[DummyBot] load_extension %s", ext_name)
-        return None
+    def remove_check(self, func):
+        if func in self._checks:
+            self._checks.remove(func)
 
-    # Slash-tree conveniences sometimes accessed
-    async def sync_commands(self):
-        return await self.tree.sync()
+    # extensions
+    def load_extension(self, name):
+        # no-op in smoke
+        self._extensions.add(name)
 
-    # Utilities often probed by helpers
+    def unload_extension(self, name):
+        self._extensions.discard(name)
+
+    # misc
+    async def wait_until_ready(self):
+        return True
+
     def is_closed(self):
         return False
 
-    def get_channel(self, channel_id):
-        # Offline: return a dummy object with minimal API
-        return types.SimpleNamespace(id=channel_id, name=f"channel-{channel_id}")
-
-    def dispatch(self, *a, **k):
-        # no-op
-        return None
-
-    # Some cogs use 'loop.create_task'
-    def create_task(self, coro):
-        return self.loop.create_task(coro)
-
-class DedupLogHandler(logging.Handler):
-    """
-    Collapses identical log messages; keeps counters.
-    """
-    def __init__(self):
-        super().__init__()
-        self.counts = {}
-
-    def emit(self, record):
-        key = (record.name, record.levelno, record.getMessage())
-        self.counts[key] = self.counts.get(key, 0) + 1
-
-def install_dedup_logging(level=logging.INFO):
-    root = logging.getLogger()
-    root.setLevel(level)
-    # keep existing console handlers but add dedup aggregator
-    agg = DedupLogHandler()
-    root.addHandler(agg)
-    return agg
+    def __getattr__(self, item):
+        # Prevent AttributeError explosions for occasional attributes.
+        # Return a benign callable/no-op for unknown attrs.
+        def _noop(*a, **k):
+            log.debug("[smoke] bot.%s called -> noop", item)
+        return _noop

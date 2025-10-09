@@ -1,1 +1,1 @@
-# added to mark package
+# make scripts importable as a package
