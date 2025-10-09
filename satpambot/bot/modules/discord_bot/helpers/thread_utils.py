@@ -39,12 +39,18 @@ async def find_thread_by_name(ch: discord.TextChannel, name: str = DEFAULT_THREA
                 return th
     except Exception:
         pass
-    try:
-        async for th in ch.archived_threads(limit=100):
-            if (th.name or "").strip().lower() == name_l:
-                return th
-    except Exception:
-        pass
+    iters = []
+    if hasattr(ch, "archived_threads"):
+        iters.append(ch.archived_threads(limit=200))
+    if hasattr(ch, "public_archived_threads"):
+        iters.append(ch.public_archived_threads(limit=200))
+    for itr in iters:
+        try:
+            async for th in itr:
+                if (th.name or "").strip().lower() == name_l:
+                    return th
+        except Exception:
+            continue
     return None
 
 async def ensure_neuro_thread(bot: discord.Client, name: str = DEFAULT_THREAD_NAME) -> Optional[discord.Thread]:

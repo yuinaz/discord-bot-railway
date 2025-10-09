@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
-import asyncio, json, logging
+import os, asyncio, json, logging, contextlib
 from pathlib import Path
 from typing import Optional, List
 
@@ -8,7 +8,6 @@ import discord
 from discord.ext import commands, tasks
 
 from satpambot.bot.modules.discord_bot.helpers.thread_utils import ensure_neuro_thread, DEFAULT_THREAD_NAME
-from satpambot.bot.modules.discord_bot.helpers.message_keeper import get_keeper
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +17,7 @@ DEFAULT_MEM_FILES: List[Path] = [
 ]
 EXTRA_GLOBS = ["data/learn_progress_*.json"]
 KEEPER_KEY = "[neuro-lite:memory]"
+ALLOW_SEND_FALLBACK = os.getenv("NEURO_MEMORY_SEND_FALLBACK", "1") not in ("0","false","False","no","No")
 
 def _discover_mem_paths() -> List[Path]:
     paths = list(DEFAULT_MEM_FILES)
@@ -42,6 +42,24 @@ def _load_memory_json() -> str:
         merged = {"status": "no memory files found", "expected": [str(x) for x in DEFAULT_MEM_FILES]}
     return "```json\n" + json.dumps(merged, ensure_ascii=False, indent=2) + "\n```"
 
+async def _keeper_update(bot: commands.Bot, th: discord.Thread, content: str) -> Optional[discord.Message]:
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.message_keeper import get_keeper
+        keeper = get_keeper(bot)
+        return await keeper.update(th, key=KEEPER_KEY, content=content)
+    except Exception as e:
+        log.warning("[memory_pinner] keeper unavailable -> %s", e)
+        if not ALLOW_SEND_FALLBACK:
+            return None
+        try:
+            msg = await th.send(content)
+            with contextlib.suppress(Exception):
+                await msg.pin(reason="Neuro-Lite memory keeper (fallback)")
+            return msg
+        except Exception as e2:
+            log.warning("[memory_pinner] fallback send failed: %s", e2)
+            return None
+
 class NeuroLiteMemoryPinner(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -59,20 +77,16 @@ class NeuroLiteMemoryPinner(commands.Cog):
         if not th:
             log.warning("[memory_pinner] cannot ensure neuro thread")
             return None
-        keeper = get_keeper(self.bot)
         blob = _load_memory_json()
-        try:
-            msg = await keeper.update(th, key=KEEPER_KEY, content="**NEURO-LITE MEMORY**\n" + blob)
+        msg = await _keeper_update(self.bot, th, "**NEURO-LITE MEMORY**\n" + blob)
+        if msg:
             try:
                 await msg.pin(reason="Neuro-Lite memory keeper")
             except Exception:
                 pass
             self._last_blob = blob
             log.info("[memory_pinner] memory keeper upserted & pinned in thread #%s", getattr(th, "name", "?"))
-            return msg
-        except Exception as e:
-            log.warning("[memory_pinner] update failed: %s", e)
-            return None
+        return msg
 
     @tasks.loop(count=1)
     async def ensure_once(self):
