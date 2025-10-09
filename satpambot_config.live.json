@@ -1,0 +1,12 @@
+{
+  "dm_muzzle_mode": "log",
+  "selfheal": true,
+  "selfheal_quiet": true,
+  "selfheal_thread_disable": true,
+  "automaton": true,
+  "automaton_quiet": true,
+  "automaton_thread_disable": true,
+  "log_channel_id": "1400375184048787566",
+  "selfheal_thread_channel_id": "",
+  "automaton_thread_channel_id": ""
+}
