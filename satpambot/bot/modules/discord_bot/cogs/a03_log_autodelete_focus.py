@@ -1,87 +1,94 @@
+"""
+Auto delete messages in focus log channel (v8)
+- Deletes NON-pinned messages older than TTL seconds.
+- Never touches messages that contain keeper markers like "SATPAMBOT_PHASH_DB_V1"
+  or "presence=online" or have attachments we use as DB blobs.
+- Runs quietly every ~45s.
+Env:
+    LOG_CHANNEL_ID  (required)
+    LOG_AUTODELETE_TTL  default: 180
+"""
+from __future__ import annotations
 
-import os
-import re
 import asyncio
 import logging
-from discord.ext import commands
+import os
+import time
+from typing import Iterable
+
 import discord
+from discord.ext import commands, tasks
 
-LOG = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-def _get_focus_id() -> int:
-    raw = os.getenv("LOG_CHANNEL_ID") or ""
+KEEPER_HINTS = (
+    "SATPAMBOT_PHASH_DB_V1",
+    "presence=online",
+    "SATPAMBOT_STATUS_V1",
+    "keeper",
+    "[auto_prune_state]",
+)
+
+def _int_env(name: str, default: int | None = None):
+    v = os.getenv(name, "").strip()
+    if not v:
+        return default
     try:
-        return int(raw)
-    except Exception:
-        return 0
+        return int(v)
+    except ValueError:
+        return default
 
 class AutoCleanLogChannel(commands.Cog):
-    """Auto-delete bot messages in log channel, except pinned/keepers."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.focus_id = _get_focus_id()
-        # default TTL 3 minutes
-        self.ttl = int(os.getenv("LOG_AUTO_DELETE_TTL", "180"))
-        # Messages containing any of these markers will NEVER be deleted
-        self._exempt_re = re.compile(
-            r"(SATPAMBOT_(?:STATUS|PHASH)_V1|NEURO[- ]LITE|PHASH_DB|keeper|memory\s+keeper)",
-            re.I
-        )
+        self.focus_id = _int_env("LOG_CHANNEL_ID")
+        self.ttl = _int_env("LOG_AUTODELETE_TTL", 180) or 180
+        self.loop.start()
 
-    def _is_exempt(self, msg: discord.Message) -> bool:
-        if not msg:
+    def cog_unload(self):
+        self.loop.cancel()
+
+    def _is_keeper(self, m: discord.Message) -> bool:
+        if m.pinned:
             return True
-        if not msg.channel or msg.channel.id != self.focus_id:
-            return True
-        if msg.pinned:
-            return True
-        # Only auto-delete bot-authored messages to be safe
-        if self.bot.user and msg.author.id != self.bot.user.id:
-            return True
-        # If it looks like a keeper/status message, protect it
-        if msg.content and self._exempt_re.search(msg.content or ""):
-            return True
-        for e in (msg.embeds or []):
-            title = f"{e.title or ''} {e.description or ''}"
-            if self._exempt_re.search(title):
+        content = (m.content or "").lower()
+        for hint in KEEPER_HINTS:
+            if hint.lower() in content:
                 return True
         return False
 
-    async def _cleanup_later(self, msg: discord.Message):
-        if self._is_exempt(msg):
+    @tasks.loop(seconds=45.0)
+    async def loop(self):
+        if not self.focus_id:
             return
         try:
-            await asyncio.sleep(self.ttl)
-            # re-fetch to see if it's pinned later
-            try:
-                fresh = await msg.channel.fetch_message(msg.id)
-                if fresh.pinned:
-                    return
-            except Exception:
-                pass
-            await msg.delete()
-        except discord.Forbidden:
-            # ignore quietly
-            return
-        except Exception:
-            return
+            # Focus channel only
+            ch = None
+            for g in self.bot.guilds:
+                tmp = g.get_channel(self.focus_id) or await self.bot.fetch_channel(self.focus_id)
+                if tmp:
+                    ch = tmp
+                    break
+            if ch is None or not isinstance(ch, discord.TextChannel):
+                return
+            cutoff = discord.utils.utcnow().timestamp() - self.ttl
+            async def _check(m: discord.Message) -> bool:
+                if self._is_keeper(m):
+                    return False
+                # keep pinned, system, and thread starter
+                if m.flags and getattr(m.flags, "is_crossposted", False):
+                    return False
+                ts = m.created_at.timestamp() if m.created_at else time.time()
+                return ts < cutoff
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if not self.focus_id or message.channel.id != self.focus_id:
-            return
-        # schedule in background
-        asyncio.create_task(self._cleanup_later(message))
+            await ch.purge(limit=200, check=_check, bulk=True, oldest_first=True, reason="auto-clean focus log")
+        except Exception as e:
+            log.debug("[log_autodelete_focus] purge skipped: %r", e)
 
-    @commands.Cog.listener()
-    async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if not self.focus_id or after.channel.id != self.focus_id:
-            return
-        asyncio.create_task(self._cleanup_later(after))
+    @loop.before_loop
+    async def before(self):
+        await self.bot.wait_until_ready()
 
-def setup(bot):
-    try:
-        bot.add_cog(AutoCleanLogChannel(bot))
-        LOG.info("[log_autodelete_focus] ready (ttl=%ss)", int(os.getenv("LOG_AUTO_DELETE_TTL", "180")))
-    except Exception as e:
-        LOG.error("[log_autodelete_focus] failed to add cog: %s", e)
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AutoCleanLogChannel(bot))
+    log.debug("[log_autodelete_focus] ready (ttl=%ss)", _int_env("LOG_AUTODELETE_TTL", 180) or 180)

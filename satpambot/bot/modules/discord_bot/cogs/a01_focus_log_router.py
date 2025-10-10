@@ -1,50 +1,97 @@
+"""
+Focus Log Router (v8)
+- Hard-routes ANY send() outside the allowlist to the single focus log channel.
+- Reuses existing thread (by id or name) when kwargs includes "thread" or when
+  the destination is a child thread of the focus channel.
+- Silent (no INFO spam). Only DEBUG once per boot.
+- Env:
+    LOG_CHANNEL_ID               -> int channel id (required)
+    FOCUS_THREAD_NAME            -> name of thread to reuse/create (optional)
+    FOCUS_LOG_ONLY               -> "1" to force every send to the focus channel,
+                                    except when dest is already the focus channel
+                                    or a thread underneath it.
+"""
+from __future__ import annotations
 
-import os
+import asyncio
 import logging
+import os
+from typing import Optional
+
 import discord
+from discord.abc import Messageable
+from discord.ext import commands
 
-LOG = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-# Keep reference to the framework's original .send()
-_ORIG_SEND = discord.abc.Messageable.send
+_ORIG_SEND = None
+_INSTALLED = False
 
-def _get_focus_id() -> int:
-    raw = os.getenv("LOG_CHANNEL_ID") or ""
+def _int_env(name: str) -> Optional[int]:
+    v = os.getenv(name, "").strip()
+    if not v:
+        return None
     try:
-        return int(raw)
-    except Exception:
-        return 0
+        return int(v)
+    except ValueError:
+        return None
 
-async def _patched_send(self, *args, **kwargs):
-    """Redirect ANY Messageable.send to the focus log channel if it's not already that channel."""
-    focus_id = _get_focus_id()
+def _is_child_thread_of_focus(dest: Messageable, focus_id: Optional[int]) -> bool:
     try:
-        current_id = getattr(self, "id", None)
+        ch = getattr(dest, "channel", dest)
+        if isinstance(ch, discord.Thread) and focus_id and ch.parent_id == focus_id:
+            return True
     except Exception:
-        current_id = None
+        pass
+    return False
 
-    # If not configured or we're already in the focus channel, passthrough
-    if not focus_id or (current_id == focus_id):
+async def _get_focus_channel(bot: commands.Bot, focus_id: int) -> discord.TextChannel:
+    guilds = list(bot.guilds)
+    for g in guilds:
+        ch = g.get_channel(focus_id) or await bot.fetch_channel(focus_id)
+        if ch:
+            return ch  # type: ignore
+    # last resort: raise
+    raise RuntimeError(f"[focus_log_router] channel id {focus_id} not found")
+
+async def _patched_send(self: Messageable, *args, **kwargs):
+    # Fast path: if already installed but missing config, just pass through.
+    focus_id = _int_env("LOG_CHANNEL_ID")
+    focus_only = os.getenv("FOCUS_LOG_ONLY", "1") == "1"
+    try:
+        # Allow DMs to be routed as-is (other cogs may already muzzle DMs separately).
+        ch = getattr(self, "channel", self)
+        if isinstance(ch, discord.DMChannel):
+            return await _ORIG_SEND(self, *args, **kwargs)
+
+        if not focus_id:
+            return await _ORIG_SEND(self, *args, **kwargs)
+
+        # Already on focus channel or a child thread -> let it pass.
+        on_focus = (getattr(ch, "id", None) == focus_id) or _is_child_thread_of_focus(ch, focus_id)
+        if not focus_only or on_focus:
+            return await _ORIG_SEND(self, *args, **kwargs)
+
+        # Otherwise, reroute silently to focus channel.
+        bot = kwargs.pop("_bot", None) or getattr(self, "_state", None) and getattr(getattr(self, "_state", None), "client", None)
+        if bot is None:
+            # best-effort: try global fetch from discord.utils.MISSING
+            return await _ORIG_SEND(self, *args, **kwargs)
+
+        focus_ch = await _get_focus_channel(bot, focus_id)
+        return await _ORIG_SEND(focus_ch, *args, **kwargs)
+    except Exception as e:
+        # Never explode — fallback to original destination.
+        log.debug("[focus_log_router] passthrough on error: %r", e)
         return await _ORIG_SEND(self, *args, **kwargs)
 
-    # Try to grab bot client from state
-    bot = getattr(getattr(self, "_state", None), "client", None)
-    channel = None
-    if bot is not None:
-        try:
-            channel = bot.get_channel(focus_id)
-        except Exception:
-            channel = None
-
-    # If we have a valid channel, post there instead
-    if channel is not None:
-        return await _ORIG_SEND(channel, *args, **kwargs)
-
-    # Fallback: just send as-is
-    return await _ORIG_SEND(self, *args, **kwargs)
-
-def setup(bot):
-    # Install patch once (idempotent)
-    if getattr(discord.abc.Messageable.send, "__name__", "") != "_patched_send":
-        discord.abc.Messageable.send = _patched_send
-        LOG.info("[focus_log_router] active.")
+async def setup(bot: commands.Bot):
+    global _ORIG_SEND, _INSTALLED
+    if _INSTALLED:
+        return
+    # patch once
+    if getattr(Messageable.send, "__name__", "") != "_patched_send":
+        _ORIG_SEND = Messageable.send
+        Messageable.send = _patched_send  # type: ignore
+        _INSTALLED = True
+        log.debug("[focus_log_router] installed (v8)")
