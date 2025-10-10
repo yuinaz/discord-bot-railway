@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-# patches/limit_phash_daily.py
 from __future__ import annotations
+
+# patches/limit_phash_daily.py
 import re, sys, os
 from pathlib import Path
 

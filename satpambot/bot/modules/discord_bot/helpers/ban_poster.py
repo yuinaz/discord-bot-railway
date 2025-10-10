@@ -1,5 +1,6 @@
-# satpambot/bot/modules/discord_bot/helpers/ban_poster.py
 from __future__ import annotations
+
+# satpambot/bot/modules/discord_bot/helpers/ban_poster.py
 
 import os
 from typing import Optional

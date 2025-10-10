@@ -1,5 +1,5 @@
-
 from __future__ import annotations
+
 import asyncio, os, re, json, logging
 from typing import Optional, List, Tuple
 import discord

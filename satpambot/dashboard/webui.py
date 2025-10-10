@@ -1,5 +1,6 @@
-# satpambot/dashboard/webui.py
 from __future__ import annotations
+
+# satpambot/dashboard/webui.py
 import logging
 class _NoisyPathFilter(logging.Filter):
     NOISY_SUBSTRS = ("/api/metrics-ingest", "/dashboard/api/metrics")

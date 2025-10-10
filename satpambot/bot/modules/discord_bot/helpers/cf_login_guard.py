@@ -1,5 +1,6 @@
-# satpambot/bot/modules/discord_bot/helpers/cf_login_guard.py
 from __future__ import annotations
+
+# satpambot/bot/modules/discord_bot/helpers/cf_login_guard.py
 import json, time, random, pathlib, logging, urllib.request, urllib.error, socket, ssl
 
 log = logging.getLogger(__name__)

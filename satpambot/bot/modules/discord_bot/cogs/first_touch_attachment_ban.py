@@ -6,6 +6,7 @@ Version: v11.4+ (combined v11.3 + v11.4)
 - v11.4: MIME sniff (magic bytes) & extension-mismatch burst → direct-ban, pack detection now respects true image kind.
 """
 from __future__ import annotations
+
 import json, os, hashlib, re, io
 from typing import Optional, Dict, Any, Set, List, Tuple
 import discord

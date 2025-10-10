@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 
 
@@ -62,7 +63,6 @@ Place this file under patches/ and run via:  python patches/hotfix_tile_phash.py
 
 
 
-from __future__ import annotations
 
 import importlib
 import os
