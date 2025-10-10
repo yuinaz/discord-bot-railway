@@ -49,17 +49,17 @@
     "228126085160763392": 4.0
   },
   "totals": {
-    "exposures_total": 7.0
+    "exposures_total": 24.0
   },
   "by_user": {
     "228126085160763392": {
-      "exposures_total": 5.0
+      "exposures_total": 17.0
     },
     "384980425120153621": {
       "exposures_total": 1.0
     },
     "635246646581526529": {
-      "exposures_total": 1.0
+      "exposures_total": 6.0
     }
   }
 }

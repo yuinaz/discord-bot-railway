@@ -1,105 +1,81 @@
-#!/usr/bin/env python3
-from __future__ import annotations
-
 import json
 import logging
-import os
-import re
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Optional
 
 log = logging.getLogger(__name__)
 
-# Default skip list (non-chat channels) — can be extended via ENV XP_SKIP_CHANNEL_IDS
-DEFAULT_SKIP_IDS = {
-    '763813761814495252',
-    '936689852546678885',
-    '767401659390623835',
-    '1270611643964850178',
-    '761163966482743307',
-    '1422084695692414996',
-    '1372983711771001064',
-    '1378739739930398811',
-}
-
-DISCORD_URL_CH_RE = re.compile(r'/channels/\d+/(\d+)/\d+')
-
-def _get_env_skip_ids() -> set[str]:
-    raw = os.getenv('XP_SKIP_CHANNEL_IDS', '').strip()
-    if not raw:
-        return set()
-    return {x.strip() for x in raw.split(',') if x.strip()}
-
-def _parse_channel_id_from_url(url: str) -> str | None:
-    if not url:
-        return None
-    m = DISCORD_URL_CH_RE.search(url)
-    if m:
-        return m.group(1)
-    return None
-
-def _ensure_int(val: Any, default: int = 0) -> int:
+async def upsert_pinned_memory(
+    bot,
+    *,
+    guild_id: Optional[int] = None,
+    channel_id: Optional[int] = None,
+    title: str = "XP: Miner Memory",
+    payload: Optional[Dict[str, Any]] = None,
+    max_keep: int = 3,
+) -> bool:
+    # Send (or upsert) a JSON snapshot to a report channel and pin it.
+    # Keeps only the newest `max_keep` pins from this bot.
+    # Falls back to LOG_CHANNEL_ID if specific report channel isn't provided.
     try:
-        return int(val)
-    except Exception:
-        return default
+        if channel_id is None:
+            try:
+                from satpambot.config.runtime import cfg
+            except Exception:
+                cfg = lambda k, d=None: d  # fallback no-op
+            channel_id = (
+                cfg("PUBLIC_REPORT_CHANNEL_ID")
+                or cfg("REPORT_CHANNEL_ID")
+                or cfg("SATPAMBOT_LOG_CHANNEL_ID")
+                or cfg("LOG_CHANNEL_ID")
+            )
+        if not channel_id:
+            log.warning("memory_upsert: channel_id missing; skip upsert.")
+            return False
 
-def upsert(payload: Any, *, json_dir: str | None = None) -> bool:
-    """
-    Tolerant upserter untuk payload XP.
-    - Menerima dict dengan key 'phish_text' (list) atau langsung list of items.
-    - Skip channel berdasarkan DEFAULT_SKIP_IDS + ENV XP_SKIP_CHANNEL_IDS.
-    - Simpan snapshot ke {json_dir}/last_phish_text.json.
-    - Selalu return True supaya kompatibel dengan caller lama.
-    """
-    skip_ids = set(DEFAULT_SKIP_IDS) | _get_env_skip_ids()
-    json_dir = json_dir or os.getenv('XP_JSON_DIR', 'data/neuro-lite')
-    Path(json_dir).mkdir(parents=True, exist_ok=True)
+        # Get channel
+        ch = bot.get_channel(int(channel_id))
+        if ch is None:
+            ch = await bot.fetch_channel(int(channel_id))
 
-    items: List[Dict[str, Any]] = []
-    ts = None
+        # Prepare embed
+        desc = ""
+        try:
+            from discord import Embed
+            embed = Embed(title=title)
+            if payload is not None:
+                txt = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2)
+                if len(txt) > 3900:
+                    txt = txt[:3900] + "\n... (truncated)"
+                desc = f"```json\n{txt}\n```"
+            embed.description = desc or "—"
+        except Exception:
+            # Discord not available? Fallback to plain text send
+            embed = None
+            if payload is not None:
+                desc = json.dumps(payload, ensure_ascii=False)[:1900]
 
-    if isinstance(payload, dict):
-        if 'phish_text' in payload and isinstance(payload['phish_text'], list):
-            items = list(payload['phish_text'])
-        elif 'items' in payload and isinstance(payload['items'], list):
-            items = list(payload['items'])
-        ts = payload.get('ts')
-    elif isinstance(payload, list):
-        items = list(payload)
-    else:
-        log.warning('[memory_upsert] payload format tidak dikenal: type=%s', type(payload))
+        msg = await ch.send(embed=embed) if embed else await ch.send(content=desc or title)
+        try:
+            await msg.pin()
+        except Exception:
+            pass
+
+        # Keep only `max_keep` newest pins from this bot
+        try:
+            pins = await ch.pins()
+            mine = [m for m in pins if getattr(m.author, "id", None) == getattr(bot.user, "id", None)]
+            # sort by created_at desc
+            mine.sort(key=lambda m: getattr(m, "created_at", 0), reverse=True)
+            for m in mine[max_keep:]:
+                try:
+                    await m.unpin()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        log.info("memory_upsert: pinned %s snapshot to channel %s", title, channel_id)
         return True
-
-    total = len(items)
-    kept: List[Dict[str, Any]] = []
-
-    for it in items:
-        if not isinstance(it, dict):
-            continue
-        it['score'] = _ensure_int(it.get('score', 0), 0)
-        ch_id = _parse_channel_id_from_url(str(it.get('url', '')))
-        if ch_id:
-            it['channel_id'] = ch_id
-        if ch_id and ch_id in skip_ids:
-            continue
-        kept.append(it)
-
-    snapshot = {
-        'ts': ts,
-        'total': total,
-        'kept': len(kept),
-        'skip_ids': sorted(skip_ids),
-        'items': kept,
-    }
-    snap_path = Path(json_dir) / 'last_phish_text.json'
-    try:
-        snap_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding='utf-8')
     except Exception as e:
-        log.exception('Gagal tulis snapshot ke %s: %s', snap_path, e)
-
-    log.info('[memory_upsert] phish_text filtered: kept=%s / total=%s', len(kept), total)
-    return True
-
-def update(payload: Any, **kwargs) -> bool:
-    return upsert(payload, **kwargs)
+        log.exception("memory_upsert failed: %s", e)
+        return False

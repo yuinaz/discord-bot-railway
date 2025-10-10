@@ -1,40 +1,44 @@
-# -*- coding: utf-8 -*-
-"""
-sitecustomize: runtime shims & small boot patches.
-This file is auto-loaded by Python if located on sys.path root.
+# Auto-applied at Python startup if this file is on sys.path (project root).
+# - Enables fast-start miner delays & intervals (override via env MINER_FAST_START=0)
+# - Provides fallback for PublicChatGate report channel using LOG_CHANNEL_ID/etc.
+import os, sys
 
-Adds a compatibility shim so legacy cogs that do
-`from satpambot.bot.utils.embed_scribe import EmbedScribe`
-continue to work even if the module migrated to function-style API.
-"""
-import importlib
+def _set_if_empty(name: str, value) -> None:
+    if os.getenv(name) in (None, ""):
+        os.environ[name] = str(value)
 
+# --------- Miner fast start ---------
+# Enable by default so testing feels instant. Disable by setting MINER_FAST_START=0.
+FAST = os.getenv("MINER_FAST_START", "1")
+if FAST == "1":
+    _set_if_empty("TEXT_MINER_DELAY_SEC", 5)       # default ~5s
+    _set_if_empty("TEXT_MINER_INTERVAL_SEC", 180)  # every 3m
+    _set_if_empty("PHISH_MINER_DELAY_SEC", 7)      # default ~7s
+    _set_if_empty("PHISH_MINER_INTERVAL_SEC", 300) # every 5m
+    _set_if_empty("SLANG_MINER_DELAY_SEC", 9)      # default ~9s
+    _set_if_empty("SLANG_MINER_INTERVAL_SEC", 300) # every 5m
+    # Optional caps to avoid overload if miner supports limits:
+    _set_if_empty("PHISH_MINER_LIMIT", 200)
+    _set_if_empty("SLANG_MINER_PER_CHANNEL", 200)
+# Print once so user sees it's active even if logging not configured yet
 try:
-    m = importlib.import_module("satpambot.bot.utils.embed_scribe")
-    if not hasattr(m, "EmbedScribe"):
-        # Create a light wrapper that delegates to module-level API.
-        class EmbedScribe:
-            @staticmethod
-            async def upsert(bot, channel, embed, key=None, pin=True, thread_name=None, **kwargs):
-                # Prefer new API if present
-                up = getattr(m, "upsert", None)
-                if up:
-                    return await up(bot, channel, embed, key=key, pin=pin, thread_name=thread_name, **kwargs)
-                # Fallback: try write_embed if provided by older versions
-                we = getattr(m, "write_embed", None)
-                if we:
-                    return await we(bot, channel, embed, key=key, pin=pin, thread_name=thread_name, **kwargs)
-                raise RuntimeError("No upsert/write_embed available in embed_scribe")
-
-            # Optional helpers some cogs might call; no-op if absent
-            @staticmethod
-            async def janitor(channel, key=None, **kwargs):
-                j = getattr(m, "janitor", None)
-                if j:
-                    return await j(channel, key=key, **kwargs)
-                return False
-
-        setattr(m, "EmbedScribe", EmbedScribe)
+    sys.stderr.write(f"[sitecustomize] MINER_FAST_START={FAST} "
+                     f"(TEXT_delay={os.getenv('TEXT_MINER_DELAY_SEC')}, "
+                     f"PHISH_delay={os.getenv('PHISH_MINER_DELAY_SEC')}, "
+                     f"SLANG_delay={os.getenv('SLANG_MINER_DELAY_SEC')})\n")
 except Exception:
-    # Never block boot on shim errors
     pass
+
+# --------- PublicChatGate fallback ---------
+# If PUBLIC_REPORT_CHANNEL_ID isn't set, fallback to other known IDs.
+if not os.getenv("PUBLIC_REPORT_CHANNEL_ID"):
+    cid = (os.getenv("PUBLIC_CHAT_REPORT_CHANNEL_ID")
+           or os.getenv("REPORT_CHANNEL_ID")
+           or os.getenv("SATPAMBOT_LOG_CHANNEL_ID")
+           or os.getenv("LOG_CHANNEL_ID"))
+    if cid:
+        os.environ["PUBLIC_REPORT_CHANNEL_ID"] = cid
+        try:
+            sys.stderr.write(f"[sitecustomize] PUBLIC_REPORT_CHANNEL_ID←{cid} (fallback)\n")
+        except Exception:
+            pass
