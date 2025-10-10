@@ -1,17 +1,27 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files
 from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
 datas = []
-hiddenimports = []
-datas += collect_data_files('satpambot')
-hiddenimports += collect_submodules('satpambot')
+binaries = []
+hiddenimports = ['satpambot.bot.modules.discord_bot.shim_runner']
+hiddenimports += collect_submodules('satpambot.bot.modules.discord_bot.cogs')
+tmp_ret = collect_all('satpambot')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('satpambot.bot')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('satpambot.bot.modules')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('satpambot.bot.modules.discord_bot')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('satpambot.bot.modules.discord_bot.cogs')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['minipc_app.py'],
-    pathex=[],
-    binaries=[],
+    ['C:\\Users\\CC-PC\\Downloads\\Music\\SatpamLeina\\minipc_app.py'],
+    pathex=['C:\\Users\\CC-PC\\Downloads\\Music\\SatpamLeina'],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -42,5 +52,4 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='NONE',
 )
