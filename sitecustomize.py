@@ -1,35 +1,40 @@
+# -*- coding: utf-8 -*-
+"""
+sitecustomize: runtime shims & small boot patches.
+This file is auto-loaded by Python if located on sys.path root.
 
-# sitecustomize: auto-import SatpamBot.env into internal config on startup,
-# and persist an import report for the DM embed.
-import os
-from satpambot.config.env_importer import parse_dotenv, import_env_map, file_sha256
-from satpambot.config.runtime import cfg, set_cfg
+Adds a compatibility shim so legacy cogs that do
+`from satpambot.bot.utils.embed_scribe import EmbedScribe`
+continue to work even if the module migrated to function-style API.
+"""
+import importlib
 
-ENV_FILE = os.getenv('SATPAMBOT_ENV_PATH', 'SatpamBot.env')
+try:
+    m = importlib.import_module("satpambot.bot.utils.embed_scribe")
+    if not hasattr(m, "EmbedScribe"):
+        # Create a light wrapper that delegates to module-level API.
+        class EmbedScribe:
+            @staticmethod
+            async def upsert(bot, channel, embed, key=None, pin=True, thread_name=None, **kwargs):
+                # Prefer new API if present
+                up = getattr(m, "upsert", None)
+                if up:
+                    return await up(bot, channel, embed, key=key, pin=pin, thread_name=thread_name, **kwargs)
+                # Fallback: try write_embed if provided by older versions
+                we = getattr(m, "write_embed", None)
+                if we:
+                    return await we(bot, channel, embed, key=key, pin=pin, thread_name=thread_name, **kwargs)
+                raise RuntimeError("No upsert/write_embed available in embed_scribe")
 
-def _auto_import():
-    try:
-        sha = file_sha256(ENV_FILE)
-        if not sha:
-            return
-        last = cfg('IMPORTED_ENV_SHA_SATPAMBOT')
-        if last == sha:
-            return  # already imported this revision
-        data = parse_dotenv(ENV_FILE)
-        if not data:
-            return
-        c_cfg, c_sec, skipped, cfg_keys, sec_keys = import_env_map(data)
-        # Persist metadata for reporter cog
-        set_cfg('IMPORTED_ENV_SHA_SATPAMBOT', sha)
-        set_cfg('IMPORTED_ENV_FILE', ENV_FILE)
-        set_cfg('IMPORTED_ENV_LAST_CFG', int(c_cfg))
-        set_cfg('IMPORTED_ENV_LAST_SEC', int(c_sec))
-        # keep only first 40 keys to avoid bloat
-        set_cfg('IMPORTED_ENV_LAST_CFG_KEYS', cfg_keys[:40])
-        set_cfg('IMPORTED_ENV_LAST_SEC_KEYS', sec_keys[:40])
-        set_cfg('IMPORTED_ENV_NOTIFY', True)
-        print(f"[sitecustomize] Imported {c_cfg} config keys, {c_sec} secrets from {ENV_FILE}.")
-    except Exception as e:
-        print(f"[sitecustomize] env import failed: {e}")
+            # Optional helpers some cogs might call; no-op if absent
+            @staticmethod
+            async def janitor(channel, key=None, **kwargs):
+                j = getattr(m, "janitor", None)
+                if j:
+                    return await j(channel, key=key, **kwargs)
+                return False
 
-_auto_import()
+        setattr(m, "EmbedScribe", EmbedScribe)
+except Exception:
+    # Never block boot on shim errors
+    pass

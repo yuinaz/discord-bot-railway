@@ -5,6 +5,7 @@ from discord.ext import commands
 log = logging.getLogger(__name__)
 
 EXTENSIONS = (
+
     "satpambot.bot.modules.discord_bot.cogs.runtime_cfg_manager",
     "satpambot.bot.modules.discord_bot.cogs.runtime_cfg_from_message",
     "satpambot.bot.modules.discord_bot.cogs.prefix_mod_only",
@@ -12,6 +13,9 @@ EXTENSIONS = (
     "satpambot.bot.modules.discord_bot.cogs.reaction_allowlist_static",
     "satpambot.bot.modules.discord_bot.cogs.status_pin_updater",
     "satpambot.bot.modules.discord_bot.cogs.ban_local_notify",
+
+    "satpambot.bot.modules.discord_bot.cogs.public_send_router",
+    "satpambot.bot.modules.discord_bot.cogs.phish_reward_listener",
 )
 
 async def _safe_load(bot: commands.Bot, name: str) -> None:
