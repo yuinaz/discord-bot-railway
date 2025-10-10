@@ -11,6 +11,8 @@ __pycache__/
 .env
 .exe
 /dist/
+.zip
+.rar
 /out/
 *.msi
 *.pkg

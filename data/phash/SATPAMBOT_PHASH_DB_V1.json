@@ -408,6 +408,18 @@
       "meta": {
         "filename": "image.png"
       }
+    },
+    {
+      "phash": "d119b70ca666b627",
+      "sha256": "6d5b9ac2cac242543eddf52c344b501e6ab29b846e1e6932b21843930ae80b7a",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426249867734552719,
+      "user_id": 635246646581526529,
+      "label": "unknown",
+      "ts": 1760114866,
+      "meta": {
+        "filename": "db3e5edda76033c0802b12667cad7076_0.jpg"
+      }
     }
   ]
 }
