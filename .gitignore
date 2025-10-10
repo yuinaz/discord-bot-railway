@@ -9,6 +9,12 @@ __pycache__/
 .pytest_cache/
 .venv/
 .env
+.exe
+/dist/
+/out/
+*.msi
+*.pkg
+/*.spec
 .DS_Store
 .env.local
 SatpamBot.env
@@ -30,3 +36,8 @@ secrets_backup/
 
 # Local build artifacts
 /build/
+
+*.log
+run_local.log
+build_exe.log
+exe_run.log
