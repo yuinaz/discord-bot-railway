@@ -1,7 +1,8 @@
-from __future__ import annotations
-
 import logging
-from discord import Interaction, app_commands
+from typing import Optional
+
+import discord
+from discord import app_commands
 from discord.ext import commands
 
 log = logging.getLogger(__name__)
@@ -10,26 +11,41 @@ class ClearChat(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="clearchat", description="Bersihkan DM bot di chat ini.")
-    async def clearchat(self, interaction: Interaction):
-        # Defer first to open a followup token reliably
+    @app_commands.command(name="clearchat", description="Bersihkan DM dari pesan bot ini")
+    async def clearchat(self, interaction: discord.Interaction):
+        # respon cepat agar token valid
         try:
-            if not interaction.response.is_done():
-                await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer(ephemeral=True, thinking=False)
         except Exception:
             pass
 
-        # Your delete logic should be here; for smoke keep it 0
         deleted = 0
-        msg = f"🧹 DM dibersihkan: {deleted} pesan bot dihapus."
-
         try:
-            if interaction.response.is_done():
-                await interaction.followup.send(msg, ephemeral=True, wait=False)
-            else:
-                await interaction.response.send_message(msg, ephemeral=True)
-        except Exception as e:
-            log.debug("[clearchat] notify failed (%r), ignoring.", e)
+            user = interaction.user
+            dm: Optional[discord.DMChannel] = user.dm_channel or await user.create_dm()
+            async for m in dm.history(limit=200):
+                if m.author.id == self.bot.user.id:
+                    try:
+                        await m.delete()
+                        deleted += 1
+                    except discord.NotFound:
+                        pass
+                    except discord.Forbidden:
+                        # tidak punya izin hapus DM (harusnya boleh), hentikan
+                        break
+        except Exception:
+            log.exception("[clearchat] gagal scan DM")
+
+        # kirim hasil
+        msg = f"🧹 DM dibersihkan: {deleted} pesan bot dihapus."
+        try:
+            await interaction.followup.send(msg, ephemeral=True)
+        except discord.NotFound:
+            # fallback: kirim DM balik
+            try:
+                await interaction.user.send(msg)
+            except Exception:
+                pass
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ClearChat(bot))

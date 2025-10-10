@@ -1,59 +1,39 @@
-def _get_conf():
-    try:
-        from satpambot.config.compat_conf import get_conf
-        return get_conf
-    except Exception:
-        try:
-            from satpambot.config.runtime_memory import get_conf
-            return get_conf
-        except Exception:
-            def _f(): return {}
-            return _f
+import logging
+from typing import Any, Dict
 
-import json, contextlib
 import discord
+
 from satpambot.bot.utils import embed_scribe
 
-def _to_text(body):
-    if body is None:
-        return ""
-    if isinstance(body, str):
-        return body
+log = logging.getLogger(__name__)
+
+async def upsert_pinned_memory(bot, payload: Dict[str, Any]) -> bool:
+    """Buat/update keeper embed 'SATPAMBOT_PINNED_MEMORY'. Aman kalau gagal permission."""
     try:
-        return json.dumps(body, ensure_ascii=False, indent=2)
+        ch_id = int(payload.get("channel_id"))
     except Exception:
-        return str(body)
-
-async def _ensure_target(bot):
-    cfg = _get_conf()()
-    log_id = int(str(cfg.get("LOG_CHANNEL_ID","0")) or 0)
-    ch = bot.get_channel(log_id) if log_id else None
-    if ch is None:
-        for g in bot.guilds:
-            with contextlib.suppress(Exception):
-                return g.text_channels[0]
-    return ch
-
-async def _safe_edit_keeper(keeper: discord.Message | None, body):
-    text = _to_text(body)
-    e = discord.Embed(title="Neuro Lite Memory", description=text[:3900])
-    bot = getattr(getattr(keeper, "guild", None), "_state", None)
-    bot = getattr(bot, "client", None) if bot else None
-    ch = getattr(keeper, "channel", None)
-    if bot is None:
-        with contextlib.suppress(Exception):
-            bot = getattr(getattr(ch, "_state", None), "client", None)
-    if bot is None:
+        log.warning("[memory_upsert] payload tidak valid: %s", payload)
         return False
-    target = ch or await _ensure_target(bot)
-    await embed_scribe.upsert(target, "SATPAMBOT_NEURO_LITE_MEMORY", e, pin=True, bot=bot, route=True)
-    return True
 
-async def upsert_pinned_memory(bot, payload):
-    text = _to_text(payload)
-    e = discord.Embed(title="Pinned Memory", description=text[:3900])
-    ch = await _ensure_target(bot)
+    ch = bot.get_channel(ch_id)
     if ch is None:
+        try:
+            ch = await bot.fetch_channel(ch_id)
+        except Exception:
+            log.warning("[memory_upsert] channel %s tidak ditemukan", ch_id)
+            return False
+
+    e = payload.get("embed")
+    if not isinstance(e, discord.Embed):
+        # build embed kalau payload bawa dict
+        try:
+            data = payload.get("embed_data") or {}
+            e = discord.Embed.from_dict(data) if data else discord.Embed(title="Memory")
+        except Exception:
+            e = discord.Embed(title="Memory")
+
+    keeper = await embed_scribe.upsert(ch, "SATPAMBOT_PINNED_MEMORY", e, pin=True, bot=bot, route=True)
+    if keeper is None:
+        log.info("[memory_upsert] keeper None (kemungkinan no permission); skip tanpa error")
         return False
-    await embed_scribe.upsert(ch, "SATPAMBOT_PINNED_MEMORY", e, pin=True, bot=bot, route=True)
     return True

@@ -1,94 +1,103 @@
-"""
-Auto delete messages in focus log channel (v8)
-- Deletes NON-pinned messages older than TTL seconds.
-- Never touches messages that contain keeper markers like "SATPAMBOT_PHASH_DB_V1"
-  or "presence=online" or have attachments we use as DB blobs.
-- Runs quietly every ~45s.
-Env:
-    LOG_CHANNEL_ID  (required)
-    LOG_AUTODELETE_TTL  default: 180
-"""
-from __future__ import annotations
-
+import os
 import asyncio
 import logging
-import os
-import time
-from typing import Iterable
+from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands, tasks
 
 log = logging.getLogger(__name__)
 
-KEEPER_HINTS = (
-    "SATPAMBOT_PHASH_DB_V1",
-    "presence=online",
-    "SATPAMBOT_STATUS_V1",
-    "keeper",
-    "[auto_prune_state]",
-)
+TTL = int(os.getenv("LOG_AUTODELETE_TTL", "10"))
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "0"))
 
-def _int_env(name: str, default: int | None = None):
-    v = os.getenv(name, "").strip()
-    if not v:
-        return default
-    try:
-        return int(v)
-    except ValueError:
-        return default
+# marker yang harus selamat
+KEEP_MARKERS = (
+    "SATPAMBOT_PINNED_MEMORY",
+    "satpambot:auto_prune_state",
+    "SATPAMBOT_KEEPER",
+    "session-scope",
+)
 
 class AutoCleanLogChannel(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.focus_id = _int_env("LOG_CHANNEL_ID")
-        self.ttl = _int_env("LOG_AUTODELETE_TTL", 180) or 180
-        self.loop.start()
+        self.ttl = TTL
+        self.session_started_at = datetime.now(timezone.utc)
 
-    def cog_unload(self):
-        self.loop.cancel()
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.loop.is_running():
+            self.loop.start()
+            log.info("[log_autodelete_focus] ready (ttl=%ss)", self.ttl)
 
-    def _is_keeper(self, m: discord.Message) -> bool:
-        if m.pinned:
-            return True
-        content = (m.content or "").lower()
-        for hint in KEEPER_HINTS:
-            if hint.lower() in content:
-                return True
-        return False
-
-    @tasks.loop(seconds=45.0)
-    async def loop(self):
-        if not self.focus_id:
-            return
+    def _should_delete(self, m: discord.Message) -> bool:
+        """SYNC predicate, supaya tidak ada 'was never awaited'."""
         try:
-            # Focus channel only
-            ch = None
-            for g in self.bot.guilds:
-                tmp = g.get_channel(self.focus_id) or await self.bot.fetch_channel(self.focus_id)
-                if tmp:
-                    ch = tmp
-                    break
-            if ch is None or not isinstance(ch, discord.TextChannel):
-                return
-            cutoff = discord.utils.utcnow().timestamp() - self.ttl
-            async def _check(m: discord.Message) -> bool:
-                if self._is_keeper(m):
+            # channel target saja
+            if LOG_CHANNEL_ID and getattr(m.channel, "id", None) != LOG_CHANNEL_ID:
+                return False
+            # jangan hapus pinned
+            if getattr(m, "pinned", False):
+                return False
+            # jangan hapus pesan sebelum session ini (pre-session)
+            if getattr(m, "created_at", None) and m.created_at < self.session_started_at:
+                return False
+            # TTL belum lewat
+            now = datetime.now(timezone.utc)
+            created = getattr(m, "created_at", None) or now
+            age = (now - created).total_seconds()
+            if age < self.ttl:
+                return False
+            # keeper markers di content/embeds
+            content = (getattr(m, "content", None) or "")
+            if any(k in content for k in KEEP_MARKERS):
+                return False
+            for e in getattr(m, "embeds", []) or []:
+                title = getattr(e, "title", None) or ""
+                desc = getattr(e, "description", None) or ""
+                if any(k in title or k in desc for k in KEEP_MARKERS):
                     return False
-                # keep pinned, system, and thread starter
-                if m.flags and getattr(m.flags, "is_crossposted", False):
-                    return False
-                ts = m.created_at.timestamp() if m.created_at else time.time()
-                return ts < cutoff
+                for f in getattr(e, "fields", []) or []:
+                    name = getattr(f, "name", None) or ""
+                    value = getattr(f, "value", None) or ""
+                    if any(k in name or k in value for k in KEEP_MARKERS):
+                        return False
+            return True
+        except Exception:
+            # kalau ada error parsing, jangan hapus
+            log.exception("[log_autodelete_focus] check error; skip message")
+            return False
 
-            await ch.purge(limit=200, check=_check, bulk=True, oldest_first=True, reason="auto-clean focus log")
-        except Exception as e:
-            log.debug("[log_autodelete_focus] purge skipped: %r", e)
+    @tasks.loop(seconds=5)
+    async def loop(self):
+        if not LOG_CHANNEL_ID:
+            return
+        ch = self.bot.get_channel(LOG_CHANNEL_ID)
+        if ch is None:
+            try:
+                ch = await self.bot.fetch_channel(LOG_CHANNEL_ID)
+            except Exception:
+                return
+
+        # scan ringan; tidak gunakan purge(check=...) untuk hindari warning sync/async
+        async for m in ch.history(limit=100, oldest_first=False):
+            if self._should_delete(m):
+                try:
+                    await m.delete()
+                    await asyncio.sleep(0.3)  # throttle
+                except discord.NotFound:
+                    pass  # sudah hilang
+                except discord.Forbidden:
+                    log.warning("[log_autodelete_focus] missing permission to delete in #%s", getattr(ch, "name", ch.id))
+                    return
+                except Exception:
+                    log.exception("[log_autodelete_focus] delete failed")
 
     @loop.before_loop
-    async def before(self):
+    async def before_loop(self):
         await self.bot.wait_until_ready()
 
 async def setup(bot: commands.Bot):
+    # v2 style: setup async + wajib di-await
     await bot.add_cog(AutoCleanLogChannel(bot))
-    log.debug("[log_autodelete_focus] ready (ttl=%ss)", _int_env("LOG_AUTODELETE_TTL", 180) or 180)

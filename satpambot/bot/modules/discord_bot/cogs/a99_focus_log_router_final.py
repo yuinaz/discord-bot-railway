@@ -1,63 +1,75 @@
-"""
-Final Focus Router Guard (v8)
-- Catches Forbidden (50013) & re-routes the message to the focus log channel.
-- Idempotent install, minimal logging.
-"""
-from __future__ import annotations
-
-import logging
 import os
+import logging
+import re
+from typing import Any
 
 import discord
-from discord.abc import Messageable
 from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
-_ORIG_SEND = None
-_INSTALLED = False
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "0"))
 
-def _int_env(name: str):
-    v = os.getenv(name, "").strip()
-    if not v:
-        return None
-    try:
-        return int(v)
-    except ValueError:
-        return None
+_RULES_RE = re.compile(r"rules|⛔", re.IGNORECASE)
 
-async def _fallback_to_focus(self, *args, **kwargs):
-    focus_id = _int_env("LOG_CHANNEL_ID")
-    try:
-        bot = kwargs.pop("_bot", None) or getattr(self, "_state", None) and getattr(getattr(self, "_state", None), "client", None)
-        if not bot or not focus_id:
-            raise RuntimeError("no bot or focus id")
-        for g in bot.guilds:
-            ch = g.get_channel(focus_id) or await bot.fetch_channel(focus_id)
-            if ch:
-                return await _ORIG_SEND(ch, *args, **kwargs)
-    except Exception as e:
-        log.debug("[focus_final] hard fallback failed: %r", e)
-    # give up silently
-    return
+def _is_rules_channel(dest: Any) -> bool:
+    name = getattr(dest, "name", "") or ""
+    return bool(_RULES_RE.search(name))
 
-async def _patched_send(self, *args, **kwargs):
+async def _safe_send(dest, *args, **kwargs):
+    """Send dengan fallback: kalau Forbidden, alihkan ke log channel bila ada."""
     try:
-        return await _ORIG_SEND(self, *args, **kwargs)
-    except discord.Forbidden as e:
-        # Missing permission at destination -> route to focus instead of exploding
-        if getattr(e, "status", None) == 403:
-            return await _fallback_to_focus(self, *args, **kwargs)
+        return await dest.send(*args, **kwargs)
+    except discord.Forbidden:
+        if LOG_CHANNEL_ID:
+            bot = getattr(dest, "_state", None) and getattr(dest._state, "_get_client", None) and dest._state._get_client()
+            # ^ cara aman dapat bot dari state, bisa None; fallback tidak wajib
+            if bot and hasattr(bot, "get_channel"):
+                ch = bot.get_channel(LOG_CHANNEL_ID) or await bot.fetch_channel(LOG_CHANNEL_ID)
+                try:
+                    warn = kwargs.copy()
+                    warn["content"] = "[focus_final] rerouted (Forbidden)"
+                    return await ch.send(*args, **warn)
+                except Exception:
+                    pass
         raise
-    except Exception:
-        raise
+
+class FocusLogRouterFinal(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    async def _patch_send(self):
+        # idempotent
+        if getattr(self.bot, "_focus_final_patched", False):
+            return
+        self.bot._focus_final_patched = True
+
+        orig_send = discord.abc.Messageable.send
+
+        async def routed_send(self, *args, **kwargs):
+            # block kirim ke #rules
+            if _is_rules_channel(self):
+                log.info("[focus_final] blocked send to #%s", getattr(self, "name", self))
+                if LOG_CHANNEL_ID:
+                    try:
+                        ch = self._state._get_client().get_channel(LOG_CHANNEL_ID) or await self._state._get_client().fetch_channel(LOG_CHANNEL_ID)
+                        return await ch.send("[focus_final] blocked a send to #rules", *args, **kwargs)
+                    except Exception:
+                        pass
+                # drop saja
+                return None
+            # normal path dengan fallback Forbidden
+            return await _safe_send(self, *args, **kwargs)
+
+        # monkey patch
+        discord.abc.Messageable.send = routed_send
+        log.info("[focus_log_router_final] installed")
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        await self._patch_send()
 
 async def setup(bot: commands.Bot):
-    global _ORIG_SEND, _INSTALLED
-    if _INSTALLED:
-        return
-    _ORIG_SEND = Messageable.send
-    if getattr(Messageable.send, "__name__", "") != "_patched_send":
-        Messageable.send = _patched_send  # type: ignore
-    _INSTALLED = True
-    log.debug("[focus_log_router_final] installed (v8)")
+    cog = FocusLogRouterFinal(bot)
+    await bot.add_cog(cog)
+    await cog._patch_send()
