@@ -15,10 +15,10 @@ class MinerEnvLogger(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         log.info(
-            "[miner_env] fast=%s "
+            "[miner_env] profile=%s "
             "TEXT(delay=%s,every=%s) PHISH(delay=%s,every=%s,limit=%s) "
             "SLANG(delay=%s,every=%s,per_channel=%s) report_ch=%s",
-            _g("MINER_FAST_START", "1"),
+            _g("MINER_PROFILE", "balanced"),
             _g("TEXT_MINER_DELAY_SEC", "?"),
             _g("TEXT_MINER_INTERVAL_SEC", "?"),
             _g("PHISH_MINER_DELAY_SEC", "?"),
