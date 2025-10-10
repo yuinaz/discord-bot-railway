@@ -1,7 +1,13 @@
-
 import discord
 from discord.ext import commands
-from satpambot.config.compat_conf import get_conf
+try:
+    from satpambot.config.compat_conf import get_conf  # prefer new compat layer
+except Exception:  # pragma: no cover
+    try:
+        from satpambot.config.runtime_memory import get_conf  # fallback older projects
+    except Exception:
+        def get_conf():
+            return {}
 from satpambot.bot.utils import phash_db as PDB
 from satpambot.bot.utils import embed_scribe
 

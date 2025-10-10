@@ -1,4 +1,3 @@
-
 import json, os, time, hashlib
 from pathlib import Path
 from io import BytesIO
@@ -29,7 +28,6 @@ def load_db(path: str = DEFAULT_PATH) -> dict:
         data = json.loads(txt) if txt.strip() else {"version":"1","items":[]}
     except Exception:
         data = {"version":"1","items":[]}
-    # migrate legacy {"phash": []}
     if isinstance(data, dict) and "phash" in data and "items" not in data:
         items = []
         for h in data.get("phash", []):
@@ -47,17 +45,15 @@ def _compute_sha256(b: bytes) -> str:
 
 def compute_phash(b: bytes) -> str:
     if Image is None or imagehash is None:
-        # fallback: sha256 prefix
         return _compute_sha256(b)[:16]
-    from PIL import Image
-    im = Image.open(BytesIO(b)).convert("RGB")
+    from PIL import Image as _Image
+    im = _Image.open(BytesIO(b)).convert("RGB")
     return str(imagehash.phash(im))
 
 def hamming(a: str, b: str) -> int:
     try:
         return imagehash.hex_to_hash(a) - imagehash.hex_to_hash(b)
     except Exception:
-        # naive fallback
         x = int(a, 16); y = int(b, 16)
         return bin(x ^ y).count("1")
 
@@ -66,7 +62,6 @@ def upsert_item(db: dict, *, phash: str, sha256: str, channel_id: int, message_i
     items = db.setdefault("items", [])
     for it in items:
         if it.get("sha256") == sha256 or it.get("phash") == phash:
-            # update last seen
             it["last_seen_ts"] = now
             it.setdefault("seen", 1)
             it["seen"] += 1

@@ -1,8 +1,14 @@
-
-import datetime as dt, platform, psutil
+import datetime as dt, platform
 import discord
 from discord.ext import tasks, commands
-from satpambot.config.compat_conf import get_conf
+try:
+    from satpambot.config.compat_conf import get_conf  # prefer new compat layer
+except Exception:  # pragma: no cover
+    try:
+        from satpambot.config.runtime_memory import get_conf  # fallback older projects
+    except Exception:
+        def get_conf():
+            return {}
 from satpambot.bot.utils import embed_scribe
 
 def _uptime_str(start):
@@ -28,10 +34,11 @@ class LiveMetricsPush(commands.Cog):
         ch = self.bot.get_channel(self.channel_id)
         if not ch:
             return
-        pres = "presence=online"  # best-effort
+        pres = "presence=online"
         uptime = _uptime_str(self.started)
         e = discord.Embed(title="SatpamBot Status", description="Status ringkas bot.", color=0x2ecc71)
-        e.add_field(name="Akun", value=str(getattr(self.bot.user,'name','?')) + "#" + str(getattr(self.bot.user,'discriminator','0000')), inline=False)
+        ua = f"{getattr(self.bot.user,'name','?')}#{getattr(self.bot.user,'discriminator','0000')}"
+        e.add_field(name="Akun", value=ua, inline=False)
         e.add_field(name="Presence", value=pres, inline=True)
         e.add_field(name="Uptime", value=uptime, inline=True)
         e.set_footer(text=self.key)

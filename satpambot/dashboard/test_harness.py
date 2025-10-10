@@ -1,4 +1,3 @@
-
 import os
 from pathlib import Path
 from flask import Flask, redirect, render_template, send_from_directory, jsonify, session
@@ -36,7 +35,6 @@ def create_app(testing: bool = True):
                 pass
         return "<div class='lg-card'>Login</div>", 200
 
-    # Health & uptime (Flask doesn't have app.head decorator)
     @app.route("/healthz", methods=["GET", "HEAD"])
     def healthz():
         return ("", 200)
