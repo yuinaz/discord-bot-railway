@@ -32,5 +32,8 @@
   "ROUTE_DEFAULT_TARGET_THREAD_NAME": "neuro-lite progress",
   "ROUTE_DEFAULT_TARGET_CREATE": "1",
   "ROUTE_FORCE_ALL": "1",
-  "PHISH_THREAD_KEYWORDS": "imagephising,imagephish,phishing,phish-lab"
+  "PHISH_THREAD_KEYWORDS": "imagephising,imagephish,phishing,phish-lab",
+  "NEURO_PUBLIC_OPEN": "0",
+  "LOG_CHANNEL_ID": "1400375184048787566",
+  "SHADOW_SILENCER_VERBOSE": "0"
 }
