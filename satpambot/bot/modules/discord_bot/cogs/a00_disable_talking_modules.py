@@ -1,3 +1,4 @@
+# a00_disable_talking_modules.py
 from discord.ext import commands
 import logging
 log = logging.getLogger(__name__)
@@ -14,22 +15,25 @@ def _is_blocked(name: str) -> bool:
 class DisableTalking(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._orig_load_ext = None
+    async def cog_load(self):
         removed = []
-        for name in list(bot.extensions.keys()):
+        for name in list(self.bot.extensions.keys()):
             if _is_blocked(name):
                 try:
-                    bot.unload_extension(name); removed.append(name)
-                except Exception: pass
-        if removed: log.info("[disable-talking] unloaded: %s", removed)
-        self._orig_load_ext = bot.load_extension
-        def _guarded_load_ext(name, *a, **kw):
-            if _is_blocked(name):
-                log.info("[disable-talking] suppress load: %s", name); return
-            return self._orig_load_ext(name, *a, **kw)
-        bot.load_extension = _guarded_load_ext
-        log.info("[disable-talking] active; blocked prefixes=%s", BLOCK_PREFIXES)
+                    self.bot.unload_extension(name); removed.append(name)
+                except Exception as e:
+                    log.warning("[disable-talking] unload fail %s: %s", name, e)
+        self._orig_load_ext = self.bot.load_extension
+        def _guarded_load_ext(modname: str, *a, **kw):
+            if _is_blocked(modname):
+                log.info("[disable-talking] suppress load: %s", modname); return
+            return self._orig_load_ext(modname, *a, **kw)
+        self.bot.load_extension = _guarded_load_ext
+        log.info("[disable-talking] active; removed=%s blocked_prefixes=%s", removed, BLOCK_PREFIXES)
     def cog_unload(self):
-        try: self.bot.load_extension = self._orig_load_ext
+        try:
+            if self._orig_load_ext: self.bot.load_extension = self._orig_load_ext
         except Exception: pass
 async def setup(bot: commands.Bot):
     await bot.add_cog(DisableTalking(bot))

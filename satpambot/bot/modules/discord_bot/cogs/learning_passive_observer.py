@@ -1,3 +1,4 @@
+# learning_passive_observer.py
 from discord.ext import commands, tasks
 import discord, logging, json, time
 from pathlib import Path
@@ -9,13 +10,9 @@ MSG_MIN_CHARS = 10
 POINTS_PER_MSG = 1
 POINTS_PER_100_CHARS = 1
 HOUR_TARGET_POINTS = 10_000  # 1 point = 0.01%%
-BOT_BAN_POINTS = 100         # +100 jika yang nge-ban adalah bot (guild.me)
-MOD_ADMIN_BAN_POINTS = 25    # +25 jika yang nge-ban moderator/admin (atau actor tidak terdeteksi)
-MODERATOR_ROLE_KEYWORDS = {"mod", "moderator", "admin", "administrator", "guardian", "staff"}
-LEVEL_THRESHOLDS = [
-    (0, "TK"), (1_000, "SD"), (5_000, "SMP"), (15_000, "SMA"),
-    (30_000, "Diploma"), (60_000, "Sarjana"), (120_000, "Master"), (240_000, "Gubernur"),
-]
+BOT_BAN_POINTS = 100
+MOD_ADMIN_BAN_POINTS = 25
+LEVEL_THRESHOLDS = [(0,"TK"),(1_000,"SD"),(5_000,"SMP"),(15_000,"SMA"),(30_000,"Diploma"),(60_000,"Sarjana"),(120_000,"Master"),(240_000,"Gubernur")]
 def _level_from_xp(xp: int):
     name = LEVEL_THRESHOLDS[0][1]
     for t, n in LEVEL_THRESHOLDS:
@@ -27,7 +24,7 @@ def _safe_load(p: Path):
         if p.exists():
             with p.open("r", encoding="utf-8") as f: return json.load(f)
     except Exception as e: log.warning("[passive-learning] load fail: %s", e)
-    return {"xp_total": 0, "hour_progress_pct": 0, "hour_points": 0, "hour_start": int(time.time()), "level": "TK"}
+    return {"xp_total":0,"hour_progress_pct":0,"hour_points":0,"hour_start":int(time.time()),"level":"TK"}
 def _safe_dump(p: Path, data: dict):
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -58,7 +55,7 @@ class PassiveLearningObserver(commands.Cog):
         self.data["hour_points"] = int(self.data.get("hour_points", 0) + max(0, int(pts)))
         self.data["hour_progress_pct"] = min(100, int((self.data["hour_points"] / max(1, HOUR_TARGET_POINTS)) * 100))
     def _add_points_from_msg(self, msg: discord.Message):
-        if msg.author.bot: return
+        if getattr(msg.author, "bot", False): return
         if _is_blocked_channel(msg.channel): return
         content = msg.content or ""
         if len(content) < MSG_MIN_CHARS: return
@@ -79,11 +76,7 @@ class PassiveLearningObserver(commands.Cog):
         except Exception as e:
             log.debug("[passive-learning] audit log fetch fail: %s", e)
         actor_id = getattr(actor, "id", None) if actor else None
-        # +100 kalau yang ban adalah BOT (guild.me). Lainnya (mod/admin/unknown) +25.
-        if guild.me and actor_id == guild.me.id:
-            points = BOT_BAN_POINTS
-        else:
-            points = MOD_ADMIN_BAN_POINTS
+        points = BOT_BAN_POINTS if (guild.me and actor_id == guild.me.id) else MOD_ADMIN_BAN_POINTS
         self._add_points(points)
         _append_jsonl(BAN_LOG_FILE, {"ts": int(time.time()), "guild_id": guild.id, "user_banned_id": user.id, "by_id": actor_id, "points": points})
         log.info("[passive-learning] ban bonus %+d pts (user=%s by=%s)", points, user.id, actor_id)

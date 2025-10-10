@@ -1,3 +1,4 @@
+# a00_disable_auto_update_manager.py
 from discord.ext import commands
 TARGET_EXT = "satpambot.bot.modules.discord_bot.cogs.auto_update_manager"
 class DisableAutoUpdate(commands.Cog):
