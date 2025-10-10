@@ -1,0 +1,27 @@
+--- a/entry/main.py
++++ b/entry/main.py
+@@
+-def main():
+-    # ... boot web server ...
+-    logging.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
+-    asyncio.run(shim_runner.start_bot(bot))  # ❌ crashes if already in an event loop
+-    # ... wait loop ...
++async def main():
++    # ... boot web server (awaitable) ...
++    logging.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
++    # ✅ inside an event loop: await instead of asyncio.run()
++    await shim_runner.start_bot(bot)
++    # ... wait loop ...
++
++def run():
++    """
++    sync entrypoint that is safe to call from a plain script.
++    """
++    try:
++        loop = asyncio.get_running_loop()
++    except RuntimeError:
++        loop = None
++    if loop and loop.is_running():
++        # schedule and return a task if someone imports us inside a loop
++        return loop.create_task(main())
++    return asyncio.run(main())
