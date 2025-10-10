@@ -27,3 +27,6 @@ secrets_backup/
 # secrets (local only)
 secrets_backup/
 >>>>>>> 6b7b0e8 (fix: remove secrets and ignore secrets_backup/)
+
+# Local build artifacts
+/build/
