@@ -1,3 +1,6 @@
+import discord as _d
+ORIGINAL_SEND = _d.abc.Messageable.send
+
 from __future__ import annotations
 
 import datetime
@@ -592,7 +595,7 @@ class MLState:
 
 
 
-        await th.send(content="ML combined snapshot", file=file)
+        await ORIGINAL_SEND(th, content="ML combined snapshot", file=file)
 
 
 

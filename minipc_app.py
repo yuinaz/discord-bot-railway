@@ -14,95 +14,56 @@ Usage:
   python minipc_app.py --override    # timpa variabel env yang sudah ada
 
 Saat dibundle jadi .exe:
-  Satukan file "SatpamBot.env" di folder yang sama dengan .exe agar auto-terbaca.
+  - Letakkan SatpamBot.env di folder yang sama dengan .exe untuk auto-detect.
 """
+
 from __future__ import annotations
-import os, sys, argparse, signal, atexit, time
 
-# ---------------------- ENV LOADER (tanpa dependency) ---------------------- #
-ENV_CANDIDATE_NAMES = ("SatpamBot.env", "satpambot.env", ".env")
+import argparse
+import os
+import sys
+import signal
+import traceback
+from pathlib import Path
 
-def _read_env_file(path: str) -> dict:
+# ---------------------- UTIL: PRINT + ENV LOADER ----------------------------- #
+def _eprint(*a, **kw):
+    print(*a, **kw, file=sys.stderr)
+
+def _read_env_file(p: str) -> dict:
     data = {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            for raw in f:
-                line = raw.strip()
-                if not line or line.startswith("#"):
-                    continue
-                # Mendukung KEY="VALUE" / KEY='VALUE' / KEY=VALUE
-                if "=" not in line:
-                    continue
-                k, v = line.split("=", 1)
-                k = k.strip()
-                v = v.strip().strip('"').strip("'")
-                # Jangan timpa jika baris invalid
-                if k:
-                    data[k] = v
-    except FileNotFoundError:
-        pass
+    p = Path(p)
+    if not p.exists():
+        return data
+    for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        data[k.strip()] = v.strip()
     return data
 
-def _is_readable_file(p: str) -> bool:
+def _try_locations() -> Path | None:
+    # urutan: arg --env, CWD/SatpamBot.env, script_dir/SatpamBot.env, exe_dir/SatpamBot.env
+    # Lokasi exe_dir hanya relevan untuk PyInstaller.
+    candidates = []
+    cwd = Path.cwd()
+    candidates.append(cwd / "SatpamBot.env")
     try:
-        return os.path.isfile(p) and os.access(p, os.R_OK)
-    except Exception:
-        return False
-
-def _iter_parents(start_dir: str):
-    start_dir = os.path.abspath(start_dir)
-    prev = None
-    cur = start_dir
-    while prev != cur:
-        yield cur
-        prev, cur = cur, os.path.dirname(cur)
-
-def _frozen_base_dir() -> str | None:
-    # Saat dibundle (PyInstaller), sys.frozen akan ada, dan sys.executable menunjuk ke file .exe
-    if getattr(sys, "frozen", False):
-        try:
-            return os.path.dirname(sys.executable)
-        except Exception:
-            return None
-    return None
-
-def find_env_file(cli_env_path: str | None = None) -> str | None:
-    # 1) CLI --env
-    if cli_env_path and _is_readable_file(cli_env_path):
-        return os.path.abspath(cli_env_path)
-
-    # 2) Env var SATPAMBOT_ENV
-    env_hint = os.environ.get("SATPAMBOT_ENV")
-    if env_hint and _is_readable_file(env_hint):
-        return os.path.abspath(env_hint)
-
-    # 3) CWD dan parentnya
-    for root in _iter_parents(os.getcwd()):
-        for name in ENV_CANDIDATE_NAMES:
-            p = os.path.join(root, name)
-            if _is_readable_file(p):
-                return os.path.abspath(p)
-
-    # 4) Folder script ini & parentnya
-    try:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        for root in _iter_parents(script_dir):
-            for name in ENV_CANDIDATE_NAMES:
-                p = os.path.join(root, name)
-                if _is_readable_file(p):
-                    return os.path.abspath(p)
+        script_dir = Path(__file__).resolve().parent
+        candidates.append(script_dir / "SatpamBot.env")
     except Exception:
         pass
+    # PyInstaller support
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.append(exe_dir / "SatpamBot.env")
 
-    # 5) Jika dibundle, cek folder EXE & parentnya
-    fb = _frozen_base_dir()
-    if fb:
-        for root in _iter_parents(fb):
-            for name in ENV_CANDIDATE_NAMES:
-                p = os.path.join(root, name)
-                if _is_readable_file(p):
-                    return os.path.abspath(p)
-
+    for c in candidates:
+        if c.exists():
+            return c
     return None
 
 def load_env_file(path: str, override: bool = False) -> dict:
@@ -121,10 +82,10 @@ def _set_shutdown():
 
 def _install_signal_handlers():
     def _handle(sig, frame):
-        # Biarkan KeyboardInterrupt terjadi pada loop utama (asyncio.run) agar clean
+        # Pastikan SIGINT benar-benar memicu KeyboardInterrupt agar Ctrl+C langsung stop.
         _set_shutdown()
-        # No raise; default SIGINT akan memicu KeyboardInterrupt
-        # SIGTERM kita tangani halus dan keluar bersih
+        if sig == signal.SIGINT:
+            raise KeyboardInterrupt
         if sig == signal.SIGTERM:
             raise SystemExit(0)
 
@@ -137,64 +98,65 @@ def _install_signal_handlers():
     except Exception:
         pass
 
-    # Windows: coba tangani event close/logoff/shutdown jika pywin32 ada
+    # Windows console close event (opsional)
     try:
         import win32api  # type: ignore
-        import win32con  # type: ignore
-        def _win_handler(ctrl_type):
-            # CTRL_CLOSE_EVENT / CTRL_LOGOFF_EVENT / CTRL_SHUTDOWN_EVENT
+        def _on_close(ctrl_type):
             _set_shutdown()
-            # Beri waktu sebentar utk cleanup
-            time.sleep(0.2)
-            return True  # hindari force-kill
-        win32api.SetConsoleCtrlHandler(_win_handler, True)
+            # return True -> event consumed; biarkan proses keluar normal
+            return True
+        win32api.SetConsoleCtrlHandler(_on_close, True)  # noqa
     except Exception:
         pass
 
-def _atexit_cleanup():
-    # Taruh hook tambahan kalau perlu (flush log dsb)
-    pass
+# ---------------------- DELEGATE KE ENTRY ASLI ----------------------------- #
+def run_main():
+    # Import malas (agar error import terlihat setelah ENV terpasang)
+    try:
+        import _entry as _entry  # modul asli project (memunculkan log: INFO:entry.main:...)
+    except Exception as e:
+        _eprint(f"Gagal import _entry: {e}")
+        raise
+    _entry.main()
 
-# ------------------------------ MAIN -------------------------------------- #
-def main(argv=None):
-    parser = argparse.ArgumentParser(description="MINIPC/Local runner for SatpamLeina")
-    parser.add_argument("--env", help="Path ke file env (override auto-detect)", default=None)
-    parser.add_argument("--strict", action="store_true", help="Error bila env tidak ditemukan")
-    parser.add_argument("--override", action="store_true", help="Timpa variabel env yang sudah ada")
-    args = parser.parse_args(argv)
+def main(argv: list[str] | None = None):
+    argv = argv or sys.argv[1:]
+    ap = argparse.ArgumentParser(prog="minipc_app", add_help=True)
+    ap.add_argument("--env", help="path ke SatpamBot.env", default=None)
+    ap.add_argument("--strict", action="store_true", help="error jika env tidak ditemukan")
+    ap.add_argument("--override", action="store_true", help="timpa environment yang sudah ada dengan isi .env")
+    args = ap.parse_args(argv)
+
+    env_path = args.env or os.environ.get("SATPAM_ENV_FILE")
+    if env_path and Path(env_path).exists():
+        load_env_file(env_path, override=args.override)
+        print(f"✅ Loaded env file: {Path(env_path).name}")
+    else:
+        auto = _try_locations()
+        if auto and auto.exists():
+            load_env_file(str(auto), override=args.override)
+            print(f"✅ Loaded env file: {auto.name}")
+        else:
+            msg = "⚠️ SatpamBot.env tidak ditemukan (pakai --env PATH atau letakkan di folder yang sama)."
+            if args.strict:
+                _eprint(msg)
+                sys.exit(2)
+            else:
+                print(msg)
 
     _install_signal_handlers()
-    atexit.register(_atexit_cleanup)
-
-    env_path = find_env_file(args.env)
-    if env_path and _is_readable_file(env_path):
-        load_env_file(env_path, override=args.override)
-        print(f"✅ Loaded env file: {os.path.basename(env_path)}")
-    elif args.strict:
-        print("❌ ENV tidak ditemukan. Set --env atau letakkan SatpamBot.env bersebelahan.", file=sys.stderr)
-        sys.exit(2)
-    else:
-        print("ℹ️ ENV tidak ditemukan, lanjut tanpa load file (menggunakan os.environ saat ini).")
-
-    # Jalankan entry lama tanpa diubah
-    try:
-        import main as _entry
-    except Exception as e:
-        print(f"❌ Gagal import main.py: {e}", file=sys.stderr)
-        sys.exit(1)
 
     try:
-        _entry.main()
+        run_main()
     except KeyboardInterrupt:
         # Tangkap agar tidak ada traceback panjang
         print("\n👋 Terima kasih. Shutting down gracefully…")
         sys.exit(0)
-    except SystemExit as e:
-        # Hargai exit code bila ada
+    except SystemExit:
         raise
     except Exception as e:
-        # Laporkan error lain
-        print(f"\n💥 Unhandled error: {e}", file=sys.stderr)
+        _eprint(f"\n💥 Unhandled error: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

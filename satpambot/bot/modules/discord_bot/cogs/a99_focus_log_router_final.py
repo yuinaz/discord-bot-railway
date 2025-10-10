@@ -1,75 +1,50 @@
-import os
-import logging
-import re
-from typing import Any
 
-import discord
-from discord.ext import commands
+"""
+a99_focus_log_router_final.py — SAFE WRAPPER HOTFIX
+---------------------------------------------------
+Goal: stop infinite routing loops across patched Messageable.send() wrappers
+observed as "maximum recursion depth exceeded" and giant call chains through
+rate_limit_guard -> public_send_router -> shadow_public_silencer -> dm_muzzle -> a99 -> ...
+
+Strategy: install a *final* lightweight wrapper that:
+  - Delegates to the previously installed chain for normal sends
+  - Adds a small re-entrancy guard; on re-entry it directly calls the raw
+    library send (discord.abc.Messageable.send), which breaks the loop.
+
+This preserves most earlier behaviors (rate limit, muzzle, etc.) for first-hop
+sends, but prevents a99 from re-triggering the entire chain when a send is
+routed to another destination.
+"""
+import logging
+import contextvars
+from discord.abc import Messageable as _Messageable
 
 log = logging.getLogger(__name__)
 
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "0"))
+# The raw library send (unpatched baseline)
+_LIB_SEND = _Messageable.send
 
-_RULES_RE = re.compile(r"rules|⛔", re.IGNORECASE)
+# A tiny guard to detect "we are already inside a patched send" so we can bail out to raw
+_GUARD = contextvars.ContextVar("a99_router_guard", default=False)
 
-def _is_rules_channel(dest: Any) -> bool:
-    name = getattr(dest, "name", "") or ""
-    return bool(_RULES_RE.search(name))
+def _install_safe_wrapper():
+    # Whatever chain is currently installed before we (a99) patch in.
+    prev_send = _Messageable.send
 
-async def _safe_send(dest, *args, **kwargs):
-    """Send dengan fallback: kalau Forbidden, alihkan ke log channel bila ada."""
-    try:
-        return await dest.send(*args, **kwargs)
-    except discord.Forbidden:
-        if LOG_CHANNEL_ID:
-            bot = getattr(dest, "_state", None) and getattr(dest._state, "_get_client", None) and dest._state._get_client()
-            # ^ cara aman dapat bot dari state, bisa None; fallback tidak wajib
-            if bot and hasattr(bot, "get_channel"):
-                ch = bot.get_channel(LOG_CHANNEL_ID) or await bot.fetch_channel(LOG_CHANNEL_ID)
-                try:
-                    warn = kwargs.copy()
-                    warn["content"] = "[focus_final] rerouted (Forbidden)"
-                    return await ch.send(*args, **warn)
-                except Exception:
-                    pass
-        raise
+    async def _safe_wrapper(self, *args, **kwargs):
+        # If we re-enter (because another router calls .send() again),
+        # short-circuit to the raw library send to break the loop.
+        if _GUARD.get():
+            return await _LIB_SEND(self, *args, **kwargs)
+        token = _GUARD.set(True)
+        try:
+            # Normal path: keep earlier behaviors intact.
+            return await prev_send(self, *args, **kwargs)
+        finally:
+            _GUARD.reset(token)
 
-class FocusLogRouterFinal(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+    _Messageable.send = _safe_wrapper
+    log.info("[a99_focus_log_router_final] safe wrapper installed (loop-guard + raw-send on re-entry)")
 
-    async def _patch_send(self):
-        # idempotent
-        if getattr(self.bot, "_focus_final_patched", False):
-            return
-        self.bot._focus_final_patched = True
-
-        orig_send = discord.abc.Messageable.send
-
-        async def routed_send(self, *args, **kwargs):
-            # block kirim ke #rules
-            if _is_rules_channel(self):
-                log.info("[focus_final] blocked send to #%s", getattr(self, "name", self))
-                if LOG_CHANNEL_ID:
-                    try:
-                        ch = self._state._get_client().get_channel(LOG_CHANNEL_ID) or await self._state._get_client().fetch_channel(LOG_CHANNEL_ID)
-                        return await ch.send("[focus_final] blocked a send to #rules", *args, **kwargs)
-                    except Exception:
-                        pass
-                # drop saja
-                return None
-            # normal path dengan fallback Forbidden
-            return await _safe_send(self, *args, **kwargs)
-
-        # monkey patch
-        discord.abc.Messageable.send = routed_send
-        log.info("[focus_log_router_final] installed")
-
-    @commands.Cog.listener()
-    async def on_ready(self):
-        await self._patch_send()
-
-async def setup(bot: commands.Bot):
-    cog = FocusLogRouterFinal(bot)
-    await bot.add_cog(cog)
-    await cog._patch_send()
+def setup(bot):
+    _install_safe_wrapper()

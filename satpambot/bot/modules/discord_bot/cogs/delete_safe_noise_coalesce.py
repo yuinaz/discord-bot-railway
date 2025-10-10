@@ -136,7 +136,3 @@ async def setup(bot):
         await bot.add_cog(cog)
 
 # Old-style for backward compatibility (discord.py <2.0)
-def setup(bot):
-    cog = DeleteSafeNoiseCoalesce(bot)
-    if getattr(bot, "add_cog", None):
-        bot.add_cog(cog)
