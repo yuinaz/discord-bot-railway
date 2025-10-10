@@ -1,28 +1,21 @@
 # -*- coding: utf-8 -*-
-# Final hard router — force all sends into LOG_CHANNEL_ID (+thread),
-# keep re-installing so we stay on top of any other monkey patches,
-# block "rules" channel outright, and de-dup spammy embeds.
-import asyncio
-import json
-import logging
-import os
-import re
-import time
+# Final hard router: force all sends into LOG_CHANNEL_ID (+thread),
+# never touch "rules"-like channels, deduplicate embeds, and never
+# fallback to original channel on error.
+import asyncio, json, logging, os, re, time
 from typing import Optional, Dict, Tuple
-
 import discord
 
 log = logging.getLogger(__name__)
 
-# ---------- config helpers ----------
-def _get_conf(key: str, default=None):
-    # env first, fallback to optional compat_conf if present
-    val = os.getenv(key, default)
-    if val is not None:
-        return val
+# ---------- config ----------
+def _get_conf(k: str, default=None):
+    v = os.getenv(k, default)
+    if v is not None:
+        return v
     try:
         from satpambot.config.compat_conf import get_conf as _gc  # type: ignore
-        return _gc(key, default)
+        return _gc(k, default)
     except Exception:
         return default
 
@@ -33,18 +26,19 @@ def _log_channel_id() -> Optional[int]:
     except Exception:
         return None
 
-# Channel name denylist (lowercased compare)
-_DENY_NAMES = {"⛔︲rules", "rules", "rule", "📜︲rules"}
+# treat any variant containing "rules" as deny
+def _looks_like_rules(name: str) -> bool:
+    low = (name or "").lower()
+    low = re.sub(r"[^\w]+", "", low)  # strip symbols/dashes/emoji borders
+    return "rules" in low
 
-# Thread routing by embed title/desc marker
 _THREAD_MAP: Tuple[Tuple[re.Pattern, str], ...] = (
     (re.compile(r"NEURO[- ]?LITE GATE STATUS", re.I), "neuro-lite progress"),
     (re.compile(r"SATPAMBOT_PHASH_DB_V1", re.I), "imagephising"),
-    (re.compile(r"SatpamBot Status", re.I), "log restart github"),
     (re.compile(r"\bML[- ]?STATE\b", re.I), "ml-state"),
+    (re.compile(r"SatpamBot Status", re.I), "log restart github"),
 )
 
-# spam control: remember last message per thread + fingerprint
 _last_fp: Dict[str, Tuple[str, float, discord.Message]] = {}
 
 def _embed_from_args(args, kwargs) -> Optional[discord.Embed]:
@@ -58,102 +52,96 @@ def _embed_from_args(args, kwargs) -> Optional[discord.Embed]:
 def _guess_thread(embed: Optional[discord.Embed]) -> Optional[str]:
     if not embed:
         return None
-    title = (embed.title or "") + " " + (embed.description or "")
+    txt = (embed.title or "") + " " + (embed.description or "")
     for rx, name in _THREAD_MAP:
-        if rx.search(title):
+        if rx.search(txt):
             return name
     return None
 
 async def _ensure_thread(ch: discord.TextChannel, name: str) -> discord.abc.Messageable:
-    # search open threads first
     for th in ch.threads:
         if th.name == name:
             return th
-    # then archived (first few pages)
     try:
         async for th in ch.archived_threads(limit=100):
             if th.name == name:
                 return th
     except Exception:
         pass
-    # create if not found
-    return await ch.create_thread(name=name, type=discord.ChannelType.public_thread)
+    try:
+        return await ch.create_thread(name=name, type=discord.ChannelType.public_thread)
+    except discord.Forbidden:
+        # no permission to create thread → fallback to channel
+        return ch
 
 def _fingerprint_embed(embed: discord.Embed) -> str:
-    # robust-ish: title/desc/fields only
     d = embed.to_dict()
     d = {k: d.get(k) for k in ("title", "description", "fields", "footer")}
     return json.dumps(d, sort_keys=True, ensure_ascii=False)
 
 # ---------- installer ----------
-_SIGNATURE = "focus_router_v6"
+_SIGNATURE = "focus_router_v7"
 
 def _is_installed() -> bool:
     return getattr(discord.abc.Messageable, "_focus_router_signature", "") == _SIGNATURE
 
-def _install(force: bool = False):
+def _install(force: bool = False, quiet: bool = False):
     Messageable = discord.abc.Messageable
-    if _is_installed() and not force:
+    already = _is_installed()
+    if already and not force:
         return
 
-    orig_send = getattr(Messageable, "_focus_router_orig_send", None) or Messageable.send
-
+    orig_send = getattr(Messageable, "_focus_router_orig_send", None)
+    if not orig_send:
+        orig_send = Messageable.send  # capture whatever is active now
+    # routed send
     async def routed_send(self, *args, **kwargs):
-        # short-circuit deny: never touch rules-like channels
         try:
-            # Resolve bot & target log channel
             bot = getattr(self, "_state", None) and getattr(self._state, "client", None)
             log_id = _log_channel_id()
             if not bot or not log_id:
+                # cannot resolve → just use current pipeline
                 return await orig_send(self, *args, **kwargs)
 
             target = bot.get_channel(log_id)
             if not isinstance(target, discord.TextChannel):
                 return await orig_send(self, *args, **kwargs)
 
-            # If current target looks like "rules" or not the log channel, reroute.
+            # if current channel is not the target, or it looks like "rules", route to log
             try:
-                ch_name = (getattr(self, "name", "") or "").lower()
+                cur_id = getattr(self, "id", None)
+                cur_name = (getattr(self, "name", "") or "")
             except Exception:
-                ch_name = ""
+                cur_id, cur_name = None, ""
 
-            # always reroute if not the log channel
-            must_route = True
-            if hasattr(self, "id"):
-                try:
-                    must_route = (self.id != log_id)
-                except Exception:
-                    must_route = True
+            must_route = (cur_id != log_id) or _looks_like_rules(cur_name)
 
-            if ch_name in _DENY_NAMES:
-                must_route = True
+            dest: discord.abc.Messageable = self
+            if must_route:
+                dest = target
 
-            dest: discord.abc.Messageable = target
-
-            # Thread mapping if embed matches
+            # if there is a recognized embed, move into its dedicated thread
             embed = _embed_from_args(args, kwargs)
             tname = _guess_thread(embed) if embed else None
-            if tname:
+            if tname and must_route:
                 try:
                     dest = await _ensure_thread(target, tname)
                 except Exception as e:
-                    log.warning("[focus_final] ensure_thread failed (%s); fallback to channel", e)
+                    log.debug("[focus_final] ensure_thread fail (%s) -> fallback channel", e)
                     dest = target
 
-            # Anti-spam for embeds: if same payload to same thread within 90s → return last message
+            # anti-spam (only for embeds, per lane)
             if embed and isinstance(dest, (discord.Thread, discord.TextChannel)):
                 lane = target.name if isinstance(dest, discord.TextChannel) else dest.name
                 fp = _fingerprint_embed(embed)
                 now = time.time()
                 prev = _last_fp.get(lane)
-                if prev and prev[0] == fp and (now - prev[1]) < float(_get_conf("FOCUS_DEDUP_WINDOW_SEC", "90")):
-                    # return last message without sending new one
+                win = float(_get_conf("FOCUS_DEDUP_WINDOW_SEC", "90"))
+                if prev and prev[0] == fp and (now - prev[1]) < win:
                     return prev[2]
 
-            # finally send to the chosen destination
-            msg = await orig_send(dest if must_route else self, *args, **kwargs)
+            msg = await orig_send(dest, *args, **kwargs)
 
-            # save last for anti-spam (embeds only)
             if embed and isinstance(msg, discord.Message):
                 lane = target.name if isinstance(dest, discord.TextChannel) else getattr(dest, "name", str(log_id))
                 _last_fp[lane] = (_fingerprint_embed(embed), time.time(), msg)
@@ -161,30 +149,42 @@ def _install(force: bool = False):
             return msg
 
         except Exception as e:
-            log.exception("[focus_final] routed_send error; passthrough: %s", e)
-            return await orig_send(self, *args, **kwargs)
+            # NEVER fallback to original channel; try log channel instead
+            try:
+                bot = getattr(self, "_state", None) and getattr(self._state, "client", None)
+                log_id = _log_channel_id()
+                if bot and log_id:
+                    target = bot.get_channel(log_id)
+                    if isinstance(target, discord.TextChannel):
+                        log.warning("[focus_final] error; rerouting to log: %s", e)
+                        return await orig_send(target, *args, **kwargs)
+            except Exception:
+                pass
+            log.exception("[focus_final] routed_send fatal; swallow to avoid spam: %s", e)
+            return None  # swallow to avoid retries/spam
 
     # mark + install
     Messageable._focus_router_orig_send = orig_send  # type: ignore[attr-defined]
     Messageable.send = routed_send  # type: ignore[assignment]
     Messageable._focus_router_signature = _SIGNATURE  # type: ignore[attr-defined]
-    log.info("[focus_log_router_final] installed")
+    if not quiet:
+        log.info("[focus_log_router_final] installed")
+    else:
+        log.debug("[focus_log_router_final] reinstalled (quiet)")
 
 async def _keep_installed_task():
-    # keep us on top: re-assert a few times early, lalu periodik
+    # assert a few times awal (senyap), lalu periodik 60s
     for _ in range(10):
         await asyncio.sleep(0.8)
-        _install(force=True)
+        _install(force=True, quiet=True)
     while True:
         await asyncio.sleep(60.0)
-        _install(force=True)
+        _install(force=True, quiet=True)
 
 def setup(bot):
-    _install(force=True)
-    # schedule keepalive only when real bot (DummyBot smoketest tidak punya loop)
+    _install(force=True, quiet=False)
     if hasattr(bot, "loop"):
         try:
             bot.loop.create_task(_keep_installed_task())
         except Exception:
-            # fallback for newer discord.py using asyncio.run
             asyncio.create_task(_keep_installed_task())
