@@ -1,103 +1,102 @@
-# satpambot/bot/modules/discord_bot/cogs/hot_env_reload.py
-from discord.ext import tasks, commands
-import asyncio, importlib, logging, os, time
+# hot_env_reload.py — safe async reload for discord.py variants
+# - Watches SatpamBot.env and reloads all loaded extensions when file changes.
+# - Uses reload_extensions_safely() helper to support both sync/async reload_extension API.
+#
+# Place at: satpambot/bot/modules/discord_bot/cogs/hot_env_reload.py
+
+import os
+import asyncio
+import logging
+from typing import List
+
+from discord.ext import commands, tasks
+
+# IMPORTANT: keep this import OUTSIDE any try/except block
+from satpambot.bot.modules.discord_bot.helpers.hotenv_reload_helpers import reload_extensions_safely
 
 log = logging.getLogger(__name__)
 
-def _read_env(path: str) -> dict:
-    env = {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                s = line.strip()
-                if not s or s.startswith("#"):
-                    continue
-                if "=" in s:
-                    k, v = s.split("=", 1)
-                    env[k.strip()] = v.strip()
-    except FileNotFoundError:
-        pass
-    return env
-
-async def _call_hook_if_any(module, bot, new_env):
-    hook = getattr(module, "on_env_reload", None)
-    if hook:
-        try:
-            if asyncio.iscoroutinefunction(hook):
-                await hook(bot, new_env)
-            else:
-                hook(bot, new_env)
-        except Exception as e:
-            log.warning("[hotenv] hook %s failed: %s", getattr(module, "__name__", module), e)
 
 class HotEnvReload(commands.Cog):
-    """Pantau file ENV dan apply perubahan TANPA memutus koneksi bot.
-    - Update os.environ saat file berubah
-    - Reload semua cogs (agar baca ENV baru di __init__/setup)
-    - (Opsional) panggil hook on_env_reload(bot, env) jika didefinisikan di cog
-    """
-    def __init__(self, bot: commands.Bot, env_path: str, interval: float = 2.0):
+    def __init__(self, bot: commands.Bot, env_path: str | None = None, interval_seconds: float = 2.0):
         self.bot = bot
-        self.env_path = env_path
-        self.interval = interval
-        self._last_mtime = os.path.getmtime(env_path) if os.path.exists(env_path) else 0.0
-        self._task = self._watcher.start()
+        # Allow override via env var; default to SatpamBot.env in repo root
+        self.env_path = env_path or os.environ.get("SATPAMBOT_ENV_FILE", "SatpamBot.env")
+        self.interval_seconds = interval_seconds
+        self._last_mtime: float | None = None
+        # start watcher loop
+        self._watch.start()
 
     def cog_unload(self):
         try:
-            self._task.cancel()
+            self._watch.cancel()
         except Exception:
             pass
 
     @tasks.loop(seconds=2.0)
-    async def _watcher(self):
-        # Sesuaikan interval dari ENV bila berubah
+    async def _watch(self):
+        """Poll the env file periodically and trigger reload on change."""
+        # adjust interval dynamically if needed
+        if self._watch.seconds != self.interval_seconds:
+            self._watch.change_interval(seconds=self.interval_seconds)
+
         try:
-            iv = float(os.getenv("HOTENV_INTERVAL_SECONDS", self.interval))
+            st = os.stat(self.env_path)
+        except FileNotFoundError:
+            if self._last_mtime is None:  # only warn once
+                log.warning("[hotenv] env file not found: %s", self.env_path)
+            await asyncio.sleep(0)
+            return
         except Exception:
-            iv = self.interval
-        if self._watcher.seconds != iv:
-            self._watcher.change_interval(seconds=iv)
+            log.exception("[hotenv] failed to stat env file: %s", self.env_path)
+            return
 
+        mtime = st.st_mtime
+        if self._last_mtime is None:
+            self._last_mtime = mtime
+            return
+
+        if mtime != self._last_mtime:
+            self._last_mtime = mtime
+            await self._on_change()
+
+    @_watch.before_loop
+    async def _before_loop(self):
+        # Make sure the bot is ready
         try:
-            cur = os.path.getmtime(self.env_path) if os.path.exists(self.env_path) else 0.0
-            if cur != self._last_mtime:
-                self._last_mtime = cur
-                new_env = _read_env(self.env_path)
-                os.environ.update(new_env)
-                log.info("[hotenv] detected change on %s; reloading all cogs...", self.env_path)
+            await self.bot.wait_until_ready()
+        except Exception:
+            pass
 
-                # Panggil hook dulu (jika ada)
-                for ext in list(self.bot.extensions.keys()):
-                    if ext.startswith("satpambot.bot.modules.discord_bot.cogs."):
-                        try:
-                            mod = importlib.import_module(ext)
-                            await _call_hook_if_any(mod, self.bot, new_env)
-                        except Exception as e:
-                            log.warning("[hotenv] pre-reload hook failed on %s: %s", ext, e)
+    async def _on_change(self):
+        log.info("[hotenv] detected change on %s; reloading all cogs...", self.env_path)
 
-                # Reload seluruh cogs (tanpa putus koneksi ke Discord)
-                for ext in list(self.bot.extensions.keys()):
-                    if ext.startswith("satpambot.bot.modules.discord_bot.cogs."):
-                        try:
-                            # reload_extension adalah operasi sinkron di discord.py
-                            self.bot.reload_extension(ext)
-                            log.info("[hotenv] reloaded %s", ext)
-                        except Exception as e:
-                            log.warning("[hotenv] reload failed on %s: %s", ext, e)
+        # Collect currently loaded extensions
+        try:
+            exts: List[str] = list(self.bot.extensions.keys())
+        except Exception:
+            log.exception("[hotenv] unable to read bot extensions")
+            return
 
-        except Exception as e:
-            log.warning("[hotenv] watcher error: %s", e)
+        # Skip reloading this module's own extension name if present
+        try:
+            # Extension name resolution—depends on how you load this cog.
+            # Usually it's "satpambot.bot.modules.discord_bot.cogs.hot_env_reload"
+            this_ext = __name__
+        except Exception:
+            this_ext = None
+
+        # Schedule safe reloads. This returns either an asyncio.Task (when in-loop)
+        # or a concurrent.futures.Future (when called from thread); we don't need to await it.
+        try:
+            reload_extensions_safely(self.bot, exts, logger=log, skip_self=this_ext)
+        except Exception:
+            log.exception("[hotenv] scheduling reload failed")
+
+        # Optional tiny delay to avoid flapping on rapid consecutive writes
+        await asyncio.sleep(0.05)
+
 
 async def setup(bot: commands.Bot):
-    enabled = os.getenv("HOTENV_ENABLED", "1") != "0"
-    if not enabled:
-        log.info("[hotenv] disabled by HOTENV_ENABLED=0")
-        return
-    env_path = os.getenv("SATPAMBOT_ENV") or os.getenv("ENV_FILE") or "SatpamBot.env"
-    try:
-        iv = float(os.getenv("HOTENV_INTERVAL_SECONDS", "2"))
-    except Exception:
-        iv = 2.0
-    await bot.add_cog(HotEnvReload(bot, env_path, interval=iv))
-    log.info("[hotenv] running (env=%s, interval=%ss)", env_path, iv)
+    """discord.py async extension entry point"""
+    await bot.add_cog(HotEnvReload(bot))
