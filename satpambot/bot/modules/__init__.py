@@ -1,1 +1,1 @@
-# namespace init for patch
+# intentionally empty; ensures package import works offline

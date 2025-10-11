@@ -1,2 +1,1 @@
-# cogs package marker
-__all__ = []
+# intentionally empty; ensures package import works offline
