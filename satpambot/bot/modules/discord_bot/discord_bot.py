@@ -55,7 +55,7 @@ logging.getLogger("aiohttp").setLevel(logging.WARNING)
 
 # ===== Intents & bot config (startup ringan untuk 1 server) =====
 # Gunakan intents minimum yang dibutuhkan saja
-intents = discord.Intents.none()
+intents = discord.Intents.default()
 intents.guilds = True
 intents.messages = True
 intents.message_content = True  # butuh utk prefix/handler

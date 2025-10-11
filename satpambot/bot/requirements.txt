@@ -32,3 +32,5 @@ Flask
 aiohttp
 Pillow
 python-dotenv
+groq>=0.11.0
+tenacity>=8.2.3

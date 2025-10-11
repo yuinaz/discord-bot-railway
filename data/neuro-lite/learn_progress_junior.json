@@ -1,20 +1,7 @@
 {
-  "overall": 0.21,
+  "overall": 0,
   "TK": {
-    "L1": 0.4,
-    "L2": 1.24
-  },
-  "SD": {
     "L1": 0,
-    "L2": 0,
-    "L3": 0,
-    "L4": 0,
-    "L5": 0,
-    "L6": 0
-  },
-  "hour_points": 202,
-  "hour_progress_pct": 2,
-  "xp_total": 226,
-  "hour_start": 1760155206,
-  "level": "TK"
+    "L2": 0
+  }
 }
