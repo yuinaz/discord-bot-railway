@@ -1,16 +1,29 @@
+<<<<<<< HEAD
 from __future__ import annotations
 
 # satpambot/bot/modules/discord_bot/helpers/ban_poster.py
+=======
+# satpambot/bot/modules/discord_bot/helpers/ban_poster.py
+from __future__ import annotations
+>>>>>>> ef940a8 (heal)
 
 import os
 from typing import Optional
 
 import discord
 from discord.ext import commands
+<<<<<<< HEAD
 
 from .log_utils import find_text_channel
 from modules.discord_bot.helpers.ban_embed import build_ban_embed, reason_hash
 from ..utils.actions import delete_message_safe
+=======
+from modules.discord_bot.helpers.ban_embed import build_ban_embed, reason_hash
+
+from ..utils.actions import delete_message_safe
+from .log_utils import find_text_channel
+
+>>>>>>> ef940a8 (heal)
 
 async def _find_existing_with_marker(
     channel: discord.TextChannel,
@@ -36,6 +49,10 @@ async def _find_existing_with_marker(
         pass
     return None
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> ef940a8 (heal)
 def _resolve_log_channel(ctx: commands.Context) -> Optional[discord.TextChannel]:
     """
     Prefer ENV:
@@ -65,6 +82,10 @@ def _resolve_log_channel(ctx: commands.Context) -> Optional[discord.TextChannel]
 
     return find_text_channel(guild)
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> ef940a8 (heal)
 async def post_ban_embed(
     ctx: commands.Context,
     target: discord.abc.User,
@@ -125,6 +146,10 @@ async def post_ban_embed(
 
     return msg
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> ef940a8 (heal)
 async def perform_ban_and_post(
     ctx: commands.Context,
     target: discord.Member,
@@ -141,4 +166,8 @@ async def perform_ban_and_post(
         # abaikan; tetap kirim embed log supaya moderator tahu perintahnya jalan
         pass
 
+<<<<<<< HEAD
     return await post_ban_embed(ctx, target, reason)
+=======
+    return await post_ban_embed(ctx, target, reason)
+>>>>>>> ef940a8 (heal)

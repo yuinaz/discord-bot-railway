@@ -1,0 +1,9 @@
+{
+  "DM_MUZZLE": "owner",
+  "STATUS_COALESCE_TITLES": "Periodic Status",
+  "STATUS_EDIT_WINDOW_SEC": 43200,
+  "COGS_FORCE_ENABLE": [
+    "satpambot.bot.modules.discord_bot.cogs.status_pin_updater",
+    "satpambot.bot.modules.discord_bot.cogs.a08_public_clearchat"
+  ]
+}

@@ -1,0 +1,11 @@
+--- a/satpambot/bot/modules/discord_bot/cogs/gemini_vision_qna.py
+    +++ b/satpambot/bot/modules/discord_bot/cogs/gemini_vision_qna.py
+    @@
+    -bot.add_cog(GeminiVisionQnA(bot))
+    +import inspect
+async def maybe_await(x):
+    if inspect.isawaitable(x):
+        return await x
+    return x
+async def setup(bot):
+    await maybe_await(bot.add_cog(GeminiVisionQnA(bot)))

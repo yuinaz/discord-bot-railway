@@ -777,6 +777,7 @@
     "complain",
     "bae",
     "user",
+<<<<<<< HEAD
     "lahir",
     "org",
     "marah",
@@ -1166,6 +1167,9 @@
     "tower",
     "necrostar",
     "dasarnya"
+=======
+    "lahir"
+>>>>>>> ef940a8 (heal)
   ],
   "emoji_map": {},
   "laugh_style": "www",

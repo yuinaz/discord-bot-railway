@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+# satpambot/bot/modules/discord_bot/cogs/public_chat_gate.py
+
+import contextlib
+import datetime as dt
+import logging
+from pathlib import Path
+from typing import Optional, Tuple
+
+import discord
+from discord.ext import commands, tasks
+
+from satpambot.shared.progress_gate import ProgressGate
+
+log = logging.getLogger(__name__)
+
+STORE_PATH = Path("data/progress_gate.json")
+REPORT_THREAD_NAME = "progress-reports"
+MENTION_REQUIRED_WHEN_ALLOWED = True
+LOCK_ON_BOOT = True  # ensure start in shadow-mode
+
+def _tz_jakarta() -> dt.tzinfo:
+    try:
+        import zoneinfo
+        return zoneinfo.ZoneInfo("Asia/Jakarta")
+    except Exception:
+        return dt.timezone(dt.timedelta(hours=7))
+
+def _is_dm(ctx_or_channel) -> bool:
+    ch = getattr(ctx_or_channel, "channel", ctx_or_channel)
+    return isinstance(ch, (discord.DMChannel, discord.GroupChannel, discord.PartialMessageable))
+
+class PublicChatGate(commands.Cog):
+    """Multi-level gate:
+    - TK (2 levels) must complete -> then SD (6 levels) must complete -> then owner can unlock public.
+    """
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.gate = ProgressGate(STORE_PATH)
+        if LOCK_ON_BOOT:
+            with contextlib.suppress(Exception):
+                self.gate.lock_public()
+                log.info("PublicChatGate: gate force-locked on boot.")
+        self._owner_id: Optional[int] = None
+        self._report_message_id: Optional[int] = None
+        self._report_channel_id: Optional[int] = None
+        self._last_daily: Optional[dt.date] = None
+        self._last_week: Optional[Tuple[int, int]] = None
+        self._last_month: Optional[Tuple[int, int]] = None
+        self._tz = _tz_jakarta()
+
+        self._tick_reports.start()
+        self._tick_prompt_owner.start()
+
+        add_check = getattr(self.bot, "add_check", None)
+        if callable(add_check):
+            add_check(self._global_gate_check)  # type: ignore[arg-type]
+        else:
+            log.warning("PublicChatGate: bot has no add_check(); global gate check disabled in this runtime.")
+
+    async def _global_gate_check(self, ctx: commands.Context) -> bool:
+        if _is_dm(ctx):
+            return True
+        try:
+            if await self._is_owner(ctx.author):
+                return True
+        except Exception:
+            pass
+        if not self.gate.is_public_allowed():
+            return False
+        if MENTION_REQUIRED_WHEN_ALLOWED and ctx.message and self.bot.user:
+            return self.bot.user in ctx.message.mentions
+        return True
+
+    async def _is_owner(self, user: discord.abc.User) -> bool:
+        try:
+            if self._owner_id is None:
+                app = await self.bot.application_info()
+                if app and app.owner:
+                    self._owner_id = app.owner.id
+            return user.id == self._owner_id
+        except Exception:
+            return False
+
+    async def _get_or_create_report_channel(self):
+        for guild in self.bot.guilds:
+            with contextlib.suppress(Exception):
+                base = guild.system_channel or next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
+                if not base:
+                    continue
+                for thread in base.threads:
+                    if thread.name == REPORT_THREAD_NAME:
+                        return thread
+                thread = await base.create_thread(name=REPORT_THREAD_NAME, auto_archive_duration=10080)
+                return thread
+        try:
+            if self._owner_id:
+                user = await self.bot.fetch_user(self._owner_id)
+                if user:
+                    return await user.create_dm()
+        except Exception:
+            pass
+        return None
+
+    async def _send_or_edit_report(self, content: str) -> None:
+        ch = None
+        if self._report_channel_id:
+            ch = self.bot.get_channel(self._report_channel_id) or await self.bot.fetch_channel(self._report_channel_id)
+        if ch is None:
+            ch = await self._get_or_create_report_channel()
+            if ch:
+                self._report_channel_id = ch.id
+        if ch is None:
+            log.warning("PublicChatGate: No channel available for reports.")
+            return
+        try:
+            if self._report_message_id:
+                msg = await ch.fetch_message(self._report_message_id)
+                await msg.edit(content=content)
+            else:
+                msg = await ch.send(content)
+                self._report_message_id = msg.id
+        except Exception as e:
+            log.warning("Report update failed: %s", e)
+
+    def _compose_report(self, stamp: str) -> str:
+        phase_line, gate_line, acc_line = self.gate.summary_lines()
+        return (
+            f"**Self-Learning Progress Report — {stamp}**\n"
+            f"{phase_line}\n{gate_line}\n{acc_line}\n\n"
+            f"_This message auto-updates to avoid spam._"
+        )
+
+    @tasks.loop(minutes=10.0)
+    async def _tick_reports(self):
+        now = dt.datetime.now(tz=self._tz)
+        today = now.date()
+        isocal = today.isocalendar()
+        ym = (today.year, today.month)
+
+        if self._last_daily != today and now.hour == 23 and now.minute >= 50:
+            self._last_daily = today
+            await self._send_or_edit_report(self._compose_report(stamp=f"Daily — {today.isoformat()} (Asia/Jakarta)"))
+
+        if (self._last_week != (isocal.year, isocal.week)) and (isocal.weekday == 1) and (now.hour == 9):
+            self._last_week = (isocal.year, isocal.week)
+            await self._send_or_edit_report(self._compose_report(stamp=f"Weekly — ISO Week {isocal.week} {isocal.year}"))
+
+        if (self._last_month != ym) and (today.day == 1) and (now.hour == 9):
+            self._last_month = ym
+            await self._send_or_edit_report(self._compose_report(stamp=f"Monthly — {today.strftime('%B %Y')}"))
+
+    @_tick_reports.before_loop
+    async def _before_tick_reports(self):
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(minutes=30.0)
+    async def _tick_prompt_owner(self):
+        await self.bot.wait_until_ready()
+        if not self.gate.should_prompt_owner():
+            return
+        try:
+            if self._owner_id is None:
+                app = await self.bot.application_info()
+                if app and app.owner:
+                    self._owner_id = app.owner.id
+            if self._owner_id:
+                user = await self.bot.fetch_user(self._owner_id)
+                if user:
+                    msg = (
+                        "✅ **Belajar selesai**: TK L1–L2 100% & SD L1–L6 100%.\n"
+                        "Ketik **`!gate unlock`** di DM ini untuk membuka _Public Chat_.\n"
+                        "Ketik **`!gate status`** untuk melihat status saat ini, atau **`!gate lock`** untuk kembali ke silent mode."
+                    )
+                    await user.send(msg)
+                    self.gate.mark_prompted_now()
+        except Exception as e:
+            log.warning("Prompt owner failed: %s", e)
+
+    @_tick_prompt_owner.before_loop
+    async def _before_tick_prompt_owner(self):
+        await self.bot.wait_until_ready()
+
+    def should_allow_public_reply(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return True
+        if not self.gate.is_public_allowed():
+            return False
+        if MENTION_REQUIRED_WHEN_ALLOWED and self.bot.user:
+            return self.bot.user in message.mentions
+        return True
+
+    @commands.Cog.listener("on_message")
+    async def _guard_own_outgoing(self, message: discord.Message):
+        if not message or not self.bot.user or message.author.id != self.bot.user.id:
+            return
+        if message.guild is None:
+            return
+        if self.gate.is_public_allowed():
+            if MENTION_REQUIRED_WHEN_ALLOWED and not (self.bot.user in (message.mentions or [])):
+                with contextlib.suppress(discord.HTTPException, discord.Forbidden):
+                    await message.delete()
+            return
+        with contextlib.suppress(discord.HTTPException, discord.Forbidden):
+            await message.delete()
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(PublicChatGate(bot))

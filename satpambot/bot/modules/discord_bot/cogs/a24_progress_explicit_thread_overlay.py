@@ -46,6 +46,3 @@ try:
             log.warning("[progress_explicit_thread] relay patch failed: %s", e)
 except Exception as e:
     log.warning("[progress_explicit_thread] failed: %s", e)
-
-# patched: force PREFERRED_THREAD_ID at module top-level (outside try/except)
-PREFERRED_THREAD_ID = 1425400701982478408

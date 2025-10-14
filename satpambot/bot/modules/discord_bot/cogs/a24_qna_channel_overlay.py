@@ -17,6 +17,3 @@ try:
         _apply("satpambot.bot.modules.discord_bot.cogs.learning_passive_observer", "QNA_CHANNEL_ID")
 except Exception as e:
     log.warning("[qna_channel_overlay] failed: %s", e)
-
-# patched: force QNA_CHANNEL_ID at module top-level (outside try/except)
-QNA_CHANNEL_ID = 1426571542627614772

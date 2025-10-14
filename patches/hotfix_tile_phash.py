@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+<<<<<<< HEAD
+=======
+from __future__ import annotations
+>>>>>>> ef940a8 (heal)
 
 
 
@@ -62,7 +66,10 @@ Place this file under patches/ and run via:  python patches/hotfix_tile_phash.py
 
 
 
+<<<<<<< HEAD
 from __future__ import annotations
+=======
+>>>>>>> ef940a8 (heal)
 
 import importlib
 import os

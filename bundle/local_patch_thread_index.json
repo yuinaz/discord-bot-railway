@@ -1,0 +1,14 @@
+{
+  "PHASH_DB_PATH": "data/phash/SATPAMBOT_PHASH_DB_V1.json",
+  "PHASH_INDEX_LOG_CHANNEL_ID": 1400375184048787566,
+  "PHASH_INDEX_THREAD_NAMES": [
+    "imagephising"
+  ],
+  "PHASH_INDEX_THREAD_IDS": "",
+  "PHASH_INDEX_BACKFILL_DAYS": 14,
+  "PHASH_INDEX_SCAN_INTERVAL": 600,
+  "PHASH_INDEX_ALLOW_EXTS": "png,jpg,jpeg,gif,webp",
+  "COGS_FORCE_ENABLE": [
+    "satpambot.bot.modules.discord_bot.cogs.imagephish_ref_indexer_v2"
+  ]
+}

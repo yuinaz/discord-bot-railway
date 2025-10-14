@@ -1,0 +1,35 @@
+--- a/satpambot/bot/modules/discord_bot/cogs/a02_miner_accel_overlay.py
++++ b/satpambot/bot/modules/discord_bot/cogs/a02_miner_accel_overlay.py
+@@
+-def _parse_factors(s: str) -> list[float]:
+-    return [float(x) for x in s.split(",")]
++import re
++def _parse_factors(s) -> list[float]:
++    """Accept '0.85, 1.00, 1.20' or '0.85|1.00|1.20' or ['0.85','1.00'] and ignore stray commas."""
++    if s is None:
++        return []
++    if isinstance(s, (list, tuple)):
++        out = []
++        for t in s:
++            try:
++                out.append(float(str(t).strip().strip(",")))
++            except ValueError:
++                cleaned = re.sub(r"[^0-9eE+\-\.]", "", str(t))
++                if cleaned:
++                    out.append(float(cleaned))
++        return out
++    tokens = re.split(r"[\s,|;]+", str(s).strip())
++    out = []
++    for t in tokens:
++        if not t:
++            continue
++        try:
++            out.append(float(t))
++        except ValueError:
++            cleaned = re.sub(r"[^0-9eE+\-\.]", "", t)
++            if cleaned:
++                out.append(float(cleaned))
++    return out
+@@
+-FACTORS = _parse_factors(os.getenv("MINER_ACCEL_FACTORS", "0.85,1.00,1.20"))
++FACTORS = _parse_factors(os.getenv("MINER_ACCEL_FACTORS", os.getenv("MINER_ACCEL", "0.85|1.00|1.20")))

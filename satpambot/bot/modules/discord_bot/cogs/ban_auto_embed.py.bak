@@ -1,0 +1,116 @@
+from __future__ import annotations
+
+
+import asyncio
+import os
+import time
+import datetime
+from typing import Optional, Union
+
+import discord
+from discord.ext import commands
+
+# Helpers to respect existing config without changing anything
+try:
+    from satpambot.bot.modules.discord_bot.helpers.banlog_thread import get_log_channel, ensure_ban_thread
+except Exception:  # fallback if helper path changes
+    get_log_channel = ensure_ban_thread = None  # type: ignore
+
+def _get_int_env(name: str, default: int) -> int:
+    try:
+        return int(str(os.getenv(name, str(default))).strip())
+    except Exception:
+        return default
+
+LOG_CHANNEL_ID = _get_int_env("LOG_CHANNEL_ID", _get_int_env("LOG_CHANNEL_ID_RAW", 0))
+WAIT_BEFORE_CHECK_MS = int(os.getenv("BAN_EMBED_WAIT_MS", "800"))
+_DEDUP_SEC = int(os.getenv("BAN_EMBED_DEDUP_SEC", "5"))
+_DELETE_AFTER_SEC = int(os.getenv("BAN_EMBED_DELETE_AFTER_SEC", "3600"))  # auto-delete in "first touch" channel
+
+_recent_bans: dict[int, float] = {}
+
+def _wib_now_str() -> str:
+    tz = datetime.timezone(datetime.timedelta(hours=7))
+    return datetime.datetime.now(tz=tz).strftime("%Y-%m-%d %H:%M WIB")
+
+async def _resolve_log_target(guild: discord.Guild) -> Optional[Union[discord.TextChannel, discord.Thread]]:
+    # 1) by ID via env (keeps current behaviour)
+    if LOG_CHANNEL_ID:
+        ch = guild.get_channel(LOG_CHANNEL_ID)
+        if isinstance(ch, discord.TextChannel):
+            # if we have thread util, prefer stable thread to keep logs tidy
+            if ensure_ban_thread is not None:
+                try:
+                    th = await ensure_ban_thread(ch)
+                    if th is not None:
+                        return th  # type: ignore[return-value]
+                except Exception:
+                    return ch
+            return ch
+    # 2) by helper name fallback (does NOT change config if above succeeded)
+    if get_log_channel is not None:
+        try:
+            ch = await get_log_channel(guild)
+            if ch is None:
+                return None
+            if ensure_ban_thread is not None:
+                th = await ensure_ban_thread(ch)
+                return th  # type: ignore[return-value]
+            return ch  # type: ignore[return-value]
+        except Exception:
+            return None
+    return None
+
+def _build_embed_like_tb(target: Optional[discord.abc.User], moderator: Optional[discord.abc.User]) -> discord.Embed:
+    # Mirror style from TBShimFormatted ("Test Ban (Simulasi)")
+    title = "🛑 Banned"
+    tgt_line = f"**Target:** <@{getattr(target, 'id', '—')}> ({getattr(target, 'id', '—')})" if target else "**Target:** —"
+    mod_line = f"**Moderator:** <@{getattr(moderator, 'id', '—')}>" if moderator else "**Moderator:** —"
+    desc = (
+        f"{tgt_line}\n"
+        f"{mod_line}\n"
+        f"**Reason:** —"
+    )
+    emb = discord.Embed(title=title, description=desc, colour=discord.Colour.red())
+    # thumbnail if we can
+    try:
+        if target is not None:
+            av = getattr(getattr(target, "display_avatar", None), "url", None) or getattr(getattr(target, "avatar", None), "url", None)
+            if av:
+                emb.set_thumbnail(url=av)
+    except Exception:
+        pass
+    emb.set_footer(text=f"SatpamBot • {_wib_now_str()}")
+    return emb
+
+class BanAutoEmbed(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User):
+        # dedup so we don't post twice
+        now = time.time()
+        last = _recent_bans.get(user.id, 0.0)
+        if now - last < _DEDUP_SEC:
+            return
+        _recent_bans[user.id] = now
+
+        # small grace to let audit log/threads become available
+        await asyncio.sleep(WAIT_BEFORE_CHECK_MS / 1000.0)
+
+        target = await _resolve_log_target(guild)
+        if target is None:
+            return
+
+        # Compose embed consistent with test ban format
+        emb = _build_embed_like_tb(user, getattr(guild, "me", None))
+
+        try:
+            await target.send(embed=emb, delete_after=_DELETE_AFTER_SEC)
+        except Exception:
+            # best-effort only
+            pass
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(BanAutoEmbed(bot))

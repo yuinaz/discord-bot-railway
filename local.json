@@ -1,0 +1,38 @@
+{
+  "qna": {
+    "channel_id": 1426571542627614772
+  },
+  "miner": {
+    "accel_factors": "0.85,1.00,1.20"
+  },
+  "overlays": {
+    "strict_sticky_titles": [
+      "Periodic Status",
+      "Maintenance",
+      "Heartbeat"
+    ]
+  },
+  "clearchat": {
+    "public": {
+      "enabled": true,
+      "allowed_channel_ids": [
+        1400375184048787566
+      ],
+      "safe_keep_pinned": true,
+      "rate_limit_ms": 900
+    }
+  },
+  "selfheal": {
+    "coalesce_window_sec": 300,
+    "max_tickets_per_minute": 2,
+    "squelch_duplicates": true
+  },
+  "vision": {
+    "provider": "groq",
+    "model": "llava-v1.6-34b",
+    "default_prompt": "Jelaskan gambar ini secara ringkas."
+  },
+  "dm_muzzle": {
+    "mode": "owner"
+  }
+}

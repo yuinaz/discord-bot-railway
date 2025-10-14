@@ -1,0 +1,32 @@
+# SatpamBot — Render-friendly (Groq-only) requirements
+# Pinned to versions you've already verified in smoke tests; safe for Render Free tier.
+Flask==3.1.2
+discord.py==2.6.3
+aiohttp==3.13.0
+flask-socketio==5.5.1
+python-dotenv==1.1.1
+requests==2.32.5
+httpx==0.28.1
+tldextract==5.3.0
+aiosqlite==0.21.0
+psutil==7.1.0
+Pillow==11.3.0
+pydantic==2.11.10
+pytest==8.4.2
+# Windows timezone DB (prevents ZoneInfoNotFoundError on Win/macOS)
+tzdata>=2025.1
+
+# Image stack (Render-safe)
+numpy==2.2.6
+opencv-python-headless==4.12.0.88
+
+# Translation features
+googletrans-py>=4.0.0
+deep-translator>=1.11.4
+langdetect>=1.0.9
+
+# LLM provider (Groq only)
+groq>=0.9,<1.0
+
+# If *any* legacy module still uses OpenAI, uncomment the next line temporarily:
+# openai==2.2.0

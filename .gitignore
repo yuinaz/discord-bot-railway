@@ -1,5 +1,53 @@
+<<<<<<< HEAD
 secrets/
 local*.json
 *.env
 *.env.*
 SatpamBot.env
+=======
+
+# Local env & overrides
+SatpamBot.env
+satpambot/config/99_env_override.json
+
+# Python & OS cruft
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+.exe
+/dist/
+.zip
+.rar
+/out/
+*.msi
+*.pkg
+/*.spec
+.DS_Store
+.env.local
+SatpamBot.env
+satpambot/config/99_env_override.json
+.env.local
+SatpamBot.env
+satpambot/config/99_env_override.json
+secrets/
+SatpamBot.env
+
+# secrets (local only)
+secrets_backup/
+<<<<<<< HEAD
+=======
+
+# secrets (local only)
+secrets_backup/
+>>>>>>> 6b7b0e8 (fix: remove secrets and ignore secrets_backup/)
+
+# Local build artifacts
+/build/
+
+*.log
+run_local.log
+build_exe.log
+exe_run.log
+>>>>>>> ef940a8 (heal)
