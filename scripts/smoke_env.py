@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 377f4f2 (secure: remove local secrets; add safe example + improved pre-commit)
 import os, sys
 try:
     from satpambot.config.runtime import cfg  # type: ignore
@@ -14,6 +17,7 @@ for k in keys:
 if not any(os.path.exists(p) for p in ["satpambot_config.local.json","config/satpambot_config.local.json"]):
     print("[hint] Buat satpambot_config.local.json dari satpambot_config.local.example.json")
 sys.exit(0 if not missing else 1)
+<<<<<<< HEAD
 =======
 import sys, platform
 from importlib import metadata
@@ -40,3 +44,5 @@ print(f"deep-translator: {v('deep-translator')}")
 print(f"langdetect    : {v('langdetect')}")
 print("== COMPAT CHECK: OK ==")
 >>>>>>> ef940a8 (heal)
+=======
+>>>>>>> 377f4f2 (secure: remove local secrets; add safe example + improved pre-commit)

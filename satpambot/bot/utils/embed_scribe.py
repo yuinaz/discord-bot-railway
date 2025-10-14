@@ -1,91 +1,62 @@
-"""Helper untuk tulis/update embed keeper (pinned) dengan aman.
-- Tahan error permission
-- Tidak akses attribute .id saat None
-- Sediakan API module-level `upsert(...)` dan class `EmbedScribe`
+
 """
-from __future__ import annotations
+Safe, minimal embed scribe used for smoke tests and headless envs.
+Provides a tiny API compatible with common usages in the repo.
+"""
+from typing import List, Tuple, Optional
 
-import logging
-from typing import Optional, Dict, Any
-
-import discord
-
-log = logging.getLogger(__name__)
-
-# cache mapping arbitrary key -> keeper message id (opsional)
-ch_map: Dict[str, int] = {}
-
-async def _find_keeper_message(ch: discord.TextChannel, key: str) -> Optional[discord.Message]:
-    try:
-        pins = await ch.pins()
-    except Exception:
-        pins = []
-    for m in pins:
-        try:
-            content = m.content or ""
-            if key in content:
-                return m
-        except Exception:
-            continue
-    # fallback scan kecil di 20 terakhir
-    try:
-        async for m in ch.history(limit=20, oldest_first=False):
-            if (m.content or "").find(key) != -1:
-                return m
-    except Exception:
-        pass
-    return None
-
-async def upsert(ch: discord.TextChannel, key: str, embed: discord.Embed, *, pin: bool = True, bot=None, route: bool = False) -> Optional[discord.Message]:
-    """Upsert satu pesan 'keeper' yang mengandung `key` dan update embed-nya.
-    Tidak lempar error fatal; return None jika gagal total.
-    """
-    keeper: Optional[discord.Message] = None
-    try:
-        keeper = await _find_keeper_message(ch, key)
-        if keeper is None:
-            # buat baru
-            try:
-                keeper = await ch.send(content=f"[{key}] keeper", embed=embed)
-            except discord.Forbidden:
-                log.warning("[embed_scribe] forbidden send to #%s", getattr(ch, 'name', ch.id))
-                return None
-            except Exception:
-                log.exception("[embed_scribe] gagal membuat keeper")
-                return None
-            # pin kalau boleh
-            if pin:
-                try:
-                    await keeper.pin(reason=f"keeper:{key}")
-                except Exception:
-                    # boleh gagal; jangan crash
-                    log.debug("[embed_scribe] pin gagal untuk keeper %s", keeper.id if keeper else None)
-        else:
-            # edit existing
-            try:
-                await keeper.edit(content=f"[{key}] keeper", embed=embed)
-            except discord.Forbidden:
-                log.warning("[embed_scribe] forbidden edit in #%s", getattr(ch, 'name', ch.id))
-                return None
-            except Exception:
-                log.exception("[embed_scribe] gagal edit keeper")
-                return None
-
-        if keeper is not None:
-            try:
-                ch_map[key] = int(keeper.id)
-            except Exception:
-                pass
-        return keeper
-    except Exception:
-        log.exception("[embed_scribe] upsert fatal error")
-        return None
-
+try:
+    import discord  # type: ignore
+except Exception:  # pragma: no cover
+    discord = None  # fallback for environments without discord
 
 class EmbedScribe:
-    """Compat class API untuk import lama."""
-    def __init__(self, key: str = "SATPAMBOT_KEEPER") -> None:
-        self.key = key
+    def __init__(self, title: Optional[str] = None, description: Optional[str] = None):
+        self.title = title or ""
+        self.description = description or ""
+        self._fields: List[Tuple[str, str, bool]] = []
+        self._footer: Optional[str] = None
 
-    async def upsert(self, ch: discord.TextChannel, key: Optional[str], embed: discord.Embed, *, pin: bool = True, bot=None, route: bool = False) -> Optional[discord.Message]:
-        return await upsert(ch, key or self.key, embed, pin=pin, bot=bot, route=route)
+    def set_title(self, title: str):
+        self.title = title or ""
+        return self
+
+    def set_description(self, description: str):
+        self.description = description or ""
+        return self
+
+    def add_field(self, name: str, value: str, inline: bool = False):
+        # Avoid None values in smoke env
+        name = "" if name is None else str(name)
+        value = "" if value is None else str(value)
+        self._fields.append((name, value, bool(inline)))
+        return self
+
+    def set_footer(self, text: str):
+        self._footer = text or ""
+        return self
+
+    def as_embed(self):
+        # If discord.Embed is available, build a real embed.
+        if discord is not None:
+            emb = discord.Embed(title=self.title or None, description=self.description or None)
+            for n, v, inline in self._fields:
+                # Discord requires non-empty fields; ensure minimal placeholders
+                emb.add_field(name=n or "\u200b", value=v or "\u200b", inline=inline)
+            if self._footer:
+                emb.set_footer(text=self._footer)
+            return emb
+        # Fallback: dict-like object for environments without discord
+        return {
+            "title": self.title,
+            "description": self.description,
+            "fields": [{"name": n, "value": v, "inline": i} for n, v, i in self._fields],
+            "footer": self._footer,
+        }
+
+# Convenience helpers that some cogs may import
+def make_embed(title: str = "", description: str = ""):
+    return EmbedScribe(title, description).as_embed()
+
+def scribe(title: str = "", description: str = "") -> EmbedScribe:
+    return EmbedScribe(title, description)
