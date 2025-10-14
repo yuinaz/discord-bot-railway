@@ -1,50 +1,61 @@
-
 from __future__ import annotations
-import logging
+import logging, os
 import discord
 from discord.ext import commands, tasks
+
 try:
     from satpambot.config.runtime import cfg
 except Exception:
-    import os
-    def cfg(k, d=None): return os.getenv(k, d)
+    def cfg(k, d=None): import os; return os.getenv(k, d)
+
 from satpambot.bot.modules.discord_bot.services.xp_store import XPStore
 from satpambot.bot.modules.discord_bot.services.schedule_gate import WeeklyGate
+
 log = logging.getLogger(__name__)
-XP_STORE_PATH = cfg('XP_STORE_PATH', 'data/state/xp_store.json')
-SCHEDULE_STORE_PATH = cfg('SCHEDULE_STORE_PATH', 'data/state/schedules.json')
-PASSIVE_XP_PER_MESSAGE = int(cfg('PASSIVE_XP_PER_MESSAGE', '1'))
-xp_store = XPStore(XP_STORE_PATH)
-weekly_gate = WeeklyGate(SCHEDULE_STORE_PATH)
+
+PASSIVE_XP_PER_MESSAGE = int(cfg('PASSIVE_XP_PER_MESSAGE', '1') or '1')
+xp_store = XPStore()
+weekly_gate = WeeklyGate()
+
 class LearningPassiveObserver(commands.Cog):
-    """Passive XP with persistence + weekly XP gate (integrated)."""
+    """Passive XP with persistence (KV) + weekly XP gate (KV)."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.weekly_award.start()
+
     def cog_unload(self):
         try: self.weekly_award.cancel()
         except Exception: pass
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.guild: return
-        if PASSIVE_XP_PER_MESSAGE <= 0: return
+        if message.author.bot or not message.guild:
+            return
+        if PASSIVE_XP_PER_MESSAGE <= 0:
+            return
         total, lvl = xp_store.add_xp(message.guild.id, message.author.id, PASSIVE_XP_PER_MESSAGE)
-        log.info("[passive-learning] g%s +%d XP -> total=%d level=%s",
-                 message.guild.id, PASSIVE_XP_PER_MESSAGE, total, lvl)
+        log.info("[passive-learning] +%d XP -> total=%d level=%s",
+                 PASSIVE_XP_PER_MESSAGE, total, lvl)
+
     @tasks.loop(hours=6)
     async def weekly_award(self):
         KEY = 'weekly_random_exp'
         if not weekly_gate.should_run(KEY):
-            log.info("[weekly-exp] skip (already ran this week)"); return
-        award = int(cfg('WEEKLY_EXP_AMOUNT', '50'))
-        if award <= 0: weekly_gate.mark_ran(KEY); return
+            log.info("[weekly-exp] skip (already ran this week)")
+            return
+        award = int(cfg('WEEKLY_EXP_AMOUNT', '50') or '50')
+        if award <= 0:
+            weekly_gate.mark_ran(KEY); return
         for g in self.bot.guilds:
             for m in g.members:
-                if not m.bot: xp_store.add_xp(g.id, m.id, award)
+                if not m.bot:
+                    xp_store.add_xp(g.id, m.id, award)
             log.info("[weekly-exp] awarded +%d XP to guild %s", award, g.id)
         weekly_gate.mark_ran(KEY)
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningPassiveObserver(bot))
+
 def setup(bot: commands.Bot):
     try: bot.add_cog(LearningPassiveObserver(bot))
     except TypeError: pass

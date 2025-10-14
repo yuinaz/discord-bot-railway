@@ -1,60 +1,32 @@
 from __future__ import annotations
-
-import logging, sys
-from discord.ext import commands
-
-log = logging.getLogger(__name__)
+import os, importlib
 
 EXTENSIONS = (
-
-                    "satpambot.bot.modules.discord_bot.cogs.runtime_cfg_manager",
-    "satpambot.bot.modules.discord_bot.cogs.runtime_cfg_from_message",
-    "satpambot.bot.modules.discord_bot.cogs.prefix_mod_only",
-    "satpambot.bot.modules.discord_bot.cogs.error_notifier",
-    "satpambot.bot.modules.discord_bot.cogs.reaction_allowlist_static",
-    "satpambot.bot.modules.discord_bot.cogs.status_pin_updater",
-    "satpambot.bot.modules.discord_bot.cogs.ban_local_notify",
-    "satpambot.bot.modules.discord_bot.cogs.public_send_router",
-    "satpambot.bot.modules.discord_bot.cogs.phish_reward_listener",
-    "satpambot.bot.modules.discord_bot.cogs.a01_xp_checkpoint_discord_backend",
-    "satpambot.bot.modules.discord_bot.cogs.a08_public_clearchat",
-    "satpambot.bot.modules.discord_bot.cogs.public_chat_gate",
-    "satpambot.bot.modules.discord_bot.cogs.repo_guild_sync_bootstrap",
-    "satpambot.bot.modules.discord_bot.cogs.a02_miner_accel_overlay",
-    "satpambot.bot.modules.discord_bot.cogs.a06_sticky_status_strict_overlay",
-    "satpambot.bot.modules.discord_bot.cogs.vision_captioner",
-    "satpambot.bot.modules.discord_bot.cogs.qna_dual_provider",
-    "satpambot.bot.modules.discord_bot.cogs.admin_sync",
-    "satpambot.bot.modules.discord_bot.cogs.admin_repo_control",
-    "satpambot.bot.modules.discord_bot.cogs.github_repo_sync",
-    "satpambot.bot.modules.discord_bot.cogs.repo_pull_and_restart",
-    "satpambot.bot.modules.discord_bot.cogs.weekly_xp_guard",
-    "satpambot.bot.modules.discord_bot.cogs.force_sync_autoheal",
+    "satpambot.bot.modules.discord_bot.cogs.learning_passive_observer",
+    "satpambot.bot.modules.discord_bot.cogs.phish_log_sticky_guard",
 )
 
-async def _safe_load(bot: commands.Bot, name: str) -> None:
-    try:
-        loaded = getattr(bot, "extensions", {})
-        if isinstance(loaded, dict) and name in loaded:
-            log.info("[cogs_loader] already loaded: %s", name); return
-    except Exception:
-        pass
-    if name in sys.modules:
-        log.info("[cogs_loader] already in sys.modules: %s", name); return
-    try:
-        await bot.load_extension(name)
-        log.info("[cogs_loader] loaded: %s", name)
-    except Exception as e:
-        msg = f"{e}"
-        if "already loaded" in msg:
-            log.info("[cogs_loader] already loaded (caught): %s", name)
-        else:
-            log.warning("[cogs_loader] failed to load %s: %r", name, e)
+def _split_csv(val: str | None) -> list[str]:
+    if not val: return []
+    return [x.strip() for x in val.split(",") if x.strip()]
 
-async def setup(bot: commands.Bot) -> None:
-    for ext in EXTENSIONS:
-        await _safe_load(bot, ext)
-    try:
-        log.info("[cogs_loader] summary loaded: %s", sorted(getattr(bot, "extensions", {}).keys()))
-    except Exception:
-        pass
+def _iter_unique(seq):
+    seen, out = set(), []
+    for s in seq:
+        if s not in seen:
+            seen.add(s); out.append(s)
+    return out
+
+async def load_all(bot):
+    enable = _split_csv(os.getenv("COGS_FORCE_ENABLE"))
+    disable = set(_split_csv(os.getenv("COGS_FORCE_DISABLE")))
+    merged = _iter_unique(list(EXTENSIONS) + enable)
+    merged = [m for m in merged if m and m not in disable and not m.endswith(".weekly_xp_guard")]
+    for ext in merged:
+        try:
+            await bot.load_extension(ext)
+        except Exception:
+            # fallback sync setup
+            mod = importlib.import_module(ext)
+            if hasattr(mod, "setup"):
+                mod.setup(bot)

@@ -1,58 +1,12 @@
-
+# Compat shim: keep import passing but reuse the new observer
 from __future__ import annotations
-import logging
 import discord
-from discord.ext import commands, tasks
-
-try:
-    from satpambot.config.runtime import cfg
-except Exception:
-    import os
-    def cfg(k, d=None): return os.getenv(k, d)
-
-from satpambot.bot.modules.discord_bot.services.xp_store import XPStore
-from satpambot.bot.modules.discord_bot.services.schedule_gate import WeeklyGate
-
-log = logging.getLogger(__name__)
-
-XP_STORE_PATH = cfg('XP_STORE_PATH', 'data/state/xp_store.json')
-SCHEDULE_STORE_PATH = cfg('SCHEDULE_STORE_PATH', 'data/state/schedules.json')
-xp_store = XPStore(XP_STORE_PATH)
-weekly_gate = WeeklyGate(SCHEDULE_STORE_PATH)
-
-class LearningPassiveObserverPersist(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.weekly_award.start()
-
-    def cog_unload(self):
-        try: self.weekly_award.cancel()
-        except Exception: pass
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.guild:
-            return
-        delta = 1
-        total, lvl = xp_store.add_xp(message.guild.id, message.author.id, delta)
-        log.info("[passive-learning] g%s +%d XP -> total=%d level=%s", message.guild.id, delta, total, lvl)
-
-    @tasks.loop(hours=6)
-    async def weekly_award(self):
-        KEY = 'weekly_random_exp'
-        if not weekly_gate.should_run(KEY):
-            log.info("[weekly-exp] skip (already ran this week)")
-            return
-        for g in self.bot.guilds:
-            for m in g.members:
-                if not m.bot:
-                    xp_store.add_xp(g.id, m.id, 50)
-            log.info("[weekly-exp] awarded +50 XP to guild %s", g.id)
-        weekly_gate.mark_ran(KEY)
+from discord.ext import commands
+from satpambot.bot.modules.discord_bot.cogs.learning_passive_observer import LearningPassiveObserver
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(LearningPassiveObserverPersist(bot))
+    await bot.add_cog(LearningPassiveObserver(bot))
 
 def setup(bot: commands.Bot):
-    try: bot.add_cog(LearningPassiveObserverPersist(bot))
+    try: bot.add_cog(LearningPassiveObserver(bot))
     except TypeError: pass
