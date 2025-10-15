@@ -1,7 +1,6 @@
-# ONE requirements for both Render (Linux) & MiniPC Windows
-# - Python 3.10+ compatible (handles NumPy wheel differences)
-# - Gunicorn skipped on Windows via marker
-# - Gemini uses the new google-genai SDK; Groq included
+# ONE requirements (cross-platform) — conflict-free for OpenCV + NumPy
+# Works on Render (Linux) and MiniPC (Windows), Python 3.10/3.11+
+# NOTE: OpenCV 4.12.0.88 requires numpy < 2.3.0 → pin NumPy to 2.2.6 globally
 
 # --- Core / Web (optional dashboard) ---
 Flask==3.1.2
@@ -23,8 +22,7 @@ tzdata>=2025.2
 
 # --- Imaging (headless-friendly) ---
 Pillow==11.3.0
-numpy==2.2.6; python_version < "3.11"
-numpy==2.3.3; python_version >= "3.11"
+numpy==2.2.6               # <- compatible with opencv-python-headless 4.12.0.88
 opencv-python-headless==4.12.0.88
 
 # --- LLM Providers ---
