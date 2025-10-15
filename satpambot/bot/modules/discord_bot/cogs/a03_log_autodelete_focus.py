@@ -1,108 +1,134 @@
+# -*- coding: utf-8 -*-
+"""
+LogAutoDeleteFocus — v4 (strict)
+HANYA menghapus embed dengan judul persis:
+  - "Maintenance"
+  - "Heartbeat"
+TIDAK akan menghapus "Periodic Status".
 
+Fokus area:
+- channel log-botphising: 1400375184048787566
+- thread neuro-lite progress: 1425400701982478408
+
+Konfigurasi TTL (detik):
+- STICKY_DELETE_TTL (prioritas 1) atau
+- LOG_AUTODELETE_TTL (prioritas 2) atau
+- default 300
+
+Catatan:
+- Menghapus pesan BOT sendiri saja (lebih aman).
+- Pesan pinned tetap akan dicoba dihapus bila cocok judulnya.
+- Kesalahan permission akan ditangani diam-diam (log.warn).
+"""
+from __future__ import annotations
+import os
 import asyncio
 import logging
-import re
-from typing import Optional
+from typing import Iterable, Set
 
-import discord
+try:
+    import discord
+    from discord.ext import commands  # type: ignore
+except Exception:  # pragma: no cover - during smoke
+    discord = None  # type: ignore
+    commands = object  # type: ignore
 
 log = logging.getLogger(__name__)
 
-# === CONFIG (no ENV) ===
-TTL_DEFAULT = 180  # detik
+TARGET_CHANNEL_IDS: Set[int] = {1400375184048787566}
+TARGET_THREAD_IDS: Set[int]  = {1425400701982478408}
 
-TTL_BY_PATTERN = [
-    (re.compile(r"^Self-?Heal Ticket\b", re.I), 12),
-    (re.compile(r"\bSelfHealRuntime aktif\b", re.I), 12),
-    (re.compile(r"\bAuto reseed", re.I), 15),
-    (re.compile(r"\bAuto reseed selesai\b", re.I), 15),
-    (re.compile(r"\bsetup failed: Cog named 'SelfHealAutoFix' already loaded\b", re.I), 12),
-]
+DELETE_TITLES = {"Maintenance", "Heartbeat"}
+PROTECT_TITLES = {"Periodic Status"}
 
-PROTECT_PINNED = True
-_PATCHED = False
+def _ttl_seconds() -> int:
+    for key in ("STICKY_DELETE_TTL", "LOG_AUTODELETE_TTL"):
+        val = os.getenv(key)
+        if val and val.isdigit():
+            return int(val)
+    return 300
 
-async def _safe_autodelete(msg: discord.Message, ttl: int) -> None:
-    if ttl <= 0:
-        return
+def _in_scope(ch) -> bool:
     try:
-        await asyncio.sleep(ttl)
-        if PROTECT_PINNED:
-            try:
-                if hasattr(msg, "channel"):
-                    msg = await msg.channel.fetch_message(msg.id)
-            except Exception:
-                pass
-            if getattr(msg, "pinned", False):
-                return
-        await msg.delete()
-    except (discord.NotFound, discord.Forbidden):
+        cid = getattr(ch, "id", None)
+        parent_id = getattr(ch, "parent_id", None)
+        if cid in TARGET_CHANNEL_IDS or cid in TARGET_THREAD_IDS:
+            return True
+        if parent_id in TARGET_CHANNEL_IDS or parent_id in TARGET_THREAD_IDS:
+            return True
+    except Exception:
         pass
-    except Exception:
-        log.exception("[log_autodelete] gagal menghapus pesan")
+    return False
 
-def _match_ttl_from_message(content: str, embeds: list) -> Optional[int]:
-    text_blobs = [content or ""]
+def _title_matches(embeds: Iterable) -> bool:
+    """Return True bila SALAH SATU embed.title ∈ DELETE_TITLES dan
+    tidak ada yang ∈ PROTECT_TITLES (proteksi eksplisit)."""
+    has_delete = False
     for e in embeds or []:
-        if isinstance(e, discord.Embed):
-            if e.title:
-                text_blobs.append(e.title)
-            if e.description:
-                text_blobs.append(e.description[:300])
-            for f in e.fields:
-                text_blobs.append((f.name or "")[:120])
-    blob = "\n".join(text_blobs)
-    for rx, ttl in TTL_BY_PATTERN:
-        if rx.search(blob):
-            return ttl
-    return None
+        title = getattr(e, "title", None) or ""
+        if title in PROTECT_TITLES:
+            return False  # proteksi keras
+        if title in DELETE_TITLES:
+            has_delete = True
+    return has_delete
 
-async def _wrapped_send(self, *args, **kwargs):
-    msg = await _wrapped_send.__orig(self, *args, **kwargs)
-    try:
-        channel_id = getattr(self, "id", None)
-        if channel_id is None and hasattr(self, "channel"):
-            channel_id = getattr(self.channel, "id", None)
+class LogAutoDeleteFocus(commands.Cog if hasattr(commands, "Cog") else object):
+    def __init__(self, bot):
+        self.bot = bot
+        self.ttl = max(0, _ttl_seconds())
+        log.info("[log_autodelete.focus:v4] aktif — TTL=%ss; titles del=%s; protect=%s; scope: ch=%s threads=%s",
+                 self.ttl, sorted(DELETE_TITLES), sorted(PROTECT_TITLES),
+                 sorted(TARGET_CHANNEL_IDS), sorted(TARGET_THREAD_IDS))
 
-        target = channel_id in LOG_CHANNEL_IDS or channel_id in PROGRESS_THREAD_IDS
-        if not target:
-            return msg
+    async def _maybe_delete(self, message):
+        try:
+            if not message or not message.channel:
+                return
+            if message.author is None or self.bot is None:
+                return
+            # Hanya hapus pesan dari BOT sendiri agar aman
+            if getattr(message.author, "id", None) != getattr(self.bot.user, "id", None):
+                return
+            ch = message.channel
+            if not _in_scope(ch):
+                return
+            embeds = getattr(message, "embeds", None) or []
+            if not embeds:
+                return
+            if not _title_matches(embeds):
+                return
 
-        if not getattr(msg.author, "bot", False):
-            return msg
+            async def do_delete():
+                try:
+                    await message.delete()
+                except Exception as e:
+                    log.warning("[log_autodelete.focus] gagal delete msg %s di ch %s: %r",
+                                getattr(message, "id", "?"), getattr(ch, "id", "?"), e)
 
-        ttl = _match_ttl_from_message(getattr(msg, "content", "") or "", getattr(msg, "embeds", []) or [])
-        if ttl is None:
-            ttl = TTL_DEFAULT
+            if self.ttl <= 0:
+                await do_delete()
+            else:
+                await asyncio.sleep(self.ttl)
+                await do_delete()
+        except Exception as e:
+            log.exception("[log_autodelete.focus] _maybe_delete error: %r", e)
 
-        if ttl and ttl > 0:
-            asyncio.create_task(_safe_autodelete(msg, ttl))
+    # Listener: pesan baru
+    if hasattr(commands, "Cog"):
+        @commands.Cog.listener()
+        async def on_message(self, message):
+            await self._maybe_delete(message)
 
-    except Exception:
-        log.exception("[log_autodelete] wrapper error")
+        # Listener: pesan diedit (sticky biasanya pakai edit)
+        @commands.Cog.listener()
+        async def on_message_edit(self, before, after):
+            await self._maybe_delete(after)
 
-    return msg
-
-async def setup(bot):
-    global _PATCHED
-    if _PATCHED:
-        log.info("[log_autodelete] already patched; skip")
+def setup(bot):
+    if discord is None or not hasattr(commands, "Cog"):
+        log.warning("[log_autodelete.focus] discord/commands unavailable (smoke mode).")
         return
-
-    orig_send = discord.abc.Messageable.send
-    if getattr(orig_send, "__name__", "") != "_wrapped_send":
-        _wrapped_send.__orig = orig_send  # type: ignore[attr-defined]
-        discord.abc.Messageable.send = _wrapped_send  # type: ignore[assignment]
-        _PATCHED = True
-        log.info("[log_autodelete] patched Messageable.send — LOG_CHANNEL_IDS=%s PROGRESS_THREAD_IDS=%s", LOG_CHANNEL_IDS, PROGRESS_THREAD_IDS)
-    else:
-        log.info("[log_autodelete] Messageable.send sudah ter-wrap")
-
-def setup_sync(bot):
-    return asyncio.get_event_loop().create_task(setup(bot))
-
-# patched: force LOG_CHANNEL_IDS at module top-level (outside try/except)
-LOG_CHANNEL_IDS = {1400375184048787566}
-
-# patched: force PROGRESS_THREAD_IDS at module top-level (outside try/except)
-PROGRESS_THREAD_IDS = {1422624261109190716, 1426397317598154844, 1425400701982478408, 1409949797313679492}
+    try:
+        bot.add_cog(LogAutoDeleteFocus(bot))
+    except Exception:
+        log.exception("[log_autodelete.focus] gagal add_cog")
