@@ -1,135 +1,105 @@
 
 from __future__ import annotations
+
 import asyncio
-import contextlib
-import logging
+from typing import Optional, Dict
 from datetime import datetime, timedelta
-from typing import Optional, Iterable
 
 import discord
 from discord.ext import commands
 
-log = logging.getLogger(__name__)
+# === STATIC CONFIG (no ENV) ===
+LOG_CHANNEL_ID = 1400375184048787566
+PROGRESS_THREAD_ID = 1425400701982478408
+QNA_CHANNEL_ID = 1426571542627614772  # optional; safe if not found
 
-# === Hardcoded IDs (tidak pakai ENV) ===
-LOG_CHANNEL_ID: int = 1400375184048787566
-PROGRESS_THREAD_ID: int = 1425400701982478408
-QNA_CHANNEL_IDS: tuple[int, ...] = (1426571542627614772,)
+LOOKBACK_HOURS = 24       # keep light for Render free plan
+AUTHOR_COOLDOWN_SEC = 20  # per-user cooldown to avoid burst +1 spam
+XP_PER_HIT = 1            # minimal unit per historical message
 
-# === Konfigurasi XP (inline) ===
-# TK total 2000 (L1=1000, L2=1000)
-TK_L1: int = 1000
-TK_L2: int = 1000
-TK_TOTAL: int = TK_L1 + TK_L2
-
-# Cooldown pemberian XP per author (agar tidak +1 terus)
-PER_AUTHOR_COOLDOWN_SEC: int = 20
-
-# Maksimal pesan yang dibaca saat catch-up
-MAX_HISTORY_PER_CHANNEL: int = 300
+COG_NAME = "XpHistoryAutoCatchup"
 
 class XpHistoryAutoCatchup(commands.Cog):
-    """Autocatchup XP dari riwayat chat.
-    Aman di smoke test: tidak akses bot.loop pada __init__.
-    Task baru dibuat saat on_ready.
+    """On first ready, scan recent history in a few channels/threads and
+    award tiny XP amounts with anti-spam. Safe in smoke envs because the
+    task starts from `on_ready` using `asyncio.create_task` (no bot.loop).
     """
-
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._task: Optional[asyncio.Task] = None
         self._started = False
-        # memory untuk cooldown per author dan pesan yang sudah dihitung
-        self._author_last_gain: dict[int, float] = {}
-        self._seen_message_ids: set[int] = set()
+        self._last_by_author: Dict[int, float] = {}
 
-    async def cog_unload(self) -> None:
-        if self._task:
-            self._task.cancel()
-            with contextlib.suppress(Exception):
-                await self._task
+    # ---- utils
+    def _cooldown_ok(self, user_id: int) -> bool:
+        now = asyncio.get_event_loop().time()
+        last = self._last_by_author.get(user_id, 0.0)
+        if now - last >= AUTHOR_COOLDOWN_SEC:
+            self._last_by_author[user_id] = now
+            return True
+        return False
 
-    @commands.Cog.listener()
-    async def on_ready(self) -> None:
-        # Hindari dobel start
+    async def _award(self, member_id: int, amount: int, *, reason: str, channel_id: Optional[int], guild_id: Optional[int]):
+        # Prefer direct methods if present (silences xp_awarder warnings)
+        fn = getattr(self.bot, "xp_add", None) or getattr(self.bot, "award_xp", None)
+        if callable(fn):
+            res = fn(member_id, amount, reason=reason, channel_id=channel_id, guild_id=guild_id)
+            if asyncio.iscoroutine(res):
+                await res
+        else:
+            # Fallback to events
+            self.bot.dispatch("xp_add", member_id, amount, reason, channel_id, guild_id)
+            self.bot.dispatch("xp.award", member_id, amount, reason, channel_id, guild_id)
+            self.bot.dispatch("satpam_xp", member_id, amount, reason, channel_id, guild_id)
+
+    async def _scan(self, ch: discord.abc.Messageable, *, since: datetime, guild_id: Optional[int]):
+        try:
+            async for m in ch.history(limit=300, after=since, oldest_first=True):
+                if m.author.bot:
+                    continue
+                if not self._cooldown_ok(m.author.id):
+                    continue
+                await self._award(m.author.id, XP_PER_HIT, reason="history-catchup", channel_id=getattr(ch, "id", None), guild_id=guild_id)
+                await asyncio.sleep(0)  # be nice to the loop
+        except Exception:
+            # Silent best-effort on free plan
+            pass
+
+    async def _runner(self):
+        await self.bot.wait_until_ready()
         if self._started:
             return
         self._started = True
-        try:
-            self._task = asyncio.create_task(self._runner(), name="xp_history_autocatchup")
-        except RuntimeError:
-            # Tidak ada running loop (misal smoke env) — aman: tidak ngebuat task
-            log.debug("[xp_history_autocatchup] no running loop, skip runner scheduling")
+        since = datetime.utcnow() - timedelta(hours=LOOKBACK_HOURS)
 
-    # ====== Utility XP ======
-    def _xp_for_message(self, msg: discord.Message) -> int:
-        # Aturan termudah: 1 XP per pesan yang bukan bot/system & ada konten
-        if msg.author.bot:
-            return 0
-        if not (msg.content or msg.attachments):
-            return 0
-        # Anti spam: cooldown per author
-        now = asyncio.get_event_loop().time()
-        last = self._author_last_gain.get(msg.author.id, 0.0)
-        if (now - last) < PER_AUTHOR_COOLDOWN_SEC:
-            return 0
-        self._author_last_gain[msg.author.id] = now
-        return 1
+        for guild in list(self.bot.guilds):
+            # log channel
+            ch = guild.get_channel(LOG_CHANNEL_ID) or self.bot.get_channel(LOG_CHANNEL_ID)
+            if isinstance(ch, (discord.TextChannel, discord.Thread)):
+                await self._scan(ch, since=since, guild_id=guild.id)
 
-    def _level_name(self, total: int) -> str:
-        if total < TK_L1:
-            return "TK-L1"
-        if total < TK_TOTAL:
-            return "TK-L2"
-        # Lanjut ke SD jika melewati TK total
-        over = total - TK_TOTAL
-        # Mapping sederhana untuk label SD
-        if over < 1000:
-            return "SD-L1"
-        elif over < 2000:
-            return "SD-L2"
-        else:
-            return "SD"
-
-    async def _award_xp(self, user_id: int, amount: int) -> None:
-        # Placeholder: integrasi ke XP store internal lain dapat ditambahkan di sini.
-        # Untuk visibilitas, kita log saja. Modul lain (learning_passive_observer) yang update total.
-        if amount <= 0:
-            return
-        log.info("[xp_history_autocatchup] +%s XP to user=%s", amount, user_id)
-
-    # ====== Runner utama ======
-    async def _runner(self) -> None:
-        # Tunda sedikit sampai cache/guild siap
-        await asyncio.sleep(5)
-        log.info("[xp_history_autocatchup] runner start")
-
-        # Kumpulkan target channel
-        targets: list[int] = [LOG_CHANNEL_ID, PROGRESS_THREAD_ID]
-        targets.extend(QNA_CHANNEL_IDS)
-
-        for channel_id in targets:
-            channel = self.bot.get_channel(channel_id)
-            if channel is None:
-                # Coba fetch bila tidak ada di cache
-                with contextlib.suppress(Exception):
-                    channel = await self.bot.fetch_channel(channel_id)  # type: ignore
-            if channel is None:
-                log.warning("[xp_history_autocatchup] channel %s tidak ditemukan", channel_id)
-                continue
-
-            # Ambil history — aman bila tipe channel mendukung
+            # progress thread
+            th = None
             try:
-                async for msg in channel.history(limit=MAX_HISTORY_PER_CHANNEL, oldest_first=True):  # type: ignore
-                    if msg.id in self._seen_message_ids:
-                        continue
-                    self._seen_message_ids.add(msg.id)
-                    amount = self._xp_for_message(msg)
-                    if amount > 0:
-                        await self._award_xp(msg.author.id, amount)
-            except Exception as e:
-                log.warning("[xp_history_autocatchup] gagal baca history %s: %r", channel_id, e)
+                th = guild.get_thread(PROGRESS_THREAD_ID)  # type: ignore
+            except Exception:
+                th = self.bot.get_channel(PROGRESS_THREAD_ID)
+            if isinstance(th, discord.Thread):
+                await self._scan(th, since=since, guild_id=guild.id)
 
-        log.info("[xp_history_autocatchup] runner finish")
+            # qna (optional)
+            q = guild.get_channel(QNA_CHANNEL_ID) or self.bot.get_channel(QNA_CHANNEL_ID)
+            if isinstance(q, (discord.TextChannel, discord.Thread)):
+                await self._scan(q, since=since, guild_id=guild.id)
 
-async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(XpHistoryAutoCatchup(bot))
+    @commands.Cog.listener()
+    async def on_ready(self):
+        # start once
+        if not self._started:
+            asyncio.create_task(self._runner())
+
+async def setup(bot: commands.Bot):
+    try:
+        await bot.add_cog(XpHistoryAutoCatchup(bot))
+    except discord.ClientException as e:
+        if "already loaded" not in str(e):
+            raise
