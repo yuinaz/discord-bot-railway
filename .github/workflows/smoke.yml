@@ -1,4 +1,3 @@
-# .github/workflows/smoke.yml
 name: Preflight Smoketest
 
 on:
@@ -19,7 +18,7 @@ jobs:
     permissions:
       contents: read
     env:
-      RUN_BOT: "0"  # cegah bot jalan di CI
+      RUN_BOT: "0"  # prevent bot from starting on CI
     steps:
       - uses: actions/checkout@v4
 

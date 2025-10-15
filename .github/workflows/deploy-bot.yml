@@ -1,18 +1,21 @@
-name: Deploy Bot (Render)
+name: Deploy Bot (manual)
+
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'bot/**'
-      - '.github/workflows/deploy-bot.yml'
   workflow_dispatch:
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    concurrency: { group: render-bot, cancel-in-progress: true }
+    permissions:
+      contents: read
+    env:
+      RUN_BOT: "0"  # safety default; set to 1 only on real deploy steps
     steps:
-      - name: Trigger Render deploy (bot)
-        env: { HOOK: ${{ secrets.RENDER_BOT_DEPLOY_HOOK }} }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Build/Package (placeholder)
         run: |
-          test -n "$HOOK" || { echo "Missing RENDER_BOT_DEPLOY_HOOK"; exit 1; }
-          curl -fsSL -X POST "$HOOK"
+          echo "Add your deployment steps here."
+          echo "Example: build docker image or upload to Render/Railway"
