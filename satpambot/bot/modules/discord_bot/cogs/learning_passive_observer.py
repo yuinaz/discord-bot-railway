@@ -1,75 +1,153 @@
-
-# ---- satpambot local helper (do not remove) ----
-
 from __future__ import annotations
-import inspect as _sp_inspect
-async def _satpam_safe_add_cog(bot, cog):
-    ret = await _satpam_safe_add_cog(cog)
-    if _sp_inspect.iscoroutine(ret):
-        return await ret
-    return ret
-# ---- end satpambot helper ----
 
-
-import logging, os
-from satpambot.bot.modules.discord_bot.helpers.cog_utils import safe_add_cog
+import asyncio
+import json
+import logging
+import os
+import re
+from collections import deque
+from typing import Dict, Any, Deque, Set
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 
-try:
-    from satpambot.config.runtime import cfg
-except Exception:
-    def cfg(k, d=None): import os; return os.getenv(k, d)
+LOGGER = logging.getLogger(__name__)
 
-from satpambot.bot.modules.discord_bot.services.xp_store import XPStore
-from satpambot.bot.modules.discord_bot.services.schedule_gate import WeeklyGate
+# --- Inline XP Rules (no ENV) ---
+TK_TOTAL = 2000
+L1_CUTOFF = 1000
+L2_CUTOFF = 2000
 
-log = logging.getLogger(__name__)
+# Channel guard (no XP here)
+CHANNEL_BLOCKLIST = {
+    1400375184048787566,
+}
 
-PASSIVE_XP_PER_MESSAGE = int(cfg('PASSIVE_XP_PER_MESSAGE', '1') or '1')
-xp_store = XPStore()
-weekly_gate = WeeklyGate()
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "data")
+STORE_PATH = os.path.join(DATA_DIR, "xp_store.json")
+AWARDED_IDS_PATH = os.path.join(DATA_DIR, "xp_awarded_ids.json")
+
+# Avoid runaway memory — persist awarded message ids with a ring buffer behavior
+MAX_AWARDED_IDS = 50000
+
+def _ensure_data_files():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    if not os.path.exists(STORE_PATH):
+        with open(STORE_PATH, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+    if not os.path.exists(AWARDED_IDS_PATH):
+        with open(AWARDED_IDS_PATH, "w", encoding="utf-8") as f:
+            json.dump({"ids": []}, f)
+
+def _load_store() -> Dict[str, Any]:
+    _ensure_data_files()
+    try:
+        with open(STORE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_store(store: Dict[str, Any]):
+    _ensure_data_files()
+    tmp = STORE_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, STORE_PATH)
+
+def _load_awarded_ids() -> Deque[int]:
+    _ensure_data_files()
+    try:
+        with open(AWARDED_IDS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            ids = data.get("ids", [])
+            dq: Deque[int] = deque(maxlen=MAX_AWARDED_IDS)
+            for v in ids[-MAX_AWARDED_IDS:]:
+                dq.append(v)
+            return dq
+    except Exception:
+        return deque(maxlen=MAX_AWARDED_IDS)
+
+def _save_awarded_ids(dq: Deque[int]):
+    _ensure_data_files()
+    tmp = AWARDED_IDS_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"ids": list(dq)}, f, ensure_ascii=False)
+    os.replace(tmp, AWARDED_IDS_PATH)
+
+def compute_level(total_xp: int) -> str:
+    if total_xp < L1_CUTOFF:
+        return "TK-L1"
+    if total_xp < L2_CUTOFF:
+        return "TK-L2"
+    # Lewat TK -> anggap masuk SD-L1 untuk kompatibilitas ke depan
+    return "SD-L1"
+
+LOG_PATTERNS = [
+    re.compile(r"^(INFO|WARNING|ERROR)\:"),        # log-style spam
+    re.compile(r"loaded satpambot", re.IGNORECASE),
+    re.compile(r"smoke_cogs\.py|smoke_lint_thread_guard\.py", re.IGNORECASE),
+]
+
+def _is_spam_like(content: str) -> bool:
+    if not content:
+        return False
+    if len(content) > 2000 or content.count("\n") > 30:
+        return True
+    return any(p.search(content) for p in LOG_PATTERNS)
 
 class LearningPassiveObserver(commands.Cog):
-    """Passive XP with persistence (KV) + weekly XP gate (KV)."""
+    """Passive XP earner (no ENV). Stores to data/xp_store.json and dedupes by message id.
+    """
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.weekly_award.start()
+        self.store: Dict[str, Any] = _load_store()
+        self.awarded_ids: Deque[int] = _load_awarded_ids()
+        # author cooldown: avoid +1 on rapid spam
+        self.author_last_ts: Dict[int, float] = {}
+        self.cooldown_sec = 5.0  # tweakable here (no ENV)
 
-    def cog_unload(self):
-        try: self.weekly_award.cancel()
-        except Exception: pass
+    def _user_key(self, guild_id: int, user_id: int) -> str:
+        return f"{guild_id}:{user_id}"
+
+    def _add_xp(self, guild_id: int, user_id: int, msg_id: int) -> None:
+        key = self._user_key(guild_id, user_id)
+        rec = self.store.get(key, {"xp": 0})
+        rec["xp"] = int(rec.get("xp", 0)) + 1
+        self.store[key] = rec
+        self.awarded_ids.append(int(msg_id))
+        _save_store(self.store)
+        _save_awarded_ids(self.awarded_ids)
+        level = compute_level(rec["xp"])
+        LOGGER.info("[passive-learning] +1 XP -> total=%s level=%s", rec["xp"], level)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        # Skip bots / DMs / no content
         if message.author.bot or not message.guild:
             return
-        if PASSIVE_XP_PER_MESSAGE <= 0:
+        if message.channel.id in CHANNEL_BLOCKLIST:
             return
-        total, lvl = xp_store.add_xp(message.guild.id, message.author.id, PASSIVE_XP_PER_MESSAGE)
-        log.info("[passive-learning] +%d XP -> total=%d level=%s",
-                 PASSIVE_XP_PER_MESSAGE, total, lvl)
+        if _is_spam_like(message.content or ""):
+            return
 
-    @tasks.loop(hours=6)
-    async def weekly_award(self):
-        KEY = 'weekly_random_exp'
-        if not weekly_gate.should_run(KEY):
-            log.info("[weekly-exp] skip (already ran this week)")
+        # Dedup by message id if we've already awarded
+        mid = int(message.id)
+        if mid in self.awarded_ids:
             return
-        award = int(cfg('WEEKLY_EXP_AMOUNT', '50') or '50')
-        if award <= 0:
-            weekly_gate.mark_ran(KEY); return
-        for g in self.bot.guilds:
-            for m in g.members:
-                if not m.bot:
-                    xp_store.add_xp(g.id, m.id, award)
-            log.info("[weekly-exp] awarded +%d XP to guild %s", award, g.id)
-        weekly_gate.mark_ran(KEY)
+
+        # Simple per-author cooldown to reduce +1 spam storms
+        ts = message.created_at.timestamp() if message.created_at else 0.0
+        last = self.author_last_ts.get(message.author.id, 0.0)
+        if ts and last and (ts - last) < self.cooldown_sec:
+            return
+        self.author_last_ts[message.author.id] = ts or last
+
+        # Award
+        try:
+            self._add_xp(message.guild.id, message.author.id, mid)
+        except Exception as e:
+            LOGGER.exception("XP award failed: %s", e)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningPassiveObserver(bot))
-
-async def setup(bot: commands.Bot):
-    try: await safe_add_cog(bot, LearningPassiveObserver(bot))
-    except TypeError: pass
