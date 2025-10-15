@@ -1,0 +1,9 @@
+Title: XP: Miner Memory
+
+Content (simple version):
+total=1500
+
+Notes:
+- Keep the title EXACTLY "XP: Miner Memory" so your backend finds it.
+- The parser in your stack will read the first `total=<number>` it sees.
+- Pin this message in the progress thread used by your XP backend (your logs show it as the neuro-lite progress thread).

@@ -1,17 +1,5 @@
-
-# ---- satpambot local helper (do not remove) ----
-
-from __future__ import annotations
-import inspect as _sp_inspect
-async def _satpam_safe_add_cog(bot, cog):
-    ret = await _satpam_safe_add_cog(cog)
-    if _sp_inspect.iscoroutine(ret):
-        return await ret
-    return ret
-# ---- end satpambot helper ----
-
 # Compat shim: keep import passing but reuse the new observer
-
+from __future__ import annotations
 import discord
 from satpambot.bot.modules.discord_bot.helpers.cog_utils import safe_add_cog
 
@@ -21,6 +9,6 @@ from satpambot.bot.modules.discord_bot.cogs.learning_passive_observer import Lea
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningPassiveObserver(bot))
 
-async def setup(bot: commands.Bot):
+def setup(bot: commands.Bot):
     try: await safe_add_cog(bot, LearningPassiveObserver(bot))
     except TypeError: pass

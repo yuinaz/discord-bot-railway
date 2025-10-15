@@ -1,6 +1,5 @@
 
 # ---- satpambot local helper (do not remove) ----
-
 from __future__ import annotations
 import inspect as _sp_inspect
 async def _satpam_safe_add_cog(bot, cog):
@@ -33,6 +32,6 @@ class PhishLogStickyExample(commands.Cog):
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishLogStickyExample(bot))
 
-async def setup(bot: commands.Bot):
+def setup(bot: commands.Bot):
     try: await safe_add_cog(bot, PhishLogStickyExample(bot))
     except TypeError: pass
