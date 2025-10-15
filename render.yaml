@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: satpambot-dashboard
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app -b 0.0.0.0:$PORT -w 2 --threads 8 --timeout 120
+    autoDeploy: true
+    envVars:
+      - key: METRICS_INGEST_TOKEN
+        generateValue: true
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATA_DIR
+        value: /opt/render/project/data

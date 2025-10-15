@@ -1,0 +1,17 @@
+Tambahkan modul-modul berikut ke list MODULES di a00_chainload_overlays.py (di posisi awal):
+
+    "satpambot.bot.modules.discord_bot.cogs.a00_auto_local_sync",
+    "satpambot.bot.modules.discord_bot.cogs.a29_public_mode_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a28_disable_talking_unblock",
+    "satpambot.bot.modules.discord_bot.cogs.a02_dm_muzzle_cfg_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a25_governor_cfg_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a02_dm_muzzle_mode_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a24_progress_explicit_thread_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a24_qna_channel_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a03_owner_notify_redirect_thread",
+    "satpambot.bot.modules.discord_bot.cogs.admin_slash_control",
+
+Tambahan modul untuk interview gate (letakkan PALING AKHIR di list):
+
+    "satpambot.bot.modules.discord_bot.cogs.admin_interview_gate",
+    "satpambot.bot.modules.discord_bot.cogs.a31_public_mode_interview_gate",

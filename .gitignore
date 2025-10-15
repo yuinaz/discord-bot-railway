@@ -1,0 +1,5 @@
+secrets/
+local*.json
+*.env
+*.env.*
+SatpamBot.env

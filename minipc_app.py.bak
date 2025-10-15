@@ -1,0 +1,86 @@
+# minipc_app.py
+# Small runner wrapper that defers to your existing local runner
+# and ensures Ctrl+C works cleanly on Windows too.
+from __future__ import annotations
+
+import asyncio
+import importlib
+import inspect
+import logging
+import os
+import signal
+import sys
+from contextlib import suppress
+
+log = logging.getLogger("minipc_app")
+
+def _install_basic_logging():
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(
+        level=getattr(logging, level, logging.INFO),
+        format="%(levelname)s:%(name)s:%(message)s",
+    )
+
+def _install_ctrl_c_handler():
+    # On Windows, add_signal_handler may not exist, so rely on signal.signal
+    def _handler(sig, frame):
+        # Raising KeyboardInterrupt will trigger asyncio.run() cancellation
+        raise KeyboardInterrupt()
+    for s in (getattr(signal, "SIGINT", None), getattr(signal, "SIGTERM", None)):
+        if s is None: 
+            continue
+        try:
+            signal.signal(s, _handler)
+        except Exception:
+            pass
+
+async def _delegate_run():
+    """Try a few known entry points so we don't break your local layout.
+    The first one that exists will be executed.
+    """
+    candidates = [
+        ("run_local_minipc", ("async_main", "main", "run")),
+        ("entry.main", ("async_main", "main", "run", "start")),
+        ("satpambot.run_local_minipc", ("async_main", "main", "run")),
+    ]
+    for mod_name, attrs in candidates:
+        with suppress(Exception):
+            mod = importlib.import_module(mod_name)
+            for name in attrs:
+                fn = getattr(mod, name, None)
+                if fn is None:
+                    continue
+                log.info("Delegating run to %s.%s()", mod_name, name)
+                res = fn()
+                if inspect.isawaitable(res):
+                    await res
+                return
+    # Fallback: idle wait so Ctrl+C still stops the process
+    log.error("No known local runner found; idle waiting. (Check your entry module)")
+    await asyncio.Event().wait()
+
+def main() -> int:
+    _install_basic_logging()
+    _install_ctrl_c_handler()
+    try:
+        asyncio.run(_delegate_run())
+    except KeyboardInterrupt:
+        log.info("CTRL+C received — shutting down.")
+        # Best-effort graceful stop hooks if present
+        with suppress(Exception):
+            m = importlib.import_module("satpambot.bot.modules.discord_bot.shim_runner")
+            for attr in ("graceful_stop", "request_exit", "stop"):
+                fn = getattr(m, attr, None)
+                if fn:
+                    res = fn()
+                    if inspect.isawaitable(res):
+                        asyncio.run(res)
+                    break
+        return 0
+    except Exception:
+        log.exception("Fatal in minipc_app")
+        return 1
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,617 @@
+{
+  "version": "1",
+  "items": [
+    {
+      "phash": "83ba78250f268d5f",
+      "sha256": "e1afb64cfc0756031e0161dc090b36406daead466bf22e522621253eb7ed1371",
+      "channel_id": 886534544688308265,
+      "message_id": 1426161972142932019,
+      "user_id": 310304772588830720,
+      "label": "unknown",
+      "ts": 1760093910,
+      "meta": {
+        "filename": "screenshot_20251010-175606.jpg"
+      }
+    },
+    {
+      "phash": "83c07872789db55e",
+      "sha256": "96a2c745feed2733e3c1d1e3163f7caf4843b8e9c16d800124321a581275aade",
+      "channel_id": 886534544688308265,
+      "message_id": 1426162659606401056,
+      "user_id": 310304772588830720,
+      "label": "unknown",
+      "ts": 1760094074,
+      "meta": {
+        "filename": "screenshot_20251010-180032.jpg"
+      }
+    },
+    {
+      "phash": "86ad7a58f14e164d",
+      "sha256": "b508d0e5441a6dc0d3c37ab93282672a8f1a3ff92c1954201a4e8559aa0f5777",
+      "channel_id": 886534544688308265,
+      "message_id": 1426189140948418571,
+      "user_id": 1157290332443123743,
+      "label": "unknown",
+      "ts": 1760100387,
+      "meta": {
+        "filename": "screenshot_20251010_194607_com_netmarble_tskgb_gameactivity.jpg"
+      }
+    },
+    {
+      "phash": "d1da2cc7929ccd91",
+      "sha256": "f15149d7cb026902ff05ca472e136e6a3d4bc287418cc4c9d9b6a9e8fd37ac13",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426189181205348465,
+      "user_id": 541614349039566858,
+      "label": "unknown",
+      "ts": 1760100411,
+      "meta": {
+        "filename": "20251010_194558.jpg"
+      }
+    },
+    {
+      "phash": "e04f37e13f19e510",
+      "sha256": "a15b96523a74f049752d2e55b482d23f50027c3e8df5b56aaad4756238ca81ee",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426190190484918383,
+      "user_id": 977223032814858250,
+      "label": "unknown",
+      "ts": 1760100637,
+      "meta": {
+        "filename": "screenshot_20251010-195002.jpg"
+      }
+    },
+    {
+      "phash": "99b966692dd68631",
+      "sha256": "bc191056df772eb604b0753658a3b116692fe65e5f65fc1ac3b0ae6974e391a3",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426190349142851625,
+      "user_id": 977223032814858250,
+      "label": "unknown",
+      "ts": 1760100675,
+      "meta": {
+        "filename": "fb_img_1745891702289.jpg"
+      }
+    },
+    {
+      "phash": "d126cdd26d1a952d",
+      "sha256": "728fda5343802992335b1df34e7640fd909ac401933840156559a7c0610de83f",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426193470275457084,
+      "user_id": 897654545423945758,
+      "label": "unknown",
+      "ts": 1760101419,
+      "meta": {
+        "filename": "img_20251010_200312.jpg"
+      }
+    },
+    {
+      "phash": "c13e3c6a78d9a887",
+      "sha256": "6c75189587fabd03c49e05c016d45291ee91b2318e87e4e3f8b7049ac4f7ad21",
+      "channel_id": 886534544688308265,
+      "message_id": 1426194970280460459,
+      "user_id": 226392878375632896,
+      "label": "unknown",
+      "ts": 1760101779,
+      "meta": {
+        "filename": "screenshot_2025-10-10-18-35-11-516_com.studiobside.starmain.jpg"
+      }
+    },
+    {
+      "phash": "eb5c0b3970273ec2",
+      "sha256": "afe1055c7fd020380446c2cbecbe87f5f2d2bf435e2c78ec2d7cd3a1f5572ec5",
+      "channel_id": 1410182921129558137,
+      "message_id": 1426195095153147997,
+      "user_id": 897654545423945758,
+      "label": "unknown",
+      "ts": 1760101807,
+      "meta": {
+        "filename": "img_20251010_200111.jpg"
+      }
+    },
+    {
+      "phash": "9dd64a88b5bd4ac8",
+      "sha256": "234ab145ef8a5bf4c6a7078ff1ac37561e29152572c67e3cd0e036a86c89bebc",
+      "channel_id": 886534544688308265,
+      "message_id": 1426199601568022590,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760102882,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "c83d52493ecee964",
+      "sha256": "24371e500b143264447f490ab12ce822ee24e897e88cd3e11234f101513043da",
+      "channel_id": 1410182921129558137,
+      "message_id": 1426201611117531269,
+      "user_id": 599871842483830784,
+      "label": "unknown",
+      "ts": 1760103361,
+      "meta": {
+        "filename": "g25n5o-bqaar42v.jpg"
+      }
+    },
+    {
+      "phash": "cd79308ccb3668d3",
+      "sha256": "f9d27352d15ae231016c22dc4e20aaee7ed5e54b3eb95a263da91b84144b4302",
+      "channel_id": 1410182921129558137,
+      "message_id": 1426202157215907941,
+      "user_id": 599871842483830784,
+      "label": "unknown",
+      "ts": 1760103491,
+      "meta": {
+        "filename": "e6696bba4b12f87d0d4ba66b650ff571.jpg"
+      }
+    },
+    {
+      "phash": "9a963ca8743d89f2",
+      "sha256": "70bcf88bf6eaada21910fe6143d4f8eed5b0cfc06a0bf4223ec22d71c6b2c045",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426203751659602061,
+      "user_id": 1312600840183480388,
+      "label": "unknown",
+      "ts": 1760103871,
+      "meta": {
+        "filename": "screenshot_2025-10-10-20-42-13-301_com.kurogame.wutheringwaves.global.jpg"
+      }
+    },
+    {
+      "phash": "8ab11517775f704a",
+      "sha256": "c627e26b2ae0351fb77cea7ce26348e848f633a52355f6ae78f9fe9b1685b242",
+      "channel_id": 886534544688308265,
+      "message_id": 1426205729114820760,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760104343,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "903f6ac44b933dd2",
+      "sha256": "fc1ec2ef0863d72b1191d484435d7298df7215061717710239bebf96a657a090",
+      "channel_id": 886534544688308265,
+      "message_id": 1426208208615116852,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760104933,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "8eb671d27182dd4a",
+      "sha256": "9c8925998e198932c6dd449d27bd6ce324d0b1d9476acb08d938dc934ac2f0f8",
+      "channel_id": 886534544688308265,
+      "message_id": 1426209247724703765,
+      "user_id": 724410225679007754,
+      "label": "unknown",
+      "ts": 1760105182,
+      "meta": {
+        "filename": "screenshot_20251010-210545.jpg"
+      }
+    },
+    {
+      "phash": "ebc685a1946b6cd8",
+      "sha256": "27ac52c64a183b93357cfb4b3cada28873cd188cac5813186b8dbb102ee043ba",
+      "channel_id": 886534544688308265,
+      "message_id": 1426209771723296778,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105306,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "91b2664d932754fa",
+      "sha256": "5591fd0e1575f705299e0c78b2348959340e9b6cdf924696bfe75e4b64b51f5d",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210003114659841,
+      "user_id": 724410225679007754,
+      "label": "unknown",
+      "ts": 1760105362,
+      "meta": {
+        "filename": "screenshot_20251010-210853.jpg"
+      }
+    },
+    {
+      "phash": "ff5dc0eca082923d",
+      "sha256": "48d180229e91cc47bec77b3fa5ee59bc76ff3a1aa717c85237ea6dc18c86c7db",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210055702970431,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105373,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "b7724a0fcb38f02c",
+      "sha256": "c65161308906ad8b1a0ad15df923c6625c9a2c7d1d0b065e2744c127d973360a",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210121662595092,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105389,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "8c314e31de328fce",
+      "sha256": "bbf5028c4fb68bbe81dcec117c4b5d5bc30b28e6c112d717b1462c1443735d3c",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210181888475338,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105405,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "86314f39cfe1921e",
+      "sha256": "f1f4b613e69a4950cbb2aa7680ce0dd6df3183aa0e060ee898bb57ce95cabdc1",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210349941522584,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105445,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "a686b40eb40ff0db",
+      "sha256": "f0e7d817e59498f551d81d0790f29ff20eee6cd5919cd9f32bd4a1e1d8bbba97",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210555684982887,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105493,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "94e166be6a1c6f18",
+      "sha256": "4d2d74d7796d38d7f6e304668ff1b7665c1a1cd7259d78de0396a579a3ad9015",
+      "channel_id": 886534544688308265,
+      "message_id": 1426210617001246861,
+      "user_id": 977223032814858250,
+      "label": "unknown",
+      "ts": 1760105508,
+      "meta": {
+        "filename": "screenshot_20251010-210811.jpg"
+      }
+    },
+    {
+      "phash": "941cf4c54363a5fc",
+      "sha256": "093b1a00a12119880cebe95e77b9d64b185484c380db604ebc02ea74a8a4d3e9",
+      "channel_id": 886534544688308265,
+      "message_id": 1426211185556062289,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760105644,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "93947becb4196d90",
+      "sha256": "d43b88f6b973a3b91f461d4ab0e712e62e700cdb8d91c5ce8d252cb92240fb4f",
+      "channel_id": 1410182921129558137,
+      "message_id": 1426214390469890058,
+      "user_id": 1054449464577884340,
+      "label": "unknown",
+      "ts": 1760106409,
+      "meta": {
+        "filename": "g25h5knxuaaujwz.png"
+      }
+    },
+    {
+      "phash": "94dab1cddab48bc0",
+      "sha256": "c7b59e22e06ead608884f87fc69f3e90662231be9422f88fcaf64d5f01baf3ae",
+      "channel_id": 886534544688308265,
+      "message_id": 1426215106064289976,
+      "user_id": 635255994678771712,
+      "label": "unknown",
+      "ts": 1760106581,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "9c9ef61c182665b9",
+      "sha256": "4a52460e3c16417eab5f84f31d176539b0e7afb1df5fde476ac2ad391c7b6a6f",
+      "channel_id": 886534544688308265,
+      "message_id": 1426216168422768730,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760106831,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "80959c976ef16bc1",
+      "sha256": "4093b99b522c934509ec657ace439cd59921350b5c3a9e97e4367f3b13fa1cfd",
+      "channel_id": 886534544688308265,
+      "message_id": 1426218234113425562,
+      "user_id": 724410225679007754,
+      "label": "unknown",
+      "ts": 1760107324,
+      "meta": {
+        "filename": "screenshot_20251010-213902.jpg"
+      }
+    },
+    {
+      "phash": "8095cd9d63b16bd1",
+      "sha256": "171cf7287e5bdb1fae53fd3c6518cdb35d441190a6ec4441dc4fb666b07d9185",
+      "channel_id": 886534544688308265,
+      "message_id": 1426219233917927456,
+      "user_id": 396556438924689409,
+      "label": "unknown",
+      "ts": 1760107563,
+      "meta": {
+        "filename": "screenshot_20251010-214536.jpg"
+      }
+    },
+    {
+      "phash": "e8849bcc3be56ad0",
+      "sha256": "d2d8b77f0a655d5ee4b9f897ba51a85f0640046a476461e02f9fe378e8c243df",
+      "channel_id": 886534544688308265,
+      "message_id": 1426224277878739185,
+      "user_id": 485776284199288852,
+      "label": "unknown",
+      "ts": 1760108765,
+      "meta": {
+        "filename": "screenshot_2025-10-10-22-05-21-98_d2b0f5c3317a1da8f4a7359868974288.jpg"
+      }
+    },
+    {
+      "phash": "87396c396d29696c",
+      "sha256": "0802a25217ff9aa50632a156873edcf55bc1b87b54d7843635ed7257813bb9e4",
+      "channel_id": 886534544688308265,
+      "message_id": 1426228779772285028,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760109838,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "b1cec6305d8fc391",
+      "sha256": "4932230ca2cfe078c67875c7d55dedaccf0f223cc6eb6f49b50b7a26c14ec961",
+      "channel_id": 886534544688308265,
+      "message_id": 1426228779772285028,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760109844,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "cfcd5eb420334947",
+      "sha256": "a9c2061167e7886bbf5c2098af5f2bcf5ea683e3fc2bba8ba20b337c420dd8ec",
+      "channel_id": 886534544688308265,
+      "message_id": 1426229476995498146,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760110007,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "d119b70ca666b627",
+      "sha256": "6d5b9ac2cac242543eddf52c344b501e6ab29b846e1e6932b21843930ae80b7a",
+      "channel_id": 1293199776824692766,
+      "message_id": 1426249867734552719,
+      "user_id": 635246646581526529,
+      "label": "unknown",
+      "ts": 1760114866,
+      "meta": {
+        "filename": "db3e5edda76033c0802b12667cad7076_0.jpg"
+      }
+    },
+    {
+      "phash": "a44235c3da5b5a5e",
+      "sha256": "fc1e0603682f6b901090b9752372a7e663cd24a4c8b2c1a0d83b0c41d63d0e52",
+      "channel_id": 886534544688308265,
+      "message_id": 1426395657706672308,
+      "user_id": 1177185297289719868,
+      "label": "unknown",
+      "ts": 1760149741,
+      "meta": {
+        "filename": "screenshot_20251011-092059.jpg"
+      }
+    },
+    {
+      "phash": "91654e27317a279b",
+      "sha256": "be7dd0145777704b6ae6ce8150dcb03dca01e0b33af9928cdef658eb505c8ea4",
+      "channel_id": 886534544688308265,
+      "message_id": 1426396237984432222,
+      "user_id": 710250135585816586,
+      "label": "unknown",
+      "ts": 1760149879,
+      "meta": {
+        "filename": "screenshot_2025-10-10-12-15-18-761_com.mi.android.globallauncher.jpg"
+      }
+    },
+    {
+      "phash": "80478df207d897ed",
+      "sha256": "bf728a711fd6d151e56a0b8276c3569623afa3533f4113f66820699c27b743c5",
+      "channel_id": 886534544688308265,
+      "message_id": 1426397670066622605,
+      "user_id": 710250135585816586,
+      "label": "unknown",
+      "ts": 1760150220,
+      "meta": {
+        "filename": "screenshot_2025-10-11-09-34-23-343_com.bilibili.trickcal.jpg"
+      }
+    },
+    {
+      "phash": "802b17ae75aa9e3a",
+      "sha256": "0edb741f6f10f114a166247ad41368737c1553d08f984582e53f1936b716853d",
+      "channel_id": 886534544688308265,
+      "message_id": 1426399415215722656,
+      "user_id": 710250135585816586,
+      "label": "unknown",
+      "ts": 1760150635,
+      "meta": {
+        "filename": "screenshot_2025-10-11-09-40-05-199_com.bilibili.trickcal.jpg"
+      }
+    },
+    {
+      "phash": "bf6c212fda2ec094",
+      "sha256": "8d3933227d8badc771180076a1c742e40d204b744cf9b357816d0e286b66a2fc",
+      "channel_id": 1371827576112152667,
+      "message_id": 1426402475316875275,
+      "user_id": 1331765056974753934,
+      "label": "unknown",
+      "ts": 1760151365,
+      "meta": {
+        "filename": "1760151210425.jpg"
+      }
+    },
+    {
+      "phash": "9b5b39b0306636e6",
+      "sha256": "017905af5563cd8448f79ca8c12a8ca7fa93f9624ec5611cdf1baf0cf702fb54",
+      "channel_id": 1371827576112152667,
+      "message_id": 1426402475316875275,
+      "user_id": 1331765056974753934,
+      "label": "unknown",
+      "ts": 1760151366,
+      "meta": {
+        "filename": "1760151213694.jpg"
+      }
+    },
+    {
+      "phash": "c0f16a7e9c0f9784",
+      "sha256": "1e7e8d28d91d0062d9af8a0e70c54c8e2d9b608904992fe17da825818f7cf027",
+      "channel_id": 1371827576112152667,
+      "message_id": 1426402489774768179,
+      "user_id": 1331765056974753934,
+      "label": "unknown",
+      "ts": 1760151368,
+      "meta": {
+        "filename": "1760151196665.jpg"
+      }
+    },
+    {
+      "phash": "cddef60234bcd160",
+      "sha256": "e84a6ba74dbdaca783c700e0a7487bfa8170be12c7eb9019545f12483b05998d",
+      "channel_id": 1410182921129558137,
+      "message_id": 1426402569583857726,
+      "user_id": 1331765056974753934,
+      "label": "unknown",
+      "ts": 1760151387,
+      "meta": {
+        "filename": "1760150690858.jpg"
+      }
+    },
+    {
+      "phash": "c83d32c978a6cdc9",
+      "sha256": "ddbffa08d994396d7f79728eed36615692810536a90bf277a4ee1d648fc2d871",
+      "channel_id": 1410182921129558137,
+      "message_id": 1426402604984041493,
+      "user_id": 1331765056974753934,
+      "label": "unknown",
+      "ts": 1760151396,
+      "meta": {
+        "filename": "1760150682114.jpg"
+      }
+    },
+    {
+      "phash": "b3854c1e2cf45e2d",
+      "sha256": "9964b626588c3ef88bb130bd3be3faebe5e378ee5baf9dbe0b8e688f9f6094d4",
+      "channel_id": 1403714881655668788,
+      "message_id": 1426424668658864178,
+      "user_id": 1272636358447599731,
+      "label": "unknown",
+      "ts": 1760156658,
+      "meta": {
+        "filename": "screenshot_2025-10-11-11-21-34-609_com.kurogame.gplay.punishing.grayraven.en.jpg"
+      }
+    },
+    {
+      "phash": "c2c57869733e1c72",
+      "sha256": "3db4395cdd82f8e0beecafd6413e0914aaeb9ec47517be1fd9292055c3b3ab67",
+      "channel_id": 886534544688308265,
+      "message_id": 1426450031057309778,
+      "user_id": 656472738965225482,
+      "label": "unknown",
+      "ts": 1760162706,
+      "meta": {
+        "filename": "screenshot_20251011-061737_morimens.png"
+      }
+    },
+    {
+      "phash": "ce9d39cd3992c849",
+      "sha256": "b4442da1b5d8de5636d0bfe91c3990831a7390b7938cb0f60fcc3cb75d234120",
+      "channel_id": 886534544688308265,
+      "message_id": 1426452085834121227,
+      "user_id": 388622795124244480,
+      "label": "unknown",
+      "ts": 1760163193,
+      "meta": {
+        "filename": "screenshot_2025-10-11-13-06-58-94.jpg"
+      }
+    },
+    {
+      "phash": "d59822e73a0ec55b",
+      "sha256": "0b3e8638771d2aca0dc324e736a0a1798add16462d953b81acf87e6d164aa5e7",
+      "channel_id": 886534544688308265,
+      "message_id": 1426452762392006697,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760163355,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "de68cc8c636321bd",
+      "sha256": "4861803605cda74b2188ba00a1ae60fb752dd7b698bcfe25ee90b05d3b2d27fe",
+      "channel_id": 886534544688308265,
+      "message_id": 1426453335774330902,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760163491,
+      "meta": {
+        "filename": "image.png"
+      }
+    },
+    {
+      "phash": "c7e065c325c725bc",
+      "sha256": "6bb1f699ef9bad5518817fccc6e327d3fb42e759ff5314260f3502051e7e8c07",
+      "channel_id": 886534544688308265,
+      "message_id": 1426458118589644873,
+      "user_id": 576875304673345589,
+      "label": "unknown",
+      "ts": 1760164631,
+      "meta": {
+        "filename": "screenshot_20251011-133432.jpg"
+      }
+    },
+    {
+      "phash": "f8e1c7cec3c0c6c4",
+      "sha256": "86a8c87b10cde4e7df6fa0dd88bfa92178e0f5538bd1ee50fd9ed5b6948a6c5b",
+      "channel_id": 886534544688308265,
+      "message_id": 1426458872608067635,
+      "user_id": 228126085160763392,
+      "label": "unknown",
+      "ts": 1760164811,
+      "meta": {
+        "filename": "image.png"
+      }
+    }
+  ]
+}

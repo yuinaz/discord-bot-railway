@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+
+
+# -*- coding: utf-8 -*-
+
+
+
+"""Render entry (free plan safe)
+
+
+
+- tiny HTTP server bound to $PORT
+
+
+
+- endpoints: /, /healthz, /ping -> 'ok'; /uptime -> JSON
+
+
+
+- quiet logs
+
+
+
+- runs module: satpambot.bot
+
+
+
+"""
+
+
+
+
+import json
+import logging
+import os
+import runpy
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# ---- logging (quiet) ----
+
+
+
+logging.basicConfig(level=logging.WARNING, format="%(message)s")
+
+
+
+logging.getLogger("discord").setLevel(logging.WARNING)
+
+
+
+logging.getLogger("discord.http").setLevel(logging.ERROR)
+
+
+
+logging.getLogger("aiohttp").setLevel(logging.WARNING)
+
+
+
+logging.getLogger("websockets").setLevel(logging.WARNING)
+
+
+
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
+
+
+
+
+
+PORT: int = int(os.environ.get("PORT", "10000"))
+
+
+
+ENTRY: str = "satpambot.bot"
+
+
+
+
+
+
+
+
+
+
+
+class Handler(BaseHTTPRequestHandler):
+
+
+
+    def _ok_text(self) -> None:
+
+
+
+        self.send_response(200)
+
+
+
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+
+
+
+        self.end_headers()
+
+
+
+        self.wfile.write(b"ok")
+
+
+
+
+
+
+
+    def _ok_json(self) -> None:
+
+
+
+        payload = {"status": "ok", "ts": int(time.time())}
+
+
+
+        data = json.dumps(payload).encode("utf-8")
+
+
+
+        self.send_response(200)
+
+
+
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+
+
+
+        self.end_headers()
+
+
+
+        self.wfile.write(data)
+
+
+
+
+
+
+
+    def do_HEAD(self) -> None:  # type: ignore[override]
+
+
+
+        if self.path in ("/", "/healthz", "/ping", "/uptime"):
+
+
+
+            self.send_response(200)
+
+
+
+            self.end_headers()
+
+
+
+            return
+
+
+
+        self.send_response(404)
+
+
+
+        self.end_headers()
+
+
+
+
+
+
+
+    def do_GET(self) -> None:  # type: ignore[override]
+
+
+
+        if self.path in ("/", "/healthz", "/ping"):
+
+
+
+            self._ok_text()
+
+
+
+            return
+
+
+
+        if self.path == "/uptime":
+
+
+
+            self._ok_json()
+
+
+
+            return
+
+
+
+        self.send_response(404)
+
+
+
+        self.end_headers()
+
+
+
+
+
+
+
+    def log_message(self, fmt: str, *args) -> None:  # type: ignore[override]
+
+
+
+        # suppress per-request logs to avoid Render log spam
+
+
+
+        return
+
+
+
+
+
+
+
+
+
+
+
+def _serve_forever() -> None:
+
+
+
+    httpd = HTTPServer(("", PORT), Handler)
+
+
+
+    httpd.serve_forever()
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+
+
+    thread = threading.Thread(target=_serve_forever, daemon=True)
+
+
+
+    thread.start()
+
+
+
+    runpy.run_module(ENTRY, run_name="__main__")
+
+
+

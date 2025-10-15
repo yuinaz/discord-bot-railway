@@ -1,0 +1,6 @@
+Deployment notes (generated):
+- Start command: python main.py
+- Dashboard served at PORT (env), fallback /ping provided for health checks.
+- Bot starts only if RUN_BOT!=0 and BOT_TOKEN/DISCORD_TOKEN is set.
+- If your bot entrypoint differs, edit satpambot/bot/main.py stub (or ensure a matching module exists).
+- Requirements are aggregated in root requirements.txt.
