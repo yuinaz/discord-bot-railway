@@ -19,10 +19,6 @@ Usage:
     git add -A && git commit -m "Hotfix: thread/forum exempt guard (robust)" && git push
 """
 from __future__ import annotations
-<<<<<<< HEAD
-=======
-
->>>>>>> ef940a8 (heal)
 import re, sys
 from pathlib import Path
 

@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-<<<<<<< HEAD
-=======
-from __future__ import annotations
->>>>>>> ef940a8 (heal)
 
 
 
@@ -74,10 +70,6 @@ patches/disable_flask_dev_server.py
 
 
 
-<<<<<<< HEAD
-from __future__ import annotations
-=======
->>>>>>> ef940a8 (heal)
 
 import os
 from pathlib import Path

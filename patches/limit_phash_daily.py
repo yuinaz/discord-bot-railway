@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-<<<<<<< HEAD
-# patches/limit_phash_daily.py
-from __future__ import annotations
-=======
-from __future__ import annotations
-
-# patches/limit_phash_daily.py
->>>>>>> ef940a8 (heal)
 import re, sys, os
 from pathlib import Path
 

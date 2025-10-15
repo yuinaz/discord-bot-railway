@@ -9,13 +9,6 @@ cleanup_phash_defines.py
 USAGE:
   python patches/cleanup_phash_defines.py
 """
-<<<<<<< HEAD
-
-from __future__ import annotations
-=======
-from __future__ import annotations
-
->>>>>>> ef940a8 (heal)
 import re
 from pathlib import Path
 

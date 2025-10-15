@@ -13,13 +13,6 @@ File target:
 - satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime.py
 - satpambot/bot/modules/discord_bot/cogs/anti_image_phash_runtime_strict.py
 """
-<<<<<<< HEAD
-
-from __future__ import annotations
-=======
-from __future__ import annotations
-
->>>>>>> ef940a8 (heal)
 import re, sys
 from pathlib import Path
 
