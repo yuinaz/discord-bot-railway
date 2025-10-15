@@ -147,3 +147,18 @@ class StickyKeeperOverlay:
 
 async def setup(bot):
     await bot.add_cog(StickyKeeperOverlay(bot))
+
+# === sticky keeper safety ===
+async def _ensure_keeper(self, channel):
+    keeper = getattr(self, "_keeper", None)
+    if keeper is None:
+        try:
+            keeper = await channel.send("🔖 keeper init")
+            try:
+                await keeper.pin()
+            except Exception:
+                pass
+            self._keeper = keeper
+        except Exception:
+            return None
+    return keeper

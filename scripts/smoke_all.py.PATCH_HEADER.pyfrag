@@ -1,0 +1,9 @@
+# -*- coding: utf-8 -*-
+# Add this near the top of scripts/smoke_all.py, before spawning subprocesses.
+import os, sys
+_SUB_ENV = dict(os.environ)
+# prefer UTF-8 output from child scripts
+_SUB_ENV.setdefault("PYTHONUTF8", "1")
+_SUB_ENV.setdefault("PYTHONIOENCODING", "utf-8")
+# when running child scripts, call like:
+#   subprocess.run([sys.executable, "-X", "utf8", "scripts/smoke_cogs.py"], env=_SUB_ENV, check=True)

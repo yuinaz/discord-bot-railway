@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 import base64, logging
 log = logging.getLogger(__name__)
@@ -39,9 +40,9 @@ def answer(image_bytes: bytes, prompt: str) -> str:
     provider = str(_cfg("VISION_PROVIDER", "none")).lower()
     if provider == "gemini":
         try:
-            import google.generativeai as genai
+            from google import genai
             genai.configure(api_key=_cfg("GEMINI_API_KEY"))
-            model = genai.GenerativeModel(_cfg("GEMINI_MODEL","gemini-1.5-flash"))
+            model = genai.GenerativeModel(_cfg("GEMINI_MODEL",os.getenv("GEMINI_MODEL", "gemini-2.5-flash")))
             resp = model.generate_content([prompt, {"mime_type":"image/png","data": image_bytes}])
             return resp.text or "(kosong)"
         except Exception as e:

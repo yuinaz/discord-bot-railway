@@ -36,3 +36,15 @@ else:
     print("[WARN] Unawaited add_cog found:")
     for path, idxs in problems:
         print(f"- {path} : lines {idxs}")
+
+
+
+from discord.ext import commands
+async def setup(bot: commands.Bot):
+    # auto-register Cog classes defined in this module
+    for _name, _obj in globals().items():
+        try:
+            if isinstance(_obj, type) and issubclass(_obj, commands.Cog):
+                await bot.add_cog(_obj(bot))
+        except Exception:
+            continue

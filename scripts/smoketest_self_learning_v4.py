@@ -1,30 +1,88 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Smoketest: SelfLearning (v4)
-- Verifies module import for self_learning_guard
-- Does not modify configs
-"""
-import importlib, os, sys, traceback
+# smoke import v4
 
-def repo_root() -> str:
-    here = os.path.abspath(os.path.dirname(__file__))
-    return os.path.abspath(os.path.join(here, ".."))
 
-def main() -> int:
-    root = repo_root()
-    if root not in sys.path:
-        sys.path.insert(0, root)
 
-    MOD = "satpambot.bot.modules.discord_bot.cogs.self_learning_guard"
-    try:
-        importlib.import_module(MOD)
-        print(f"OK   : import OK: {MOD}")
-        return 0
-    except Exception as e:
-        print(f"FAIL : {MOD}")
-        traceback.print_exc()
-        return 1
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+
+
+
+try:
+
+
+
+
+
+
+
+    from satpambot.bot.modules.discord_bot.cogs.self_learning_guard import SelfLearningGuard
+
+
+
+
+
+
+
+    from satpambot.ml.guard_hooks import GuardAdvisor
+
+
+
+
+
+
+
+    from satpambot.ml.online_nb import OnlineNB
+
+
+
+
+
+
+
+    from satpambot.ml.state_store_discord import MLState
+
+
+
+
+
+
+
+    from satpambot.ml.phash_reconcile import hamming_hex
+
+
+
+
+
+
+
+    print("OK   : self-learning v4 import")
+
+
+
+
+
+
+
+except Exception as e:
+
+
+
+
+
+
+
+    print("FAILED self-learning v4:", e)
+
+
+
+
+
+
+
+    raise SystemExit(1)
+
+
+
+
+
+
+

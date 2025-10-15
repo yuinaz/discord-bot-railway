@@ -1,11 +1,32 @@
 from __future__ import annotations
 
-import hashlib
-import io
-import re
+
+
+
+
+
+
+import re, io, hashlib
+
+
+
+
+
+
+
 from typing import List, Optional
 
+
+
+
+
+
+
 try:
+
+
+
+
 
 
 
@@ -13,7 +34,15 @@ try:
 
 
 
+
+
+
+
 except Exception:
+
+
+
+
 
 
 
@@ -25,67 +54,27 @@ except Exception:
 
 
 
-PHISHY_TLDS = {"ru", "tk", "ml", "ga", "cf", "gq", "top", "icu", "click", "xyz", "cn", "rest"}
 
 
 
-SEED_WORDS = {
 
 
 
-    "nitro",
+
+
+PHISHY_TLDS = {"ru","tk","ml","ga","cf","gq","top","icu","click","xyz","cn","rest"}
 
 
 
-    "giveaway",
 
 
 
-    "gratis",
+
+SEED_WORDS = {"nitro","giveaway","gratis","free","gift","steam","genshin","mihoyo","topup","claim","verif","verify","hadiah"}  # noqa: E501
 
 
 
-    "free",
 
-
-
-    "gift",
-
-
-
-    "steam",
-
-
-
-    "genshin",
-
-
-
-    "mihoyo",
-
-
-
-    "topup",
-
-
-
-    "claim",
-
-
-
-    "verif",
-
-
-
-    "verify",
-
-
-
-    "hadiah",
-
-
-
-}
 
 
 
@@ -101,7 +90,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
     s = (s or "").lower()
+
+
+
+
 
 
 
@@ -109,7 +106,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
     out = []
+
+
+
+
 
 
 
@@ -117,7 +122,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
         if len(t) <= 2:
+
+
+
+
 
 
 
@@ -125,7 +138,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
         out.append(t)
+
+
+
+
 
 
 
@@ -133,7 +154,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
             parts = t.split(".")
+
+
+
+
 
 
 
@@ -141,11 +170,23 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
             tld = parts[-1]
 
 
 
-            out.append("tld:" + tld)
+
+
+
+
+            out.append("tld:"+tld)
+
+
+
+
 
 
 
@@ -153,7 +194,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
                 out.append("tld_phishy")
+
+
+
+
 
 
 
@@ -161,11 +210,23 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
         if w in s:
 
 
 
-            out.append("seed:" + w)
+
+
+
+
+            out.append("seed:"+w)
+
+
+
+
 
 
 
@@ -181,7 +242,15 @@ def tokenize_text(s: str) -> List[str]:
 
 
 
+
+
+
+
 def dhash64(b: bytes) -> Optional[str]:
+
+
+
+
 
 
 
@@ -189,7 +258,15 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
+
+
+
+
         return None
+
+
+
+
 
 
 
@@ -197,11 +274,23 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
+
+
+
+
         with Image.open(io.BytesIO(b)) as im:
 
 
 
-            im = im.convert("L").resize((9, 8))
+
+
+
+
+            im = im.convert("L").resize((9,8))
+
+
+
+
 
 
 
@@ -209,7 +298,15 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
-            rows = [px[i * 9 : (i + 1) * 9] for i in range(8)]
+
+
+
+
+            rows = [px[i*9:(i+1)*9] for i in range(8)]
+
+
+
+
 
 
 
@@ -217,7 +314,15 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
+
+
+
+
             for r in range(8):
+
+
+
+
 
 
 
@@ -225,15 +330,31 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
+
+
+
+
                     left = rows[r][c]
 
 
 
-                    right = rows[r][c + 1]
 
 
 
-                    bits = (bits << 1) | (1 if left > right else 0)
+
+                    right = rows[r][c+1]
+
+
+
+
+
+
+
+                    bits = (bits<<1) | (1 if left > right else 0)
+
+
+
+
 
 
 
@@ -241,7 +362,15 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
+
+
+
+
     except Exception:
+
+
+
+
 
 
 
@@ -257,7 +386,15 @@ def dhash64(b: bytes) -> Optional[str]:
 
 
 
-def sha1k(b: bytes, k: int = 12288) -> str:
+
+
+
+
+def sha1k(b: bytes, k: int=12288) -> str:
+
+
+
+
 
 
 
@@ -273,7 +410,15 @@ def sha1k(b: bytes, k: int = 12288) -> str:
 
 
 
-def extract_tokens(message_content: str, ocr_text: Optional[str] = None) -> List[str]:
+
+
+
+
+def extract_tokens(message_content: str, ocr_text: Optional[str]=None) -> List[str]:
+
+
+
+
 
 
 
@@ -281,7 +426,15 @@ def extract_tokens(message_content: str, ocr_text: Optional[str] = None) -> List
 
 
 
+
+
+
+
     tokens += tokenize_text(message_content or "")
+
+
+
+
 
 
 
@@ -289,11 +442,23 @@ def extract_tokens(message_content: str, ocr_text: Optional[str] = None) -> List
 
 
 
+
+
+
+
         tokens += tokenize_text(ocr_text)
 
 
 
+
+
+
+
     return tokens
+
+
+
+
 
 
 

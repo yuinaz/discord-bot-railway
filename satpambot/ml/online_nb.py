@@ -1,11 +1,48 @@
 from __future__ import annotations
 
+
+
+
+
+
+
 import math
+
+
+
+
+
+
+
 from collections import defaultdict
+
+
+
+
+
+
+
 from typing import Dict, Iterable
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 class OnlineNB:
+
+
+
+
 
 
 
@@ -13,7 +50,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         self.alpha = alpha
+
+
+
+
 
 
 
@@ -21,7 +66,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         self.neg_counts = defaultdict(int)
+
+
+
+
 
 
 
@@ -29,7 +82,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         self.neg_total = 0
+
+
+
+
 
 
 
@@ -37,7 +98,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         self.neg_docs = 0
+
+
+
+
 
 
 
@@ -49,7 +118,19 @@ class OnlineNB:
 
 
 
+
+
+
+
+
+
+
+
     def _update_vocab(self, tokens: Iterable[str]):
+
+
+
+
 
 
 
@@ -57,7 +138,15 @@ class OnlineNB:
 
 
 
+
+
+
+
             if t:
+
+
+
+
 
 
 
@@ -69,7 +158,19 @@ class OnlineNB:
 
 
 
+
+
+
+
+
+
+
+
     def learn(self, tokens: Iterable[str], label: str):
+
+
+
+
 
 
 
@@ -77,7 +178,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         if not tokens:
+
+
+
+
 
 
 
@@ -85,7 +194,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         self._update_vocab(tokens)
+
+
+
+
 
 
 
@@ -93,7 +210,15 @@ class OnlineNB:
 
 
 
+
+
+
+
             for t in tokens:
+
+
+
+
 
 
 
@@ -101,7 +226,15 @@ class OnlineNB:
 
 
 
+
+
+
+
                 self.pos_total += 1
+
+
+
+
 
 
 
@@ -109,7 +242,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         else:
+
+
+
+
 
 
 
@@ -117,11 +258,23 @@ class OnlineNB:
 
 
 
+
+
+
+
                 self.neg_counts[t] += 1
 
 
 
+
+
+
+
                 self.neg_total += 1
+
+
+
+
 
 
 
@@ -133,7 +286,19 @@ class OnlineNB:
 
 
 
+
+
+
+
+
+
+
+
     def _log_prob(self, tokens: Iterable[str], label: str) -> float:
+
+
+
+
 
 
 
@@ -141,11 +306,23 @@ class OnlineNB:
 
 
 
-        prior = 0.5 if total_docs == 0 else ((self.pos_docs if label == "phish" else self.neg_docs) / total_docs)
 
 
 
-        counts, total = (self.pos_counts, self.pos_total) if label == "phish" else (self.neg_counts, self.neg_total)
+
+        prior = 0.5 if total_docs == 0 else ((self.pos_docs if label=='phish' else self.neg_docs) / total_docs)
+
+
+
+
+
+
+
+        counts, total = (self.pos_counts, self.pos_total) if label=='phish' else (self.neg_counts, self.neg_total)
+
+
+
+
 
 
 
@@ -153,11 +330,23 @@ class OnlineNB:
 
 
 
+
+
+
+
         a = self.alpha
 
 
 
-        logp = math.log(prior if prior > 0 else 1e-9)
+
+
+
+
+        logp = math.log(prior if prior>0 else 1e-9)
+
+
+
+
 
 
 
@@ -165,11 +354,23 @@ class OnlineNB:
 
 
 
+
+
+
+
             c = counts.get(t, 0)
 
 
 
+
+
+
+
             logp += math.log((c + a) / (total + a * V))
+
+
+
+
 
 
 
@@ -181,7 +382,19 @@ class OnlineNB:
 
 
 
+
+
+
+
+
+
+
+
     def predict_proba(self, tokens: Iterable[str]) -> Dict[str, float]:
+
+
+
+
 
 
 
@@ -189,19 +402,39 @@ class OnlineNB:
 
 
 
+
+
+
+
         if not tokens:
 
 
 
-            return {"phish": 0.5, "safe": 0.5}
 
 
 
-        lp_pos = self._log_prob(tokens, "phish")
+
+            return {'phish': 0.5, 'safe': 0.5}
 
 
 
-        lp_neg = self._log_prob(tokens, "safe")
+
+
+
+
+        lp_pos = self._log_prob(tokens, 'phish')
+
+
+
+
+
+
+
+        lp_neg = self._log_prob(tokens, 'safe')
+
+
+
+
 
 
 
@@ -209,7 +442,15 @@ class OnlineNB:
 
 
 
+
+
+
+
         p_pos = math.exp(lp_pos - m)
+
+
+
+
 
 
 
@@ -217,111 +458,23 @@ class OnlineNB:
 
 
 
+
+
+
+
         Z = p_pos + p_neg
 
 
 
-        return {"phish": p_pos / Z, "safe": p_neg / Z}
 
 
 
 
+        return {'phish': p_pos / Z, 'safe': p_neg / Z}
 
 
 
-    # --- snapshot helpers ---
 
-
-
-    def to_dict(self) -> Dict:
-
-
-
-        return {
-
-
-
-            "alpha": self.alpha,
-
-
-
-            "pos_counts": dict(self.pos_counts),
-
-
-
-            "neg_counts": dict(self.neg_counts),
-
-
-
-            "pos_total": self.pos_total,
-
-
-
-            "neg_total": self.neg_total,
-
-
-
-            "pos_docs": self.pos_docs,
-
-
-
-            "neg_docs": self.neg_docs,
-
-
-
-            "vocab": list(self.vocab),
-
-
-
-        }
-
-
-
-
-
-
-
-    @classmethod
-
-
-
-    def from_dict(cls, d: Dict) -> "OnlineNB":
-
-
-
-        m = cls(alpha=d.get("alpha", 1.0))
-
-
-
-        m.pos_counts.update(d.get("pos_counts", {}))
-
-
-
-        m.neg_counts.update(d.get("neg_counts", {}))
-
-
-
-        m.pos_total = d.get("pos_total", 0)
-
-
-
-        m.neg_total = d.get("neg_total", 0)
-
-
-
-        m.pos_docs = d.get("pos_docs", 0)
-
-
-
-        m.neg_docs = d.get("neg_docs", 0)
-
-
-
-        m.vocab = set(d.get("vocab", []))
-
-
-
-        return m
 
 
 

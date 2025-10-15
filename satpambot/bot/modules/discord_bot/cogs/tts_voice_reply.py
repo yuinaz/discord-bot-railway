@@ -6,11 +6,8 @@ from satpambot.bot.utils import profanity as prof
 
 log = logging.getLogger(__name__)
 
-def setup(bot: commands.Bot):
-    bot.add_cog(TTSVoiceReply(bot))
-
 class TTSVoiceReply(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.cfg = getattr(bot, "local_cfg", {})
         tts_cfg = self.cfg.get("TTS", {})
@@ -27,7 +24,14 @@ class TTSVoiceReply(commands.Cog):
         if not self.bot.user:
             return
         bot_ids = {self.bot.user.id}
-        is_trigger = self.bot.user.mentioned_in(m) or (m.reference and getattr(m.reference, "resolved", None) and getattr(m.reference.resolved.author, "id", None) in bot_ids)
+        is_trigger = (
+            self.bot.user.mentioned_in(m)
+            or (
+                m.reference
+                and getattr(m.reference, "resolved", None)
+                and getattr(m.reference.resolved.author, "id", None) in bot_ids
+            )
+        )
         if not is_trigger:
             return
         bucket = self._cd.get_bucket(m)
@@ -36,7 +40,7 @@ class TTSVoiceReply(commands.Cog):
         try:
             text = m.content.strip()
             if len(text) > 400:
-                text = text[:380] + "…"
+                text = text[:380] + "..."
             text = prof.sanitize(self.bot, text)
             mp3 = await self._speak_bytes(text)
             file = discord.File(io.BytesIO(mp3), filename="reply.mp3")
@@ -51,3 +55,13 @@ class TTSVoiceReply(commands.Cog):
             if chunk["type"] == "audio":
                 out.write(chunk["data"])
         return out.getvalue()
+
+
+async def setup(bot: commands.Bot):
+    # auto-register Cog classes defined in this module
+    for _name, _obj in list(globals().items()):
+        try:
+            if isinstance(_obj, type) and issubclass(_obj, commands.Cog):
+                await bot.add_cog(_obj(bot))
+        except Exception:
+            continue

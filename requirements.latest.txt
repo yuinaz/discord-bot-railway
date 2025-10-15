@@ -1,18 +1,9 @@
-<<<<<<< HEAD
-# ONE requirements (cross-platform) — conflict-free for OpenCV + NumPy
-# Works on Render (Linux) and MiniPC (Windows), Python 3.10/3.11+
-# NOTE: OpenCV 4.12.0.88 requires numpy < 2.3.0 → pin NumPy to 2.2.6 globally
-
-# --- Core / Web (optional dashboard) ---
+# unified, conflict-free (NumPy < 2.3 due to OpenCV 4.12.0.88)
 Flask==3.1.2
 flask-socketio==5.5.1
 gunicorn==23.0.0; sys_platform != "win32"
-
-# --- Discord bot ---
 discord.py==2.6.3
 aiohttp==3.13.0
-
-# --- Config / HTTP / Utils ---
 python-dotenv==1.1.1
 requests==2.32.3
 httpx==0.28.1
@@ -20,51 +11,14 @@ tldextract==5.3.0
 aiosqlite==0.21.0
 psutil==7.1.0
 tzdata>=2025.2
-
-# --- Imaging (headless-friendly) ---
 Pillow==11.3.0
-numpy==2.2.6               # <- compatible with opencv-python-headless 4.12.0.88
+numpy==2.2.6
 opencv-python-headless==4.12.0.88
-
-# --- LLM Providers ---
 google-genai>=1.44.0
 groq>=0.32,<1.0
-
-# --- NLP / Translation helpers (optional) ---
 googletrans-py>=4.0.0
 deep-translator>=1.11.4
 langdetect>=1.0.9
-
-# --- Data validation / retries ---
 pydantic==2.11.10
 tenacity>=8.2.3
-
-# --- (Optional) TTS ---
 edge-tts
-=======
-
-# Core
-Flask>=3.1,<4
-discord.py>=2.6,<3
-aiohttp>=3.13,<4
-httpx>=0.28,<0.29
-python-dotenv>=1.0,<2
-requests>=2.31,<3
-gunicorn>=23,<24
-
-# Utils
-psutil>=7.0,<8
-numpy>=2.2,<2.3
-Pillow>=11.2,<12
-tzdata>=2025.2
-
-# LLM client (Groq only; no OpenAI)
-groq>=0.32
-
-# Translation stack
-deep-translator>=1.11.4,<2
-googletrans-py>=4.0.0,<5
-langdetect>=1.0.9,<2
-google-generativeai>=0.8
-asyncpg>=0.29
->>>>>>> ef940a8 (heal)

@@ -1,0 +1,15 @@
+# -*- coding: utf-8 -*-
+# Ensure path & encoding
+try:
+    from scripts._bootstrap_path import safe_print  # type: ignore
+except Exception:
+    def safe_print(*args, **kwargs): print(*args, **kwargs)
+
+import sys, os, pathlib
+try:
+    here = pathlib.Path(__file__).resolve()
+    repo_root = here.parent.parent
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+except Exception:
+    pass

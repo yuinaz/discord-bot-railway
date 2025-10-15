@@ -1,22 +1,56 @@
 from __future__ import annotations
 
-import discord as _d
-ORIGINAL_SEND = _d.abc.Messageable.send
 
 
-import datetime
-import gzip
-import io
-import json
-from typing import Any, Dict, List, Optional
+
+
+
+
+import asyncio, io, gzip, json, datetime
+
+
+
+
+
+
+
+from typing import Optional, Dict, Any, List
+
+
+
+
+
+
 
 import discord
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 SNAPSHOT_PREFIX = "mlsnap_"
 
 
 
+
+
+
+
 MAX_MESSAGES_SCAN = 250
+
+
+
+
 
 
 
@@ -28,23 +62,51 @@ MAX_ATTACH_PER_MSG = 2
 
 
 
-CHAN_CANDIDATES = ["log-botphising", "log-botphishing", "log-satpam", "log-satpam-bot"]
 
 
 
-THREAD_PHISH = ["imagephising", "image-phising", "imagephishing", "image-phishing"]
 
 
 
-THREAD_WL = ["whitelist", "white-list", "wl-"]
+
+
+CHAN_CANDIDATES = ["log-botphising","log-botphishing","log-satpam","log-satpam-bot"]
 
 
 
-THREAD_BANLOG = ["ban-log", "log-ban", "banlog"]
 
 
 
-THREAD_BLACKLIST = ["blacklist", "black-list"]
+
+THREAD_PHISH = ["imagephising","image-phising","imagephishing","image-phishing"]
+
+
+
+
+
+
+
+THREAD_WL = ["whitelist","white-list","wl-"]
+
+
+
+
+
+
+
+THREAD_BANLOG = ["ban-log","log-ban","banlog"]
+
+
+
+
+
+
+
+THREAD_BLACKLIST = ["blacklist","black-list"]
+
+
+
+
 
 
 
@@ -60,7 +122,15 @@ THREAD_STATE = ["ml-state"]
 
 
 
+
+
+
+
 class CombinedState:
+
+
+
+
 
 
 
@@ -68,11 +138,23 @@ class CombinedState:
 
 
 
+
+
+
+
         self.model_dict: Dict[str, Any] = {}
 
 
 
+
+
+
+
         self.whitelist = {"dhash64": [], "sha1k": []}
+
+
+
+
 
 
 
@@ -84,35 +166,35 @@ class CombinedState:
 
 
 
+
+
+
+
+
+
+
+
     def to_json_bytes(self) -> bytes:
 
 
 
-        data = {
 
 
 
-            "version": 4,
+
+        data = {"version": 4, "model": self.model_dict, "whitelist": self.whitelist, "exempt": self.exempt}
 
 
 
-            "model": self.model_dict,
 
-
-
-            "whitelist": self.whitelist,
-
-
-
-            "exempt": self.exempt,
-
-
-
-        }
 
 
 
         js = json.dumps(data).encode("utf-8")
+
+
+
+
 
 
 
@@ -124,7 +206,19 @@ class CombinedState:
 
 
 
+
+
+
+
+
+
+
+
     @classmethod
+
+
+
+
 
 
 
@@ -132,7 +226,15 @@ class CombinedState:
 
 
 
+
+
+
+
         d = json.loads(gzip.decompress(b).decode("utf-8"))
+
+
+
+
 
 
 
@@ -140,7 +242,15 @@ class CombinedState:
 
 
 
+
+
+
+
         cs.model_dict = d.get("model", {})
+
+
+
+
 
 
 
@@ -148,7 +258,15 @@ class CombinedState:
 
 
 
+
+
+
+
         cs.exempt = d.get("exempt", {"threads": [], "channels": []})
+
+
+
+
 
 
 
@@ -164,7 +282,15 @@ class CombinedState:
 
 
 
+
+
+
+
 class MLState:
+
+
+
+
 
 
 
@@ -172,7 +298,15 @@ class MLState:
 
 
 
+
+
+
+
         self.bot = bot
+
+
+
+
 
 
 
@@ -180,11 +314,23 @@ class MLState:
 
 
 
+
+
+
+
         self.thread_id: Optional[int] = None
 
 
 
+
+
+
+
         self.combined = CombinedState()
+
+
+
+
 
 
 
@@ -196,11 +342,27 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     def _name_has_any(self, name: str, keys: List[str]) -> bool:
 
 
 
+
+
+
+
         n = (name or "").lower()
+
+
+
+
 
 
 
@@ -212,7 +374,19 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     def find_log_channel(self) -> Optional[discord.TextChannel]:
+
+
+
+
 
 
 
@@ -220,7 +394,15 @@ class MLState:
 
 
 
+
+
+
+
             if isinstance(ch, discord.TextChannel):
+
+
+
+
 
 
 
@@ -228,7 +410,15 @@ class MLState:
 
 
 
+
+
+
+
                     return ch
+
+
+
+
 
 
 
@@ -240,7 +430,19 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     def all_active_threads(self) -> List[discord.Thread]:
+
+
+
+
 
 
 
@@ -248,7 +450,15 @@ class MLState:
 
 
 
+
+
+
+
         for ch in self.bot.get_all_channels():
+
+
+
+
 
 
 
@@ -256,7 +466,15 @@ class MLState:
 
 
 
+
+
+
+
                 try:
+
+
+
+
 
 
 
@@ -264,11 +482,23 @@ class MLState:
 
 
 
+
+
+
+
                 except Exception:
 
 
 
+
+
+
+
                     pass
+
+
+
+
 
 
 
@@ -280,7 +510,19 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     def classify_threads(self):
+
+
+
+
 
 
 
@@ -288,7 +530,15 @@ class MLState:
 
 
 
+
+
+
+
         wl = []
+
+
+
+
 
 
 
@@ -296,7 +546,15 @@ class MLState:
 
 
 
+
+
+
+
         bl = []
+
+
+
+
 
 
 
@@ -304,7 +562,15 @@ class MLState:
 
 
 
+
+
+
+
         for th in self.all_active_threads():
+
+
+
+
 
 
 
@@ -312,7 +578,15 @@ class MLState:
 
 
 
+
+
+
+
             if self._name_has_any(n, THREAD_STATE):
+
+
+
+
 
 
 
@@ -320,7 +594,15 @@ class MLState:
 
 
 
+
+
+
+
             if self._name_has_any(n, THREAD_PHISH):
+
+
+
+
 
 
 
@@ -328,7 +610,15 @@ class MLState:
 
 
 
+
+
+
+
             if self._name_has_any(n, THREAD_WL):
+
+
+
+
 
 
 
@@ -336,7 +626,15 @@ class MLState:
 
 
 
+
+
+
+
             if self._name_has_any(n, THREAD_BANLOG):
+
+
+
+
 
 
 
@@ -344,11 +642,23 @@ class MLState:
 
 
 
+
+
+
+
             if self._name_has_any(n, THREAD_BLACKLIST):
 
 
 
+
+
+
+
                 bl.append(th)
+
+
+
+
 
 
 
@@ -360,7 +670,19 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     async def _ensure_thread(self) -> Optional[discord.Thread]:
+
+
+
+
 
 
 
@@ -368,7 +690,15 @@ class MLState:
 
 
 
+
+
+
+
         if self.parent_channel_id:
+
+
+
+
 
 
 
@@ -376,7 +706,15 @@ class MLState:
 
 
 
+
+
+
+
             if isinstance(ch, discord.TextChannel):
+
+
+
+
 
 
 
@@ -384,7 +722,15 @@ class MLState:
 
 
 
+
+
+
+
         if parent is None:
+
+
+
+
 
 
 
@@ -392,11 +738,27 @@ class MLState:
 
 
 
+
+
+
+
         if parent is None:
 
 
 
+
+
+
+
             return None
+
+
+
+
+
+
+
+
 
 
 
@@ -408,7 +770,15 @@ class MLState:
 
 
 
+
+
+
+
             t = self.bot.get_channel(self.thread_id)
+
+
+
+
 
 
 
@@ -416,7 +786,15 @@ class MLState:
 
 
 
+
+
+
+
                 return t
+
+
+
+
 
 
 
@@ -424,7 +802,15 @@ class MLState:
 
 
 
+
+
+
+
             if (th.name or "").lower() == "ml-state":
+
+
+
+
 
 
 
@@ -432,7 +818,15 @@ class MLState:
 
 
 
+
+
+
+
                 return th
+
+
+
+
 
 
 
@@ -440,7 +834,15 @@ class MLState:
 
 
 
+
+
+
+
             th = await parent.create_thread(name="ml-state", type=discord.ChannelType.public_thread)
+
+
+
+
 
 
 
@@ -448,11 +850,23 @@ class MLState:
 
 
 
+
+
+
+
             return th
 
 
 
+
+
+
+
         except Exception:
+
+
+
+
 
 
 
@@ -464,7 +878,19 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     async def load_latest(self) -> bool:
+
+
+
+
 
 
 
@@ -480,7 +906,15 @@ class MLState:
 
 
 
+
+
+
+
         if th is None:
+
+
+
+
 
 
 
@@ -488,7 +922,15 @@ class MLState:
 
 
 
+
+
+
+
             return False
+
+
+
+
 
 
 
@@ -496,7 +938,15 @@ class MLState:
 
 
 
+
+
+
+
             async for msg in th.history(limit=50, oldest_first=False):
+
+
+
+
 
 
 
@@ -504,7 +954,15 @@ class MLState:
 
 
 
+
+
+
+
                     if a.filename.startswith(SNAPSHOT_PREFIX) and a.filename.endswith(".json.gz"):
+
+
+
+
 
 
 
@@ -512,7 +970,15 @@ class MLState:
 
 
 
+
+
+
+
                         cs = CombinedState.from_json_bytes(b)
+
+
+
+
 
 
 
@@ -520,7 +986,15 @@ class MLState:
 
 
 
+
+
+
+
                         self.model = OnlineNB.from_dict(cs.model_dict) if cs.model_dict else OnlineNB()
+
+
+
+
 
 
 
@@ -528,7 +1002,15 @@ class MLState:
 
 
 
+
+
+
+
         except Exception:
+
+
+
+
 
 
 
@@ -536,7 +1018,15 @@ class MLState:
 
 
 
+
+
+
+
         self.model = OnlineNB()
+
+
+
+
 
 
 
@@ -548,7 +1038,19 @@ class MLState:
 
 
 
+
+
+
+
+
+
+
+
     async def save_snapshot(self) -> bool:
+
+
+
+
 
 
 
@@ -556,7 +1058,19 @@ class MLState:
 
 
 
+
+
+
+
             return False
+
+
+
+
+
+
+
+        from .online_nb import OnlineNB
 
 
 
@@ -568,7 +1082,15 @@ class MLState:
 
 
 
+
+
+
+
         th = await self._ensure_thread()
+
+
+
+
 
 
 
@@ -576,7 +1098,15 @@ class MLState:
 
 
 
+
+
+
+
             return False
+
+
+
+
 
 
 
@@ -584,7 +1114,15 @@ class MLState:
 
 
 
+
+
+
+
         fname = f"{SNAPSHOT_PREFIX}{ts}.json.gz"
+
+
+
+
 
 
 
@@ -592,15 +1130,31 @@ class MLState:
 
 
 
+
+
+
+
         file = discord.File(io.BytesIO(b), filename=fname)
 
 
 
-        await ORIGINAL_SEND(th, content="ML combined snapshot", file=file)
+
+
+
+
+        await th.send(content="ML combined snapshot", file=file)
+
+
+
+
 
 
 
         return True
+
+
+
+
 
 
 

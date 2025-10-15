@@ -1,84 +1,712 @@
 # -*- coding: utf-8 -*-
-"""
-Auto-inject Guard Hooks
------------------------
-Menyuntikkan `from satpambot.ml import guard_hooks` + try/except ke `on_message` guard-image
-secara aman. Menghindari file non-guard & file bootstrap tertentu.
-"""
-from __future__ import annotations
 
-import pathlib
-import re
-import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]  # repo root (../)
-COGS = ROOT / "satpambot" / "bot" / "modules" / "discord_bot" / "cogs"
 
-EXCLUDE = {
-    "anti_url_phish_guard.py",
-    "anti_url_phish_guard_bootstrap.py",
-}
 
-def needs_inject(text: str) -> bool:
-    return "from satpambot.ml import guard_hooks" not in text
 
-def is_guard_candidate(name: str, text: str) -> bool:
-    base = name.lower()
-    if base in EXCLUDE:
+
+
+import os, re, sys
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+
+
+
+
+
+COGS = os.path.join(ROOT, "satpambot", "bot", "modules", "discord_bot", "cogs")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+IMPORT_SNIP = "from satpambot.ml.guard_hooks import GuardAdvisor  # auto-injected"
+
+
+
+
+
+
+
+PRECHECK_SNIP = (
+
+
+
+
+
+
+
+"        # auto-injected precheck (global thread exempt + whitelist)\\n"
+
+
+
+
+
+
+
+"        try:\\n"
+
+
+
+
+
+
+
+"            _gadv = getattr(self, '_guard_advisor', None)\\n"
+
+
+
+
+
+
+
+"            if _gadv is None:\\n"
+
+
+
+
+
+
+
+"                self._guard_advisor = GuardAdvisor(self.bot)\\n"
+
+
+
+
+
+
+
+"                _gadv = self._guard_advisor\\n"
+
+
+
+
+
+
+
+"            from inspect import iscoroutinefunction\\n"
+
+
+
+
+
+
+
+"            if _gadv.is_exempt(message):\\n"
+
+
+
+
+
+
+
+"                return\\n"
+
+
+
+
+
+
+
+"            if iscoroutinefunction(_gadv.any_image_whitelisted_async):\\n"
+
+
+
+
+
+
+
+"                if await _gadv.any_image_whitelisted_async(message):\\n"
+
+
+
+
+
+
+
+"                    return\\n"
+
+
+
+
+
+
+
+"        except Exception:\\n"
+
+
+
+
+
+
+
+"            pass\\n"
+
+
+
+
+
+
+
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def looks_like_guard(path, text):
+
+
+
+
+
+
+
+    name = os.path.basename(path).lower()
+
+
+
+
+
+
+
+    if "self_learning_guard" in name:
+
+
+
+
+
+
+
         return False
-    # heuristik: hanya image-related atau yang sudah disepakati di proyek
-    keys = ("image", "phash", "attach", "ocr", "phish_hash", "scored_guard")
-    return any(k in base for k in keys) and "async def on_message" in text
 
-def inject(text: str) -> str:
-    # 1) sisipkan import kalau belum ada
-    if needs_inject(text):
-        text = re.sub(r"^(from __future__.+?\n)?", lambda m: (m.group(0) or "") + "from satpambot.ml import guard_hooks\n", text, count=1, flags=re.MULTILINE)
-    # 2) bungkus body on_message dengan try/except ringan
-    def repl(m: re.Match[str]) -> str:
-        header = m.group("def")
-        body = m.group("body")
-        # kalau sudah ada guard_hooks.on_guard_error, skip
-        if "guard_hooks.on_guard_error(" in body:
-            return m.group(0)
-        wrapped = (
-            f"{header}:\n"
-            "        try:\n"
-            f"{body}"
-            "        except Exception as e:\n"
-            "            try:\n"
-            "                guard_hooks.on_guard_error(e, context='on_message')\n"
-            "            except Exception:\n"
-            "                pass\n"
-        )
-        return wrapped
-    pattern = re.compile(r"(?P<def>\s*async\s+def\s+on_message\(self,\s*message[^)]*\)):\n(?P<body>(\s{8}.+\n)+)", re.MULTILINE)
-    return pattern.sub(repl, text)
 
-def main() -> int:
-    if not COGS.exists():
-        print("Skip: cogs dir not found", file=sys.stderr)
+
+
+
+
+
+    keys = ["phish","phishing","image","guard","blocklist","score"]
+
+
+
+
+
+
+
+    if any(k in name for k in keys):
+
+
+
+
+
+
+
+        return True
+
+
+
+
+
+
+
+    if re.search(r"(phish|pHash|image|guard|blocklist)", text, re.I):
+
+
+
+
+
+
+
+        return True
+
+
+
+
+
+
+
+    return False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def already_injected(text):
+
+
+
+
+
+
+
+    return "auto-injected precheck" in text
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def inject_into_on_message(text):
+
+
+
+
+
+
+
+    import re
+
+
+
+
+
+
+
+    pat = re.compile(r"async\\s+def\\s+on_message\\s*\\(\\s*self\\s*,\\s*message\\s*:\\s*discord\\.Message\\s*\\)\\s*:\\s*\\n", re.I)  # noqa: E501
+
+
+
+
+
+
+
+    m = pat.search(text)
+
+
+
+
+
+
+
+    if not m:
+
+
+
+
+
+
+
+        return None
+
+
+
+
+
+
+
+    insert_at = m.end()
+
+
+
+
+
+
+
+    return text[:insert_at] + PRECHECK_SNIP + text[insert_at:]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def ensure_import(text):
+
+
+
+
+
+
+
+    if IMPORT_SNIP in text:
+
+
+
+
+
+
+
+        return text
+
+
+
+
+
+
+
+    lines = text.splitlines(True)
+
+
+
+
+
+
+
+    for i,ln in enumerate(lines[:
+
+
+
+
+
+
+
+        50]):
+
+
+
+
+
+
+
+        if ln.startswith("from discord") or ln.startswith("import discord"):
+
+
+
+
+
+
+
+            lines.insert(i+1, IMPORT_SNIP + "\\n")
+
+
+
+
+
+
+
+            return "".join(lines)
+
+
+
+
+
+
+
+    return IMPORT_SNIP + "\\n" + text
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def main():
+
+
+
+
+
+
+
+    if not os.path.isdir(COGS):
+
+
+
+
+
+
+
+        print("COGS folder tidak ditemukan:", COGS)
+
+
+
+
+
+
+
         return 0
+
+
+
+
+
+
+
     changed = 0
-    for p in sorted(COGS.glob("*.py")):
-        name = p.name
+
+
+
+
+
+
+
+    for fn in os.listdir(COGS):
+
+
+
+
+
+
+
+        if not fn.endswith(".py"):
+
+
+
+
+
+
+
+            continue
+
+
+
+
+
+
+
+        path = os.path.join(COGS, fn)
+
+
+
+
+
+
+
         try:
-            text = p.read_text(encoding="utf-8", errors="ignore")
+
+
+
+
+
+
+
+            with open(path, "r", encoding="utf-8") as f:
+
+
+
+
+
+
+
+                txt = f.read()
+
+
+
+
+
+
+
         except Exception:
-            print(f"Skip (read error): {name}")
+
+
+
+
+
+
+
             continue
-        if not is_guard_candidate(name, text):
-            print(f"Skip (non-image guard): {name}")
+
+
+
+
+
+
+
+        if not looks_like_guard(path, txt):
+
+
+
+
+
+
+
             continue
-        new_text = inject(text)
-        if new_text != text:
-            p.write_text(new_text, encoding="utf-8")
-            print(f"Injected: {name}")
-            changed += 1
-        else:
-            print(f"Skip (already injected): {name}")
+
+
+
+
+
+
+
+        if already_injected(txt):
+
+
+
+
+
+
+
+            continue
+
+
+
+
+
+
+
+        new_txt = ensure_import(txt)
+
+
+
+
+
+
+
+        inj = inject_into_on_message(new_txt)
+
+
+
+
+
+
+
+        if inj is None:
+
+
+
+
+
+
+
+            continue
+
+
+
+
+
+
+
+        with open(path, "w", encoding="utf-8") as f:
+
+
+
+
+
+
+
+            f.write(inj)
+
+
+
+
+
+
+
+        changed += 1
+
+
+
+
+
+
+
+        print("Injected:", fn)
+
+
+
+
+
+
+
     print(f"Done. Files injected: {changed}")
+
+
+
+
+
+
+
     return 0
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+
+
+
+
+
+
+
+    sys.exit(main())
+
+
+
+
+
+
+

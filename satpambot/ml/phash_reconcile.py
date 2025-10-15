@@ -1,14 +1,56 @@
 from __future__ import annotations
 
-import json
-import re
-from typing import Optional, Set, Tuple
+
+
+
+
+
+
+import json, re
+
+
+
+
+
+
+
+from typing import Set, Tuple, Optional
+
+
+
+
+
+
 
 import discord
 
+
+
+
+
+
+
 from .feature_extractor import dhash64
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 PAT_MAGIC = "SATPAMBOT_PHASH_DB_V1"
+
+
+
+
 
 
 
@@ -24,7 +66,15 @@ def _hex_ok(s: str) -> bool:
 
 
 
+
+
+
+
     if not s:
+
+
+
+
 
 
 
@@ -32,7 +82,15 @@ def _hex_ok(s: str) -> bool:
 
 
 
+
+
+
+
     s = s.strip().lower()
+
+
+
+
 
 
 
@@ -48,7 +106,15 @@ def _hex_ok(s: str) -> bool:
 
 
 
+
+
+
+
 def hamming_hex(a: str, b: str) -> Optional[int]:
+
+
+
+
 
 
 
@@ -56,7 +122,15 @@ def hamming_hex(a: str, b: str) -> Optional[int]:
 
 
 
+
+
+
+
         xa = int(a, 16)
+
+
+
+
 
 
 
@@ -64,11 +138,23 @@ def hamming_hex(a: str, b: str) -> Optional[int]:
 
 
 
+
+
+
+
         return (xa ^ xb).bit_count()
 
 
 
+
+
+
+
     except Exception:
+
+
+
+
 
 
 
@@ -84,7 +170,15 @@ def hamming_hex(a: str, b: str) -> Optional[int]:
 
 
 
+
+
+
+
 async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int = 400) -> Set[str]:
+
+
+
+
 
 
 
@@ -92,11 +186,23 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
     async for msg in channel.history(limit=limit_msgs, oldest_first=False):
 
 
 
-        text = msg.content or ""
+
+
+
+
+        text = (msg.content or "")
+
+
+
+
 
 
 
@@ -104,15 +210,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
-            blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.S) or re.findall(
 
 
 
-                r"(\{.*\})", text, flags=re.S
+
+            blocks = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, flags=re.S) or re.findall(r"(\{.*\})", text, flags=re.S)  # noqa: E501
 
 
 
-            )
+
 
 
 
@@ -120,7 +226,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
                 try:
+
+
+
+
 
 
 
@@ -128,7 +242,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
                 except Exception:
+
+
+
+
 
 
 
@@ -136,7 +258,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
                 arr = d.get("dhash") or d.get("phash") or []
+
+
+
+
 
 
 
@@ -144,7 +274,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
                     for it in arr:
+
+
+
+
 
 
 
@@ -152,7 +290,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
                             found.add(it.lower())
+
+
+
+
 
 
 
@@ -168,7 +314,15 @@ async def collect_phash_from_log(channel: discord.TextChannel, limit_msgs: int =
 
 
 
+
+
+
+
 async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int = 250) -> Set[str]:
+
+
+
+
 
 
 
@@ -176,11 +330,31 @@ async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int =
 
 
 
+
+
+
+
     async for msg in th.history(limit=limit_msgs, oldest_first=True):
 
 
 
-        for a in msg.attachments[:2]:
+
+
+
+
+        for a in msg.attachments[:
+
+
+
+
+
+
+
+            2]:
+
+
+
+
 
 
 
@@ -188,7 +362,15 @@ async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int =
 
 
 
+
+
+
+
                 try:
+
+
+
+
 
 
 
@@ -196,7 +378,15 @@ async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int =
 
 
 
+
+
+
+
                 except Exception:
+
+
+
+
 
 
 
@@ -204,7 +394,15 @@ async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int =
 
 
 
+
+
+
+
                 h = dhash64(b)
+
+
+
+
 
 
 
@@ -212,7 +410,15 @@ async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int =
 
 
 
+
+
+
+
                     seen.add(h.lower())
+
+
+
+
 
 
 
@@ -228,7 +434,15 @@ async def collect_image_hashes_from_thread(th: discord.Thread, limit_msgs: int =
 
 
 
+
+
+
+
 def split_false_positives(log_hashes: Set[str], phish_hashes: Set[str], ham_thr: int = 6) -> Tuple[Set[str], Set[str]]:
+
+
+
+
 
 
 
@@ -236,7 +450,15 @@ def split_false_positives(log_hashes: Set[str], phish_hashes: Set[str], ham_thr:
 
 
 
+
+
+
+
     fps: Set[str] = set()
+
+
+
+
 
 
 
@@ -244,7 +466,15 @@ def split_false_positives(log_hashes: Set[str], phish_hashes: Set[str], ham_thr:
 
 
 
+
+
+
+
         matched = False
+
+
+
+
 
 
 
@@ -252,7 +482,15 @@ def split_false_positives(log_hashes: Set[str], phish_hashes: Set[str], ham_thr:
 
 
 
+
+
+
+
             dv = hamming_hex(h, p)
+
+
+
+
 
 
 
@@ -260,7 +498,15 @@ def split_false_positives(log_hashes: Set[str], phish_hashes: Set[str], ham_thr:
 
 
 
+
+
+
+
                 matched = True
+
+
+
+
 
 
 
@@ -268,11 +514,23 @@ def split_false_positives(log_hashes: Set[str], phish_hashes: Set[str], ham_thr:
 
 
 
+
+
+
+
         (tps if matched else fps).add(h)
 
 
 
+
+
+
+
     return tps, fps
+
+
+
+
 
 
 
