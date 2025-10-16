@@ -1,35 +1,23 @@
+# Patch: Upstash ENV bridge + Force Senior Progress
 
-# SatpamBot Patches (Render + mini-PC)
+## What this does
+1. **a06_upstash_env_bridge_overlay.py**
+   - Maps common Render/Upstash ENV names to those expected by the bot:
+     - `UPSTASH_REDIS_REST_URL` -> `UPSTASH_REST_URL`
+     - `UPSTASH_REDIS_REST_TOKEN` -> `UPSTASH_REST_TOKEN`
+     - also supports `UPSTASH_KV_REST_*` and generic `UPSTASH_URL/TOKEN`.
+   - Sets `UPSTASH_ENABLE=1` if not present.
+   - Logs the effective URL/token presence for verification.
 
-This bundle fixes:
-- async setup warnings (`add_cog` not awaited) for several cogs
-- makes `/clearchat` allowed in public channels (global slash-check)
-- sanitizes miner accel factors to avoid `ValueError: could not convert string to float: '0.85,'`
-- provides a clean `local.json` that works on both Render and mini-PC
+2. **a25_force_senior_progress_overlay.py**
+   - Forces preferred track to **senior**.
+   - Best-effort patch for curriculum split and reporter (if present).
 
-## Install
-1. Copy `patches/` into your project at:
-   `satpambot/bot/modules/discord_bot/cogs/patches/`
-   (Create the `patches` folder if it doesn't exist.)
+## How to install
+- Extract this zip at the repo root so paths match.
+- Deploy/run. In logs you should see:
+  - `[upstash-overlay] effective url=... token=set`
+  - Bridge log should change to `upstash=True`.
 
-2. Replace your `local.json` with the one in this bundle, or merge manually.
-
-3. Ensure ENV (Render):
-   ```
-   HOTENV_ENABLE=1
-   SATPAMBOT_ENV_FILE=/opt/render/project/src/SatpamBot.env
-   NEURO_GOVERNOR_ENABLE=1
-   SELFHEAL_ENABLE=1
-   SELFHEAL_AUTOFIX=1
-   SELFHEAL_CRITICAL_ONLY=0
-   ```
-
-4. Restart the bot. On boot, you should see logs that the `preload` overlays are imported
-   before other cogs. `/clearchat` should now work in public channels (with mod role).
-
-## Notes
-- If you still see "has no setup function" warnings, the patched async `setup()` will be used instead.
-- `a02_miner_accel_overlay` is excluded; timing is handled by other overlays + the safe sanitizer.
-- You can tweak miner accel via ENV:
-  - `SATPAMBOT_MINER_ACCEL_TEXT`, `SATPAMBOT_MINER_ACCEL_PHISH`, `SATPAMBOT_MINER_ACCEL_SLANG`
-  Trailing commas/whitespace will be ignored.
+## Rollback
+- Remove these two overlay files and redeploy.
