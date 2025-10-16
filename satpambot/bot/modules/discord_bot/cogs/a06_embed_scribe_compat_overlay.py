@@ -1,19 +1,27 @@
-import logging
-log = logging.getLogger(__name__)
-try:
-    from satpambot.bot.utils.embed_scribe import EmbedScribe  # type: ignore
-except Exception as e:
-    EmbedScribe = None  # type: ignore
-    log.exception("[scribe_compat] cannot import EmbedScribe: %s", e)
 
+# a06_embed_scribe_compat_overlay.py (v7.1)
+import sys, logging
+from discord.ext import commands
+log = logging.getLogger(__name__)
+def _patch_embed_scribe():
+    try:
+        for name, mod in list(sys.modules.items()):
+            if not name or "embed" not in name: 
+                continue
+            cls = getattr(mod, "EmbedScribe", None)
+            if cls and not hasattr(cls, "post"):
+                def post(self, *a, **k):
+                    if hasattr(self, "upsert"): return self.upsert(*a, **k)
+                    if hasattr(self, "write"):  return self.write(*a, **k)
+                    return None
+                setattr(cls, "post", post)
+                log.info("[scribe-compat] Injected EmbedScribe.post alias")
+    except Exception as e:
+        log.info("[scribe-compat] patch failed: %r", e)
+class EmbedScribeCompat(commands.Cog):
+    def __init__(self, bot): self.bot=bot
+    @commands.Cog.listener()
+    async def on_ready(self): _patch_embed_scribe()
 async def setup(bot):
-    if EmbedScribe is None:
-        return
-    if getattr(EmbedScribe, "upsert", None):
-        log.info("[scribe_compat] upsert already exists")
-        return
-    def _upsert(self, channel, title: str, body: str, **kwargs):
-        # Fallback behaviour: just post a new embed (keeps smoke happy)
-        return self.post(channel, title, body, **kwargs)
-    setattr(EmbedScribe, "upsert", _upsert)
-    log.info("[scribe_compat] injecting EmbedScribe.upsert")
+    try: await bot.add_cog(EmbedScribeCompat(bot))
+    except Exception as e: log.info("[scribe-compat] setup swallowed: %r", e)
