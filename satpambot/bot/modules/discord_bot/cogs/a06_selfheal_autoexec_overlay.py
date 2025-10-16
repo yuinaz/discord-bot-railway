@@ -1,5 +1,5 @@
 
-# a06_selfheal_autoexec_overlay.py (v7.1)
+# a06_selfheal_autoexec_overlay.py (v7.4)
 import os, re, json, asyncio, logging, shlex, subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -26,7 +26,7 @@ def _extract_edits(text: str) -> Optional[Dict[str,Any]]:
     except Exception: return None
     return None
 def _apply_edits(edits: Dict[str,Any]) -> List[str]:
-    changed=[]; 
+    changed=[]
     try:
         for e in edits.get("edits", []):
             p = REPO_DIR / e.get("path","").strip("/"); p.parent.mkdir(parents=True, exist_ok=True)
@@ -36,14 +36,11 @@ def _apply_edits(edits: Dict[str,Any]) -> List[str]:
 def _git_push(changed_files: List[str]) -> bool:
     if not USE_GIT: return False
     try:
-        def run(cmd): 
-            logger.info("[selfheal:git] %s", cmd)
-            return subprocess.run(shlex.split(cmd), cwd=str(REPO_DIR), capture_output=True, text=True)
+        def run(cmd): logger.info("[selfheal:git] %s", cmd); return subprocess.run(shlex.split(cmd), cwd=str(REPO_DIR), capture_output=True, text=True)
         run("git config user.email bot@localhost"); run("git config user.name SelfHealBot")
-        run(f"git checkout -B {GITHUB_BRANCH}"); run("git add -A"); run("git commit -m selfheal:auto-fix || true")
+        run(f"git checkout -B {GITHUB_BRANCH}"); run("git add -A"); run("bash -lc 'git commit -m selfheal:auto-fix || true'")
         if GITHUB_TOKEN and GITHUB_REPO:
-            remote=f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"; res=run(f"git push {remote} HEAD:{GITHUB_BRANCH}")
-            return res.returncode==0
+            remote=f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"; res=run(f"git push {remote} HEAD:{GITHUB_BRANCH}"); return res.returncode==0
         res=run(f"git push origin HEAD:{GITHUB_BRANCH}"); return res.returncode==0
     except Exception as e: logger.info("[selfheal:git] push failed: %r", e); return False
 async def _restart_via_existing_cogs(bot) -> bool:
@@ -53,8 +50,10 @@ async def _restart_via_existing_cogs(bot) -> bool:
         for m in ("pull_and_restart","restart","pullrepo","pull_and_reboot","pull","do_restart"):
             fn = getattr(cog, m, None)
             if fn:
-                try:
-                    res = fn(); 
+                try: res = fn(); 
+                except Exception as e: logger.info("[selfheal:restart] %s.%s call error: %r", cog_name, m, e); continue
+                try: 
+                    import asyncio
                     if asyncio.iscoroutine(res): await res
                     logger.info("[selfheal:restart] used %s.%s()", cog_name, m); return True
                 except Exception as e: logger.info("[selfheal:restart] %s.%s failed: %r", cog_name, m, e)

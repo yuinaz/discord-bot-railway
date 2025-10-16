@@ -1,5 +1,5 @@
 
-# a00_strict_warning_filter_overlay.py (v7.1)
+# a00_strict_warning_filter_overlay.py (v7.4)
 import os, warnings, logging
 from discord.ext import commands
 logger = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 
-# llm_providers.py (v7.1)
+# llm_providers.py (v7.4)
 import os, asyncio, subprocess, shlex, logging
 from typing import Optional
 logger = logging.getLogger(__name__)
