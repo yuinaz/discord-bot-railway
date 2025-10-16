@@ -1,0 +1,11 @@
+
+default_model: auto
+model_chain:
+  - provider: groq
+    model: llama-3.1-70b-versatile
+  - provider: gemini
+    model: gemini-1.5-flash
+sampling:
+  temperature: 0.4
+  top_p: 0.9
+  max_tokens: 800
