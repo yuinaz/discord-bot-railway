@@ -1,36 +1,24 @@
-import asyncio, logging
+
+import asyncio
 from discord.ext import commands
 
-log = logging.getLogger(__name__)
-
 class ProgressForceRefreshOverlay(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
-        self._task = None
-        # Create background task if event loop is available
         loop = getattr(bot, "loop", None)
         if loop and hasattr(loop, "create_task"):
             self._task = loop.create_task(self._kick())
         else:
-            try:
-                loop = asyncio.get_running_loop()
-                self._task = loop.create_task(self._kick())
-            except RuntimeError:
-                # Smoke/DummyBot environment: no running loop; skip scheduling
-                log.warning("[progress_force_refresh] no running loop; background task disabled in smoke env")
-
-    async def cog_unload(self):
-        if self._task:
-            self._task.cancel()
+            # Smoke/DummyBot - skip scheduled task
+            self._task = None
 
     async def _kick(self):
-        await asyncio.sleep(1.5)
-        # In real runtime we could call into reporter/keeper to force refresh; keep simple here
-        log.info("[progress_force_refresh] kick executed")
+        # small periodic no-op to nudge progress reporters (runtime only)
+        try:
+            while True:
+                await asyncio.sleep(1800)  # 30 min
+        except asyncio.CancelledError:
+            return
 
 async def setup(bot):
-    # Avoid failing in smoke where DummyBot may not have .loop
-    try:
-        await bot.add_cog(ProgressForceRefreshOverlay(bot))
-    except Exception as e:
-        log.warning("[progress_force_refresh] setup no-op in smoke: %s", e)
+    await bot.add_cog(ProgressForceRefreshOverlay(bot))

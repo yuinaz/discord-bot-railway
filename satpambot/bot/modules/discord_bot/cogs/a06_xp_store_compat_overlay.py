@@ -1,136 +1,163 @@
-import os, json, time, logging, pathlib, urllib.request, urllib.parse
+
+import os, json, time, datetime
+from pathlib import Path
 from typing import Any, Dict
 
-log = logging.getLogger(__name__)
+from discord.ext import commands
 
+# ---- Tiny Upstash REST helper (no external deps) ----
 try:
-    from satpambot.bot.modules.discord_bot.services.xp_store import XPStore  # type: ignore
-except Exception as e:
-    XPStore = None  # type: ignore
-    log.exception("[xp_store_compat] cannot import XPStore: %s", e)
+    from urllib.parse import quote as _quote
+    from urllib.request import Request, urlopen
+except Exception:  # pragma: no cover
+    _quote = None
+    Request = None
+    urlopen = None
 
-DEFAULT = {"version": 2, "users": {}, "awards": {}, "stats": {}, "updated_at": 0}
-DEFAULT_PATH = pathlib.Path("satpambot/bot/data/xp_store.json")
+UPSTASH_URL = os.getenv("UPSTASH_REDIS_REST_URL") or os.getenv("REDIS_REST_URL") or os.getenv("UPSTASH_URL")
+UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN") or os.getenv("REDIS_REST_TOKEN") or os.getenv("UPSTASH_TOKEN")
+UPSTASH_KEY = os.getenv("XP_STORE_UPSTASH_KEY", "satpam:xp_store")
 
-class _UpstashKV:
-    def __init__(self, url: str, token: str, prefix: str = "satpambot"):
-        self.url = url.rstrip("/")
-        self.token = token
-        self.prefix = prefix
+def _now_iso():
+    return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
-    def _fetch(self, path: str) -> Dict[str, Any]:
-        req = urllib.request.Request(self.url + path)
-        req.add_header("Authorization", f"Bearer {self.token}")
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = r.read().decode("utf-8")
-            try:
-                return json.loads(data)
-            except Exception:
-                return {"error": "decode", "raw": data}
-
-    def get(self, key: str):
-        k = f"{self.prefix}:{key}"
-        path = "/get/" + urllib.parse.quote(k, safe="")
-        return self._fetch(path).get("result")
-
-    def set(self, key: str, value: str) -> bool:
-        k = f"{self.prefix}:{key}"
-        v = urllib.parse.quote(value, safe="")
-        path = "/set/" + urllib.parse.quote(k, safe="") + "/" + v
-        res = self._fetch(path)
-        return res.get("result") == "OK"
-
-def _ensure_dir(p: pathlib.Path):
+def _project_store_path() -> Path:
+    # Prefer explicit path
+    env_path = os.getenv("XP_STORE_PATH")
+    if env_path:
+        p = Path(env_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    # Fallback common locations
+    candidates = [
+        Path("satpambot/bot/data/xp_store.json"),
+        Path("./satpambot/bot/data/xp_store.json"),
+        Path.cwd() / "satpambot" / "bot" / "data" / "xp_store.json",
+    ]
+    for p in candidates:
+        parent = p if p.suffix else (p / "xp_store.json")
+        if parent.parent.exists() or parent.parent.as_posix().endswith("/data"):
+            parent.parent.mkdir(parents=True, exist_ok=True)
+            return parent
+    # Last resort
+    p = Path.cwd() / "xp_store.json"
     p.parent.mkdir(parents=True, exist_ok=True)
+    return p
 
-def _file_load(path: pathlib.Path):
-    if not path.exists():
-        _ensure_dir(path)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT, f, ensure_ascii=False, indent=2)
-        return DEFAULT.copy()
-    with open(path, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except Exception as e:
-            log.warning("[xp_store_compat] invalid json at %s: %s; resetting.", path, e)
-            with open(path, "w", encoding="utf-8") as fw:
-                json.dump(DEFAULT, fw, ensure_ascii=False, indent=2)
-            return DEFAULT.copy()
+LOCAL_STORE_PATH = _project_store_path()
 
-def _file_save(data: Dict[str, Any], path: pathlib.Path):
-    _ensure_dir(path)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    tmp.replace(path)
-
-def _upstash_backend():
-    url = os.environ.get("UPSTASH_REDIS_REST_URL")
-    token = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-    if url and token:
-        return _UpstashKV(url, token, prefix=os.environ.get("UPSTASH_PREFIX", "satpambot"))
-    return None
-
-def _load_impl(path: str = None):
-    ub = _upstash_backend()
-    if ub:
-        raw = ub.get("xp_store")
-        if not raw:
-            data = DEFAULT.copy()
-            data["updated_at"] = int(time.time())
-            ub.set("xp_store", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
-            log.info("[xp_store_compat] created default Upstash value for xp_store")
-            return data
-        try:
-            return json.loads(raw)
-        except Exception as e:
-            log.warning("[xp_store_compat] Upstash decode failed: %s; resetting default.", e)
-            data = DEFAULT.copy()
-            data["updated_at"] = int(time.time())
-            ub.set("xp_store", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
-            return data
-    # file mode
-    the_path = pathlib.Path(path) if path else DEFAULT_PATH
-    return _file_load(the_path)
-
-def _save_impl(data: Dict[str, Any], path: str = None):
-    data = dict(data or {})
-    data.setdefault("version", 2)
-    data.setdefault("users", {})
-    data.setdefault("awards", {})
-    data.setdefault("stats", {})
-    data["updated_at"] = int(time.time())
-    ub = _upstash_backend()
-    if ub:
-        ok = ub.set("xp_store", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
-        if not ok:
-            log.warning("[xp_store_compat] Upstash set failed; falling back to file.")
-    # Always keep a file copy as local cache/snapshot
-    the_path = pathlib.Path(path) if path else DEFAULT_PATH
+def _upstash_get() -> Dict[str, Any] | None:
+    if not (UPSTASH_URL and UPSTASH_TOKEN and _quote and Request):
+        return None
+    url = f"{UPSTASH_URL.rstrip('/')}/get/{_quote(UPSTASH_KEY)}"
+    req = Request(url, headers={"Authorization": f"Bearer {UPSTASH_TOKEN}"})
+    with urlopen(req, timeout=5) as resp:
+        raw = resp.read().decode("utf-8")
     try:
-        _file_save(data, the_path)
-    except Exception as e:
-        log.warning("[xp_store_compat] file save failed at %s: %s", the_path, e)
-    return True
+        payload = json.loads(raw)
+        val = payload.get("result")
+        if isinstance(val, str):
+            return json.loads(val)
+        return val
+    except Exception:
+        return None
+
+def _upstash_set(data: Dict[str, Any]) -> bool:
+    if not (UPSTASH_URL and UPSTASH_TOKEN and _quote and Request):
+        return False
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    url = f"{UPSTASH_URL.rstrip('/')}/set/{_quote(UPSTASH_KEY)}/{_quote(payload)}"
+    req = Request(url, headers={"Authorization": f"Bearer {UPSTASH_TOKEN}"})
+    try:
+        with urlopen(req, timeout=5) as resp:
+            _ = resp.read()
+        return True
+    except Exception:
+        return False
+
+def _init_store() -> Dict[str, Any]:
+    return {
+        "version": 2,
+        "users": {},
+        "awards": [],
+        "stats": {"total": 0},
+        "updated_at": _now_iso(),
+    }
+
+def load_store() -> Dict[str, Any]:
+    # Try Upstash first
+    data = _upstash_get()
+    if isinstance(data, dict) and "users" in data:
+        return data
+    # Fallback file
+    p = LOCAL_STORE_PATH
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    data = _init_store()
+    save_store(data)
+    return data
+
+def save_store(data: Dict[str, Any]) -> None:
+    # Always update timestamp
+    data["updated_at"] = _now_iso()
+    # Write local file
+    p = LOCAL_STORE_PATH
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Try Upstash mirror (best-effort)
+    _upstash_set(data)
+
+# ---- Monkey patch XPStore if needed ----
+def _monkey_patch():
+    try:
+        from satpambot.bot.modules.discord_bot.services import xp_store as xs
+    except Exception:
+        xs = None
+
+    if xs is None:
+        return False
+
+    # If module has class XPStore, ensure it has load/save; otherwise provide a shim object on the module
+    patched = False
+    if hasattr(xs, "XPStore"):
+        XP = xs.XPStore
+        if not hasattr(XP, "load"):
+            @classmethod
+            def _load(cls):
+                return load_store()
+            XP.load = _load  # type: ignore[attr-defined]
+            patched = True
+        if not hasattr(XP, "save"):
+            @classmethod
+            def _save(cls, data):
+                return save_store(data)
+            XP.save = _save  # type: ignore[attr-defined]
+            patched = True
+    else:
+        class _XPStoreShim:  # very small surface area used by overlays
+            @classmethod
+            def load(cls):
+                return load_store()
+            @classmethod
+            def save(cls, data):
+                return save_store(data)
+        setattr(xs, "XPStore", _XPStoreShim)
+        patched = True
+    return patched
+
+class XPStoreCompatOverlay(commands.Cog):
+    """Inject XPStore.load/save and provide Upstash/file backing."""
+    def __init__(self, bot):
+        self.bot = bot
 
 async def setup(bot):
-    # Inject compat methods once at import/setup
-    if XPStore is None:
-        log.error("[xp_store_compat] XPStore not available; cannot inject.")
-        return
-    injected = []
-    if not hasattr(XPStore, "load") or not callable(getattr(XPStore, "load")):
-        def _load(cls, path=None):
-            return _load_impl(path)
-        XPStore.load = classmethod(_load)  # type: ignore
-        injected.append("load")
-    if not hasattr(XPStore, "save") or not callable(getattr(XPStore, "save")):
-        def _save(cls, data, path=None):
-            return _save_impl(data, path)
-        XPStore.save = classmethod(_save)  # type: ignore
-        injected.append("save")
-    if injected:
-        log.info("[xp_store_compat] injected methods: %s (Upstash=%s)", ", ".join(injected), bool(_upstash_backend()))
-    else:
-        log.info("[xp_store_compat] no-op (methods already present) (Upstash=%s)", bool(_upstash_backend()))
+    cog = XPStoreCompatOverlay(bot)
+    bot.add_cog(cog)
+    patched = _monkey_patch()
+    src = "Upstash" if (UPSTASH_URL and UPSTASH_TOKEN) else "File"
+    try:
+        bot.logger.info("[xp_store_compat] ready (patched=%s, src=%s, path=%s)", patched, src, LOCAL_STORE_PATH)
+    except Exception:
+        print(f"[xp_store_compat] ready (patched={patched}, src={src}, path={LOCAL_STORE_PATH})")
