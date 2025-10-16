@@ -1,1 +1,4 @@
-{}
+{
+  "version": 1,
+  "notes": "stub metrics file to satisfy smoketest"
+}
