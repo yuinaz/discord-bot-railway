@@ -1,73 +1,70 @@
-
-import os
-import time
-import logging
+import logging, asyncio, time
 from discord.ext import commands
+from typing import Optional
 
 log = logging.getLogger(__name__)
+try:
+    from satpambot.bot.modules.discord_bot.services.xp_store import XPStore  # type: ignore
+except Exception:
+    XPStore = None  # type: ignore
 
-_QNA_ID = int(os.getenv("QNA_CHANNEL_ID", "1426571542627614772"))
-# CSV of thread ids
-_threads_csv = os.getenv("XP_PINNED_THREADS", "1372541073947361380,1371827576112152667,1389138326698852432,1389136684012015777")
-_PINNED_THREADS = set()
-for part in _threads_csv.split(","):
-    part = part.strip()
-    if part.isdigit():
-        _PINNED_THREADS.add(int(part))
-
-_FALLBACK_XP = int(os.getenv("FALLBACK_XP_PER_MSG", "5"))
-_FALLBACK_COOLDOWN = int(os.getenv("FALLBACK_COOLDOWN_SECS", "45"))
-_ALLOW_BOT_AWARD = os.getenv("XP_ALLOW_BOT_AWARD", "0") in ("1", "true", "True")
+FORCE_INCLUDE_QNA = True
+COOLDOWN_SEC = 6
 
 class XPForceIncludeOverlay(commands.Cog):
-    """Guarantee XP scan runs in QNA channel and specified threads.
-    If base XP system skips, we provide a minimal fallback award with cooldown.
-    """
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._last_award = {}  # (user_id) -> ts
+        self._last = {}  # author_id -> ts
 
-    def _should_award_here(self, message):
-        ch_id = getattr(message.channel, "id", None)
-        thr_id = getattr(message.channel, "id", None)
-        return (ch_id == _QNA_ID) or (thr_id in _PINNED_THREADS)
+    def _allowed(self, message) -> bool:
+        # Always include threads
+        if getattr(message.channel, "type", None) and str(message.channel.type).endswith("thread"):
+            return True
+        # Include QNA if configured overlay is present
+        if FORCE_INCLUDE_QNA:
+            name = getattr(message.channel, "name", "") or ""
+            if "qna" in name.lower():
+                return True
+        return False
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        # ignore DMs and system
-        if not getattr(message, "guild", None):
-            return
-        # optionally ignore bot authors to avoid XP farming loops
-        if message.author.bot and not _ALLOW_BOT_AWARD:
-            return
-        if not self._should_award_here(message):
-            return
-
-        # If base XP overlay already processed, nothing to do.
-        # We can't reliably detect it, so we enforce a cooldown per user to be safe.
-        uid = int(message.author.id)
+    def _cool(self, author_id: int) -> bool:
         now = time.time()
-        last = self._last_award.get(uid, 0)
-        if now - last < _FALLBACK_COOLDOWN:
-            return
+        last = self._last.get(author_id, 0)
+        if now - last >= COOLDOWN_SEC:
+            self._last[author_id] = now
+            return True
+        return False
 
-        # Try route to XPStore if available
+    @commands.Cog.listener("on_message")
+    async def on_message(self, message):
         try:
-            from satpambot.bot.modules.discord_bot.services.xp_store import XPStore  # type: ignore
-            store = XPStore.load()
-            store.add_xp(uid, _FALLBACK_XP, reason="fallback:force-include-qna/threads")
-            store.save()
-            self._last_award[uid] = now
-            log.debug("[xp_force] awarded %s XP to %s in %s", _FALLBACK_XP, uid, message.channel.id)
-            return
-        except Exception as e:
-            log.warning("[xp_force] XPStore fallback failed: %r", e)
+            if message.author.bot:
+                return
+            if not self._allowed(message):
+                return
+            if not self._cool(message.author.id):
+                return
 
-        # If XPStore missing, remain silent to avoid spam.
-        self._last_award[uid] = now
+            # Prefer direct award events; else fallback to XPStore file/upstash via compat overlay
+            dispatched = 0
+            for evt in ("xp_add", "xp.award", "satpam_xp"):
+                try:
+                    self.bot.dispatch(evt, message.author.id, +5, reason="force-include")
+                    dispatched += 1
+                except Exception:
+                    pass
+
+            if dispatched == 0 and XPStore and hasattr(XPStore, "load"):
+                data = XPStore.load()
+                users = data.setdefault("users", {})
+                u = users.setdefault(str(message.author.id), {"xp": 0})
+                u["xp"] = int(u.get("xp", 0)) + 5
+                XPStore.save(data)
+                log.info("[xp_force] fallback awarded +5 via XPStore compat (uid=%s)", message.author.id)
+            else:
+                log.debug("[xp_force] dispatched award events=%d (uid=%s)", dispatched, message.author.id)
+        except Exception as e:
+            log.warning("[xp_force] error: %s", e)
 
 async def setup(bot):
     await bot.add_cog(XPForceIncludeOverlay(bot))
-
-def setup_legacy(bot):
-    bot.add_cog(XPForceIncludeOverlay(bot))
