@@ -120,3 +120,31 @@ class XPHistoryRenderOverlay(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(XPHistoryRenderOverlay(bot))
+
+
+# --- PATCH: award fallback via event ---
+try:
+    from discord.ext import commands as _cmds
+    class _XPHistoryAwardFallback(_cmds.Cog):
+        def __init__(self, bot):
+            self.bot = bot
+        async def _award_event(self, msg, amount: int, reason: str = "history"):
+            try:
+                self.bot.dispatch("xp_add",
+                    user_id=getattr(msg.author, "id", None),
+                    amount=int(amount),
+                    guild_id=getattr(getattr(msg, "guild", None), "id", None),
+                    channel_id=getattr(getattr(msg, "channel", None), "id", None),
+                    message_id=getattr(msg, "id", None),
+                    reason=reason
+                )
+                return True
+            except Exception:
+                return False
+    async def setup(bot):
+        try:
+            await bot.add_cog(_XPHistoryAwardFallback(bot))
+        except Exception:
+            pass
+except Exception:
+    pass

@@ -1,58 +1,50 @@
-
+import os
 import logging
-from typing import Any
 from discord.ext import commands
-
-from satpambot.bot.modules.discord_bot.services.xp_store_v2 import XPStoreV2
 
 log = logging.getLogger(__name__)
 
-def _extract_user_id(arg: Any):
-    try:
-        if hasattr(arg, "id"):
-            return int(arg.id)
-        return int(arg)
-    except Exception:
-        return None
+TRUTHY = {"1","true","yes","on","enabled"}
+
+def _boolenv(name: str) -> bool:
+    v = os.getenv(name, "")
+    return v.lower() in TRUTHY
 
 class XPStoreBridge(commands.Cog):
+    """Thin facade that chooses File vs Upstash backend at runtime.
+    It also exposes a single 'award' method other cogs can call.
     """
-    Tangkap event XP dan persist ke XPStoreV2.
-    Kompatibel: 'xp_add', 'xp.award', 'satpam_xp'.
-    """
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
-        self.store = XPStoreV2()
-        log.info("[xp-bridge] XPStoreBridge active (file=%s, upstash=%s)", self.store.store_path, getattr(self.store, "_upstash", None) and self.store._upstash.enabled)
+        # Consider multiple signals to enable Upstash, including Render's REST vars.
+        has_upstash_url = any(os.getenv(k) for k in (
+            "UPSTASH_REDIS_REST_URL", "UPSTASH_REST_URL", "UPSTASH_URL"
+        ))
+        self.use_upstash = has_upstash_url or _boolenv("UPSTASH_ENABLE") or _boolenv("XP_UPSTASH_ENABLED")
+        if self.use_upstash and not _boolenv("UPSTASH_ENABLE"):
+            # normalize for downstream code that checks this flag
+            os.environ["UPSTASH_ENABLE"] = "1"
+        log.info("[xp-bridge] backend=%s (url=%s)",
+                 "upstash" if self.use_upstash else "file",
+                 os.getenv("UPSTASH_REDIS_REST_URL") or os.getenv("UPSTASH_REST_URL") or "-")
 
-    def _award(self, *args, **kwargs):
-        user_id = None
-        amount = int(kwargs.pop("amount", kwargs.pop("xp", 1)))
-        reason = kwargs.pop("reason", None)
-        award_key = kwargs.pop("award_key", kwargs.pop("message_id", None))
+    async def award(self, user_id: int, amount: int, *, guild_id: int|None=None, reason: str|None=None,
+                    channel_id: int|None=None, message_id: int|None=None):
+        """Unified award entry point used by history renderers and on_message overlays."""
+        try:
+            if guild_id is None and getattr(self.bot, "guilds", None):
+                guild = self.bot.guilds[0]
+                guild_id = getattr(guild, "id", None)
+            if guild_id is None:
+                raise RuntimeError("guild_id required")
 
-        if args:
-            user_id = _extract_user_id(args[0])
-        if user_id is None and "user_id" in kwargs:
-            user_id = _extract_user_id(kwargs["user_id"])
-        if user_id is None:
-            log.warning("[xp-bridge] missing user_id in xp event (%s, %s)", args, kwargs)
-            return
+            # Prefer V1 service (dynamic KV detection); it's lighter and robust in free Render
+            from satpambot.bot.modules.discord_bot.services import xp_store as xp_v1
+            added = xp_v1.add_xp(guild_id, user_id, int(amount))
+            return added
+        except Exception as e:
+            log.exception("[xp-bridge] award failed: %r", e)
+            raise
 
-        ctx = {k: v for k, v in kwargs.items()
-               if k not in ("amount", "xp", "reason", "award_key", "message_id", "user_id")}
-        total = self.store.add_xp(user_id, amount=amount, reason=reason, context=ctx, award_key=award_key)
-        log.info("[xp-bridge] +%s XP -> total=%s (user=%s, reason=%s)", amount, total, user_id, reason)
-
-    # Listeners
-    async def on_xp_add(self, *args, **kwargs):
-        self._award(*args, **kwargs)
-
-    async def on_xp_award(self, *args, **kwargs):
-        self._award(*args, **kwargs)
-
-    async def on_satpam_xp(self, *args, **kwargs):
-        self._award(*args, **kwargs)
-
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(XPStoreBridge(bot))

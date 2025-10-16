@@ -1,3 +1,23 @@
+
+# --- PATCH: robust fallback that does not import XPStore class ---
+import logging as _logging
+_log = _logging.getLogger(__name__)
+async def _award_via_event(bot, author, amount: int, message=None, reason="qna/thread"):
+    try:
+        guild_id = getattr(getattr(message, "guild", None), "id", None) if message else None
+        channel_id = getattr(getattr(message, "channel", None), "id", None) if message else None
+        message_id = getattr(message, "id", None) if message else None
+        bot.dispatch("xp_add",
+            user_id=getattr(author, "id", None),
+            amount=int(amount),
+            guild_id=guild_id, channel_id=channel_id, message_id=message_id,
+            reason=reason,
+        )
+        return True
+    except Exception as e:
+        _log.exception("[xp_force] event dispatch failed: %r", e)
+        return False
+
 import logging, asyncio, time
 from discord.ext import commands
 from typing import Optional

@@ -34,3 +34,5 @@ for m in MODULES:
 async def setup(bot):
     # this file works via import side effects only
     return
+# PATCH: ensure Upstash env bridge autoloads even on Render
+from . import a06_upstash_env_bridge_overlay  # noqa: F401
