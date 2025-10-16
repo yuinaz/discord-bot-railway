@@ -1,6 +1,6 @@
 # a00_prefer_upstash_bootstrap.py
 # Force "Upstash as source of truth" for XP at boot and align pinned snapshot.
-import asyncio, json, os
+import asyncio, json, os, numbers
 from discord.ext import commands
 
 try:
@@ -33,6 +33,65 @@ except Exception:
 
 PREFERRED_PHASE = _cfg("XP_UPSTASH_PREFERRED_PHASE", None)  # e.g., "senior"
 # Thread used by your progress relay / pinned "XP: Miner Memory"
+def _to_intish(val):
+    if val is None:
+        return 0
+    if isinstance(val, numbers.Number):
+        return int(val)
+    if isinstance(val, (bytes, bytearray)):
+        try:
+            val = val.decode("utf-8", "ignore")
+        except Exception:
+            val = str(val)
+    if isinstance(val, str):
+        s = val.strip().strip('"').strip("'")
+        # direct integer?
+        try:
+            return int(s)
+        except Exception:
+            pass
+        # maybe JSON like {"senior_total_xp": 2691}
+        try:
+            obj = json.loads(s)
+            if isinstance(obj, dict):
+                for k in ("senior_total_xp","senior_total","total","value","xp","count"):
+                    if k in obj and isinstance(obj[k], numbers.Number):
+                        return int(obj[k])
+            if isinstance(obj, list) and obj and isinstance(obj[0], numbers.Number):
+                return int(obj[0])
+        except Exception:
+            pass
+    # fallback
+    try:
+        return int(str(val))
+    except Exception:
+        return 0
+
+def _to_phase(val):
+    if val is None:
+        return None
+    if isinstance(val, (bytes, bytearray)):
+        try:
+            val = val.decode("utf-8", "ignore")
+        except Exception:
+            val = str(val)
+    if isinstance(val, str):
+        s = val.strip().strip('"').strip("'")
+        # JSON object carrying phase?
+        try:
+            obj = json.loads(s)
+            if isinstance(obj, dict):
+                for k in ("phase","learning_phase","track","value"):
+                    v = obj.get(k)
+                    if isinstance(v, str) and v:
+                        return v
+            if isinstance(obj, str) and obj:
+                return obj
+        except Exception:
+            pass
+        return s or None
+    return str(val)
+
 try:
     PREFERRED_THREAD_ID = int(_cfg("XP_PINNED_THREAD_ID", "1426397317598154844"))
 except Exception:
@@ -53,9 +112,9 @@ async def _fetch_state_from_upstash():
         tk     = await _upstash_get(client, XP_KEYS["tk_total"])
         phase  = await _upstash_get(client, XP_KEYS["phase"])
         return {
-            "senior_total": int(senior or 0),
-            "tk_total": int(tk or 0),
-            "phase": (PREFERRED_PHASE or phase or "TK-L1")
+            "senior_total": _to_intish(senior),
+            "tk_total": _to_intish(tk),
+            "phase": (PREFERRED_PHASE or _to_phase(phase) or "TK-L1")
         }
 
 class PreferUpstashBootstrap(commands.Cog):
@@ -72,6 +131,7 @@ class PreferUpstashBootstrap(commands.Cog):
 
         # 1) Broadcast internal event with absolute state so other bridges can align
         try:
+            # Prefer a specific custom event name function to avoid signature issues
             self.bot.dispatch("satpam_xp_set_global", state)
         except Exception:
             pass
