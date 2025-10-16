@@ -1,8 +1,0 @@
-diff --git a/satpambot/bot/modules/discord_bot/cogs/translator.py b/satpambot/bot/modules/discord_bot/cogs/translator.py
---- a/satpambot/bot/modules/discord_bot/cogs/translator.py
-+++ b/satpambot/bot/modules/discord_bot/cogs/translator.py
-@@ -1,5 +1,8 @@
--async def setup(bot: commands.Bot): bot.add_cog(Translator(bot))  # type: ignore
-+async def setup(bot: commands.Bot):
-+    # Awaited add_cog agar kompatibel dengan DummyBot di smoke test dan bot asli di runtime
-+    await bot.add_cog(Translator(bot))  # type: ignore

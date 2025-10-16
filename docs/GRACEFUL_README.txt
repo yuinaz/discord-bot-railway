@@ -1,1 +1,0 @@
-Graceful: SIGTERM/SIGINT shutdown, !selfrestart, readiness keys RUNTIME_READY_TS/RUNTIME_ALIVE_TS, READY_DELAY_SECS option.

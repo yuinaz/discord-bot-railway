@@ -1,1 +1,0 @@
-Automaton cog: proposal -> approval (DM/command). Auto-approve non-kritis. Commands: !auto, !auto status, !auto approve <id>, !auto deny <id>.

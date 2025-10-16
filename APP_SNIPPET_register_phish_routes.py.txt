@@ -1,2 +1,0 @@
-from satpambot.dashboard.phish_api import register_phish_routes
-register_phish_routes(app)
