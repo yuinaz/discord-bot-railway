@@ -4,7 +4,7 @@
     "RENDER": "true",
 
     "CONFIG_OVERRIDES_PATH": "data/config/overrides.render-free.json",
-
+	"LADDER_JSON_PATH": "data/neuro-lite/ladder.json",
     "KV_BACKEND": "upstash_rest",
     "UPSTASH_REDIS_REST_URL": "https://moving-weasel-24261.upstash.io",
     "LEARNING_PHASE_KEY": "learning:phase",
@@ -17,8 +17,8 @@
     "DISABLE_TALKING": "0",
     "QNA_PUBLIC_ENABLE": "1",
     "QNA_MENTION_REQUIRED": "false",
-    "QNA_DEDUPE_SECONDS": "0",
-    "QNA_ALLOW_DUPLICATE": "true",
+    "QNA_DEDUPE_SECONDS": "60",
+    "QNA_ALLOW_DUPLICATE": "false",
     "QNA_PROVIDER_ORDER": "groq,gemini",
     "QNA_CHANNEL_ALLOWLIST": "1426571542627614772",
 

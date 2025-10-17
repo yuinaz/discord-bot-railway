@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import asyncio
@@ -6,19 +7,16 @@ import logging
 import os
 import re
 from collections import deque
-from typing import Dict, Any, Deque, Set
+from typing import Dict, Any, Deque
 
 import discord
 from discord.ext import commands
 
 LOGGER = logging.getLogger(__name__)
 
-# --- Inline XP Rules (no ENV) ---
-TK_TOTAL = 2000
 L1_CUTOFF = 1000
 L2_CUTOFF = 2000
 
-# Channel guard (no XP here)
 CHANNEL_BLOCKLIST = {
     1400375184048787566,
 }
@@ -27,23 +25,22 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.
 STORE_PATH = os.path.join(DATA_DIR, "xp_store.json")
 AWARDED_IDS_PATH = os.path.join(DATA_DIR, "xp_awarded_ids.json")
 
-# Avoid runaway memory — persist awarded message ids with a ring buffer behavior
 MAX_AWARDED_IDS = 50000
 
 def _ensure_data_files():
-    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(STORE_PATH), exist_ok=True)
     if not os.path.exists(STORE_PATH):
         with open(STORE_PATH, "w", encoding="utf-8") as f:
-            json.dump({}, f)
+            json.dump({}, f, ensure_ascii=False, indent=2)
     if not os.path.exists(AWARDED_IDS_PATH):
         with open(AWARDED_IDS_PATH, "w", encoding="utf-8") as f:
-            json.dump({"ids": []}, f)
+            json.dump({"ids": []}, f, ensure_ascii=False, indent=2)
 
 def _load_store() -> Dict[str, Any]:
     _ensure_data_files()
     try:
         with open(STORE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+            return json.load(f) or {}
     except Exception:
         return {}
 
@@ -74,80 +71,72 @@ def _save_awarded_ids(dq: Deque[int]):
         json.dump({"ids": list(dq)}, f, ensure_ascii=False)
     os.replace(tmp, AWARDED_IDS_PATH)
 
-def compute_level(total_xp: int) -> str:
-    if total_xp < L1_CUTOFF:
-        return "TK-L1"
-    if total_xp < L2_CUTOFF:
-        return "TK-L2"
-    # Lewat TK -> anggap masuk SD-L1 untuk kompatibilitas ke depan
-    return "SD-L1"
+def _current_group(bot) -> str:
+    override = os.getenv("LEARNING_FORCE_GROUP")
+    if override:
+        return override.lower()
+    phase = (getattr(bot, "learning_phase", None) or os.getenv("LEARNING_FORCE_PHASE") or "TK").lower()
+    return "senior" if phase == "senior" else "junior"
 
-LOG_PATTERNS = [
-    re.compile(r"^(INFO|WARNING|ERROR)\:"),        # log-style spam
-    re.compile(r"loaded satpambot", re.IGNORECASE),
-    re.compile(r"smoke_cogs\.py|smoke_lint_thread_guard\.py", re.IGNORECASE),
-]
+LADDER_JSON_PATH = os.getenv("LADDER_JSON_PATH", os.path.join(DATA_DIR, "ladder.json"))
 
-def _is_spam_like(content: str) -> bool:
-    if not content:
-        return False
-    if len(content) > 2000 or content.count("\n") > 30:
-        return True
-    return any(p.search(content) for p in LOG_PATTERNS)
+try:
+    from satpambot.bot.modules.discord_bot.helpers.ladder_utils import load_ladder, compute_label_from_group
+except Exception:
+    try:
+        from ..helpers.ladder_utils import load_ladder, compute_label_from_group  # type: ignore
+    except Exception:
+        load_ladder = compute_label_from_group = None  # type: ignore
 
 class LearningPassiveObserver(commands.Cog):
-    """Passive XP earner (no ENV). Stores to data/xp_store.json and dedupes by message id.
-    """
-
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
         self.store: Dict[str, Any] = _load_store()
         self.awarded_ids: Deque[int] = _load_awarded_ids()
-        # author cooldown: avoid +1 on rapid spam
-        self.author_last_ts: Dict[int, float] = {}
-        self.cooldown_sec = 5.0  # tweakable here (no ENV)
+        self._ladder_map: Dict = {}
+        if callable(load_ladder):
+            self._ladder_map = load_ladder(LADDER_JSON_PATH) or {}
+            if self._ladder_map:
+                LOGGER.info("[learning-passive] ladder loaded: %s", LADDER_JSON_PATH)
+            else:
+                LOGGER.warning("[learning-passive] ladder empty or missing: %s", LADDER_JSON_PATH)
 
-    def _user_key(self, guild_id: int, user_id: int) -> str:
-        return f"{guild_id}:{user_id}"
+    def _key(self, gid: int, uid: int) -> str:
+        return f"{gid}:{uid}"
 
-    def _add_xp(self, guild_id: int, user_id: int, msg_id: int) -> None:
-        key = self._user_key(guild_id, user_id)
-        rec = self.store.get(key, {"xp": 0})
-        rec["xp"] = int(rec.get("xp", 0)) + 1
-        self.store[key] = rec
-        self.awarded_ids.append(int(msg_id))
+    def _get_rec(self, gid: int, uid: int) -> Dict[str, Any]:
+        return self.store.setdefault(self._key(gid, uid), {"xp": 0})
+
+    def _compute_level_label(self, total_xp: int) -> str:
+        group = _current_group(self.bot)
+        if callable(compute_label_from_group) and self._ladder_map:
+            label = compute_label_from_group(total_xp, group, self._ladder_map)
+            if label:
+                return label
+        if total_xp < L1_CUTOFF: return "TK-L1"
+        if total_xp < L2_CUTOFF: return "TK-L2"
+        return "SD-L1"
+
+    def _add_xp(self, gid: int, uid: int, mid: int) -> None:
+        rec = self._get_rec(gid, uid)
+        if mid in self.awarded_ids:
+            return
+        rec["xp"] = rec.get("xp", 0) + 1
+        self.awarded_ids.append(mid)
+        self.store[self._key(gid, uid)] = rec
         _save_store(self.store)
         _save_awarded_ids(self.awarded_ids)
-        level = compute_level(rec["xp"])
+
+        level = self._compute_level_label(rec["xp"])
         LOGGER.info("[passive-learning] +1 XP -> total=%s level=%s", rec["xp"], level)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Skip bots / DMs / no content
-        if message.author.bot or not message.guild:
+        if message.author.bot or not message.guild or not message.content:
             return
-        if message.channel.id in CHANNEL_BLOCKLIST:
+        if message.channel and message.channel.id in CHANNEL_BLOCKLIST:
             return
-        if _is_spam_like(message.content or ""):
-            return
-
-        # Dedup by message id if we've already awarded
-        mid = int(message.id)
-        if mid in self.awarded_ids:
-            return
-
-        # Simple per-author cooldown to reduce +1 spam storms
-        ts = message.created_at.timestamp() if message.created_at else 0.0
-        last = self.author_last_ts.get(message.author.id, 0.0)
-        if ts and last and (ts - last) < self.cooldown_sec:
-            return
-        self.author_last_ts[message.author.id] = ts or last
-
-        # Award
         try:
-            self._add_xp(message.guild.id, message.author.id, mid)
+            self._add_xp(message.guild.id, message.author.id, message.id)
         except Exception as e:
-            LOGGER.exception("XP award failed: %s", e)
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(LearningPassiveObserver(bot))
+            LOGGER.warning("[passive-learning] error: %r", e)
