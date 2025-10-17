@@ -1,0 +1,64 @@
+{
+  "env": {
+    "ENV_PROFILE": "render",
+    "RENDER": "true",
+
+    "CONFIG_OVERRIDES_PATH": "data/config/overrides.render-free.json",
+
+    "KV_BACKEND": "upstash_rest",
+    "UPSTASH_REDIS_REST_URL": "https://moving-weasel-24261.upstash.io",
+    "LEARNING_PHASE_KEY": "learning:phase",
+    "TK_XP_KEY": "xp:bot:tk_total",
+    "SENIOR_XP_KEY": "xp:bot:senior_total",
+    "XP_UPSTASH_VERBOSE": "1",
+    "XP_UPSTASH_EVENTS_ENABLE": "1",
+
+    "CHAT_ENABLE": "1",
+    "DISABLE_TALKING": "0",
+    "QNA_PUBLIC_ENABLE": "1",
+    "QNA_MENTION_REQUIRED": "false",
+    "QNA_DEDUPE_SECONDS": "0",
+    "QNA_ALLOW_DUPLICATE": "true",
+    "QNA_PROVIDER_ORDER": "groq,gemini",
+    "QNA_CHANNEL_ALLOWLIST": "1426571542627614772",
+
+    "PUBLIC_SEND_ROUTER_DISABLED": "0",
+    "PUBLIC_GATE_ALLOWLIST": "1426571542627614772",
+    "PUBLIC_MODE_ALLOW_NO_MENTION": "1426571542627614772",
+    "PUBLIC_GUARD_MUTED_CHANNELS": "",
+
+    "DISCORD_GUILD_ID": "761163966030151701",
+    "LOG_CHANNEL_ID": "1400375184048787566",
+    "LOG_CHANNEL_NAME": "log-botphising",
+    "MEMROUTE_THREAD_ID": "1426397317598154844",
+    "THREAD_PROGRESS_NAME": "neuro-lite progress",
+    "FOCUS_THREAD_NAME": "neuro-lite progress",
+    "STATUS_EMBED_THROTTLE_SEC": "30",
+
+    "PHASH_AUTOBAN": "1",
+    "PHISH_HASH_THRESH_P": "10",
+    "PHISH_HASH_THRESH_D": "8",
+    "PHISH_HASH_THRESH_A": "10",
+    "PHISH_ACTION": "ban",
+    "PHISH_BAN_DELETE_DAYS": "7",
+    "PHISH_EXEMPT_FORUM": "1",
+    "PHISH_EXEMPT_CHANNELS": "bot-commands",
+
+    "LINK_GUARD_ENABLED": "1",
+    "LINK_GUARD_ACTION": "delete",
+    "LINK_RATE_PER_USER": "20",
+    "LINK_RISK_THRESHOLD": "4",
+    "LINK_IGNORE_THREADS": "1",
+    "LINK_IGNORE_FORUMS": "1",
+
+    "SILENT_PUBLIC": "1",
+    "OWNER_USER_ID": "228126085160763392",
+    "XP_STATE_CHANNEL_ID": "1400375184048787566",
+
+    "OPENAI_TIMEOUT_S": "20",
+    "VISION_PROVIDER": "gemini",
+    "VISION_MODEL": "gemini-1.5-flash",
+    "GROQ_MODEL": "llama-3.1-8b-instant",
+    "GEMINI_MODEL": "gemini-2.5-flash-lite"
+  }
+}
