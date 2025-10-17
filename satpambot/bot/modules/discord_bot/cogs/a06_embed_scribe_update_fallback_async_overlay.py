@@ -1,28 +1,28 @@
-import logging, inspect
+# Ensure EmbedScribe.update doesn't await None
 from discord.ext import commands
+import types
 
-log = logging.getLogger(__name__)
-
-class EmbedScribeAwaitFix(commands.Cog):
-    def __init__(self, bot):
+class EmbedScribeUpdateFallback(commands.Cog):
+    def __init__(self, bot): 
         self.bot = bot
+        self._patch()
+
+    def _patch(self):
         try:
-            from satpambot.bot.utils import embed_scribe as es
-            if hasattr(es, "EmbedScribe") and hasattr(es.EmbedScribe, "update"):
-                orig = es.EmbedScribe.update
-                async def safe_update(self, *a, **k):
-                    try:
-                        res = orig(self, *a, **k)
-                        if inspect.isawaitable(res):
-                            return await res
-                        return res
-                    except Exception as e:
-                        log.warning("[embed-fix] update fallback: %s", e)
-                        return None
-                es.EmbedScribe.update = safe_update
-                log.info("[embed-fix] EmbedScribe.update patched")
-        except Exception as e:
-            log.warning("[embed-fix] patch failed: %s", e)
+            from ...utils.embed_scribe import EmbedScribe
+        except Exception:
+            return
+        orig_update = getattr(EmbedScribe, "update", None)
+        if not orig_update: 
+            return
+        async def safe_update(self, *a, **kw):
+            try:
+                r = await orig_update(self, *a, **kw)
+                return r
+            except TypeError as e:
+                # "object NoneType can't be used in 'await' expression"
+                return None
+        setattr(EmbedScribe, "update", safe_update)
 
 async def setup(bot):
-    await bot.add_cog(EmbedScribeAwaitFix(bot))
+    await bot.add_cog(EmbedScribeUpdateFallback(bot))

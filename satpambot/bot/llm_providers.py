@@ -1,37 +1,76 @@
-# -*- coding: utf-8 -*-
-"""
-Patch: _ask_groq with user default model llama-3.1-8b-instant.
-Override via env LLM_GROQ_MODEL if needed.
-"""
-import os, json, logging, httpx
+import os, json, httpx, time
 
-logger = logging.getLogger(__name__)
-DEFAULT_GROQ_MODEL = os.environ.get("LLM_GROQ_MODEL", "llama-3.1-8b-instant")
+_GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+_GEM_URL_TMPL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
 
-async def _ask_groq(prompt, system=None, temperature=0.2):
-    try:
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-            "Content-Type": "application/json",
-        }
-        msgs = []
+def _env(key, default=None):
+    v = os.environ.get(key)
+    return v if v not in (None, "") else default
+
+def _select_model(provider: str|None, model: str|None):
+    provider = (provider or "").lower().strip()
+    if model:
+        return provider or ("gemini" if model.startswith("gemini-") else "groq"), model
+    # Defaults
+    g_model = _env("LLM_GEMINI_MODEL", "gemini-2.5-flash-lite")
+    q_model = _env("LLM_GROQ_MODEL", "llama-3.1-8b-instant")
+    if provider == "gemini":
+        return "gemini", g_model
+    if provider == "groq":
+        return "groq", q_model
+    # auto: prefer GROQ for general chat
+    return "groq", q_model
+
+def ask(prompt: str,
+        system: str|None = None,
+        provider: str|None = None,
+        model: str|None = None,
+        temperature: float|None = None,
+        max_tokens: int|None = None,
+        timeout: float = 15.0) -> str:
+    """Unified LLM entrypoint.
+    Accepts legacy calls with unexpected kwargs (ignored).
+    Returns text string.
+    """
+    prov, model = _select_model(provider, model)
+    temperature = 0.2 if temperature is None else float(temperature)
+
+    if prov == "gemini":
+        key = _env("GOOGLE_API_KEY")
+        if not key:
+            raise RuntimeError("GOOGLE_API_KEY is missing")
+        url = _GEM_URL_TMPL.format(model=model, key=key)
+        parts = []
         if system:
-            msgs.append({"role": "system", "content": str(system)})
-        msgs.append({"role": "user", "content": str(prompt)})
-        payload = {
-            "model": DEFAULT_GROQ_MODEL,
-            "messages": msgs,
-            "temperature": float(temperature),
-            "stream": False,
-        }
-        async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(url, headers=headers, json=payload)
-            if r.status_code >= 400:
-                logger.warning("[llm] groq 4xx: %s", r.text[:500])
-                r.raise_for_status()
+            parts.append({"text": f"[system]\n{system}"})
+        parts.append({"text": prompt})
+        payload = {"contents":[{"role":"user","parts":parts}]}
+        with httpx.Client(timeout=timeout) as x:
+            r = x.post(url, json=payload)
+            r.raise_for_status()
             data = r.json()
-            return (data.get("choices") or [{}])[0].get("message",{}).get("content","").strip()
-    except Exception as e:
-        logger.info("[llm] groq failed: %r", e)
-        return ""
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception:
+            return json.dumps(data)[:800]
+
+    # default: groq
+    key = _env("GROQ_API_KEY")
+    if not key:
+        raise RuntimeError("GROQ_API_KEY is missing")
+    headers = {"Authorization": f"Bearer {key}", "Content-Type":"application/json"}
+    messages = []
+    if system:
+        messages.append({"role":"system","content":system})
+    messages.append({"role":"user","content":prompt})
+    payload = {"model": model, "messages": messages, "temperature": temperature}
+    if max_tokens is not None:
+        payload["max_tokens"] = int(max_tokens)
+    with httpx.Client(timeout=timeout) as x:
+        r = x.post(_GROQ_URL, headers=headers, json=payload)
+        r.raise_for_status()
+        data = r.json()
+    try:
+        return data["choices"][0]["message"]["content"]
+    except Exception:
+        return json.dumps(data)[:800]

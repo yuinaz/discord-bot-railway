@@ -1,43 +1,66 @@
-import os, logging
+import inspect, logging, discord
 from discord.ext import commands
-import discord
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+MAX_FIELD = 1024
 
-QNA_CHANNEL_ID = int(os.getenv("QNA_CHANNEL_ID","0") or "0")
+def _persona_name(bot) -> str:
+    po = bot.get_cog("PersonaOverlay")
+    fn = getattr(po, "get_active_persona", None) if po else None
+    if callable(fn):
+        try:
+            return fn() if not inspect.iscoroutinefunction(fn) else "leina"
+        except Exception:
+            pass
+    for attr in ("active", "ACTIVE", "DEFAULT", "default_name"):
+        v = getattr(po, attr, None) if po else None
+        if isinstance(v, str) and v:
+            return v
+    return "leina"
 
-class AutolearnQnAAutoReplyFix(commands.Cog):
-    def __init__(self, bot):
+async def _llm_call(bot, prompt: str, system: str):
+    for provider in ("groq", "gemini"):
+        try:
+            fn = getattr(bot, "llm_ask", None)
+            if not callable(fn):
+                raise RuntimeError("bot.llm_ask missing")
+            try:
+                return await fn(prompt, system=system, provider=provider), provider
+            except TypeError:
+                return await fn(prompt, provider=provider), provider
+        except Exception as e:
+            logger.warning("[autolearn-fix] %s failed: %r", provider, e)
+            continue
+    return "", ""
+
+class AutoLearnQnAAutoReplyFixOverlay(commands.Cog):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.Cog.listener()
-    async def on_message(self, msg: discord.Message):
-        if not QNA_CHANNEL_ID or msg.guild is None: return
-        if msg.channel.id != QNA_CHANNEL_ID: return
-        if msg.author.bot: return
-        content = (msg.content or "").strip()
-        if not content: return
+    async def on_message(self, m: discord.Message):
+        if m.author.bot:
+            return
+        ch_id = getattr(self.bot, "QNA_CHANNEL_ID", None)
+        if not ch_id or m.channel.id != ch_id:
+            return
 
-        # Call provider via unified hook
-        ans = None; provider = "unknown"
-        try:
-            if hasattr(self.bot, "llm_ask"):
-                ans = await self.bot.llm_ask(content, prefer=os.getenv("LLM_PREFER","groq"))
-                provider = os.getenv("LLM_PREFER","groq").upper()
-        except Exception as e:
-            log.warning("[autolearn-qna] provider error: %s", e)
+        q = (m.content or "").strip()
+        if not q:
+            return
+
+        persona = _persona_name(self.bot)
+        system = f"Kamu adalah {persona}. Jawab singkat, jelas, dan ramah."
+
+        ans, src = await _llm_call(self.bot, q, system)
         if not ans:
-            ans = "(no answer from provider)"
+            return
 
-        emb = discord.Embed(title="Auto QnA", colour=discord.Colour.blurple())
-        emb.add_field(name="Question (Leina)", value=content[:1024] or "-", inline=False)
-        emb.add_field(name=f"Answer ({provider})", value=ans[:1024], inline=False)
-        emb.set_footer(text="autolearn • Q&A")
-
-        try:
-            await msg.channel.send(embed=emb)
-        except Exception as e:
-            log.warning("[autolearn-qna] send embed failed: %s", e)
+        e = discord.Embed(title="[auto-learn]", color=0x3b82f6)
+        e.add_field(name="Q", value=(q[:MAX_FIELD] or "-"), inline=False)
+        e.add_field(name=f"A · {src}", value=(ans[:MAX_FIELD] or "-"), inline=False)
+        e.set_footer(text=f"#{persona} • auto")
+        await m.channel.send(embed=e)
 
 async def setup(bot):
-    await bot.add_cog(AutolearnQnAAutoReplyFix(bot))
+    await bot.add_cog(AutoLearnQnAAutoReplyFixOverlay(bot))

@@ -1,13 +1,15 @@
+import discord
 from discord.ext import commands
 
-class PersonaGetterFallbackOverlay(commands.Cog):
-    def __init__(self, bot):
+class PersonaGetterFallback(commands.Cog):
+    """If PersonaOverlay lacks get_active_persona(), provide a safe getter on bot."""
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        cog = bot.get_cog("PersonaOverlay")
-        if cog and not hasattr(cog, "get_active_persona"):
-            async def _get_active_persona(guild):
-                return "default"
-            setattr(cog, "get_active_persona", _get_active_persona)
+        if not hasattr(bot, "get_active_persona"):
+            def _fallback(*args, **kwargs):
+                # minimal persona
+                return {"name":"Leina", "style":"helpful, concise, friendly", "prefix":"Leina"}
+            setattr(bot, "get_active_persona", _fallback)
 
-async def setup(bot):
-    await bot.add_cog(PersonaGetterFallbackOverlay(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(PersonaGetterFallback(bot))
