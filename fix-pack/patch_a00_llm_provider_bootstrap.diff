@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: satpambot/bot/modules/discord_bot/cogs/a00_llm_provider_bootstrap.py
+@@
+-    from satpambot.bot.llm_providers import ask
+-    bot.llm_ask = ask
++    # prefer providers facade if available, else ask()
++    try:
++        from satpambot.bot.providers import LLM as _LLM
++        bot.llm_ask = _LLM.ask
++    except Exception:
++        from satpambot.bot.llm_providers import ask as _ask
++        bot.llm_ask = _ask
+*** End Patch

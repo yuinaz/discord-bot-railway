@@ -1,72 +1,89 @@
-# -*- coding: utf-8 -*-
-import os, asyncio, logging, datetime, json
-from typing import Optional
+import os, logging, httpx
 import discord
 from discord.ext import commands
 
-LOG = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-def _env(name: str, default: Optional[str]=None) -> Optional[str]:
-    v = os.environ.get(name)
-    return v if v not in (None, "") else default
-
-def _provider_name() -> str:
-    p = (_env("LLM_PROVIDER","auto") or "auto").lower()
-    if p == "groq": return "Groq"
-    if p == "gemini": return "Gemini"
-    if p == "cli": return "CLI"
-    return "LLM"
-
-def _provider_model_label() -> str:
-    groq = _env("LLM_GROQ_MODEL","llama-3.1-8b-instant")
-    gem  = _env("LLM_GEMINI_MODEL","gemini-2.5-flash-lite")
-    p = (_env("LLM_PROVIDER","auto") or "auto").lower()
-    if p == "groq": return f"groq:{groq}"
-    if p == "gemini": return f"gemini:{gem}"
-    return f"auto(groq={groq},gemini={gem})"
-
-def _qna_channel_id() -> Optional[int]:
-    v = _env("LEARNING_QNA_CHANNEL_ID") or _env("QNA_CHANNEL_ID")
-    try: return int(v) if v else None
-    except: return None
-
-class AutoLearnQnAAutoreply(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+class AutoLearnQnAAutoReply(commands.Cog):
+    def __init__(self, bot):
         self.bot = bot
-        self.qna_channel_id = _qna_channel_id()
+        # Boleh di-set overlay/channel overlay lain
+        self.QNA_CHANNEL_ID = getattr(
+            self.bot.get_cog("QnaDualProvider") or self.bot, "QNA_CHANNEL_ID", None
+        ) or int(os.getenv("QNA_CHANNEL_ID") or 0) or None
 
-    async def _send_embed(self, where: discord.TextChannel, question: str, answer: str, reference=None):
-        color = discord.Color.blue()
-        e = discord.Embed(title=_env("AUTOLEARN_EMBED_TITLE","QnA"),
-                          color=color, timestamp=datetime.datetime.utcnow())
-        e.add_field(name="Question by Leina", value=(question or "-")[:1024], inline=False)
-        e.add_field(name=f"Answer by {_provider_name()}", value=(answer or "-")[:1024], inline=False)
-        e.set_footer(text=_env("AUTOLEARN_EMBED_FOOTER", _provider_model_label()))
-        await where.send(embed=e, reference=reference) if reference else await where.send(embed=e)
+    async def _ask_llm(self, prompt: str) -> str | None:
+        # 1) Facade internal
+        ask = getattr(self.bot, "llm_ask", None)
+        if ask:
+            try:
+                res = await ask(prompt)
+                if res:
+                    return str(res).strip()
+            except Exception as e:
+                log.warning("[autolearn] llm_ask failed: %r", e)
 
-    async def _answer_with_llm(self, text: str) -> str:
-        fn = getattr(self.bot, "llm_ask", None)
-        if not fn:
-            return "LLM is not available."
-        prompt = f"Answer briefly and clearly:\n\n{text}"
-        out = await fn(prompt, system="Be concise and accurate.", temperature=0.3)
-        return out or "No answer."
+        # 2) Groq HTTP fallback
+        groq_key = os.getenv("GROQ_API_KEY")
+        if groq_key:
+            try:
+                async with httpx.AsyncClient(timeout=20.0) as x:
+                    r = await x.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {groq_key}",
+                                 "Content-Type": "application/json"},
+                        json={"model":"llama-3.1-8b-instant",
+                              "messages":[{"role":"user","content":prompt}]}
+                    )
+                    r.raise_for_status()
+                    j = r.json()
+                    return j["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                log.warning("[autolearn] groq fallback failed: %r", e)
+
+        # 3) Gemini HTTP fallback
+        gem_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if gem_key:
+            try:
+                async with httpx.AsyncClient(timeout=20.0) as x:
+                    r = await x.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={gem_key}",
+                        headers={"Content-Type": "application/json"},
+                        json={"contents":[{"role":"user","parts":[{"text":prompt}]}]}
+                    )
+                    r.raise_for_status()
+                    j = r.json()
+                    return j["candidates"][0]["content"]["parts"][0]["text"].strip()
+            except Exception as e:
+                log.warning("[autolearn] gemini fallback failed: %r", e)
+        return None
+
+    def _is_qna_channel(self, message: discord.Message) -> bool:
+        if self.QNA_CHANNEL_ID and message.channel.id == self.QNA_CHANNEL_ID:
+            return True
+        # fallback: kalau QNA_CHANNEL_ID belum terset, izinkan di channel apapun
+        return True
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
-        ch_id = self.qna_channel_id
-        if not ch_id:
+        if not self._is_qna_channel(message):
             return
-        if message.channel.id != ch_id:
+        q = (message.content or "").strip()
+        if not q:
             return
-        # Only answer messages that mention the bot or start with '?'
-        if not (self.bot.user in message.mentions or message.content.strip().startswith("?")):
+
+        ans = await self._ask_llm(q)
+        if not ans:
+            log.info("[autolearn] no answer")
             return
-        q = message.content.strip().lstrip("?").strip()
-        ans = await self._answer_with_llm(q)
-        await self._send_embed(message.channel, q, ans, reference=message.to_reference())
+
+        emb = discord.Embed(title="QnA AutoLearn", color=0x3b82f6)
+        emb.add_field(name="Question (Leina)", value=q[:1024] or "-", inline=False)
+        emb.add_field(name="Answer", value=ans[:1024] or "-", inline=False)
+        emb.set_footer(text="AutoLearn • dual-provider (Groq/Gemini)")
+        await message.channel.send(embed=emb)
 
 async def setup(bot):
-    await bot.add_cog(AutoLearnQnAAutoreply(bot))
+    await bot.add_cog(AutoLearnQnAAutoReply(bot))

@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: satpambot/bot/modules/discord_bot/cogs/a06_autolearn_qna_answer_overlay.py
+@@
+-    # old code expected PersonaOverlay.get_active_persona()
+-    persona_name = self.persona.get_active_persona()
++    # be tolerant: PersonaOverlay may not expose get_active_persona()
++    # fall back to env or 'default' to avoid AttributeError
++    persona_name = None
++    get_name = getattr(self.persona, "get_active_persona", None)
++    if callable(get_name):
++        persona_name = get_name()
++    if not persona_name:
++        import os
++        persona_name = os.getenv("PERSONA_ACTIVE_NAME", "default")
+*** End Patch

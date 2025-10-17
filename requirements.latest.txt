@@ -22,3 +22,4 @@ langdetect>=1.0.9
 pydantic==2.11.10
 tenacity>=8.2.3
 edge-tts
+pyyaml>=6.0
