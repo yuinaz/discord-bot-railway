@@ -275,7 +275,11 @@ Max files: {MAX_FILES}; Max edit size: {MAX_EDIT_SIZE} bytes.
 
 async def setup(bot):
     try:
+        # idempotent guard
+        if bot.get_cog('SelfHealAutoFix'):
+            log.debug('[selfheal] already loaded; skipping')
+            return
         await bot.add_cog(SelfHealAutoFix(bot))
-        log.info("[selfheal] SelfHealAutoFix loaded")
+        log.info('[selfheal] SelfHealAutoFix loaded')
     except Exception as e:
-        log.warning("[selfheal] setup failed: %s", e)
+        log.warning('[selfheal] setup failed: %s', e)

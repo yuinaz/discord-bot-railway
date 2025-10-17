@@ -15,5 +15,6 @@ try:
         _apply("satpambot.bot.modules.discord_bot.cogs.selfheal_learning_bridge", "QNA_CHANNEL_ID")
         _apply("satpambot.bot.modules.discord_bot.cogs.neuro_shadow_bridge", "QNA_CHANNEL_ID")
         _apply("satpambot.bot.modules.discord_bot.cogs.learning_passive_observer", "QNA_CHANNEL_ID")
+        _apply("satpambot.bot.modules.discord_bot.cogs.qna_dual_provider", "QNA_CHANNEL_ID")
 except Exception as e:
     log.warning("[qna_channel_overlay] failed: %s", e)
