@@ -1,106 +1,96 @@
-
-"""
-a06_autolearn_qna_answer_overlay.py
-- Detect messages the bot posts with "[auto-learn]" + "Q:"
-- Generate an answer using ProvidersOverlay (LLM) + PersonaOverlay prompt
-- Post the answer as an embed reply (and cache via QnAResponseCache if available)
-- Cooldown & loop-safe
-"""
-import asyncio, logging, re, os
-from discord.ext import commands
+# a06_autolearn_qna_answer_overlay.py
+# Robust autolearn → QnA embed answerer (no config changes).
+import os, re, logging, datetime, asyncio
+from typing import Optional
 import discord
+from discord.ext import commands
 
 log = logging.getLogger(__name__)
-QUESTION_RE = re.compile(r"\[auto-learn\].*?Q:\s*(.+)", re.I | re.S)
-COOLDOWN_SEC = int(os.getenv("AUTOLEARN_COOLDOWN_SEC", "20"))
-MAX_LEN = int(os.getenv("AUTOLEARN_MAX_Q_LEN", "600"))
 
-class AutoLearnQnA(commands.Cog):
-    def __init__(self, bot):
+AUTOLEARN_RE = re.compile(r'^\s*\[(?:auto[\-\s]?learn)\]\s*$', re.I | re.M)
+QUESTION_RE  = re.compile(r'^\s*Q:\s*(.+)$', re.I | re.M)
+
+def _env(k, d=None):
+    v = os.environ.get(k)
+    return v if v not in (None, "") else d
+
+def _qna_id():
+    raw = _env("LEARNING_QNA_CHANNEL_ID") or _env("QNA_CHANNEL_ID")
+    try: return int(raw) if raw else None
+    except: return None
+
+def _provider_label():
+    prov = (_env("LLM_PROVIDER","auto") or "auto").lower()
+    groq = _env("LLM_GROQ_MODEL","llama-3.1-8b-instant")
+    gem  = _env("LLM_GEMINI_MODEL","gemini-2.5-flash-lite")
+    if prov == "groq": name="Groq"; footer=f"groq:{groq}"
+    elif prov == "gemini": name="Gemini"; footer=f"gemini:{gem}"
+    else: name="LLM"; footer=f"auto(groq={groq},gemini={gem})"
+    return name, footer
+
+class AutoLearnQnaAnswerOverlay(commands.Cog):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._last_ts = 0
+        self.qna_id = _qna_id()
+        self._answered = set()
 
-    def _extract_question(self, content: str):
-        m = QUESTION_RE.search(content or "")
-        if not m:
-            return None
-        q = (m.group(1) or "").strip()
-        return q[:MAX_LEN]
-
-    def _should_skip(self):  # basic global cooldown
-        import time
-        now = time.time()
-        if (now - self._last_ts) < COOLDOWN_SEC:
-            return True
-        self._last_ts = now
-        return False
-
-    @commands.Cog.listener("on_message")
-    async def on_message(self, message: discord.Message):
-        try:
-            if message.author.id != getattr(self.bot.user, "id", None):
-                return  # only react to our own [auto-learn] prompts
-            if "[auto-learn:answer]" in (message.content or ""):
-                return
-            q = self._extract_question(message.content or "")
-            if not q:
-                return
-            if self._should_skip():
-                return
-
-            # Providers + Persona
-            prov = self.bot.get_cog("ProvidersOverlay")
-            persona = self.bot.get_cog("PersonaOverlay")
-            cache = self.bot.get_cog("QnAResponseCache")
-
-            sys_prompt = ""
-            if persona:
-                data = persona.get_active_persona() or {}
-                sys_prompt = (data.get("prompt_prefix") or "")
-
-            # Cache try
-            answer = None
-            if cache:
-                try:
-                    answer = await cache.try_get_cached(q)
-                except Exception:
-                    pass
-
-            if not answer and prov and getattr(prov, "llm", None):
-                try:
-                    answer = await prov.llm.generate(system_prompt=sys_prompt, messages=[{"role":"user","content":q}], temperature=0.6, max_tokens=512)
-                except Exception as e:
-                    log.warning("[autolearn] llm failed: %r", e)
-
-            if not answer:
-                answer = "Maaf, aku belum yakin. Aku akan belajar dari pertanyaan ini dan coba lagi nanti."
-
-            # Cache set
-            if cache:
-                try:
-                    await cache.cache_answer(q, answer)
-                except Exception:
-                    pass
-
-            # Send nicely as embed (reply)
-            emb = discord.Embed(title="Auto‑learn Answer", description=answer)
-            emb.set_footer(text="[auto-learn:answer]")
+    async def _ask(self, prompt: str) -> str:
+        # primary path
+        if hasattr(self.bot, "llm_ask"):
             try:
-                await message.channel.send(embed=emb, reference=message, mention_author=False)
-            except TypeError:
-                # older discord.py
-                await message.channel.send(embed=emb)
+                out = await self.bot.llm_ask(
+                    prompt,
+                    system="Jawab ringkas, jelas, actionable. Gunakan bullet jika cocok.",
+                    temperature=0.2,
+                )
+                if out and out.strip():
+                    return out.strip()
+            except Exception as e:
+                log.warning("[autolearn] llm_ask failed primary: %r", e)
+        # fallback: try providers facade if available
+        try:
+            from satpambot.bot import llm_providers as providers
+            if hasattr(providers, "LLM"):
+                out = await providers.LLM.ask(prompt, system="Ringkas dan teknis.", temperature=0.2)
+                if out and out.strip():
+                    return out.strip()
         except Exception as e:
-            log.warning("[autolearn] error: %r", e)
+            log.debug("[autolearn] providers.LLM fallback not available: %r", e)
+        return ""
+
+    async def _send_embed(self, ch: discord.TextChannel, q: str, a: str, ref: Optional[discord.MessageReference] = None):
+        name, footer = _provider_label()
+        emb = discord.Embed(title="QnA", color=discord.Color.blurple(), timestamp=datetime.datetime.utcnow())
+        emb.add_field(name="Question by Leina", value=q[:1024] if q else "-", inline=False)
+        emb.add_field(name=f"Answer by {name}", value=a[:1024] if a else "—", inline=False)
+        emb.set_footer(text=footer)
+        await ch.send(embed=emb, reference=ref) if ref else await ch.send(embed=emb)
+
+    @commands.Cog.listener()
+    async def on_message(self, m: discord.Message):
+        # hanya di channel QNA jika disetel
+        if self.qna_id and m.channel.id != self.qna_id:
+            return
+        if not m.content or m.author.bot is False:
+            # auto-learn post biasanya dari bot; tetapi jika kamu ingin user, hapus kondisi ini
+            pass
+        if not AUTOLEARN_RE.search(m.content):
+            return
+        mm = QUESTION_RE.search(m.content)
+        if not mm:
+            return
+        if m.id in self._answered:
+            return
+        q = mm.group(1).strip()
+        ans = await self._ask(q)
+        if not ans:
+            log.info("[autolearn] no answer")
+            return
+        try:
+            await self._send_embed(m.channel, q, ans, m.to_reference())
+            self._answered.add(m.id)
+        except Exception as e:
+            log.warning("[autolearn] embed send failed: %r", e)
 
 async def setup(bot):
-    await bot.add_cog(AutoLearnQnA(bot))
-
-def setup(bot):
-    try:
-        import asyncio
-        if asyncio.get_event_loop().is_running():
-            return asyncio.create_task(bot.add_cog(AutoLearnQnA(bot)))
-    except Exception:
-        pass
-    return bot.add_cog(AutoLearnQnA(bot))
+    await bot.add_cog(AutoLearnQnaAnswerOverlay(bot))
