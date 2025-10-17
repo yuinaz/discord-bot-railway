@@ -164,7 +164,7 @@ class PreferUpstashBootstrap(commands.Cog):
             return
         # Launch task
         try:
-            self.bot.loop.create_task(self.on_ready_do())
+            asyncio.create_task(self.on_ready_do())
         except Exception:
             pass
 

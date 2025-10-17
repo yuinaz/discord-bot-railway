@@ -77,7 +77,7 @@ def _install_embed_scribe_shim():
                     return self.update(*args, **kwargs)
                 if hasattr(self, "send"):
                     return self.send(*args, **kwargs)
-                raise AttributeError("EmbedScribe shim: no update/send")
+                LOG.debug("EmbedScribe shim: no update/send"); return None
             setattr(es.EmbedScribe, "upsert", upsert)
             LOG.info("[render-guard] EmbedScribe.upsert shim installed")
     except Exception as e:

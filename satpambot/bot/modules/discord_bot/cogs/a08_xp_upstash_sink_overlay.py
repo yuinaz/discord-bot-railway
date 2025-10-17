@@ -63,7 +63,7 @@ class XpUpstashSinkOverlay(commands.Cog):
             log.warning("[xp-upstash] Upstash not configured; overlay will be idle.")
 
         # preload task
-        self._preload_task = self.bot.loop.create_task(self._preload_from_upstash()) if hasattr(self.bot, "loop") else asyncio.create_task(self._preload_from_upstash())
+        self._preload_task = asyncio.create_task(self._preload_from_upstash()) if hasattr(self.bot, "loop") else asyncio.create_task(self._preload_from_upstash())
 
     async def _preload_from_upstash(self):
         # Best-effort: Pull xp:store and if it exists, advertise via log.

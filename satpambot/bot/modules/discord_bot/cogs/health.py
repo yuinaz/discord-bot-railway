@@ -101,7 +101,7 @@ class Health(commands.Cog):
         if old:
             try: old.cancel()
             except Exception: pass
-        self._hb_tasks[key] = self.bot.loop.create_task(loop())
+        self._hb_tasks[key] = asyncio.create_task(loop())
 
         await ctx.message.add_reaction("✅")
         if ctx.channel.id != log_ch.id:
