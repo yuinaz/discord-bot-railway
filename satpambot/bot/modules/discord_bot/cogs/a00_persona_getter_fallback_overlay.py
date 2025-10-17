@@ -9,9 +9,5 @@ class PersonaGetterFallbackOverlay(commands.Cog):
                 return "default"
             setattr(cog, "get_active_persona", _get_active_persona)
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        pass
-
 async def setup(bot):
     await bot.add_cog(PersonaGetterFallbackOverlay(bot))
