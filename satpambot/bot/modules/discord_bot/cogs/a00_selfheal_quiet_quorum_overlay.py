@@ -1,14 +1,12 @@
 
-import os, logging, importlib, inspect, asyncio, json, re
+import os, logging, importlib, inspect
 from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
-
 ENABLE = os.getenv("SELFHEAL_QUORUM_ENABLE", "1") == "1"
 
 class _QuietQuorum:
     targets = ("_execute_plan","_apply_plan","execute_plan","apply_plan","_loop")
-
     @classmethod
     def pick_target(cls, Cog):
         for name in cls.targets:
@@ -23,25 +21,22 @@ class SelfHealQuorumOverlay(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if not ENABLE: 
+        if not ENABLE:
             return
         try:
             M = importlib.import_module("satpambot.bot.modules.discord_bot.cogs.selfheal_groq_agent")
         except Exception as e:
-            LOG.debug("[quorum-overlay] import selfheal_groq_agent failed: %r", e); 
+            LOG.debug("[quorum-overlay] import selfheal_groq_agent failed: %r", e)
             return
         Cog = getattr(M, "SelfHealGroqAgent", None) or getattr(M, "SelfHealRuntime", None)
-        if not Cog: 
+        if not Cog:
             return
         name, fn = _QuietQuorum.pick_target(Cog)
-        if not name: 
-            # stay quiet; do not spam logs
-            return
-        if getattr(fn, "__quiet_quorum__", False):
+        if not name or getattr(fn, "__quiet_quorum__", False):
             return
 
         async def wrapped(self, *args, **kwargs):
-            # currently we do NOT block here; quorum gating may exist elsewhere.
+            # keep behavior; gating may live elsewhere
             return await fn(self, *args, **kwargs)
 
         setattr(wrapped, "__quiet_quorum__", True)

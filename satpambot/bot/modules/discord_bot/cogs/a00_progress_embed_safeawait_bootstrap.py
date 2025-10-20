@@ -1,5 +1,5 @@
 
-import importlib, logging, inspect, asyncio
+import importlib, logging, inspect
 from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ class ProgressEmbedSafeAwait(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # Patch progress_embed_solo.update to always be awaitable
+        # progress_embed_solo.update
         try:
             m = importlib.import_module("satpambot.bot.modules.discord_bot.helpers.progress_embed_solo")
             if hasattr(m, "update") and not getattr(m.update, "__safeawait__", False):
@@ -25,9 +25,9 @@ class ProgressEmbedSafeAwait(commands.Cog):
                 m.update = wrapped
                 LOG.info("[safeawait] patched progress_embed_solo.update")
         except Exception as e:
-            LOG.debug("[safeawait] skip m.update: %r", e)
+            LOG.debug("[safeawait] skip progress_embed_solo.update: %r", e)
 
-        # Patch EmbedScribe.upsert to be awaitable
+        # EmbedScribe.upsert
         try:
             s = importlib.import_module("satpambot.bot.modules.discord_bot.helpers.embed_scribe")
             ES = getattr(s, "EmbedScribe", None)
