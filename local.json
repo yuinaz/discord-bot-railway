@@ -34,5 +34,6 @@
   },
   "dm_muzzle": {
     "mode": "owner"
-  }
+  },
+  "DM_MUZZLE": "off"
 }
