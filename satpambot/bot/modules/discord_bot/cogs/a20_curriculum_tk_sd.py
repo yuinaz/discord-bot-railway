@@ -1,4 +1,4 @@
-import os, json, asyncio, logging
+import os, json, logging
 from typing import Dict, Tuple
 from datetime import datetime, timezone
 
@@ -31,10 +31,7 @@ def _compute_junior_label(total: int, ladders: Dict[str, Dict[str,int]]) -> Tupl
     last_idx = len(_order_stages(ladders.get(last, {"S1":1})))
     return (f"{last}-S{last_idx}", 100.0, 0)
 
-# === Compatibility shim for a24_curriculum_auto_pin ===
 def _load_cfg():
-    """Return a dict containing config; at least 'report_channel_id' key for a24."""
-    cid = None
     try:
         cid = int(os.getenv("LEINA_CURRICULUM_CHANNEL_ID","") or "0") or None
     except Exception:
@@ -42,7 +39,6 @@ def _load_cfg():
     return {"report_channel_id": cid}
 
 class CurriculumTKSD(commands.Cog):
-    """Robust TK/SD curriculum cog that reads from Upstash and never crashes."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.client = UpstashClient()
@@ -54,34 +50,23 @@ class CurriculumTKSD(commands.Cog):
         self._last_text = None
         if self.channel_id and self.client.enabled:
             self.loop.start()
-        else:
-            log.info("[a20_curriculum_tk_sd] passive mode (no channel or upstash not enabled)")
 
     def cog_unload(self):
-        try:
-            self.loop.cancel()
-        except Exception:
-            pass
+        try: self.loop.cancel()
+        except Exception: pass
 
     async def _read_state(self) -> Tuple[str, float]:
-        """Return (label, percent) using Upstash junior total; fallback safe defaults."""
         total = 0
         if self.client.enabled:
             try:
-                import aiohttp
-                async with aiohttp.ClientSession() as session:
-                    raw = await self.client.get(session, "xp:bot:junior_total")
-                    if raw is not None:
-                        try:
-                            total = int(raw)
-                        except Exception:
-                            try:
-                                j = json.loads(raw)
-                                total = int(j.get("overall", 0))
-                            except Exception:
-                                total = 0
-            except Exception as e:
-                log.debug("[a20] upstash read failed: %s", e)
+                raw = await self.client.get_raw("xp:bot:junior_total")
+                if raw is not None:
+                    try: total = int(raw)
+                    except Exception:
+                        try: total = int(json.loads(raw).get("overall", 0))
+                        except Exception: total = 0
+            except Exception:
+                total = 0
         label, pct, _ = _compute_junior_label(int(total), self.ladders or {})
         return (label, pct)
 
@@ -94,16 +79,14 @@ class CurriculumTKSD(commands.Cog):
             return
         try:
             ch = self.bot.get_channel(self.channel_id) or await self.bot.fetch_channel(self.channel_id)
-            if not ch:
-                return
+            if not ch: return
             label, pct = await self._read_state()
             text = self.template.format(label=label, percent=pct)
-            if text == self._last_text:
-                return
+            if text == self._last_text: return
             await ch.send(text)
             self._last_text = text
-        except Exception as e:
-            log.debug("[a20] loop skipped: %s", e)
+        except Exception:
+            pass
 
     @loop.before_loop
     async def _before(self):
@@ -111,7 +94,6 @@ class CurriculumTKSD(commands.Cog):
 
     @commands.command(name="kurjunior")
     async def cmd_kurjunior(self, ctx: commands.Context):
-        """Show TK/SD curriculum progress (junior)."""
         label, pct = await self._read_state()
         await ctx.send(self.template.format(label=label, percent=pct))
 

@@ -1,4 +1,4 @@
-import os, json
+import os, json, aiohttp, asyncio
 
 class UpstashClient:
     def __init__(self):
@@ -6,28 +6,36 @@ class UpstashClient:
         self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN","")
         self.enabled = bool(self.base and self.token and os.getenv("KV_BACKEND","").lower()=="upstash_rest")
 
-    async def get(self, session, key: str):
+    async def _req_json(self, method: str, path: str, json_body=None):
         if not self.enabled: return None
-        import aiohttp
         headers = {"Authorization": f"Bearer {self.token}"}
+        if method == "POST":
+            headers["Content-Type"] = "application/json"
         try:
-            async with session.get(f"{self.base}/get/{key}", headers=headers, timeout=15) as r:
-                r.raise_for_status()
-                j = await r.json()
-                return j.get("result")
+            async with aiohttp.ClientSession() as session:
+                if method == "GET":
+                    async with session.get(f"{self.base}{path}", headers=headers, timeout=15) as r:
+                        r.raise_for_status()
+                        try: return await r.json()
+                        except Exception: return None
+                else:
+                    async with session.post(f"{self.base}{path}", headers=headers, json=json_body, timeout=15) as r:
+                        r.raise_for_status()
+                        try: return await r.json()
+                        except Exception: return True
         except Exception:
             return None
 
-    async def pipeline(self, session, commands):
-        if not self.enabled: return None
-        import aiohttp
-        headers = {"Authorization": f"Bearer {self.token}", "Content-Type":"application/json"}
-        try:
-            async with session.post(f"{self.base}/pipeline", headers=headers, json=commands, timeout=15) as r:
-                r.raise_for_status()
-                try:
-                    return await r.json()
-                except Exception:
-                    return True
-        except Exception:
-            return None
+    async def get_raw(self, key: str):
+        data = await self._req_json("GET", f"/get/{key}")
+        if not data: return None
+        return data.get("result")
+
+    async def get_json(self, key: str):
+        raw = await self.get_raw(key)
+        if raw is None: return None
+        try: return json.loads(raw)
+        except Exception: return None
+
+    async def pipeline(self, commands):
+        return await self._req_json("POST", "/pipeline", json_body=commands)

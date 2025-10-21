@@ -1,34 +1,26 @@
 import json, logging
-
 log = logging.getLogger(__name__)
 
 DEFAULT_STATE = {"total": 0, "label": None, "percent": 0.0, "remaining": None}
 
 def _coerce_dict(obj):
-    """Map various shapes to a normalized dict with keys: total,label,percent,remaining."""
     if not isinstance(obj, dict):
         return dict(DEFAULT_STATE)
-    # map alternative keys
     total = obj.get("total", obj.get("senior_total", obj.get("overall", 0)))
     label = obj.get("label")
     percent = obj.get("percent", 0.0)
     remaining = obj.get("remaining")
-    try:
-        total = int(total or 0)
-    except Exception:
-        total = 0
-    try:
-        percent = float(percent or 0.0)
-    except Exception:
-        percent = 0.0
+    try: total = int(total or 0)
+    except Exception: total = 0
+    try: percent = float(percent or 0.0)
+    except Exception: percent = 0.0
     return {"total": total, "label": label, "percent": percent, "remaining": remaining}
 
-def load(text: str):
-    """Safe load that never returns None. Accepts JSON or already-dict-like text."""
+def load(text):
     if text is None:
         return dict(DEFAULT_STATE)
     try:
-        if isinstance(text, (dict,)):
+        if isinstance(text, dict):
             return _coerce_dict(text)
         s = str(text).strip()
         if not s:

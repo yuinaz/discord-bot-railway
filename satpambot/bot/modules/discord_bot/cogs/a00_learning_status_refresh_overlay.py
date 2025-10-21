@@ -1,6 +1,5 @@
-import os, json, asyncio, logging
+import os, json, logging
 from datetime import datetime, timezone
-from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
@@ -23,7 +22,7 @@ class _Upstash:
             r.raise_for_status()
             return await r.json()
 
-    async def get(self, session, key: str) -> Optional[str]:
+    async def get(self, session, key: str):
         if not self.enabled: return None
         try:
             j = await self._get_json(session, f"/get/{key}")
@@ -36,14 +35,15 @@ class _Upstash:
         if not self.enabled or not commands: return False
         import aiohttp
         headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
-        async with session.post(f"{self.url}/pipeline", headers=headers, json=commands, timeout=15) as r:
-            if r.status // 100 != 2:
-                return False
-            try:
-                await r.json()
-            except Exception:
-                pass
-            return True
+        async with aiohttp.ClientSession() as sess:
+            async with sess.post(f"{self.url}/pipeline", headers=headers, json=commands, timeout=15) as r:
+                if r.status // 100 != 2:
+                    return False
+                try:
+                    await r.json()
+                except Exception:
+                    pass
+                return True
 
 upstash = _Upstash()
 
@@ -58,7 +58,6 @@ def _safe_int(raw: str) -> int:
             return 0
 
 class A00LearningStatusRefreshOverlay(commands.Cog):
-    """Learning status writer (strict no-downgrade, configurable XP key)."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.period = max(60, int(os.getenv("LEARNING_REFRESH_PERIOD_SEC", "300") or "300"))
@@ -74,7 +73,6 @@ class A00LearningStatusRefreshOverlay(commands.Cog):
         raw_total = await upstash.get(session, self.xp_key)
         total = _safe_int(raw_total)
         label, pct, rem = compute_senior_label(total, self.ladders or {})
-        # Enforce floor by existing live and LEARNING_MIN_LABEL
         live_raw = await upstash.get(session, "learning:status_json")
         live_label = None
         if live_raw:
@@ -98,13 +96,12 @@ class A00LearningStatusRefreshOverlay(commands.Cog):
             import aiohttp
             async with aiohttp.ClientSession() as session:
                 data = await self._compute(session)
-                # Strict no-downgrade against current live label
                 live_raw = await upstash.get(session, "learning:status_json")
                 if live_raw:
                     try:
                         live_label = json.loads(live_raw).get("label")
                         if live_label and is_lower(data["label"], live_label):
-                            return  # skip write
+                            return
                     except Exception:
                         pass
                 await upstash.pipeline(session, [

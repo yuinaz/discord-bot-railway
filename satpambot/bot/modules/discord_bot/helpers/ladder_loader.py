@@ -30,12 +30,10 @@ def resolve_ladder_path(script_dir: str):
         envp2 = _to_windows_drive_if_gitbash_style(envp)
         if os.path.exists(envp2):
             return os.path.abspath(envp2)
-    # canonical data/neuro-lite/ladder.json
     for root in _repo_root_candidates(script_dir):
         cand = os.path.join(root, "data", "neuro-lite", "ladder.json")
         if os.path.exists(cand):
             return os.path.abspath(cand)
-    # fallback: repo root ladder.json
     for root in _repo_root_candidates(script_dir):
         cand = os.path.join(root, "ladder.json")
         if os.path.exists(cand):

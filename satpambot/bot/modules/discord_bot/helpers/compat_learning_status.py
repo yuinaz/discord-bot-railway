@@ -1,4 +1,4 @@
-import os, json, asyncio
+import os, json
 
 from .ladder_loader import load_ladders, compute_senior_label
 
@@ -18,18 +18,11 @@ class UpstashLite:
             return j.get("result")
 
 async def read_learning_status(session, base: str, token: str):
-    """
-    Return dict(label, percent, remaining, senior_total) from Upstash keys:
-    - prefer learning:status_json
-    - fallback to compute from XP key (XP_SENIOR_KEY or default)
-    """
     up = UpstashLite(base, token)
-    # try direct
     raw = await up.get(session, "learning:status_json")
     if raw:
         try:
             j = json.loads(raw)
-            # normalize
             return {
                 "label": j.get("label"),
                 "percent": float(j.get("percent") or 0.0),
@@ -38,7 +31,6 @@ async def read_learning_status(session, base: str, token: str):
             }
         except Exception:
             pass
-    # fallback compute
     xp_key = os.getenv("XP_SENIOR_KEY","xp:bot:senior_total")
     total_raw = await up.get(session, xp_key)
     try:
@@ -46,8 +38,7 @@ async def read_learning_status(session, base: str, token: str):
     except Exception:
         try:
             jt = json.loads(total_raw); total = int(jt.get("overall",0))
-        except Exception:
-            total = 0
+        except Exception: total = 0
     ladders = load_ladders(__file__)
     label, percent, remaining = compute_senior_label(total, ladders)
     return {"label": label, "percent": percent, "remaining": remaining, "senior_total": total}

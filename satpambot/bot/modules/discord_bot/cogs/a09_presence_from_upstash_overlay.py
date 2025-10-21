@@ -1,4 +1,4 @@
-import os, json, asyncio, logging
+import os, json, logging
 from datetime import datetime, timezone
 
 import discord
@@ -10,10 +10,6 @@ from ..helpers.ladder_loader import load_ladders, compute_senior_label
 log = logging.getLogger(__name__)
 
 class PresenceFromUpstash(commands.Cog):
-    """
-    Presence overlay: read learning:status_json from Upstash and render presence.
-    Fallback: compute from xp (senior) + ladder.json.
-    """
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.period = max(30, int(os.getenv("LEINA_PRESENCE_PERIOD_SEC","60") or "60"))
@@ -50,7 +46,7 @@ class PresenceFromUpstash(commands.Cog):
         try:
             import aiohttp
             async with aiohttp.ClientSession() as session:
-                raw = await self.client.get(session, "learning:status_json")
+                raw = await self.client.get("learning:status_json")
                 if raw:
                     try:
                         j = json.loads(raw)
@@ -59,9 +55,8 @@ class PresenceFromUpstash(commands.Cog):
                     except Exception:
                         label, percent = "N/A", 0.0
                 else:
-                    # Fallback compute (read senior xp)
                     xp_key = os.getenv("XP_SENIOR_KEY","xp:bot:senior_total")
-                    total_raw = await self.client.get(session, xp_key)
+                    total_raw = await self.client.get(xp_key)
                     try: total = int(total_raw or 0)
                     except Exception:
                         try:

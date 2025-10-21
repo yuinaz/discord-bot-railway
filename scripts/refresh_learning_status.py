@@ -94,7 +94,6 @@ def main(args):
                 try_total = 0
 
         label, pct, rem = _compute_label(try_total, ladders)
-        # Floor
         live_raw = get_key("learning:status_json")
         live_label = None
         if live_raw:
@@ -107,7 +106,6 @@ def main(args):
             tab={"SMP":0,"SMA":1,"KULIAH":2}
             try: return (tab.get(p,-1), int(s.upper().replace("S","")))
             except Exception: return (tab.get(p,-1),0)
-            return (-1,0)
         floor = env_floor or live_label
         if floor and R(label) < R(floor):
             label = floor

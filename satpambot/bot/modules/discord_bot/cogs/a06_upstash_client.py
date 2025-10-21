@@ -1,85 +1,40 @@
+import os, json, aiohttp
 
-import os
-import json
-import urllib.parse
-from typing import Any, Dict, List, Optional
+class UpstashRedisClient:
+    def __init__(self):
+        self.base = os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")
+        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN","")
+        self.enabled = bool(self.base and self.token)
 
-try:
-    import httpx  # type: ignore
-except Exception:  # pragma: no cover
-    httpx = None
-
-DEFAULT_TIMEOUT = 8.0
-
-class UpstashRedis:
-    """
-    Minimal Upstash REST client (async). Uses /pipeline for safety (POST body),
-    falling back to GET endpoints for simple commands.
-    """
-    def __init__(self, url: str, token: str, timeout: float = DEFAULT_TIMEOUT):
-        self.url = url.rstrip("/")
-        self.token = token
-        self.timeout = timeout
-
-    def ok(self) -> bool:
-        return bool(self.url and self.token and httpx is not None)
-
-    async def _post(self, path: str, json_body: Any) -> Any:
-        if not self.ok():
-            raise RuntimeError("UpstashRedis not initialized or httpx missing")
+    async def _req_json(self, method: str, path: str, json_body=None):
+        if not self.enabled: return None
         headers = {"Authorization": f"Bearer {self.token}"}
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.post(self.url + path, headers=headers, json=json_body)
-            r.raise_for_status()
-            try:
-                return r.json()
-            except Exception:
-                return {"result": r.text}
+        if method == "POST": headers["Content-Type"] = "application/json"
+        try:
+            async with aiohttp.ClientSession() as session:
+                if method == "GET":
+                    async with session.get(f"{self.base}{path}", headers=headers, timeout=15) as r:
+                        r.raise_for_status()
+                        try: return await r.json()
+                        except Exception: return None
+                else:
+                    async with session.post(f"{self.base}{path}", headers=headers, json=json_body, timeout=15) as r:
+                        r.raise_for_status()
+                        try: return await r.json()
+                        except Exception: return True
+        except Exception:
+            return None
 
-    async def _get(self, path: str) -> Any:
-        if not self.ok():
-            raise RuntimeError("UpstashRedis not initialized or httpx missing")
-        headers = {"Authorization": f"Bearer {self.token}"}
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.get(self.url + path, headers=headers)
-            r.raise_for_status()
-            try:
-                return r.json()
-            except Exception:
-                return {"result": r.text}
-
-    async def pipeline(self, commands: List[List[str]]) -> Any:
-        return await self._post("/pipeline", commands)
-
-    async def get_raw(self, key: str) -> Optional[str]:
-        k = urllib.parse.quote(key, safe="")
-        data = await self._get(f"/get/{k}")
+    async def get_raw(self, key: str):
+        data = await self._req_json("GET", f"/get/{key}")
+        if not data: return None
         return data.get("result")
 
-    async def set_raw(self, key: str, value: str) -> bool:
-        # Use pipeline to avoid URL length limits
-        resp = await self.pipeline([["SET", key, value]])
-        try:
-            return (resp and isinstance(resp, list) and resp[0].get("result") == "OK")
-        except Exception:
-            return False
-
-    async def get_json(self, key: str) -> Optional[dict]:
+    async def get_json(self, key: str):
         raw = await self.get_raw(key)
-        if raw is None:
-            return None
-        try:
-            return json.loads(raw)
-        except Exception:
-            return None
+        if raw is None: return None
+        try: return json.loads(raw)
+        except Exception: return None
 
-    async def set_json(self, key: str, value: dict) -> bool:
-        raw = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-        return await self.set_raw(key, raw)
-
-def discover_from_env() -> Optional[UpstashRedis]:
-    url = os.getenv("UPSTASH_REDIS_REST_URL") or os.getenv("UPSTASH_URL")
-    token = os.getenv("UPSTASH_REDIS_REST_TOKEN") or os.getenv("UPSTASH_TOKEN")
-    if url and token:
-        return UpstashRedis(url=url, token=token)
-    return None
+    async def pipeline(self, commands):
+        return await self._req_json("POST", "/pipeline", json_body=commands)

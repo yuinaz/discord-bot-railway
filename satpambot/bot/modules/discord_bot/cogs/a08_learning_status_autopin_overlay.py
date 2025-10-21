@@ -1,7 +1,6 @@
-import os, json, asyncio, logging
+import os, json, logging
 from datetime import datetime, timezone
 
-import discord
 from discord.ext import commands, tasks
 
 from ..helpers.compat_learning_status import read_learning_status
@@ -9,19 +8,15 @@ from ..helpers.compat_learning_status import read_learning_status
 log = logging.getLogger(__name__)
 
 class LearningStatusAutopin(commands.Cog):
-    """Safe autopin/refresher for learning status."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.period = max(60, int(os.getenv("LEARNING_AUTOPIN_PERIOD_SEC","300") or "300"))
-        self.channel_id = None
         try:
             self.channel_id = int(os.getenv("LEARNING_STATUS_CHANNEL_ID","") or "0") or None
         except Exception:
             self.channel_id = None
         if self.channel_id:
             self.task = self.loop.start()
-        else:
-            log.info("[autopin] no channel set; passive mode")
 
     def cog_unload(self):
         try: self.loop.cancel()
@@ -30,19 +25,18 @@ class LearningStatusAutopin(commands.Cog):
     @tasks.loop(seconds=30)
     async def loop(self):
         try:
+            from discord import Game, Status
+            import aiohttp
             now = datetime.now(timezone.utc)
             if int(now.timestamp()) % self.period != 0:
                 return
-            ch = None
-            if self.channel_id:
-                ch = self.bot.get_channel(self.channel_id) or await self.bot.fetch_channel(self.channel_id)
-            if not ch:
+            if not self.channel_id:
                 return
+            ch = self.bot.get_channel(self.channel_id) or await self.bot.fetch_channel(self.channel_id)
+            if not ch: return
             base = os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")
             token = os.getenv("UPSTASH_REDIS_REST_TOKEN","")
-            if not (base and token):
-                return
-            import aiohttp
+            if not (base and token): return
             async with aiohttp.ClientSession() as session:
                 s = await read_learning_status(session, base, token)
             txt = f"📚 {s['label']} • {s['percent']:.1f}% (rem {s['remaining']})"
@@ -54,5 +48,5 @@ class LearningStatusAutopin(commands.Cog):
     async def _before(self):
         await self.bot.wait_until_ready()
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(LearningStatusAutopin(bot))
