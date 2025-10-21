@@ -1,54 +1,105 @@
 #!/usr/bin/env python3
-import os, json, urllib.request, urllib.error
-from pathlib import Path
+import os, json, argparse
+import httpx
 
-BASE = os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")
-TOK  = os.getenv("UPSTASH_REDIS_REST_TOKEN","")
-LADDER_PATH = Path(os.getenv("LADDER_PATH","data/neuro-lite/ladder.json"))
+SENIOR_PHASES = ["SMP", "SMA", "KULIAH"]
 
-def http_get(path: str) -> dict:
-    req = urllib.request.Request(url=f"{BASE}{path}", headers={"Authorization": f"Bearer {TOK}"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-def http_post_json(path: str, payload):
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url=f"{BASE}{path}", data=data, method="POST",
-        headers={"Authorization": f"Bearer {TOK}", "Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-def compute(total: int, senior: dict):
-    running = int(total or 0)
-    for g, levels in senior.items():
-        for lvl, cost in levels.items():
-            cost = int(cost)
-            if running < cost:
-                pct = round((running / cost) * 100.0, 1) if cost > 0 else 100.0
-                return f"{g}-{lvl}", pct, (cost - running)
-            running -= cost
-    last_g = list(senior.keys())[-1]
-    last_l = list(senior[last_g].keys())[-1]
-    return f"{last_g}-{last_l}", 100.0, 0
-
-def main():
-    if not (BASE and TOK):
-        print("Set UPSTASH_REDIS_REST_URL & UPSTASH_REDIS_REST_TOKEN"); return
-    ladder = json.loads(LADDER_PATH.read_text("utf-8"))
-    senior = ladder.get("senior") or {}
-    raw = http_get("/get/xp:bot:senior_total").get("result")
+def _parse_stage_key(k: str) -> int:
+    k = str(k).strip().upper()
+    for p in ("L","S"):
+        if k.startswith(p):
+            try:
+                return int(k[len(p):])
+            except Exception:
+                pass
     try:
-        total = int(raw)
+        return int(k)
     except Exception:
-        try: total = int(json.loads(raw).get("senior_total_xp",0))
-        except Exception: total = 0
-    label, pct, remaining = compute(total, senior)
-    status = f"{label} ({pct}%)"
-    status_json = json.dumps({"label":label,"percent":float(pct),"remaining":int(remaining),"senior_total":int(total)}, separators=(",",":"))
-    out = http_post_json("/pipeline", [["SET","learning:status",status],["SET","learning:status_json",status_json]])
-    print("Wrote:", out); print("Status:", status); print("JSON  :", status_json)
+        return 999999
+
+def _load_ladders_from_repo():
+    cur = os.path.abspath(os.path.dirname(__file__))
+    for _ in range(10):
+        cand = os.path.join(cur, "..","data","neuro-lite","ladder.json")
+        cand = os.path.abspath(cand)
+        if os.path.exists(cand):
+            with open(cand, "r", encoding="utf-8") as f:
+                j = json.load(f)
+            ladders = {}
+            for domain in ("junior","senior"):
+                d = j.get(domain) or {}
+                for phase, stages in d.items():
+                    ladders[phase] = {str(k): int(v) for k,v in stages.items()}
+            return ladders
+        cur = os.path.dirname(cur)
+    return {}
+
+def _compute_label(total, ladders):
+    spent = 0
+    def order(d):
+        return sorted(d.items(), key=lambda kv: _parse_stage_key(kv[0]))
+    for phase in SENIOR_PHASES:
+        chunks = ladders.get(phase, {})
+        for (stage, need) in order(chunks):
+            need = max(1, int(need))
+            have = max(0, total - spent)
+            if have < need:
+                pct = 100.0 * (have / float(need))
+                rem = max(0, need - have)
+                return (f"{phase}-S{_parse_stage_key(stage)}", round(pct,1), rem)
+            spent += need
+    last = SENIOR_PHASES[-1]
+    last_idx = len(order(ladders.get(last, {"S1":1})))
+    return (f"{last}-S{last_idx}", 100.0, 0)
+
+def main(write: bool):
+    base = os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")
+    token = os.getenv("UPSTASH_REDIS_REST_TOKEN","")
+    if not base or not token:
+        print("Upstash env missing.")
+        return 1
+    headers = {"Authorization": f"Bearer {token}", "Content-Type":"application/json"}
+    ladders = _load_ladders_from_repo()
+    with httpx.Client(timeout=15.0) as http:
+        def get_key(k):
+            try:
+                r = http.get(f"{base}/get/{k}", headers=headers)
+                r.raise_for_status()
+                return r.json().get("result")
+            except Exception:
+                return None
+        def mset_pipeline(kv):
+            try:
+                commands = [["SET", k, v] for k, v in kv.items()]
+                r = http.post(f"{base}/pipeline", headers=headers, json=commands)
+                r.raise_for_status()
+                return True
+            except Exception:
+                return False
+        raw = get_key("xp:bot:senior_total")
+        try_total = 0
+        try:
+            try_total = int(raw) if raw is not None else 0
+        except Exception:
+            try:
+                j = json.loads(raw)
+                try_total = int(j.get("overall",0))
+            except Exception:
+                try_total = 0
+        label, pct, rem = _compute_label(try_total, ladders)
+        phase = label.split("-")[0]
+        status = f"{label} ({pct:.1f}%)"
+        status_json = json.dumps({"label":label,"percent":pct,"remaining":rem,"senior_total":try_total}, separators=(",",":"))
+        print("Computed:", status_json)
+        if write:
+            ok = mset_pipeline({
+                "learning:status": status,
+                "learning:status_json": status_json,
+                "learning:phase": phase
+            })
+            print("Wrote (pipeline):", ok)
+    return 0
 
 if __name__ == "__main__":
-    main()
+    import sys, os
+    raise SystemExit(main("--write" in sys.argv))

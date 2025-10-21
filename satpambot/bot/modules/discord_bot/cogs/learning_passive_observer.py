@@ -1,142 +1,99 @@
-
-from __future__ import annotations
-
-import asyncio
-import json
-import logging
-import os
-import re
-from collections import deque
-from typing import Dict, Any, Deque
+import os, asyncio, logging, json
+from datetime import datetime, timezone
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
-LOGGER = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-L1_CUTOFF = 1000
-L2_CUTOFF = 2000
+class _Upstash:
+    def __init__(self):
+        self.url = os.getenv("UPSTASH_REDIS_REST_URL", "").rstrip("/")
+        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+        self.enabled = bool(self.url and self.token and os.getenv("KV_BACKEND","").lower()=="upstash_rest")
 
-CHANNEL_BLOCKLIST = {
-    1400375184048787566,
-}
+    async def incrby(self, session, key: str, delta: int):
+        if not self.enabled: return None
+        import aiohttp
+        headers = {"Authorization": f"Bearer {self.token}"}
+        async with session.post(f"{self.url}/incrby/{key}/{int(delta)}", headers=headers, timeout=15) as r:
+            r.raise_for_status()
+            try:
+                j = await r.json()
+                return int(j.get("result")) if "result" in j else None
+            except Exception:
+                return None
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "data")
-STORE_PATH = os.path.join(DATA_DIR, "xp_store.json")
-AWARDED_IDS_PATH = os.path.join(DATA_DIR, "xp_awarded_ids.json")
+upstash = _Upstash()
 
-MAX_AWARDED_IDS = 50000
-
-def _ensure_data_files():
-    os.makedirs(os.path.dirname(STORE_PATH), exist_ok=True)
-    if not os.path.exists(STORE_PATH):
-        with open(STORE_PATH, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=2)
-    if not os.path.exists(AWARDED_IDS_PATH):
-        with open(AWARDED_IDS_PATH, "w", encoding="utf-8") as f:
-            json.dump({"ids": []}, f, ensure_ascii=False, indent=2)
-
-def _load_store() -> Dict[str, Any]:
-    _ensure_data_files()
-    try:
-        with open(STORE_PATH, "r", encoding="utf-8") as f:
-            return json.load(f) or {}
-    except Exception:
-        return {}
-
-def _save_store(store: Dict[str, Any]):
-    _ensure_data_files()
-    tmp = STORE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(store, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, STORE_PATH)
-
-def _load_awarded_ids() -> Deque[int]:
-    _ensure_data_files()
-    try:
-        with open(AWARDED_IDS_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            ids = data.get("ids", [])
-            dq: Deque[int] = deque(maxlen=MAX_AWARDED_IDS)
-            for v in ids[-MAX_AWARDED_IDS:]:
-                dq.append(v)
-            return dq
-    except Exception:
-        return deque(maxlen=MAX_AWARDED_IDS)
-
-def _save_awarded_ids(dq: Deque[int]):
-    _ensure_data_files()
-    tmp = AWARDED_IDS_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"ids": list(dq)}, f, ensure_ascii=False)
-    os.replace(tmp, AWARDED_IDS_PATH)
-
-def _current_group(bot) -> str:
-    override = os.getenv("LEARNING_FORCE_GROUP")
-    if override:
-        return override.lower()
-    phase = (getattr(bot, "learning_phase", None) or os.getenv("LEARNING_FORCE_PHASE") or "TK").lower()
-    return "senior" if phase == "senior" else "junior"
-
-LADDER_JSON_PATH = os.getenv("LADDER_JSON_PATH", os.path.join(DATA_DIR, "ladder.json"))
-
-try:
-    from satpambot.bot.modules.discord_bot.helpers.ladder_utils import load_ladder, compute_label_from_group
-except Exception:
-    try:
-        from ..helpers.ladder_utils import load_ladder, compute_label_from_group  # type: ignore
-    except Exception:
-        load_ladder = compute_label_from_group = None  # type: ignore
+def _parse_id_csv(s: str):
+    out = set()
+    for part in (s or "").split(","):
+        part = part.strip()
+        if not part: continue
+        try: out.add(int(part))
+        except Exception: pass
+    return out
 
 class LearningPassiveObserver(commands.Cog):
-    def __init__(self, bot):
+    """Leina: batched passive XP → xp:bot:senior_total (daily cap)."""
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.store: Dict[str, Any] = _load_store()
-        self.awarded_ids: Deque[int] = _load_awarded_ids()
-        self._ladder_map: Dict = {}
-        if callable(load_ladder):
-            self._ladder_map = load_ladder(LADDER_JSON_PATH) or {}
-            if self._ladder_map:
-                LOGGER.info("[learning-passive] ladder loaded: %s", LADDER_JSON_PATH)
-            else:
-                LOGGER.warning("[learning-passive] ladder empty or missing: %s", LADDER_JSON_PATH)
+        self._per_msg = max(0, int(os.getenv("LEARNING_PASSIVE_XP_PER_MESSAGE", "1") or "1"))
+        self._daily_cap = max(0, int(os.getenv("LEARNING_PASSIVE_DAILY_CAP", "300") or "300"))
+        self._allow_guilds = _parse_id_csv(os.getenv("LEARNING_PASSIVE_ALLOW_GUILDS",""))
+        self._deny_channels = _parse_id_csv(os.getenv("LEARNING_PASSIVE_DENY_CHANNELS",""))
+        self._bucket = 0
+        self._today = None
+        self._task = self._flush.start()
 
-    def _key(self, gid: int, uid: int) -> str:
-        return f"{gid}:{uid}"
+    def cog_unload(self):
+        try:
+            self._flush.cancel()
+        except Exception:
+            pass
 
-    def _get_rec(self, gid: int, uid: int) -> Dict[str, Any]:
-        return self.store.setdefault(self._key(gid, uid), {"xp": 0})
+    def _same_day(self, dt: datetime) -> bool:
+        if self._today is None: return False
+        return dt.date() == self._today
 
-    def _compute_level_label(self, total_xp: int) -> str:
-        group = _current_group(self.bot)
-        if callable(compute_label_from_group) and self._ladder_map:
-            label = compute_label_from_group(total_xp, group, self._ladder_map)
-            if label:
-                return label
-        if total_xp < L1_CUTOFF: return "TK-L1"
-        if total_xp < L2_CUTOFF: return "TK-L2"
-        return "SD-L1"
-
-    def _add_xp(self, gid: int, uid: int, mid: int) -> None:
-        rec = self._get_rec(gid, uid)
-        if mid in self.awarded_ids:
-            return
-        rec["xp"] = rec.get("xp", 0) + 1
-        self.awarded_ids.append(mid)
-        self.store[self._key(gid, uid)] = rec
-        _save_store(self.store)
-        _save_awarded_ids(self.awarded_ids)
-
-        level = self._compute_level_label(rec["xp"])
-        LOGGER.info("[passive-learning] +1 XP -> total=%s level=%s", rec["xp"], level)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.bot or not message.guild or not message.content:
-            return
-        if message.channel and message.channel.id in CHANNEL_BLOCKLIST:
+    @tasks.loop(seconds=10)
+    async def _flush(self):
+        if not upstash.enabled: return
+        if self._bucket <= 0: return
+        now = datetime.now(timezone.utc)
+        if not self._same_day(now):
+            self._today = now.date()
+            self._bucket = min(self._bucket, self._daily_cap)
+        delta = min(self._bucket, self._daily_cap)
+        if delta <= 0: 
             return
         try:
-            self._add_xp(message.guild.id, message.author.id, message.id)
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                await upstash.incrby(session, "xp:bot:senior_total", int(delta))
         except Exception as e:
-            LOGGER.warning("[passive-learning] error: %r", e)
+            log.debug("[passive] flush failed: %s", e)
+            return
+        finally:
+            self._bucket = 0
+
+    @_flush.before_loop
+    async def _before(self):
+        await self.bot.wait_until_ready()
+        self._today = datetime.now(timezone.utc).date()
+
+    @commands.Cog.listener("on_message")
+    async def _on_message(self, message: discord.Message):
+        if message.author.bot: 
+            return
+        if self._per_msg <= 0:
+            return
+        if self._deny_channels and message.channel.id in self._deny_channels:
+            return
+        if self._allow_guilds and message.guild and (message.guild.id not in self._allow_guilds):
+            return
+        self._bucket = min(self._bucket + self._per_msg, self._daily_cap)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(LearningPassiveObserver(bot))
