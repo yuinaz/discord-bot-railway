@@ -5,7 +5,7 @@ class Admin(commands.Cog):
     def __init__(self, bot): self.bot = bot
 
     @commands.has_permissions(ban_members=True)
-    # @commands.command(name="unban")  # disabled by script
+    # # @commands.command(name="unban")  # disabled  # disabled by script
 async def _disabled_unban(self, ctx, user_id: int):
         user = await self.bot.fetch_user(user_id)
         await ctx.guild.unban(user, reason=f"Unban by {ctx.author}")
