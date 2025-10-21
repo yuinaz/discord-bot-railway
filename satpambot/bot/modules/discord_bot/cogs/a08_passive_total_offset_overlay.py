@@ -1,6 +1,24 @@
 
 import os, logging, importlib
 from discord.ext import commands, tasks
+
+def _intish(x, default=0):
+    if x is None:
+        return default
+    try:
+        return int(x)
+    except Exception:
+        s = str(x).strip()
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                obj = json.loads(s)
+                for k in ("senior_total_xp","value","v"):
+                    if k in obj:
+                        return int(obj[k])
+            except Exception:
+                pass
+        digits = "".join(ch for ch in s if ch.isdigit())
+        return int(digits or default)
 try:
     import httpx
 except Exception:

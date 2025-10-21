@@ -67,8 +67,7 @@ class XpBridgeFromStoreSAFE(commands.Cog):
         if url and tok and httpx is not None:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as x:
-                    r = await x.post(url, headers={"Authorization": f"Bearer {tok}", "Content-Type":"application/json"},
-                                     json=["INCRBY", key, str(delta)])
+                    r = await x.post(f"{url}/pipeline", headers={"Authorization": f"Bearer {tok}", "Content-Type":"application/json"}, json=[["INCRBY", key, str(delta)]])
                     r.raise_for_status()
                     return r.json()
             except Exception:

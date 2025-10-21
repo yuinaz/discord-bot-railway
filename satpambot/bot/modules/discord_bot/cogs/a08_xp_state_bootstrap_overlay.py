@@ -1,6 +1,24 @@
 
 import os, logging
 from discord.ext import commands, tasks
+
+def _intish(x, default=0):
+    if x is None:
+        return default
+    try:
+        return int(x)
+    except Exception:
+        s = str(x).strip()
+        if s.startswith("{") and s.endswith("}"):
+            try:
+                obj = json.loads(s)
+                for k in ("senior_total_xp","value","v"):
+                    if k in obj:
+                        return int(obj[k])
+            except Exception:
+                pass
+        digits = "".join(ch for ch in s if ch.isdigit())
+        return int(digits or default)
 try:
     import httpx
 except Exception:
@@ -37,8 +55,8 @@ class XPStateBootstrap(commands.Cog):
             sr_total = await _get(self._client, SR_KEY)
             self.bot._xp_state = {
                 "phase": (phase or DEFAULT_PHASE),
-                "tk_total": int(tk_total or 0),
-                "senior_total": int(sr_total or 0),
+                "tk_total": _intish(tk_total or 0),
+                "senior_total": _intish(sr_total or 0),
             }
             log.info("[xp-state] phase=%s tk_total=%s senior_total=%s",
                      self.bot._xp_state["phase"], self.bot._xp_state["tk_total"], self.bot._xp_state["senior_total"])
