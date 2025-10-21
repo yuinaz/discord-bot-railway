@@ -31,6 +31,16 @@ def _compute_junior_label(total: int, ladders: Dict[str, Dict[str,int]]) -> Tupl
     last_idx = len(_order_stages(ladders.get(last, {"S1":1})))
     return (f"{last}-S{last_idx}", 100.0, 0)
 
+# === Compatibility shim for a24_curriculum_auto_pin ===
+def _load_cfg():
+    """Return a dict containing config; at least 'report_channel_id' key for a24."""
+    cid = None
+    try:
+        cid = int(os.getenv("LEINA_CURRICULUM_CHANNEL_ID","") or "0") or None
+    except Exception:
+        cid = None
+    return {"report_channel_id": cid}
+
 class CurriculumTKSD(commands.Cog):
     """Robust TK/SD curriculum cog that reads from Upstash and never crashes."""
     def __init__(self, bot: commands.Bot):
@@ -39,11 +49,8 @@ class CurriculumTKSD(commands.Cog):
         self.ladders = load_ladders(__file__)
         self.period = max(60, int(os.getenv("LEINA_CURRICULUM_PERIOD_SEC","300") or "300"))
         self.template = os.getenv("LEINA_CURRICULUM_TEMPLATE", "📘 {label} • {percent:.1f}% (TK/SD)")
-        self.channel_id = None
-        try:
-            self.channel_id = int(os.getenv("LEINA_CURRICULUM_CHANNEL_ID","") or "0") or None
-        except Exception:
-            self.channel_id = None
+        cfg = _load_cfg()
+        self.channel_id = cfg.get("report_channel_id")
         self._last_text = None
         if self.channel_id and self.client.enabled:
             self.loop.start()
