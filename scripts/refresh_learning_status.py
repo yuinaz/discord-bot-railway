@@ -36,11 +36,11 @@ def _load_ladders_from_repo():
 
 def _compute_label(total, ladders):
     spent = 0
-    def order(d):
-        return sorted(d.items(), key=lambda kv: _parse_stage_key(kv[0]))
+    def ordered_items(dct):
+        return sorted(list(dct.items()), key=lambda kv: _parse_stage_key(kv[0]))
     for phase in SENIOR_PHASES:
         chunks = ladders.get(phase, {})
-        for (stage, need) in order(d:=chunks.items() if hasattr(chunks,'items') else []):
+        for (stage, need) in ordered_items(chunks):
             need = max(1, int(need))
             have = max(0, total - spent)
             if have < need:
@@ -49,7 +49,7 @@ def _compute_label(total, ladders):
                 return (f"{phase}-S{_parse_stage_key(stage)}", round(pct,1), rem)
             spent += need
     last = SENIOR_PHASES[-1]
-    last_idx = len(order(ladders.get(last, {"S1":1}).items()))
+    last_idx = len(ordered_items(ladders.get(last, {"S1":1})))
     return (f"{last}-S{last_idx}", 100.0, 0)
 
 def main(args):
@@ -102,12 +102,12 @@ def main(args):
             except Exception: live_label = None
         env_floor = os.getenv("LEARNING_MIN_LABEL","").strip() or None
         def R(l): 
-            import re
             if not l: return (-1,0)
             p,s=(l.split("-",1)+["S0"])[:2]
             tab={"SMP":0,"SMA":1,"KULIAH":2}
             try: return (tab.get(p,-1), int(s.upper().replace("S","")))
             except Exception: return (tab.get(p,-1),0)
+            return (-1,0)
         floor = env_floor or live_label
         if floor and R(label) < R(floor):
             label = floor
@@ -126,7 +126,6 @@ def main(args):
     return 0
 
 if __name__ == "__main__":
-    import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--xp-key", help="Upstash key to read senior XP from (overrides env XP_SENIOR_KEY)")
