@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 class PresenceFromUpstash(commands.Cog):
     """
     Presence overlay: read learning:status_json from Upstash and render presence.
-    Fallback: compute from xp:bot:senior_total + ladder.json.
+    Fallback: compute from xp (senior) + ladder.json.
     """
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -59,8 +59,9 @@ class PresenceFromUpstash(commands.Cog):
                     except Exception:
                         label, percent = "N/A", 0.0
                 else:
-                    # Fallback compute
-                    total_raw = await self.client.get(session, "xp:bot:senior_total")
+                    # Fallback compute (read senior xp)
+                    xp_key = os.getenv("XP_SENIOR_KEY","xp:bot:senior_total")
+                    total_raw = await self.client.get(session, xp_key)
                     try: total = int(total_raw or 0)
                     except Exception:
                         try:

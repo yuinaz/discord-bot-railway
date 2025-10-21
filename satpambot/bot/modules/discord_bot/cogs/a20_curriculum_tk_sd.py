@@ -93,7 +93,6 @@ class CurriculumTKSD(commands.Cog):
             text = self.template.format(label=label, percent=pct)
             if text == self._last_text:
                 return
-            # Post a new message; optionally you can implement upsert/edit logic if you keep message_id.
             await ch.send(text)
             self._last_text = text
         except Exception as e:

@@ -1,4 +1,4 @@
-import os, json, asyncio
+import os, json
 
 class UpstashClient:
     def __init__(self):
@@ -21,7 +21,7 @@ class UpstashClient:
     async def pipeline(self, session, commands):
         if not self.enabled: return None
         import aiohttp
-        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type":"application/json"}
         try:
             async with session.post(f"{self.base}/pipeline", headers=headers, json=commands, timeout=15) as r:
                 r.raise_for_status()
