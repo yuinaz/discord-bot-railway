@@ -4,6 +4,13 @@ import importlib, logging
 log = logging.getLogger(__name__)
 
 MODULES = [
+    "satpambot.bot.modules.discord_bot.cogs.a02_status_pin_embed_overlay",
+    "modules.discord_bot.cogs.a02_status_pin_embed_overlay",
+
+    "modules.discord_bot.cogs.a01_interview_thread_overlay",
+
+    "satpambot.bot.modules.discord_bot.cogs.a01_interview_thread_overlay",
+
     "satpambot.bot.modules.discord_bot.cogs.a00_governor_gate_neurosama_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a00_qna_allowlist_bridge_overlay",
 
