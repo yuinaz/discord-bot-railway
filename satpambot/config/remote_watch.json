@@ -1,9 +1,5 @@
 {
-  "enabled": true,
-  "interval_days": 4,
-  "interval_minutes": null,
-  "check_url": "",
-  "notify_channel_id": 1400375184048787566,
-  "notify_thread_name": "log restart github",
-  "request_timeout_s": 15
+  "enabled": false,
+  "interval_sec": 900,
+  "check_url": ""
 }

@@ -4,6 +4,13 @@ import importlib, logging
 log = logging.getLogger(__name__)
 
 MODULES = [
+    "satpambot.bot.modules.discord_bot.cogs.a00_governor_gate_neurosama_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a00_qna_allowlist_bridge_overlay",
+
+    # compatibility for alternative namespace (if used by some hosts)
+    "modules.discord_bot.cogs.a00_governor_gate_neurosama_overlay",
+    "modules.discord_bot.cogs.a00_qna_allowlist_bridge_overlay",
+
     # safety first
     "satpambot.bot.modules.discord_bot.cogs.a27_thread_protect_shim",
     "satpambot.bot.modules.discord_bot.cogs.a26_memory_upsert_thread_router",
@@ -37,6 +44,12 @@ async def setup(bot):
 # PATCH: ensure Upstash env bridge autoloads even on Render
 try:
     from . import a06_upstash_env_bridge_overlay  # noqa: F401
+except Exception:
+    try:
+        from . import a00_upstash_env_bridge_overlay  # noqa: F401
+    except Exception:
+        pass
+
 except Exception:
     try:
         from . import a00_upstash_env_bridge_overlay  # noqa: F401
