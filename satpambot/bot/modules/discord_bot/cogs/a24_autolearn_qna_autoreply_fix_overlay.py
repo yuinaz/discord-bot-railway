@@ -1,126 +1,199 @@
-import os, re, time, json, logging, hashlib
+
+from __future__ import annotations
+import os, re, json, asyncio, logging, hashlib, time
+from typing import Optional, List, Tuple
 import discord
 from discord.ext import commands
+try:
+    import aiohttp
+except Exception:
+    aiohttp = None
 
-log = logging.getLogger(__name__)
-MAX_FIELD = 1024
+from ..helpers.config_defaults import env, env_int
 
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip().lower())
+LOG = logging.getLogger(__name__)
+
+def _channels_allowlist() -> List[int]:
+    raw = env("QNA_CHANNEL_ALLOWLIST", env("QNA_CHANNEL_ID"))
+    ids = []
+    for tok in re.split(r"[,\s]+", raw or ""):
+        tok = tok.strip()
+        if tok.isdigit():
+            try: ids.append(int(tok))
+            except Exception: pass
+    return ids
+
+def _provider_order() -> List[str]:
+    raw = env("QNA_PROVIDER_ORDER", "groq,gemini")
+    return [p.strip().lower() for p in (raw or "").split(",") if p.strip()]
 
 def _hash(s: str) -> str:
-    return hashlib.sha1(_norm(s).encode()).hexdigest()
+    return hashlib.sha1((s or "").encode("utf-8")).hexdigest()
 
-async def _get(url, token, key):
-    if not (url and token): return None
-    try:
-        import aiohttp
-        async with aiohttp.ClientSession() as sess:
-            r = await sess.get(f"{url}/get/{key}", headers={"Authorization": f"Bearer {token}"}, timeout=8)
-            if r.status == 200:
-                j = await r.json()
-                return (j or {}).get("result")
-    except Exception:
-        return None
+def _dedup_key(question: str) -> str:
+    ns = env("QNA_ANSWER_DEDUP_NS","qna:answered")
+    return f"{ns}:{_hash(question.strip().lower())}"
 
-async def _setex(url, token, key, ttl, val):
-    if not (url and token): return False
-    try:
-        import aiohttp
-        async with aiohttp.ClientSession() as sess:
-            r = await sess.post(f"{url}/setex/{key}/{ttl}/{val}", headers={"Authorization": f"Bearer {token}"}, timeout=8)
-            return r.status == 200
-    except Exception:
-        return False
-
-async def _llm(bot, q: str, providers):
-    # 1) prefer bot.llm_ask if exists
-    fn = getattr(bot, "llm_ask", None)
-    if callable(fn):
-        for prov in providers:
-            try:
-                try: txt = await fn(q, provider=prov)
-                except TypeError: txt = await fn(q)
-                if txt: return txt, prov
-            except Exception as e:
-                log.debug("[autolearn-fix] bot.llm_ask %s failed: %r", prov, e)
-    # 2) fallback to direct (import-lazy to avoid import error at import time)
-    try:
-        from ..helpers.llm_fallback_min import groq_chat, gemini_chat
-    except Exception:
-        groq_chat = gemini_chat = None
-    for prov in providers:
-        try:
-            if prov == "gemini" and gemini_chat:
-                txt = await gemini_chat(q, system="Jawab singkat dan jelas. Bahasa Indonesia.")
-            elif prov == "groq" and groq_chat:
-                txt = await groq_chat(q, system="Jawab singkat dan jelas. Bahasa Indonesia.")
-            else:
-                continue
-            if txt: return txt, prov
-        except Exception as e:
-            log.debug("[autolearn-fix] direct %s failed: %r", prov, e)
-    return "", ""
-
-class AutoLearnQnAAutoReplyFixOverlay(commands.Cog):
-    """Auto-reply Q->A di channel QnA. Import-safe, tidak crash bila config/ENV kosong."""
+class AutoLearnQnAAutoReplyFix(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # channel id dari env atau default (1426571542627614772)
-        try:
-            self.QID = int(os.getenv("QNA_CHANNEL_ID","1426571542627614772"))
-        except Exception:
-            self.QID = 1426571542627614772
-        # provider order dari env atau default
-        prov = os.getenv("QNA_PROVIDER_ORDER","groq,gemini")
-        self.providers = [p.strip().lower() for p in prov.split(",") if p.strip()]
-        # upstash (opsional)
-        self.url = (os.getenv("UPSTASH_REDIS_REST_URL","") or "").rstrip("/") or None
-        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN") or None
-        self.ns = os.getenv("QNA_ANSWER_DEDUP_NS","qna:answered")
-        try:
-            self.ttl = int(os.getenv("QNA_ANSWER_TTL_SEC","86400"))
-        except Exception:
-            self.ttl = 86400
-        log.info("[autolearn-fix] channel=%s providers=%s", self.QID, self.providers)
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.allow_channels = set(_channels_allowlist())
+        self.answer_ttl = env_int("QNA_ANSWER_TTL_SEC", 86400)
+        self.xp_award = env_int("QNA_XP_AWARD", 5)
+
+    async def _ensure_session(self):
+        if self.session is None and aiohttp is not None:
+            self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=25))
+
+    def cog_unload(self):
+        if self.session and not self.session.closed:
+            asyncio.create_task(self.session.close())
 
     @commands.Cog.listener()
-    async def on_message(self, m: discord.Message):
+    async def on_message(self, message: discord.Message):
+        if not message or not message.guild or not message.embeds:
+            return
+        if self.allow_channels and (message.channel.id not in self.allow_channels):
+            return
         try:
-            if not m or not hasattr(m, "content"): return
-            if getattr(m, "author", None) and getattr(m.author, "bot", False): return
-            if not m.channel or int(m.channel.id) != self.QID: return
-            q = (m.content or "").strip()
-            if not q: return
-
-            h = _hash(q)
-            if await _get(self.url, self.token, f"{self.ns}:{h}") is not None:
+            if not message.author.bot or message.author.id != self.bot.user.id:
                 return
+        except Exception:
+            return
 
-            ans, src = await _llm(self.bot, q, self.providers)
-            if not ans: return
+        q = self._extract_question(message)
+        if not q:
+            return
+        if await self._is_answered(q):
+            return
 
-            e = discord.Embed(title="[auto-learn]", color=0x3b82f6)
-            e.add_field(name="Q", value=q[:MAX_FIELD], inline=False)
-            e.add_field(name=f"A · {src}", value=ans[:MAX_FIELD], inline=False)
-            await m.channel.send(embed=e)
+        text, prov = await self._answer(q)
+        if not text:
+            LOG.warning("[autolearn-qna] providers failed to answer")
+            return
 
-            await _setex(self.url, self.token, f"{self.ns}:{h}", self.ttl, str(int(time.time())))
-            # best-effort XP award
-            for name in ("satpam_xp", "xp_add", "xp_award"):
-                fn = getattr(self.bot, name, None)
-                if callable(fn):
-                    try:
-                        fn(int(m.author.id), 5, "autolearn:answer")
-                        break
-                    except TypeError:
-                        try:
-                            fn(int(m.author.id), 5)
-                            break
-                        except Exception:
-                            pass
+        title = f"Answer by {prov.capitalize()}" if prov else "Answer by Leina"
+        desc = text.strip() + "\n\n" + f"*Q: {q.strip()}*"
+        em = discord.Embed(title=title, description=desc)
+        if prov:
+            em.set_footer(text=f"via {prov.capitalize()}")
+        try:
+            await message.reply(embed=em, mention_author=False)
         except Exception as e:
-            log.debug("[autolearn-fix] on_message error: %r", e)
+            LOG.warning("[autolearn-qna] failed to reply: %r", e)
+            return
+
+        await self._mark_answered(q)
+        await self._award_xp(self.xp_award)
+
+    def _extract_question(self, message: discord.Message) -> Optional[str]:
+        try:
+            for em in message.embeds:
+                if (em.title or "").strip().lower() == "question by leina":
+                    return (em.description or "").strip()
+        except Exception:
+            pass
+        return None
+
+    async def _is_answered(self, q: str) -> bool:
+        if aiohttp is None: return False
+        await self._ensure_session()
+        url = env("UPSTASH_REDIS_REST_URL",""); tok=env("UPSTASH_REDIS_REST_TOKEN","")
+        if not (url and tok): return False
+        key = _dedup_key(q)
+        try:
+            payload = json.dumps([["EXISTS", key]])
+            async with self.session.post(f"{url}/pipeline",
+                headers={"Authorization": f"Bearer {tok}","Content-Type": "application/json"},
+                data=payload) as r:
+                data = await r.json()
+                return bool(data and data[0].get("result"))
+        except Exception:
+            return False
+
+    async def _mark_answered(self, q: str):
+        if aiohttp is None: return
+        await self._ensure_session()
+        url = env("UPSTASH_REDIS_REST_URL",""); tok=env("UPSTASH_REDIS_REST_TOKEN","")
+        if not (url and tok): return
+        key = _dedup_key(q)
+        try:
+            payload = json.dumps([["SETEX", key, str(self.answer_ttl), "1"]])
+            async with self.session.post(f"{url}/pipeline",
+                headers={"Authorization": f"Bearer {tok}","Content-Type": "application/json"},
+                data=payload) as r:
+                await r.read()
+        except Exception:
+            pass
+
+    async def _award_xp(self, amt: int):
+        if amt <= 0 or aiohttp is None: return
+        url = env("UPSTASH_REDIS_REST_URL",""); tok=env("UPSTASH_REDIS_REST_TOKEN","")
+        if not (url and tok): return
+        key = env("XP_SENIOR_KEY","xp:bot:senior_total_v2")
+        try:
+            await self._ensure_session()
+            payload = json.dumps([["INCRBY", key, str(amt)]])
+            async with self.session.post(f"{url}/pipeline",
+                headers={"Authorization": f"Bearer {tok}","Content-Type":"application/json"},
+                data=payload) as r:
+                await r.read()
+            LOG.info("[autolearn-qna] XP +%d → %s", amt, key)
+        except Exception as e:
+            LOG.debug("[autolearn-qna] xp award fail: %r", e)
+
+    async def _answer(self, question: str) -> Tuple[Optional[str], Optional[str]]:
+        for p in _provider_order():
+            try:
+                if p == "groq":
+                    ans = await self._ask_groq(question)
+                elif p == "gemini":
+                    ans = await self._ask_gemini(question)
+                else:
+                    ans = None
+                if ans: return ans.strip(), p
+            except Exception as e:
+                LOG.warning("[autolearn-qna] provider %s failed: %r", p, e)
+        return None, None
+
+    async def _ask_groq(self, question: str) -> Optional[str]:
+        key = env("GROQ_API_KEY",""); model = env("GROQ_MODEL","llama-3.1-8b-instant")
+        if not key or aiohttp is None: return None
+        await self._ensure_session()
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        body = {"model": model, "messages":[{"role":"user","content": question}], "temperature":0.7, "max_tokens":512}
+        async with self.session.post(url, json=body, headers={"Authorization":f"Bearer {key}","Content-Type":"application/json"}) as r:
+            data = await r.json()
+        try: return data["choices"][0]["message"]["content"]
+        except Exception: return None
+
+    async def _ask_gemini(self, question: str) -> Optional[str]:
+        key = env("GEMINI_API_KEY",""); model = env("GEMINI_MODEL","gemini-2.5-flash-lite")
+        if not key or aiohttp is None: return None
+        await self._ensure_session()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+        body = {"contents":[{"parts":[{"text": question}]}]}
+        async with self.session.post(url, json=body, headers={"Content-Type":"application/json"}) as r:
+            data = await r.json()
+        try: return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception: return None
 
 async def setup(bot):
-    await bot.add_cog(AutoLearnQnAAutoReplyFixOverlay(bot))
+    await bot.add_cog(AutoLearnQnAAutoreplyFix(bot))
+
+
+# Legacy sync setup wrapper (smoketest-friendly)
+def setup(bot):
+    try:
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            return loop.create_task(setup(bot))  # schedule async setup
+        else:
+            return asyncio.run(setup(bot))
+    except Exception:
+        return None

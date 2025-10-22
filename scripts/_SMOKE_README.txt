@@ -1,1 +1,0 @@
-After applying this patch, add `from scripts._bootstrap_path import safe_print` at the top of scripts/smoke_cogs.py and replace status prints with `safe_print`. The patch provides the header scaffold.

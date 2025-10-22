@@ -35,4 +35,26 @@ async def setup(bot):
     # this file works via import side effects only
     return
 # PATCH: ensure Upstash env bridge autoloads even on Render
-from . import a06_upstash_env_bridge_overlay  # noqa: F401
+try:
+    from . import a06_upstash_env_bridge_overlay  # noqa: F401
+except Exception:
+    try:
+        from . import a00_upstash_env_bridge_overlay  # noqa: F401
+    except Exception:
+        pass
+
+
+# Legacy sync setup wrapper (smoketest-friendly)
+def setup(bot):
+    try:
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            return loop.create_task(setup(bot))  # schedule async setup
+        else:
+            return asyncio.run(setup(bot))
+    except Exception:
+        return None
