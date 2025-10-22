@@ -1,98 +1,80 @@
+# patched a06_autolearn_qna_answer_overlay.py
+import logging, asyncio, json, os
+from discord.ext import commands, tasks
+from satpambot.bot.utils.json import tolerant_loads, tolerant_dumps
 
-import os, asyncio, logging, json, time, re
-from collections import deque
-from typing import Optional
+LOG = logging.getLogger(__name__)
 
-import discord
-from discord.ext import commands
+def _d(d):
+    return d if isinstance(d, dict) else {}
 
-try:
-    from ....providers.llm_facade import ask as llm_ask
-except Exception as e:
-    llm_ask = None
-    logging.getLogger(__name__).warning("[autolearn] llm_facade import failed: %r", e)
+def _s(v, default=""):
+    try:
+        return str(v)
+    except Exception:
+        return default
 
-log = logging.getLogger(__name__)
+class AutoLearnQnAAnswerOverlay(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self._task = self._loop.start()
 
-QNA_CHANNEL_ID = int(os.getenv("QNA_CHANNEL_ID") or 0) or 1426571542627614772
-DEFAULT_PROVIDER = os.getenv("QNA_PROVIDER") or "groq"
-DEFAULT_MODEL = os.getenv("QNA_MODEL") or "llama-3.1-8b-instant"
+    def cog_unload(self):
+        try: self._task.cancel()
+        except Exception: pass
 
-_recent_q_hash = deque(maxlen=64)
-
-def _hash_text(s: str) -> int:
-    return hash(re.sub(r"\s+", " ", s.strip().lower()))
-
-def _get_persona_name(bot: commands.Bot) -> str:
-    name = None
-    for attr in ("get_active_persona", "active_persona", "persona_name"):
+    @tasks.loop(minutes=2)
+    async def _loop(self):
         try:
-            v = getattr(bot, attr, None)
-            name = v() if callable(v) else v
-            if name:
-                break
+            await self._tick_once()
+        except Exception as e:
+            LOG.warning("[autolearn] error: %r", e)
+
+    @_loop.before_loop
+    async def _before(self):
+        await self.bot.wait_until_ready()
+
+    async def _tick_once(self):
+        # retrieve pending Qs from a store (best-effort); tolerate missing/None
+        store = getattr(self.bot, "autolearn_store", None)
+        if not isinstance(store, dict):
+            return
+        q = store.get("pending")
+        if not isinstance(q, dict):
+            return
+        text = _s(q.get("text","")).strip()
+        if not text:
+            return
+
+        # ask provider (best-effort)
+        ans = await self._ask_llm(text)
+        if not ans:
+            return
+
+        # xp award (best-effort)
+        xp = int(os.getenv("QNA_XP_AWARD", "5") or "5")
+        try:
+            award = getattr(self.bot, "satpam_xp", None) or getattr(self.bot, "xp_add", None) or getattr(self.bot, "xp_award", None)
+            if callable(award):
+                await award(q.get("author_id"), xp, "qna:auto-learn")
         except Exception:
             pass
-    return name or "Leina"
 
-class AutoLearnQnAAnswer(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+        # mark answered to avoid duplication
+        q["answered"] = True
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        try:
-            if message.author.bot is False:
-                return
-            if message.channel.id != QNA_CHANNEL_ID:
-                return
-
-            content = (message.content or "")
-            qtext = None
-            if content.strip().startswith("Q:"):
-                qtext = content.strip()[2:].strip()
-            elif message.embeds:
-                emb = message.embeds[0]
-                title = (emb.title or "").lower()
-                if "question by" in title:
-                    qtext = (emb.description or "").strip() or (emb.fields[0].value if emb.fields else "")
-                else:
-                    desc = (emb.description or "").strip()
-                    if desc.lower().startswith("q:"):
-                        qtext = desc[2:].strip()
-
-            if not qtext:
-                return
-
-            h = _hash_text(qtext)
-            if h in _recent_q_hash:
-                log.info("[autolearn] skip duplicate question")
-                return
-            _recent_q_hash.append(h)
-
-            persona = _get_persona_name(self.bot)
-            system_prompt = f"You are {persona}, a concise helpful assistant for Discord QnA. Answer briefly but helpfully."
-
-            provider = DEFAULT_PROVIDER
-            model = DEFAULT_MODEL
-            if "gemini" in (os.getenv("QNA_MODEL") or "").lower():
-                provider = "gemini"
-
-            if not llm_ask:
-                log.warning("[autolearn] no llm_ask; cannot answer")
-                return
-
-            answer = await llm_ask(provider=provider, model=model, system=system_prompt,
-                                   messages=[{"role":"user","content": qtext}], temperature=0.6, max_tokens=512)
-
-            e = discord.Embed(title=f"Answer by {provider.title()}", description=answer)
-            e.set_footer(text=f"Q: {qtext}")
+    async def _ask_llm(self, prompt: str):
+        # try bot.llm_ask if available
+        fn = getattr(self.bot, "llm_ask", None)
+        if callable(fn):
             try:
-                await message.channel.send(embed=e)
-            except TypeError:
-                await message.channel.send(content=f"**Answer by {provider.title()}**\n{answer}\n\n_Q:_ {qtext}")
-        except Exception as e:
-            log.warning("[autolearn] error: %r", e)
+                resp = await fn(prompt, provider_order=["groq","gemini"])
+                data = _d(resp)  # ensure dict
+                return data.get("answer") or data.get("text") or _s(resp, "")
+            except Exception:
+                pass
+        # fallback: Groq/Gemini raw calls if configured (omitted here; rely on existing cogs)
+        return None
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(AutoLearnQnAAnswer(bot))
+async def setup(bot):
+    await bot.add_cog(AutoLearnQnAAnswerOverlay(bot))

@@ -1,10 +1,20 @@
+# patched utils/json.py
 import json
 
 def tolerant_loads(s, *args, **kwargs):
-    # Accept and ignore arbitrary kwargs like cls, object_hook, etc.
     if s is None:
         return None
-    return json.loads(s)
+    try:
+        return json.loads(s, **kwargs)
+    except Exception:
+        try:
+            ss = str(s).strip()
+            return json.loads(ss, **kwargs)
+        except Exception:
+            return None
 
 def tolerant_dumps(obj, *args, **kwargs):
-    return json.dumps(obj)
+    try:
+        return json.dumps(obj, **kwargs)
+    except Exception:
+        return json.dumps(obj, ensure_ascii=False)

@@ -1,48 +1,38 @@
-
+# patched a00_selfheal_json_guard_overlay.py
 import re, json as _stdlib_json, logging, importlib, types
 from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
 
+def _sanitize(text: str) -> str:
+    if text is None:
+        return ""
+    if not isinstance(text, str):
+        try:
+            text = text.decode("utf-8", "ignore")
+        except Exception:
+            text = str(text)
+    text = text.replace("\x00", "")
+    text = re.sub(r',\s*([}\]])', r'\1', text)
+    return text.strip()
+
+def tolerant_loads(text: str, *args, **kwargs):
+    try:
+        return _stdlib_json.loads(text, **kwargs)
+    except Exception:
+        try:
+            return _stdlib_json.loads(_sanitize(text), **kwargs)
+        except Exception:
+            return None
+
 def _extract_json_block(text: str):
     if not text: return None
     m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.I)
     if m: return m.group(1).strip()
-    start = text.find("{")
-    if start == -1: return None
-    depth = 0
-    for i, ch in enumerate(text[start:], start=start):
-        if ch == "{": depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start:i+1]
+    start = text.find("{");  end = text.rfind("}")
+    if start != -1 and end > start:
+        return text[start:end+1]
     return None
-
-def _sanitize(s: str) -> str:
-    s = re.sub(r"(?m)\b'([A-Za-z0-9_\-]+)'\s*:", r'"\1":', s)
-    s = re.sub(r":\s*'([^'\\]*(?:\\.[^'\\]*)*)'", lambda m: ':"%s"' % m.group(1).replace('"','\\"'), s)
-    s = re.sub(r",\s*(?=[}\]])", "", s)
-    s = re.sub(r"\bTrue\b", "true", s)
-    s = re.sub(r"\bFalse\b", "false", s)
-    s = re.sub(r"\bNone\b", "null", s)
-    return s
-
-def tolerant_loads(text: str):
-    try:
-        return _stdlib_json.loads(text)
-    except Exception:
-        pass
-    block = _extract_json_block(text)
-    if block:
-        try:
-            return _stdlib_json.loads(block)
-        except Exception:
-            try:
-                return _stdlib_json.loads(_sanitize(block))
-            except Exception:
-                pass
-    return _stdlib_json.loads(_sanitize(text))
 
 class _JsonShim(types.SimpleNamespace):
     def __init__(self, real_json):
@@ -52,12 +42,18 @@ class _JsonShim(types.SimpleNamespace):
         self.dump = real_json.dump
         self.JSONDecodeError = real_json.JSONDecodeError
     def loads(self, s, *a, **kw):
-        return tolerant_loads(s)
+        blk = _extract_json_block(s) if isinstance(s, str) else None
+        if blk:
+            res = tolerant_loads(blk, *a, **kw)
+            if res is not None: return res
+        return tolerant_loads(s, *a, **kw)
     def __getattr__(self, name):
         return getattr(self._real, name)
 
 class SelfHealJsonGuardScoped(commands.Cog):
-    def __init__(self, bot): self.bot = bot
+    def __init__(self, bot):
+        self.bot = bot
+
     @commands.Cog.listener()
     async def on_ready(self):
         try:
