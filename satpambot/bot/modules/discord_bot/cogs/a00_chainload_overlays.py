@@ -4,37 +4,27 @@ import importlib, logging
 log = logging.getLogger(__name__)
 
 MODULES = [
-    "satpambot.bot.modules.discord_bot.cogs.a02_status_pin_embed_overlay",
-    "modules.discord_bot.cogs.a02_status_pin_embed_overlay",
-
     "modules.discord_bot.cogs.a01_interview_thread_overlay",
-
     "satpambot.bot.modules.discord_bot.cogs.a01_interview_thread_overlay",
-
     "satpambot.bot.modules.discord_bot.cogs.a00_governor_gate_neurosama_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a00_qna_allowlist_bridge_overlay",
-
-    # compatibility for alternative namespace (if used by some hosts)
     "modules.discord_bot.cogs.a00_governor_gate_neurosama_overlay",
     "modules.discord_bot.cogs.a00_qna_allowlist_bridge_overlay",
-
-    # safety first
     "satpambot.bot.modules.discord_bot.cogs.a27_thread_protect_shim",
     "satpambot.bot.modules.discord_bot.cogs.a26_memory_upsert_thread_router",
     "satpambot.bot.modules.discord_bot.cogs.a24_curriculum_auto_pin",
     "satpambot.bot.modules.discord_bot.cogs.a23_curriculum_admin_bridge",
-
-    # compatibility for alternative namespace
     "modules.discord_bot.cogs.a27_thread_protect_shim",
     "modules.discord_bot.cogs.a26_memory_upsert_thread_router",
     "modules.discord_bot.cogs.a24_curriculum_auto_pin",
     "modules.discord_bot.cogs.a23_curriculum_admin_bridge",
-
-    # existing overlays (keep order after our safety patches)
     "satpambot.bot.modules.discord_bot.cogs._miner_tuning_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a00_miner_constants_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a02_balanced_interval_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a10_interval_overlay_import",
+    "[chainload_hotfix] imported %s",
+    "satpambot.bot.modules.discord_bot.cogs.a02_status_card_embed_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a03_cleanup_tools_overlay"
 ]
 
 for m in MODULES:
