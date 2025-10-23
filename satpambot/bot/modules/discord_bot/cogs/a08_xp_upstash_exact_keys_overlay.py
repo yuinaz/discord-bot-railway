@@ -1,6 +1,6 @@
+from discord.ext import commands
 
 # a08_xp_upstash_exact_keys_overlay.py (v7.4 stub-safe)
-from discord.ext import commands
 import logging
 
 log = logging.getLogger(__name__)

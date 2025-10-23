@@ -1,3 +1,5 @@
+from discord.ext import commands
+from discord.ext import tasks
 
 import asyncio
 import logging
@@ -124,7 +126,7 @@ async def setup(bot):
 
 # --- PATCH: award fallback via event ---
 try:
-    from discord.ext import commands as _cmds
+
     class _XPHistoryAwardFallback(_cmds.Cog):
         def __init__(self, bot):
             self.bot = bot

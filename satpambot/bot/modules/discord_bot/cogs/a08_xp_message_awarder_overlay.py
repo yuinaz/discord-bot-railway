@@ -1,7 +1,7 @@
 from __future__ import annotations
+from discord.ext import commands
 
 # from __future__ import annotations
-from discord.ext import commands
 """
 a08_xp_message_awarder_overlay.py
 ---------------------------------
@@ -9,6 +9,7 @@ Drop-in overlay to *force-enable* XP awarding per user message, with cooldown.
 Tries multiple backends: XPDiscordBackend, XPCommand, or event dispatch.
 Safe for smoke import: only installs listeners; no slash commands; no external deps.
 """
+
 
 import asyncio
 import logging
@@ -131,6 +132,7 @@ class XPOnMessageOverlay(commands.Cog):
                 log.warning("[xp-awarder] backend returned False for %s", message.author)
         except Exception:
             log.exception("[xp-awarder] error during on_message handling")
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(XPOnMessageOverlay(bot))
     log.info("[xp-awarder] overlay loaded: on_message -> XP +%s / %ss cooldown", PER_MESSAGE_XP, USER_COOLDOWN_SEC)

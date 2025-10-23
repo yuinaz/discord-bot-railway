@@ -1,3 +1,4 @@
+from discord.ext import commands
 
 """
 a22_force_senior_overlay.py
@@ -14,5 +15,6 @@ log.info("[senior-overlay] set CURRICULUM_FORCE_SENIOR=1, CURRICULUM_PREF=senior
 class _SeniorOverlay:
     def __init__(self, bot):  # pragma: no cover
         self.bot = bot
+
 async def setup(bot):  # pragma: no cover
     _SeniorOverlay(bot)

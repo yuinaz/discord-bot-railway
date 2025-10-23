@@ -1,5 +1,5 @@
-
 from discord.ext import commands
+
 import os, logging, importlib
 
 log = logging.getLogger(__name__)
@@ -61,5 +61,6 @@ class LadderSegmentMode(commands.Cog):
 
         setattr(m, "compute_label_from_group", compute_label_segment)
         log.info("[ladder-segment] compute_label_from_group = segment-mode")
+
 async def setup(bot):
     await bot.add_cog(LadderSegmentMode(bot))

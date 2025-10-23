@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import logging
 
 log = logging.getLogger(__name__)
@@ -8,6 +9,7 @@ class XPStoreCompatOverlay(commands.Cog):
     This version only exists to be a safe, awaitable loader in discord.py 2.x."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
 async def setup(bot: commands.Bot):
     # discord.py 2.x style loader
     name = XPStoreCompatOverlay.__name__

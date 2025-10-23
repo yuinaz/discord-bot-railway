@@ -6,6 +6,7 @@ a08_xp_upstash_enforcer_overlay
 - Non-blocking; akan skip jika env tidak lengkap.
 """
 from discord.ext import commands
+
 import os, json, logging, urllib.request, urllib.error, pathlib, asyncio
 
 log=logging.getLogger(__name__)
@@ -66,4 +67,5 @@ class XPEnforcer(commands.Cog):
         if v is None and os.getenv("XP_MIGRATE_FILE_TO_UPSTASH","0")=="1":
             _migrate_file_to_upstash()
         log.info("[xp-enforcer] backend target=upstash url=%s (key senior_total=%s)", BASE, v)
+
 async def setup(bot): await bot.add_cog(XPEnforcer(bot))

@@ -1,7 +1,7 @@
+from discord.ext import commands
 
 # a06_xp_upstash_args_normalizer_overlay.py (v7.9)
 # Normalizes on_satpam_xp(*args, **kwargs) so legacy emitters won't break.
-from discord.ext import commands
 import logging, inspect, asyncio
 
 log = logging.getLogger(__name__)
@@ -78,5 +78,6 @@ class UpstashArgsNormalizer(commands.Cog):
     async def on_ready(self):
         if not self._task:
             self._task = asyncio.create_task(self._patch())
+
 async def setup(bot):
     await bot.add_cog(UpstashArgsNormalizer(bot))

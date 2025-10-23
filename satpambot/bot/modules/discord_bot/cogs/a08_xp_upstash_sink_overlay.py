@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import os, json, logging
 
 log = logging.getLogger(__name__)
@@ -70,5 +71,6 @@ class XpUpstashSinkOverlay(commands.Cog):
     @commands.Cog.listener()
     async def on_satpam_xp(self, user_id, amount, reason, *args, **kwargs):
         await self._apply_award(user_id, amount, reason)
+
 async def setup(bot):
     await bot.add_cog(XpUpstashSinkOverlay(bot))

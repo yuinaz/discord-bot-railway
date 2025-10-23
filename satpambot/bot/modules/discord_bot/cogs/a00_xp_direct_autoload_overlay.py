@@ -1,5 +1,5 @@
-
 from discord.ext import commands
+
 import logging, importlib
 
 LOG = logging.getLogger(__name__)
@@ -36,4 +36,5 @@ class XPDirectAutoload(commands.Cog):
         ):
             await _try_setup(self.bot, m)
         if not _has_direct(self.bot): _attach_minimal(self.bot)
+
 async def setup(bot): await bot.add_cog(XPDirectAutoload(bot))

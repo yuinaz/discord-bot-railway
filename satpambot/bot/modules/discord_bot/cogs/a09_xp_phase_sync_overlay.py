@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from discord.ext import commands
+
 import os, json, urllib.request, asyncio
 
 BASE=(os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")); TOK=os.getenv("UPSTASH_REDIS_REST_TOKEN","")

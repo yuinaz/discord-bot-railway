@@ -1,5 +1,5 @@
-
 from discord.ext import commands
+
 import os
 import json
 from typing import Optional
@@ -60,6 +60,7 @@ class XpStateFromUpstash(commands.Cog):
         except Exception as e:
             try: await ctx.reply(f"xp_state_fix unexpected error: {e!r}", ephemeral=True)
             except Exception: pass
+
 async def setup(bot):
     await bot.add_cog(XpStateFromUpstash(bot))
     print("[a08_xp_state_from_upstash_overlay] ready — using GET endpoints (no pipeline) on /xp_state_fix")

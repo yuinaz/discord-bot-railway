@@ -1,6 +1,6 @@
 from __future__ import annotations
-
 from discord.ext import commands
+
 import logging, os, json
 from pathlib import Path
 

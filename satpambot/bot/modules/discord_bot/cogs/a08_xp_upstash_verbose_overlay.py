@@ -1,5 +1,5 @@
-
 from discord.ext import commands
+
 """
 a08_xp_upstash_verbose_overlay.py
 Menulis XP ke Upstash secara rinci tanpa mengubah key lama:
@@ -128,6 +128,7 @@ class XpUpstashVerbose(commands.Cog):
     async def xp_award(self, *args, **kwargs):
         uid, delta, reason = self._norm(*args, **kwargs)
         await self._write_verbose(uid, delta, reason or "xp_award")
+
 async def setup(bot):
     await bot.add_cog(XpUpstashVerbose(bot))
 

@@ -1,5 +1,5 @@
-
 from discord.ext import commands
+
 """
 Reduce noisy logs from XP awarder overlay without changing behavior.
 """
@@ -15,5 +15,6 @@ class XPAwarderQuietOverlay(commands.Cog):
         self.bot = bot
         for name in QUIET_LOGGERS:
             logging.getLogger(name).setLevel(logging.INFO)
+
 async def setup(bot):
     await bot.add_cog(XPAwarderQuietOverlay(bot))

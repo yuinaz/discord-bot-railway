@@ -1,10 +1,11 @@
+from discord.ext import commands
+from discord.ext import tasks
 
 # a00_xp_bridge_from_store_overlay.py (v4 SAFE)
 # Works with DummyBot (no .loop / no wait_until_ready). No config changes required.
 # READ-ONLY from xp:store (schema v2) -> updates ladder & totals mirrors.
 # Does NOT touch xp:store.
 
-from discord.ext import commands
 import os, json, asyncio, logging
 from discord.ext import commands, tasks
 
@@ -59,74 +60,13 @@ class XpBridgeFromStoreSAFE(commands.Cog):
             return None
 
     async def _kv_incrby_atomic(self, key: str, delta: int):
-        if self.kv and hasattr(self.kv, "incrby"):
+        # Safe fallback: prefer kv.incrby if available; otherwise, skip silently.
+        if self.kv and hasattr(self.kv, 'incrby'):
             try:
                 return await self.kv.incrby(key, delta)
             except Exception:
-                log.warning("[xpbridge] kv.incrby(%s,%s) failed; REST fallback", key, delta, exc_info=True)
-
-        url = os.environ.get("UPSTASH_REDIS_REST_URL")
-        tok = os.environ.get("UPSTASH_REDIS_REST_TOKEN")
-        if url and tok and httpx is not None:
-            try:
-                async with httpx.AsyncClient(timeout=10.0) as x:
-                    r = await x.post(f"{url}/pipeline", headers={"Authorization": f"Bearer {tok}", "Content-Type":"application/json"}, json=[["INCRBY", key, str(delta)]])
-                    r.raise_for_status()
-                    return r.json()
-            except Exception:
-                log.warning("[xpbridge] REST INCRBY failed for %s", key, exc_info=True)
-
-        # last resort non-atomic
-        try:
-            cur = await self._kv_get(key)
-            cur_i = int(cur or 0)
-            new_i = cur_i + int(delta)
-            await self._kv_set(key, str(new_i))
-            return {"result": str(new_i)}
-        except Exception:
-            log.warning("[xpbridge] non-atomic set fallback failed for %s", key, exc_info=True)
-            return None
-
-    async def _incr_senior_total_safely(self, delta: int):
-        key = "xp:bot:senior_total"
-        raw = await self._kv_get(key)
-        if raw is None:
-            await self._kv_set(key, "0")
-            raw = "0"
-        # integer?
-        try:
-            int(raw)
-            await self._kv_incrby_atomic(key, delta)
-            return
-        except Exception:
-            pass
-        # JSON?
-        try:
-            obj = json.loads(raw)
-            if isinstance(obj, dict) and "senior_total_xp" in obj:
-                cur = int(obj.get("senior_total_xp") or 0)
-                obj["senior_total_xp"] = cur + int(delta)
-                await self._kv_set(key, json.dumps(obj, separators=(',',':')))
-                return
-        except Exception:
-            pass
-        # fallback mirror
-        mirror = "xp:bot:senior_total_xp"
-        if await self._kv_get(mirror) is None:
-            await self._kv_set(mirror, "0")
-        await self._kv_incrby_atomic(mirror, delta)
-
-    async def _incr_phase_total_if_present(self, bot_total_key: str, delta: int):
-        if not bot_total_key:
-            return
-        raw = await self._kv_get(bot_total_key)
-        if raw is None:
-            return
-        try:
-            int(raw)
-        except Exception:
-            return
-        await self._kv_incrby_atomic(bot_total_key, delta)
+                log.warning('[xpbridge] kv.incrby(%s,%s) failed', key, delta, exc_info=True)
+        return None
 
     def _sum_users_total(self, data: dict) -> int:
         users = data.get("users") or {}
@@ -194,6 +134,7 @@ class XpBridgeFromStoreSAFE(commands.Cog):
     async def cog_unload(self):
         if self.runner.is_running():
             self.runner.cancel()
+
 async def setup(bot: commands.Bot):
     # just add; do not touch other cogs / configs
     await bot.add_cog(XpBridgeFromStoreSAFE(bot))

@@ -1,8 +1,7 @@
 from __future__ import annotations
+from discord.ext import commands
 
 # a00_xp_kv_selfheal_overlay.py
-
-from discord.ext import commands
 import os, json, asyncio, logging
 from typing import Optional
 try:
@@ -54,5 +53,6 @@ class XpKvSelfHeal(commands.Cog):
                     log.info("[xp-selfheal] Normalized %s to %d", KEY, coerced)
         except Exception:
             pass
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(XpKvSelfHeal(bot))

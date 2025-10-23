@@ -1,5 +1,6 @@
-
 from discord.ext import commands
+from discord.ext import tasks
+
 """
 a08_xp_senior_detail_reporter.py
 Menghitung ringkasan XP senior & menulis dua key:
@@ -117,6 +118,7 @@ class SeniorDetailReporter(commands.Cog):
     @task.before_loop
     async def before(self):
         await self.bot.wait_until_ready()
+
 async def setup(bot):
     await bot.add_cog(SeniorDetailReporter(bot))
 

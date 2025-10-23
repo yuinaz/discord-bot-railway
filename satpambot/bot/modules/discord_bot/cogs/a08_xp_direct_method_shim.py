@@ -1,6 +1,6 @@
 from __future__ import annotations
-
 from discord.ext import commands
+
 import asyncio
 from typing import Optional
 import discord
@@ -35,6 +35,7 @@ class XPAwardDirectMethodShim(commands.Cog):
                     delattr(self.bot, attr)
                 except Exception:
                     pass
+
 async def setup(bot: commands.Bot):
     try:
         await bot.add_cog(XPAwardDirectMethodShim(bot))

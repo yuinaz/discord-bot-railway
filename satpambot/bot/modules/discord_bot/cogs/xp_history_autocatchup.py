@@ -1,6 +1,6 @@
 from __future__ import annotations
-
 from discord.ext import commands
+
 
 import asyncio
 from typing import Optional, Dict
@@ -96,6 +96,7 @@ class XpHistoryAutoCatchup(commands.Cog):
         # start once
         if not self._started:
             asyncio.create_task(self._runner())
+
 async def setup(bot: commands.Bot):
     try:
         await bot.add_cog(XpHistoryAutoCatchup(bot))

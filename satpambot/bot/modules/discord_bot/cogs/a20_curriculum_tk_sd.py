@@ -99,3 +99,40 @@ class CurriculumTKSD(commands.Cog):
         await ctx.send(self.template.format(label=label, percent=pct))
 async def setup(bot: commands.Bot):
     await bot.add_cog(CurriculumTKSD(bot))
+
+# === compat shims for TK overlays (safe, no format change) ===
+from os import getenv
+from pathlib import Path
+try:
+    import httpx  # type: ignore
+except Exception:
+    httpx = None
+
+PROGRESS_FILE = getenv("TKPROGRESS_FILE", "data/neuro-lite/tk_progress.json")
+
+async def _probe_total_xp_runtime(bot=None):
+    try:
+        url = getenv("UPSTASH_REST_URL") or getenv("UPSTASH_REDIS_REST_URL")
+        tok = getenv("UPSTASH_REST_TOKEN") or getenv("UPSTASH_REDIS_REST_TOKEN")
+        key = getenv("XP_SENIOR_KEY", "xp:bot:senior_total_v2")
+        if not (url and tok and key) or httpx is None:
+            return None
+        async with httpx.AsyncClient(timeout=5) as cli:
+            r = await cli.get(f"{url}/get/{key}", headers={"Authorization": f"Bearer {tok}"})
+            if r.status_code // 100 != 2:
+                return None
+            res = r.json().get("result")
+            try:
+                return int(str(res))
+            except Exception:
+                return None
+    except Exception:
+        return None
+
+def _ensure_progress_dir():
+    try:
+        Path(PROGRESS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+_ensure_progress_dir()
+# === end compat shims ===

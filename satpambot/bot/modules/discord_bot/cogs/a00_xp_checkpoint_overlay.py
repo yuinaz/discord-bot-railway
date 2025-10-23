@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import os
 import re
 import asyncio
@@ -111,5 +112,6 @@ class XPCheckpointOverlay(commands.Cog):
         h = _H()
         h.setLevel(logging.INFO)
         return h
+
 async def setup(bot):
     await bot.add_cog(XPCheckpointOverlay(bot))

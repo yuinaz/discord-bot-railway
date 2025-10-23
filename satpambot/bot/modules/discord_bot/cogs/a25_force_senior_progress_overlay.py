@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import os
 import logging
 
@@ -27,5 +28,6 @@ class ForceSeniorProgressOverlay(commands.Cog):
                 log.info("[senior-overlay] reporter preferred track=senior")
         except Exception as e:
             log.warning("[senior-overlay] reporter patch skipped: %r", e)
+
 async def setup(bot):
     await bot.add_cog(ForceSeniorProgressOverlay(bot))

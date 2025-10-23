@@ -1,6 +1,6 @@
 from __future__ import annotations
-
 from discord.ext import commands
+
 import asyncio, os, re, logging
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -40,6 +40,7 @@ class WeeklyXPGuard(commands.Cog):
         for m in msgs[1:]:
             try: await m.delete(); await asyncio.sleep(0.2)
             except Exception: pass
+
 async def setup(bot):
     res = await bot.add_cog(WeeklyXPGuard(bot))
     import asyncio as _aio

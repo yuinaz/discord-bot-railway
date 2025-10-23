@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import logging
 
 log = logging.getLogger(__name__)
@@ -51,5 +52,6 @@ class XPAwardEventBridge(commands.Cog):
             log.info("[xp-bridge] awarded +%s to %s in guild=%s", amount, user_id, guild_id)
         except Exception as e:
             log.exception("[xp-bridge] on_xp_add failed: %r", e)
+
 async def setup(bot):
     await bot.add_cog(XPAwardEventBridge(bot))

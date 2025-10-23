@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import asyncio
 
 class XpBridgeSoftRetry(commands.Cog):
@@ -9,5 +10,6 @@ class XpBridgeSoftRetry(commands.Cog):
 
     async def _runner(self):
         await asyncio.sleep(0)
+
 async def setup(bot):
     await bot.add_cog(XpBridgeSoftRetry(bot))

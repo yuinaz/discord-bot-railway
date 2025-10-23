@@ -1,6 +1,6 @@
 from __future__ import annotations
-
 from discord.ext import commands
+
 import json, os
 from pathlib import Path
 import discord
@@ -66,4 +66,5 @@ class XPCommand(commands.Cog):
             await ctx.reply(embed=emb)
         except Exception:
             await ctx.send(embed=emb)
+
 async def setup(bot): await bot.add_cog(XPCommand(bot))

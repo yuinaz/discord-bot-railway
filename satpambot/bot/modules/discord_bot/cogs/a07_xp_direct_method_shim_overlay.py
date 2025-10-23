@@ -1,5 +1,5 @@
-
 from discord.ext import commands
+
 class XpDirectMethodShim(commands.Cog):
     """Provide direct XP methods so a08_xp_message_awarder_overlay can call them
     instead of falling back to 'dispatch events' (and spamming self-heal warnings).
@@ -26,6 +26,7 @@ class XpDirectMethodShim(commands.Cog):
 
     async def xp_award(self, member, amount: int, reason: str | None = None):
         return await self.xp_add(member, amount, reason)
+
 async def setup(bot):
     await bot.add_cog(XpDirectMethodShim(bot))
     print("[xp-direct-shim] ready — provided xp_add/xp_award/satpam_xp methods")

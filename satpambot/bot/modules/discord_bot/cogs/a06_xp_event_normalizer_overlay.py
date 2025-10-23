@@ -12,8 +12,8 @@ log = logging.getLogger(__name__)
 
 class UpstashMini:
     def __init__(self):
-        self.url = os.getenv("UPSTASH_REDIS_REST_URL")
-        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+        self.url = os.getenv('UPSTASH_REST_URL') or os.getenv('UPSTASH_REDIS_REST_URL')
+        self.token = os.getenv('UPSTASH_REST_TOKEN') or os.getenv('UPSTASH_REDIS_REST_TOKEN')
         self.enabled = bool(self.url and self.token)
     async def incrby(self, key, amt):
         if not self.enabled: return False

@@ -1,4 +1,5 @@
 from discord.ext import commands
+
 import os
 import logging
 
@@ -45,5 +46,6 @@ class XPStoreBridge(commands.Cog):
         except Exception as e:
             log.exception("[xp-bridge] award failed: %r", e)
             raise
+
 async def setup(bot):
     await bot.add_cog(XPStoreBridge(bot))
