@@ -3,8 +3,9 @@
 a03_cleanup_tools_overlay (enhanced)
 /clearchat dan !clearchat untuk hapus non-pinned di STATUS_CHANNEL_ID
 """
-import os, logging
 from discord.ext import commands
+import os, logging
+
 try:
     from discord import app_commands
 except Exception:
@@ -46,7 +47,6 @@ class CleanupTools(commands.Cog):
         if ch is None: return await ctx.reply("❌ Channel tidak ditemukan.", mention_author=False)
         n=await self._purge(ch, limit=1000)
         await ctx.reply(f"🧹 Dibersihkan: {n} pesan (non-pinned).", mention_author=False)
-
 async def setup(bot):
     cog=CleanupTools(bot); await bot.add_cog(cog)
     if app_commands is not None:

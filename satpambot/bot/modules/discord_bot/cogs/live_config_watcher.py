@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, json, logging, os, hashlib, re
 from typing import Any, Dict, Optional, Tuple
-from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
 
@@ -220,6 +221,5 @@ class LiveConfigWatcher(commands.Cog):
                 await ctx.reply(f"livecfg source set -> {self.source}"); return
             await ctx.reply("usage: !livecfg source <file|url|discord_message|discord_topic> [arg]"); return
         await ctx.reply(f"livecfg: source={self.source} poll={self.poll}s hash={self._last_hash}")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LiveConfigWatcher(bot))

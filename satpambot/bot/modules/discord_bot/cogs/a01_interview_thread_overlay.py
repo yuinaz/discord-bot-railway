@@ -7,9 +7,10 @@ a01_interview_thread_overlay
 - Persist state di Upstash
 Commands: !interview, !interview start, !interview reset
 """
+from discord.ext import commands
 import os, re, json, logging, asyncio
 from typing import Optional
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 YES=re.compile(r'\b(ya|iya|yes|y|sip|oke)\b', re.I)
@@ -159,7 +160,6 @@ class InterviewOverlay(commands.Cog):
         for k,v in [("interview:status","idle"),("interview:score","0"),("interview:q_index","0"),("governor:interview_passed","0")]:
             await self.us.set(k,v)
         await ctx.reply("🔄 Interview di-reset.", mention_author=False)
-
 async def setup(bot):
     await bot.add_cog(InterviewOverlay(bot))
 def setup(bot):

@@ -1,6 +1,6 @@
+from discord.ext import commands
 import re, logging
 import discord
-from discord.ext import commands
 
 from ..helpers.upgrade_store import UpgradeStore
 from ..helpers.persona import generate_reply
@@ -109,6 +109,5 @@ class OwnerConversationalApprovals(commands.Cog):
             await message.reply(s2, mention_author=False)
             if g2: await message.channel.send(g2)
         except Exception: pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(OwnerConversationalApprovals(bot))

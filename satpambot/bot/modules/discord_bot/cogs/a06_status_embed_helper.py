@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import discord, datetime as dt
 
 def status_embed(title: str, description: str, *, color: int=0x2b9dff, fields: dict[str,str]|None=None) -> discord.Embed:

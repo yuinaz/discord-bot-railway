@@ -1,5 +1,6 @@
-import inspect
 from discord.ext import commands
+import inspect
+
 from satpambot.bot.utils.embed_scribe import EmbedScribe
 
 class EmbedScribeUpdateFallbackAsyncOverlay(commands.Cog):
@@ -22,6 +23,5 @@ class EmbedScribeUpdateFallbackAsyncOverlay(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         pass
-
 async def setup(bot):
     await bot.add_cog(EmbedScribeUpdateFallbackAsyncOverlay(bot))

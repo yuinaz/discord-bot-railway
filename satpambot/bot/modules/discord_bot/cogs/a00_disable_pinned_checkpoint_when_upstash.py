@@ -1,7 +1,8 @@
+
 # a00_disable_pinned_checkpoint_when_upstash.py
 # When Upstash is configured, unload the pinned-checkpoint backend so boot always prefers Upstash.
-import os
 from discord.ext import commands
+import os
 
 try:
     from satpambot.config.runtime import cfg
@@ -32,6 +33,5 @@ class DisablePinnedCheckpoint(commands.Cog):
                     await self.bot.unload_extension(name)
                 except Exception:
                     pass
-
 async def setup(bot):
     await bot.add_cog(DisablePinnedCheckpoint(bot))

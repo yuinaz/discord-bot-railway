@@ -1,9 +1,10 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, json, aiohttp
 from pathlib import Path
 from typing import Optional
-from discord.ext import commands
+
 from discord import app_commands
 import discord
 
@@ -35,7 +36,6 @@ class GitHubSync(commands.Cog):
             "local": {"bltxt":str(LOCAL_BLACKLIST_TXT),"bljson":str(LOCAL_BLACKLIST_JSON),"wljson":str(LOCAL_WHITELIST_JSON)},
             "auth": bool(GITHUB_TOKEN),
         }, indent=2, ensure_ascii=False)+"\n```", ephemeral=True)
-
 async def setup(bot):
     import asyncio as _aio
     res = await bot.add_cog(GitHubSync(bot))

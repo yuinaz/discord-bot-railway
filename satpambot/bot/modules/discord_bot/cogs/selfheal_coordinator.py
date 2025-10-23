@@ -1,7 +1,8 @@
+from discord.ext import commands
 import os, logging
 from datetime import datetime, timezone
 
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,5 @@ class SelfhealCoordinator(commands.Cog):
     @_tick_process.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(SelfhealCoordinator(bot))

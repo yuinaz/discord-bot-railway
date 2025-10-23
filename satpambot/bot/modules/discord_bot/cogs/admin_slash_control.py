@@ -1,9 +1,11 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import json, logging
 from pathlib import Path
 import discord
 from discord import app_commands
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg, cfg_bool
 
 log = logging.getLogger(__name__)
@@ -84,6 +86,5 @@ class AdminSlash(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         _write_local({"DM_MUZZLE": mode})
         await interaction.followup.send(f"✅ DM_MUZZLE = {mode}.", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AdminSlash(bot))

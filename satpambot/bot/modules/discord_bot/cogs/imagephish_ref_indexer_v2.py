@@ -1,3 +1,5 @@
+
+from discord.ext import commands
 \
 import asyncio, json, os, hashlib, datetime as dt
 import discord
@@ -33,6 +35,7 @@ def _load_cfg():
     conf = {}
     try:
         from satpambot.config.runtime import cfg as rcfg
+
         keys = [
             "PHASH_DB_PATH","PHASH_INDEX_LOG_CHANNEL_ID","PHASH_INDEX_THREAD_NAMES","PHASH_INDEX_THREAD_IDS",
             "PHASH_INDEX_BACKFILL_DAYS","PHASH_INDEX_SCAN_INTERVAL","PHISH_ENFORCE_MODE","PHISH_STRONG_DISTANCE",
@@ -209,6 +212,5 @@ class ImagePhishRefIndexerV2(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         self._delayed_start.start()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ImagePhishRefIndexerV2(bot))

@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import asyncio, logging, random, discord
 from discord.ext import commands
+
+import asyncio, logging, random, discord
+
 from satpambot.bot.modules.discord_bot.config.self_learning_cfg import HTTP_429_MAX_RETRY
 
 log = logging.getLogger(__name__)
@@ -43,5 +45,4 @@ def patch_http_429_backoff():
 class HTTP429Backoff(commands.Cog):
     def __init__(self, bot): self.bot=bot
     async def cog_load(self): patch_http_429_backoff()
-
 async def setup(bot): await bot.add_cog(HTTP429Backoff(bot))

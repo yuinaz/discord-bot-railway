@@ -1,4 +1,5 @@
 
+from discord.ext import commands
 import os
 import re
 import io
@@ -7,7 +8,7 @@ from typing import Dict, Any, Iterable, Tuple, List, Optional
 
 import aiohttp
 import discord
-from discord.ext import commands
+
 from discord import app_commands, Embed, Colour, File
 
 DASHBOARD_BASE = os.getenv("SATPAMBOT_DASHBOARD_URL", "http://127.0.0.1:10000").rstrip("/")
@@ -285,7 +286,6 @@ class GuardDiag(commands.Cog):
             keys = [k for k in keys if current_lower in k.lower()]
         keys.sort()
         return [app_commands.Choice(name=k[:100], value=k) for k in keys[:25]]
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuardDiag(bot))
 def legacy_setup(bot: commands.Bot):

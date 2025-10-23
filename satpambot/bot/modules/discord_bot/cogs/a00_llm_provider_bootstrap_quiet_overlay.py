@@ -1,5 +1,6 @@
-import os, logging, json
 from discord.ext import commands
+import os, logging, json
+
 import asyncio
 
 log = logging.getLogger(__name__)
@@ -73,6 +74,5 @@ class LlmBootstrap(commands.Cog):
             log.info("[llm-bootstrap] satpambot.bot.llm_providers.ask exported")
         except Exception as e:
             log.warning("[llm-bootstrap] compat export failed (non-fatal): %s", e)
-
 async def setup(bot):
     await bot.add_cog(LlmBootstrap(bot))

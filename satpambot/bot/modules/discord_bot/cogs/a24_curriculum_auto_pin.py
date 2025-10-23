@@ -1,7 +1,9 @@
+
 # a24_curriculum_auto_pin.py
+from discord.ext import commands
 import logging
 from importlib import import_module
-from discord.ext import commands
+
 log=logging.getLogger(__name__)
 class CurriculumAutoPin(commands.Cog):
     def __init__(self, bot): self.bot=bot; self._target_id=None

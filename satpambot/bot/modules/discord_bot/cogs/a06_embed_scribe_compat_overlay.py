@@ -1,8 +1,9 @@
 
 # a06_embed_scribe_compat_overlay.py (v7.9)
 # Provides EmbedScribe.post() shim if not available.
-import logging, asyncio, inspect
 from discord.ext import commands
+import logging, asyncio, inspect
+
 log = logging.getLogger(__name__)
 
 class EmbedScribeCompat(commands.Cog):
@@ -34,6 +35,5 @@ class EmbedScribeCompat(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         await self._patch()
-
 async def setup(bot):
     await bot.add_cog(EmbedScribeCompat(bot))

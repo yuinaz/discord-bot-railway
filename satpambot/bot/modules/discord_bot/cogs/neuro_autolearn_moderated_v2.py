@@ -1,6 +1,8 @@
+from discord.ext import commands
 import os, json, logging, time
 from datetime import datetime, timezone
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +68,5 @@ class NeuroAutolearnModeratedV2(commands.Cog):
     @_scan.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(NeuroAutolearnModeratedV2(bot))

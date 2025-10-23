@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from discord.ext import commands
+
 import re, json, os, contextlib, logging
 from typing import List, Dict, Any, Optional
 import discord
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 HARD = {
@@ -174,6 +176,5 @@ class FirstTouchAutoBanPackMime(commands.Cog):
         else:
             await self._log_embed(message.guild, "PACK detected (no ban)",
                                   f"User: {member.mention} — sequence: {pack.get('sequence')}", 0xF1C40F, getattr(message, "jump_url", None))
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(FirstTouchAutoBanPackMime(bot))

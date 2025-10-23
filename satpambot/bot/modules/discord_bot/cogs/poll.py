@@ -1,5 +1,5 @@
-import discord
 from discord.ext import commands
+import discord
 
 class Poll(commands.Cog):
     def __init__(self, bot): self.bot = bot
@@ -20,5 +20,4 @@ class Poll(commands.Cog):
             await ctx.reply("🛑 Poll closed.", mention_author=False)
         except Exception:
             await ctx.reply("⚠️ Tidak bisa menemukan/menutup poll.", mention_author=False)
-
 async def setup(bot): await bot.add_cog(Poll(bot))

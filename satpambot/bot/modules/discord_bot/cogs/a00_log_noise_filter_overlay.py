@@ -1,6 +1,6 @@
 
-import logging, os, re
 from discord.ext import commands
+import logging, os, re
 
 DEFAULT_PATTERNS = [
     r"Extension .+ is already loaded",
@@ -52,7 +52,6 @@ class LogNoiseFilter(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         _install_filters()
-
 async def setup(bot):
     await bot.add_cog(LogNoiseFilter(bot))
     print("[log-noise-filter] overlay loaded (WARNING demotion via drop filter)")

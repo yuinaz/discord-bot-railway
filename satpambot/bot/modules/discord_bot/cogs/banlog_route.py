@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import discord
 from discord.ext import commands
+
+import discord
+
 from satpambot.bot.modules.discord_bot.helpers import banlog_thread
 
 class BanLogRoute(commands.Cog):
@@ -26,6 +28,5 @@ class BanLogRoute(commands.Cog):
             await th.send(embed=emb, allowed_mentions=discord.AllowedMentions.none())
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(BanLogRoute(bot))

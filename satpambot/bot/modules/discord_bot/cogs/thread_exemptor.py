@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # satpambot/bot/modules/discord_bot/cogs/thread_exemptor.py
 # Global thread exemption layer.
 # This cog wraps every other cog's on_message handler so that **messages posted in Threads**
@@ -11,7 +13,6 @@ import inspect
 from typing import Any, Callable, Coroutine, Optional
 
 import discord
-from discord.ext import commands
 
 WRAP_ATTR = "_thread_exempt_wrapped"
 
@@ -75,6 +76,5 @@ class ThreadExemptor(commands.Cog):
             setattr(cog, "on_message", wrapped)
 
         self._patched = True
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ThreadExemptor(bot))

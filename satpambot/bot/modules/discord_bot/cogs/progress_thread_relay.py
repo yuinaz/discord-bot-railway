@@ -1,8 +1,11 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import json, logging
 from pathlib import Path
 import discord
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 from satpambot.config.local_cfg import cfg, cfg_int
 
 log = logging.getLogger(__name__)
@@ -121,6 +124,5 @@ class ProgressThreadRelay(commands.Cog):
             await msg.pin()
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProgressThreadRelay(bot))

@@ -71,3 +71,5 @@ def _patch_learning():
              BURST_ON_BOOT, BURST_MULTIPLIER, BURST_DURATION_SEC)
 
 _patch_learning()
+async def setup(bot):
+    return None

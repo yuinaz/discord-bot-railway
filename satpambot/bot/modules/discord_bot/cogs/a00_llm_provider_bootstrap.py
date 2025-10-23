@@ -1,7 +1,9 @@
+
 # a00_llm_provider_bootstrap.py (v7.5 hotfix)
+from discord.ext import commands
 import os, logging
 from pathlib import Path
-from discord.ext import commands
+
 try:
     import yaml  # optional
 except Exception:
@@ -58,6 +60,5 @@ class LLMProviderBootstrap(commands.Cog):
             log.info("[llm-bootstrap] bot.llm_ask ready (providers.LLM)")
         except Exception as e:
             log.error("[llm-bootstrap] no LLM provider available: %r", e)
-
 async def setup(bot):
     await bot.add_cog(LLMProviderBootstrap(bot))

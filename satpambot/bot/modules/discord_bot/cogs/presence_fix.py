@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, time
 from collections import defaultdict
-from discord.ext import commands, tasks
+from discord.ext import tasks
 try:
     from satpambot.bot.modules.discord_bot.helpers import log_utils
 except Exception:
@@ -54,6 +56,5 @@ class PresenceFix(commands.Cog):
             except Exception:
                 pass
         asyncio.create_task(_task())
-
 async def setup(bot):  # type: ignore[override]
     await bot.add_cog(PresenceFix(bot))

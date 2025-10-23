@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # -*- coding: utf-8 -*-
 
 import os
@@ -219,6 +221,7 @@ class AntiImagePhashRuntimeStrict(commands.Cog):
         if ch is not None:
             try:
                 import discord
+
                 # Exempt true Thread objects
                 if isinstance(ch, getattr(discord, "Thread", tuple())):
                     return
@@ -300,8 +303,6 @@ class AntiImagePhashRuntimeStrict(commands.Cog):
 
             except Exception as e:
                 LOG.exception("Gagal memproses attachment: %r", e)
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhashRuntimeStrict(bot))
     LOG.info("[phash-runtime.strict] setup selesai")

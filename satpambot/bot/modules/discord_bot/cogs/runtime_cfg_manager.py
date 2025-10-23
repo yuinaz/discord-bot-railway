@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, json, logging, io, re
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from satpambot.bot.modules.discord_bot.helpers.runtime_cfg import ConfigManager
 
 log = logging.getLogger(__name__)
@@ -136,7 +138,6 @@ class RuntimeCfgManager(commands.Cog):
         self.cfg.set("config_source.channel_id", int(ch.id))
         self.cfg.set("config_source.message_id", int(msg.id))
         await interaction.response.send_message(f"Bound ke pesan {msg.id} di #{ch.name}. Bot akan mengikuti perubahan JSON.", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     cog = RuntimeCfgManager(bot)
     await bot.add_cog(cog)

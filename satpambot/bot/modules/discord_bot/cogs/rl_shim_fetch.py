@@ -1,7 +1,9 @@
+
 # Throttle high-risk Discord HTTP calls to avoid per-channel 429 at startup.
 # - Patches TextChannel.fetch_message (GET /channels/{id}/messages/{message.id})
 # - Patches Message.edit (PATCH /channels/{id}/messages/{message.id})
 # Non-invasive: no config keys required. Uses env 'RL_FETCH_MIN_INTERVAL' (optional).
+from discord.ext import commands
 import os
 import time
 import asyncio
@@ -9,7 +11,6 @@ import logging
 from collections import defaultdict
 
 import discord
-from discord.ext import commands
 
 log = logging.getLogger("satpambot.rl_shim_fetch")
 
@@ -73,6 +74,5 @@ class RLShimFetch(commands.Cog):
 
         self._patched = True
         log.info("[rl_shim_fetch] patched TextChannel.fetch_message and Message.edit (min_interval=%.2fs)", _interval())
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RLShimFetch(bot))

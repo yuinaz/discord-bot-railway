@@ -2,8 +2,9 @@
 # a00_selfheal_dedupe_manager.py (v7.5)
 # - Disables or dedupes legacy selfheal_autofix extensions so they don't collide
 #   with a06_selfheal_autoexec_overlay.
-import asyncio, logging, os
 from discord.ext import commands
+import asyncio, logging, os
+
 log = logging.getLogger(__name__)
 
 LEGACY_EXTS = [
@@ -55,7 +56,6 @@ class SelfHealDedupeManager(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         await self._dedupe()
-
 async def setup(bot):
     try:
         await bot.add_cog(SelfHealDedupeManager(bot))

@@ -1,5 +1,6 @@
-import logging
 from discord.ext import commands
+import logging
+
 log = logging.getLogger("slash")
 class SyncTools(commands.Cog):
     def __init__(self, bot): self.bot = bot

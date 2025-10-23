@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, asyncio, logging, signal, time
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from ..helpers import env_store
 
 log = logging.getLogger(__name__)
@@ -54,6 +56,5 @@ class GracefulRuntime(commands.Cog):
     async def cmd_selfrestart(self, ctx: commands.Context):
         await ctx.reply("Restarting gracefully…", mention_author=False)
         await self._graceful_terminate("owner-cmd")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(GracefulRuntime(bot))

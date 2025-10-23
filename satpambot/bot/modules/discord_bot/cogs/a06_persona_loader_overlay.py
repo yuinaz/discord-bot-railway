@@ -1,11 +1,12 @@
 
+from discord.ext import commands
 """
 a06_persona_loader_overlay.py
 Expose PersonaStore via Cog so other cogs can access it with bot.get_cog("PersonaOverlay")
 Commands (optional, text): !persona list / !persona use <name>
 """
 import logging
-from discord.ext import commands
+
 from satpambot.bot.persona.loader import get_store
 
 log = logging.getLogger(__name__)
@@ -27,7 +28,6 @@ class PersonaOverlay(commands.Cog):
     async def cmd_use(self, ctx, name: str):
         ok = self.store.set_active(name)
         await ctx.send("OK" if ok else f"Persona '{name}' not found.")
-
 async def setup(bot):
     await bot.add_cog(PersonaOverlay(bot))
 

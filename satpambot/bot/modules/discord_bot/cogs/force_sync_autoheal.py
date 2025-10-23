@@ -1,8 +1,8 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, logging, asyncio
 import discord
-from discord.ext import commands
 
 LOG = logging.getLogger("satpambot.bot.modules.discord_bot.cogs.force_sync_autoheal")
 
@@ -74,6 +74,5 @@ class ForceSyncAutoHeal(commands.Cog):
         try:
             await msg.add_reaction("✅")
         except Exception: pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ForceSyncAutoHeal(bot))

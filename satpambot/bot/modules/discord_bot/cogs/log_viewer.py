@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import json, itertools, datetime
 from pathlib import Path
 import discord
-from discord.ext import commands
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 BANLOG = DATA_DIR / "ban_events.jsonl"
@@ -59,6 +60,5 @@ class BanLogViewer(commands.Cog):
         else:
             for e in embeds:
                 await ctx.send(embed=e)
-
 async def setup(bot):
     await bot.add_cog(BanLogViewer(bot))

@@ -10,11 +10,12 @@ Safe to keep loaded at all times. No impact when DM_MUZZLE unset.
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, logging, asyncio, contextlib, inspect
 from typing import Any, Optional
 
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +48,6 @@ async def _send_to_log(bot: commands.Bot, content: Optional[str] = None, embed: 
     except Exception as e:
         log.warning("[dm_muzzle] failed redirect DM to log: %r", e)
         return False
-
 async def setup(bot: commands.Bot):
     mode = (os.getenv("DM_MUZZLE") or "").strip().lower()
     if not mode:

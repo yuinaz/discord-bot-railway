@@ -1,3 +1,4 @@
+from discord.ext import commands
 import os, json, logging
 from datetime import datetime, timezone
 
@@ -94,6 +95,7 @@ class A00LearningStatusRefreshOverlay(commands.Cog):
         if int(now.timestamp()) % self.period != 0: return
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 data = await self._compute(session)
                 live_raw = await upstash.get(session, "learning:status_json")
@@ -115,6 +117,5 @@ class A00LearningStatusRefreshOverlay(commands.Cog):
     @loop.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(A00LearningStatusRefreshOverlay(bot))

@@ -4,9 +4,10 @@ Pastikan satu pesan presence pinned di thread neuro: upsert by marker.
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, json, contextlib, logging, asyncio
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,5 @@ class NeuroPresenceUpserter(commands.Cog):
                 log.info("[presence_upserter] created presence keeper + pinned")
         except Exception as e:
             log.exception("[presence_upserter] failed: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(NeuroPresenceUpserter(bot))

@@ -1,9 +1,11 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import json, logging
 from pathlib import Path
 import discord
 from discord import app_commands
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg, cfg_bool, cfg_int
 
 log = logging.getLogger(__name__)
@@ -105,6 +107,5 @@ class InterviewGate(commands.Cog):
             return await interaction.followup.send("Belum bisa approve. Item belum PASSED: " + ", ".join(missing), ephemeral=True)
         data = _write_local({"INTERVIEW_APPROVED": True, "PUBLIC_MODE_ENABLE": True})
         await interaction.followup.send("✅ Interview APPROVED. Public mode diizinkan (PUBLIC_MODE_ENABLE=true).", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(InterviewGate(bot))

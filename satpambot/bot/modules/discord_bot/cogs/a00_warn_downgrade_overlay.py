@@ -1,7 +1,9 @@
-# a00_warn_downgrade_overlay.py
 from __future__ import annotations
-import logging, re
+
+# a00_warn_downgrade_overlay.py
+
 from discord.ext import commands
+import logging, re
 
 class _MsgFilter(logging.Filter):
     DROP_PAT = [
@@ -31,6 +33,5 @@ class WarnDowngrade(commands.Cog):
         root.addFilter(_MsgFilter())
         # Discord client voice warning → silence to ERROR
         logging.getLogger("discord.client").setLevel(logging.ERROR)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(WarnDowngrade(bot))

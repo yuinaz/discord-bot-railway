@@ -1,11 +1,10 @@
 
+from discord.ext import commands
 import asyncio
 import json
 import logging
 import re
 from typing import Any, Optional
-
-from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
 
@@ -120,7 +119,6 @@ class SelfHealGroqJsonOverlay(commands.Cog):
             self._patch_done = True
         else:
             LOG.warning("[selfheal-json] target _loop not found to wrap")
-
 async def setup(bot):
     await bot.add_cog(SelfHealGroqJsonOverlay(bot))
     print("[selfheal-json] overlay loaded — tolerant JSON parsing enabled")

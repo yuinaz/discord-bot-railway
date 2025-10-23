@@ -1,8 +1,9 @@
 
 # a06_selfheal_auto_policy_overlay.py
 # Force self-heal to run without human approval; relax public gating.
-import os, logging
 from discord.ext import commands
+import os, logging
+
 log = logging.getLogger(__name__)
 
 def _setenv_default(k, v):
@@ -24,6 +25,5 @@ class SelfHealAutoPolicy(commands.Cog):
         # Prefer senior track if present
         _setenv_default("XP_UPSTASH_PREFERRED_PHASE", "senior")
         log.info("[selfheal:auto-policy] approval disabled and gates relaxed.")
-
 async def setup(bot):
     await bot.add_cog(SelfHealAutoPolicy(bot))

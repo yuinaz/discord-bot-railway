@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging, asyncio
 import discord
-from discord.ext import commands
 
 from satpambot.config.runtime import cfg
 
@@ -25,6 +26,5 @@ class UpgradeAdvisor(commands.Cog):
     async def send_startup_report(self):
         # Biarkan auto_update_manager atau restart_notifier_boot yang kirim laporan startup
         return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(UpgradeAdvisor(bot))

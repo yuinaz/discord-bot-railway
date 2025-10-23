@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # Minimal, safe AntiUrlPhishGuard to pass smoke test and run on Render Free Plan.
 # - Keeps env parsing (_norm_domain defined before use)
 # - Does NOT create threads/DMs by itself (quiet by default)
@@ -7,7 +9,6 @@ from __future__ import annotations
 
 import os
 from typing import List
-from discord.ext import commands
 
 def _norm_domain(p: str) -> str:
     return p.strip().lower().lstrip(".")
@@ -37,6 +38,5 @@ class AntiUrlPhishGuard(commands.Cog):
 
     # Intentionally quiet: no auto-thread/DM creation here to suit Render Free Plan.
     # Actual URL scanning & enforcement is handled by existing guards; this cog is a safe loader.
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiUrlPhishGuard(bot))

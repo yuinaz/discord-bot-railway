@@ -1,8 +1,8 @@
+from discord.ext import commands
 import os
 import re
 import asyncio
 import logging
-from discord.ext import commands
 
 # Abstraksi store yang memilih Postgres (jika tersedia) atau JSON
 from satpambot.bot.utils import xp_store as store
@@ -111,6 +111,5 @@ class XPCheckpointOverlay(commands.Cog):
         h = _H()
         h.setLevel(logging.INFO)
         return h
-
 async def setup(bot):
     await bot.add_cog(XPCheckpointOverlay(bot))

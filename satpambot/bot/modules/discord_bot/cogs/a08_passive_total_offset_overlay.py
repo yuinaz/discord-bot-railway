@@ -1,6 +1,7 @@
 
+from discord.ext import commands
 import os, logging, importlib
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 def _intish(x, default=0):
     if x is None:
@@ -83,6 +84,5 @@ class PassiveLearningTotalOffset(commands.Cog):
             wrapped.__offset_patched__ = True
             m.compute_label_from_group = wrapped
             log.info("[passive-total-offset] hooked compute_label_from_group (+offset)")
-
 async def setup(bot):
     await bot.add_cog(PassiveLearningTotalOffset(bot))

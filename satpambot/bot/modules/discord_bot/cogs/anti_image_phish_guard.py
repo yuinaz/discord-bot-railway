@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # satpambot/bot/modules/discord_bot/cogs/anti_image_phish_guard.py
 
 import asyncio
@@ -9,7 +11,6 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 import discord
-from discord.ext import commands
 
 # Keep existing import (as in your repo)
 try:
@@ -84,6 +85,5 @@ class AntiImagePhishGuard(commands.Cog):
 
     # -------------- detection stubs --------------
     # Your existing detection logic in other cogs can read self._phash_entries.
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhishGuard(bot))

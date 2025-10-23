@@ -1,5 +1,6 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 
 import asyncio
 import os
@@ -10,7 +11,6 @@ from typing import Optional
 import aiohttp
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 LOG = __import__("logging").getLogger(__name__)
 
@@ -150,6 +150,5 @@ class AdminRepoControl(commands.Cog):
                 sys.exit(0)
 
         asyncio.create_task(_do_exit())
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AdminRepoControl(bot))

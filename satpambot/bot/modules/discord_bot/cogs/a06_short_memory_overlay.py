@@ -1,8 +1,9 @@
 
+from discord.ext import commands
 """a06_short_memory_overlay.py (v8.2)"""
 import time, os, logging
 from collections import deque, defaultdict
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 class ShortMemoryStore:
@@ -31,7 +32,6 @@ class ShortMemoryOverlay(commands.Cog):
         try: self.store.add(message.author.id, content)
         except Exception as e: log.warning("[short-mem] add failed: %r", e)
     def get_short_context(self, user_id: int): return self.store.get(user_id)
-
 async def setup(bot): await bot.add_cog(ShortMemoryOverlay(bot))
 def setup(bot):
     try:

@@ -8,10 +8,11 @@ Proteksi kuat:
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, logging, contextlib, time
 from typing import Optional, Iterable
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +90,5 @@ class DeleteSafeShimPlus(commands.Cog):
 
     async def cog_load(self):
         setup_delete_guard()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(DeleteSafeShimPlus(bot))

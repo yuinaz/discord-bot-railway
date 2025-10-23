@@ -1,3 +1,5 @@
+
+from discord.ext import commands
 def _get_conf():
     try:
         from satpambot.config.compat_conf import get_conf
@@ -11,7 +13,7 @@ def _get_conf():
             return _f
 
 import re, discord
-from discord.ext import commands
+
 from satpambot.ml.neuro_lite_rewards import award_points_all
 
 KEYWORDS = ("phish", "phishing", "phash", "ban", "enforce")
@@ -42,6 +44,5 @@ class PhishRewardListener(commands.Cog):
         if any(k in joined for k in KEYWORDS):
             # Reward once per message (simple heuristic)
             await award_points_all(self.bot, n=1, reason="phish-ban")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishRewardListener(bot))

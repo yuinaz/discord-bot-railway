@@ -1,5 +1,7 @@
+from discord.ext import commands
 import io, logging, os
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +38,5 @@ class StateBackup(commands.Cog):
 
     async def cog_unload(self):
         self._backup_loop.cancel()
-
 async def setup(bot):
     await bot.add_cog(StateBackup(bot))

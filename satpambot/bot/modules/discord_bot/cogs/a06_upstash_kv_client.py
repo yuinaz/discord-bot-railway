@@ -91,3 +91,5 @@ def json_loads_maybe_twice(s: Optional[str]) -> Optional[Any]:
 
 def iso_now() -> str:
     return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+async def setup(bot):
+    return None

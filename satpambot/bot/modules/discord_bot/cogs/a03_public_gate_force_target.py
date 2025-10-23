@@ -1,6 +1,6 @@
+from discord.ext import commands
 import os
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +46,5 @@ class PublicGateForceBind(commands.Cog):
                 except Exception as e:
                     log.warning("[public_gate_force] Failed to bind: %r", e)
                 break
-
 async def setup(bot):
     await bot.add_cog(PublicGateForceBind(bot))

@@ -1,6 +1,7 @@
+
 # a00_persona_overlay_guard_early.py
-import logging
 from discord.ext import commands
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +32,5 @@ class PersonaOverlayGuardEarly(commands.Cog):
         self.bot = bot
     async def cog_load(self):
         _inject()
-
 async def setup(bot):
     await bot.add_cog(PersonaOverlayGuardEarly(bot))

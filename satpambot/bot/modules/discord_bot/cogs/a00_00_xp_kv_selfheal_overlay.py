@@ -1,7 +1,10 @@
-# a00_00_xp_kv_selfheal_overlay.py
 from __future__ import annotations
-import os, json, logging
+
+# a00_00_xp_kv_selfheal_overlay.py
+
 from discord.ext import commands
+import os, json, logging
+
 try: import httpx
 except Exception: httpx=None
 log = logging.getLogger(__name__)
@@ -37,6 +40,5 @@ class EarlyXpKvSelfHeal(commands.Cog):
                 log.info("[xp-selfheal] normalized %s -> %d", KEY, val)
         except Exception as e:
             log.debug("[xp-selfheal] early heal failed: %r", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(EarlyXpKvSelfHeal(bot))

@@ -1,3 +1,4 @@
+from discord.ext import commands
 import os, asyncio, logging, random, json, hashlib, time, re
 import discord
 from discord.ext import commands, tasks
@@ -58,6 +59,7 @@ async def _llm_generate(topic: str) -> str:
     # prefer shared facade if available
     try:
         from ....providers.llm_facade import ask as llm_ask
+
     except Exception:
         llm_ask = None
     prompt = "Buat SATU pertanyaan singkat, sopan, netral, aman, berakhir '?'. Topik: " + topic
@@ -174,6 +176,5 @@ class AutoAskQnA(commands.Cog):
     @loop.before_loop
     async def before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoAskQnA(bot))

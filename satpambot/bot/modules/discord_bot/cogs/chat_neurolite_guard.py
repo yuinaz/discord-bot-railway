@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, asyncio, logging, re
 from typing import Iterable, Set
 
 import discord
-from discord.ext import commands
 
 from ._idempotent import set_once_flag, TTLSet, LogCoalescer
 
@@ -111,7 +112,6 @@ class ChatNeuroLiteGuard(commands.Cog):
             log.warning("[chat_neurolite_guard] missing permission to delete in #%s", getattr(message.channel, "name", "?"))
         except Exception as e:
             log.exception("[chat_neurolite_guard] delete failed: %r", e)
-
 async def setup(bot: commands.Bot):
     if bot.get_cog("ChatNeuroLiteGuard"):
         return

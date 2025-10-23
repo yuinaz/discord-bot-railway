@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, time, logging
 from collections import defaultdict
 from typing import Dict
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +90,5 @@ class RateLimitGuard(commands.Cog):
             _ORIG_SEND = discord.abc.Messageable.send
             discord.abc.Messageable.send = _patched_send  # type: ignore
             log.info("[rate_limit_guard] patched Messageable.send")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RateLimitGuard(bot))

@@ -1,7 +1,7 @@
-
 from __future__ import annotations
-import os, logging
+
 from discord.ext import commands
+import os, logging
 
 LOG = logging.getLogger(__name__)
 
@@ -21,7 +21,6 @@ class ForceSyncOnce(commands.Cog):
         except Exception as e:
             LOG.exception("[force-sync] failed: %r", e)
         self._did = True
-
 async def setup(bot):
     res = await bot.add_cog(ForceSyncOnce(bot))
     import asyncio as _aio

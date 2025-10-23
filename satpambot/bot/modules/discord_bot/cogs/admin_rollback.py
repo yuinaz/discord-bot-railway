@@ -1,6 +1,6 @@
+from discord.ext import commands
 import logging
 import discord
-from discord.ext import commands
 
 from ..helpers.upgrade_engine_ext import list_snapshots, attempt_rollback_last, attempt_rollback_rev
 try:
@@ -85,6 +85,5 @@ class AdminRollback(commands.Cog):
             reloaded = await _reload_all(self.bot)
             msg += f" — reloaded={len(reloaded)} cogs"
         await ctx.reply(msg, mention_author=False)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AdminRollback(bot))

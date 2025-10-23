@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging, json, time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -75,6 +76,5 @@ def _install():
         log.warning("[status_coalescer] install failed: %s", e)
 
 _install()
-
 async def setup(_bot):  # overlay module, no-op
     return

@@ -1,5 +1,6 @@
-import logging, discord
 from discord.ext import commands
+import logging, discord
+
 log = logging.getLogger("friendly_errors")
 async def _infer_member(ctx: commands.Context):
     if ctx.message.mentions:

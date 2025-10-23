@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, re, random
 import discord
-from discord.ext import commands
+
 from ..helpers import env_store
 
 def _get_names():
@@ -33,6 +35,5 @@ class NameWakeAutoReply(commands.Cog):
                 await msg.channel.send(random.choice(replies))
             except Exception:
                 pass
-
 async def setup(bot):
     await bot.add_cog(NameWakeAutoReply(bot))

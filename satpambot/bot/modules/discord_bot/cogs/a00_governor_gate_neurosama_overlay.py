@@ -25,9 +25,10 @@ ENV:
   ADMIN_USER_IDS        comma separated Discord user IDs
   KV_BACKEND=upstash_rest, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 """
+from discord.ext import commands
 import os, asyncio, logging, re, json
 from typing import Optional, List
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 class _Upstash:
@@ -271,7 +272,6 @@ class GovernorGate(commands.Cog):
             return await ctx.reply("❌", mention_author=False)
         _,_,_, public, pubs = await self.get_state()
         await ctx.reply(f"📜 Public channels: {pubs}", mention_author=False)
-
 async def setup(bot):
     cog = GovernorGate(bot)
     await bot.add_cog(cog)

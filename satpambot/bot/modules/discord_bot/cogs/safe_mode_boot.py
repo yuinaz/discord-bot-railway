@@ -1,5 +1,5 @@
-import os, json, time, logging
 from discord.ext import commands
+import os, json, time, logging
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +36,5 @@ class SafeModeBoot(commands.Cog):
         safe = self._touch_boot()
         if safe:
             log.warning("[safe-mode] aktif: terlalu sering restart.")
-
 async def setup(bot):
     await bot.add_cog(SafeModeBoot(bot))

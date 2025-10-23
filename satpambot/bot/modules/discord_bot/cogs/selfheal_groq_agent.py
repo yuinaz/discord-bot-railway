@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # REPLACEMENT for satpambot/bot/modules/discord_bot/cogs/selfheal_groq_agent.py
 # (Same skeleton as earlier bundle, but includes bot.dispatch('selfheal_action_applied', act, ok, msg))
 import os, json, time, asyncio, logging
@@ -131,6 +133,7 @@ class SelfHealGroqAgent(commands.Cog):
             plan = json.loads(text)
         except Exception:
             import re
+
             m = re.search(r"\{.*\}", text, re.S)
             plan = json.loads(m.group(0)) if m else None
         if not isinstance(plan, dict): return
@@ -186,6 +189,5 @@ class SelfHealGroqAgent(commands.Cog):
             else: await self.bot.load_extension(name)
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfHealGroqAgent(bot))

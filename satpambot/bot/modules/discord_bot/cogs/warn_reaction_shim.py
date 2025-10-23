@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # Shim: hide warn (⚠️) reaction without disabling any learning features.
 # This cog monkey-patches the underlying call that adds the warning reaction.
 # If the project uses a helper like add_warn_reaction(msg), we intercept it.
 import os
-from discord.ext import commands
 
 FILTER = os.getenv("REACT_WARN_FILTER", "⚠")
 ENABLE = os.getenv("REACT_WARN_ENABLE", "false").lower() not in ("0","false","no","off")
@@ -37,6 +38,5 @@ class WarnReactionShim(commands.Cog):
     async def on_ready(self):
         # just to log once
         print("[warn_reaction_shim] aktif; filter:", FILTER, "enabled:", ENABLE)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(WarnReactionShim(bot))

@@ -1,10 +1,11 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, json, time, logging
 from pathlib import Path
 from typing import Dict, Any
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 log = logging.getLogger(__name__)
@@ -98,6 +99,5 @@ class NeuroCurriculumBridge(commands.Cog):
         txt = (f"Junior: {j['xp']} XP (upd: {j['updated']})\n"
                f"Senior: {s['xp']} XP (upd: {s['updated']})")
         await itx.response.send_message(txt, ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(NeuroCurriculumBridge(bot))

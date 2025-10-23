@@ -1,5 +1,6 @@
-import discord
 from discord.ext import commands
+import discord
+
 from satpambot.bot.modules.discord_bot.helpers.metrics_agg import inc
 
 # Realtime dashboard + DB helpers (safe fallbacks if not present)
@@ -53,7 +54,6 @@ class MetricsCog(commands.Cog):
             emit("dashboard:push", data, room=f"guild:{int(guild.id)}")
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     # Hindari double-register kalau sudah ada
     if bot.get_cog("MetricsCog") is not None:

@@ -1,6 +1,7 @@
 
-import logging, importlib
 from discord.ext import commands
+import logging, importlib
+
 LOG = logging.getLogger(__name__)
 def _wrap_client(mod):
     if not hasattr(mod, "UpstashClient"): return

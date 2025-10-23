@@ -1,5 +1,6 @@
-import logging, discord
 from discord.ext import commands
+import logging, discord
+
 from discord import app_commands
 log = logging.getLogger("mod_policy")
 class ModPolicy(commands.Cog):

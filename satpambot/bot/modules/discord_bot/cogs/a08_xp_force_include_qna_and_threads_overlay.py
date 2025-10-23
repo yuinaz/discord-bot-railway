@@ -1,5 +1,6 @@
 
 # --- PATCH: robust fallback that does not import XPStore class ---
+from discord.ext import commands
 import logging as _logging
 _log = _logging.getLogger(__name__)
 async def _award_via_event(bot, author, amount: int, message=None, reason="qna/thread"):
@@ -19,7 +20,7 @@ async def _award_via_event(bot, author, amount: int, message=None, reason="qna/t
         return False
 
 import logging, asyncio, time
-from discord.ext import commands
+
 from typing import Optional
 
 log = logging.getLogger(__name__)
@@ -85,6 +86,5 @@ class XPForceIncludeOverlay(commands.Cog):
                 log.debug("[xp_force] dispatched award events=%d (uid=%s)", dispatched, message.author.id)
         except Exception as e:
             log.warning("[xp_force] error: %s", e)
-
 async def setup(bot):
     await bot.add_cog(XPForceIncludeOverlay(bot))

@@ -1,7 +1,8 @@
 
+from discord.ext import commands
 import os, logging
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 from typing import Literal
 
@@ -71,6 +72,5 @@ class AdminSync(commands.Cog):
         except Exception as e:
             log.exception("sync error")
             await inter.followup.send(f"❌ Sync error: `{type(e).__name__}` {e}", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AdminSync(bot))

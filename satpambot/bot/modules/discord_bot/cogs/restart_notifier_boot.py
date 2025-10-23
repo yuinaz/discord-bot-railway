@@ -1,4 +1,5 @@
 
+from discord.ext import commands
 import asyncio
 import json
 import logging
@@ -8,7 +9,6 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -182,7 +182,5 @@ class RestartNotifierBoot(commands.Cog):
                 path.unlink(missing_ok=True)
         except Exception:
             log.exception("[restart_notifier_boot] gagal hapus ticket %s", path)
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RestartNotifierBoot(bot))

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging
 import os
 from typing import Set
 
 import discord
-from discord.ext import commands
 
 from satpambot.ml import shadow_metrics as sm
 
@@ -55,8 +56,6 @@ class ShadowLearnObserver(commands.Cog):
             sm.bump("exposures_total", 1.0, user_id=m.author.id)
         except Exception as e:
             log.warning("[shadow_learn_observer] metrics write failed: %r", e)
-
-
 async def setup(bot: commands.Bot):
     # discord.py v2 requires async setup()
     await bot.add_cog(ShadowLearnObserver(bot))

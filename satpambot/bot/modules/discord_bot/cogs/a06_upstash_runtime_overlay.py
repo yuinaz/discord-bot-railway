@@ -1,6 +1,6 @@
+from discord.ext import commands
 import os, json, logging
 from pathlib import Path
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +43,5 @@ class UpstashRuntimeOverlay(commands.Cog):
 
     async def cog_load(self):
         return
-
 async def setup(bot):
     await bot.add_cog(UpstashRuntimeOverlay(bot))

@@ -1,10 +1,10 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import asyncio, os, re, logging
 from datetime import datetime, timezone
 from typing import Optional, List
 import discord
-from discord.ext import commands
 
 LOG = logging.getLogger("satpambot.bot.modules.discord_bot.cogs.weekly_xp_guard")
 TITLE_PREFIX = os.getenv("WEEKLY_XP_TITLE_PREFIX","Weekly Random XP")
@@ -40,7 +40,6 @@ class WeeklyXPGuard(commands.Cog):
         for m in msgs[1:]:
             try: await m.delete(); await asyncio.sleep(0.2)
             except Exception: pass
-
 async def setup(bot):
     res = await bot.add_cog(WeeklyXPGuard(bot))
     import asyncio as _aio

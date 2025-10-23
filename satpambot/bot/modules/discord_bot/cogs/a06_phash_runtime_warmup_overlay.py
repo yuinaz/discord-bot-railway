@@ -1,6 +1,7 @@
+
 # a06_phash_runtime_warmup_overlay.py
-import logging, asyncio, inspect
 from discord.ext import commands
+import logging, asyncio, inspect
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +110,5 @@ class PhashRuntimeWarmupOverlay(commands.Cog):
             await self._try_warmup()
         except Exception as e:
             log.info("[phash_warmup] warmup skipped: %r", e)
-
 async def setup(bot):
     await bot.add_cog(PhashRuntimeWarmupOverlay(bot))

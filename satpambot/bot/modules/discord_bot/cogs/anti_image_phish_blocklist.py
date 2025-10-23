@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os
 import json
 import time
@@ -235,6 +237,7 @@ class AntiImagePhishBlocklist(commands.Cog):
         if ch is not None:
             try:
                 import discord
+
                 # Exempt true Thread objects
                 if isinstance(ch, getattr(discord, "Thread", tuple())):
                     return
@@ -299,6 +302,5 @@ class AntiImagePhishBlocklist(commands.Cog):
         except Exception:
             # Be silent to avoid breaking other cogs
             return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhishBlocklist(bot))

@@ -1,3 +1,4 @@
+from discord.ext import commands
 import inspect, logging, asyncio
 
 log = logging.getLogger(__name__)
@@ -14,7 +15,6 @@ async def _maybe_add_cog(bot, cog):
         log.exception("failed to add cog %s: %s", type(cog).__name__, e)
 
 import re, logging, os, json
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +51,6 @@ class MinerAccelOverlay(commands.Cog):
         raw = cfg.get("accel_factors") or os.getenv("MINER_ACCEL_FACTORS", "0.85,1.00,1.20")
         self.factors = _parse_floats(raw) or [1.0]
         log.info("[miner_accel_overlay] factors=%s (raw=%r)", self.factors, raw)
-
 async def setup(bot):
     if bot.get_cog("MinerAccelOverlay"):
         return

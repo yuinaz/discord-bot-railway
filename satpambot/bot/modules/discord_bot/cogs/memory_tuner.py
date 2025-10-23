@@ -1,5 +1,6 @@
-import logging, asyncio
 from discord.ext import commands
+import logging, asyncio
+
 try:
     from ...config import envcfg
 except Exception:
@@ -38,6 +39,5 @@ class MemoryTuner(commands.Cog):
             except Exception:
                 pass
         log.info("[memory_tuner] applied memory profile: soft=%sMB hard=%sMB (updated=%s)", soft, hard, updated)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemoryTuner(bot))

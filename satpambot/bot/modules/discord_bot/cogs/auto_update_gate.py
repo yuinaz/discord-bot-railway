@@ -1,5 +1,5 @@
-import asyncio, logging, os, sys
 from discord.ext import commands
+import asyncio, logging, os, sys
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +19,5 @@ class AutoUpdateGate(commands.Cog):
         except Exception as e:
             log.warning("[update-gate] smoke failed: %r", e)
             return False
-
 async def setup(bot):
     await bot.add_cog(AutoUpdateGate(bot))

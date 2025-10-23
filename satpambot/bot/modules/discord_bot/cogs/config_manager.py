@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import json, re
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 from satpambot.config.runtime import cfg, set_cfg, all_cfg
 from satpambot.config.env_importer import parse_dotenv, import_env_map, file_sha256
@@ -150,6 +152,5 @@ class ConfigManager(commands.Cog):
             data = all_cfg()
             text = json.dumps(data, indent=2, ensure_ascii=False)[:3900]
             await interaction.response.send_message(embed=discord.Embed(title='Config', description=f'```json\n{text}\n```', color=0x3498db), ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ConfigManager(bot))

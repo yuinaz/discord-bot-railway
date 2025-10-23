@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, inspect, logging, asyncio
 from typing import Optional
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from ..helpers import env_store
 from ..helpers import automaton_store
 
@@ -186,6 +188,5 @@ class Automaton(commands.Cog):
                 await msg.reply("Tidak ada tiket pending."); return
             automaton_store.update_ticket_status(p["id"], "denied")
             await msg.reply(f"Ticket #{p['id']} DENIED."); return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(Automaton(bot))

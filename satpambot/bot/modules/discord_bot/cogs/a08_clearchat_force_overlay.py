@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import logging
 from discord.ext import commands
+
+import logging
+
 import discord
 from discord import app_commands
 
@@ -39,6 +41,5 @@ class ClearChatForce(commands.Cog):
                 await interaction.followup.send(f"Deleted {{limit}} messages.", ephemeral=True)
         except Exception as e:
             LOGGER.exception("clearchat slash purge failed: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ClearChatForce(bot))

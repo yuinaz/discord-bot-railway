@@ -1,9 +1,10 @@
+from discord.ext import commands
 import os, json, logging
 from typing import Dict, Tuple
 from datetime import datetime, timezone
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 from ..helpers.upstash_client import UpstashClient
 from ..helpers.ladder_loader import load_ladders, parse_stage_idx
@@ -96,6 +97,5 @@ class CurriculumTKSD(commands.Cog):
     async def cmd_kurjunior(self, ctx: commands.Context):
         label, pct = await self._read_state()
         await ctx.send(self.template.format(label=label, percent=pct))
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(CurriculumTKSD(bot))

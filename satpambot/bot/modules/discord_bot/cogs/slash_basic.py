@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # modules/discord_bot/cogs/slash_basic.py
 import asyncio
 import discord
-from discord.ext import commands
 
 class SlashBasic(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -37,6 +38,5 @@ class SlashBasic(commands.Cog):
         if isinstance(error, CommandNotFound):
             return
         raise error
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SlashBasic(bot))

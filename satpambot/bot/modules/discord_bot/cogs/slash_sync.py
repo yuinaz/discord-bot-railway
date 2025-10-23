@@ -1,6 +1,7 @@
+from discord.ext import commands
 import os, asyncio, logging, discord
 from discord import app_commands
-from discord.ext import commands
+
 log = logging.getLogger("slash_sync")
 AUTO_THRESHOLD = int(os.getenv("SLASH_SYNC_AUTO_THRESHOLD", "5"))
 def _bool_env(name: str):

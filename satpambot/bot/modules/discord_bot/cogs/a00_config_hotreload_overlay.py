@@ -1,10 +1,10 @@
 
 # a00_config_hotreload_overlay.py (v7.6)
 # Watches YAML config files and applies them to env + dispatches a bot event.
+from discord.ext import commands
 import os, asyncio, logging, json, time
 from pathlib import Path
 from typing import Dict, Any
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "satpambot/config"))
@@ -117,7 +117,6 @@ class ConfigHotReload(commands.Cog):
     async def on_ready(self):
         if self._task is None:
             self._task = asyncio.create_task(self._loop())
-
 async def setup(bot):
     try:
         await bot.add_cog(ConfigHotReload(bot))

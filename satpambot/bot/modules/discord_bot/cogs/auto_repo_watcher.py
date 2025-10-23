@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # auto_repo_watcher.py — best-stable (NO-ENV)
 import asyncio, aiohttp, hashlib, io, json, os, sys, zipfile, time
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
-from discord.ext import commands
+
 from satpambot.bot.modules.discord_bot.helpers import restart_guard as rg
 
 BOOT_T0 = time.monotonic()
@@ -118,6 +120,5 @@ class AutoRepoWatcher(commands.Cog):
             except Exception:
                 pass
             await asyncio.sleep(interval_s)
-
 async def setup(bot):
     await bot.add_cog(AutoRepoWatcher(bot))

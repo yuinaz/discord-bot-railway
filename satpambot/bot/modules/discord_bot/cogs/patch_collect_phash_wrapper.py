@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import logging
 from discord.ext import commands
+
+import logging
+
 from satpambot.bot.modules.discord_bot.config.self_learning_cfg import PHASH_LOG_SCAN_LIMIT
 
 log = logging.getLogger(__name__)
@@ -26,5 +28,4 @@ class PatchCollectPhashWrapper(commands.Cog):
 
         M.collect_phash_from_log = wrapped  # type: ignore
         log.info("[patch_collect_phash] installed wrapper; limit=%s", PHASH_LOG_SCAN_LIMIT)
-
 async def setup(bot): await bot.add_cog(PatchCollectPhashWrapper(bot))

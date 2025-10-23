@@ -1,5 +1,5 @@
-import logging
 from discord.ext import commands
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +22,5 @@ class PersonaGetterFallback(commands.Cog):
                 return "default"
             setattr(self.bot, "get_active_persona", _safe_get_active_persona)
             log.info("[persona-fallback] installed bot.get_active_persona() default")
-
 async def setup(bot):
     await bot.add_cog(PersonaGetterFallback(bot))

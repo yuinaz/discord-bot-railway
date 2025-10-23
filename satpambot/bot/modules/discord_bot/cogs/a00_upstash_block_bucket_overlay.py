@@ -1,4 +1,6 @@
+
 # a00_upstash_block_bucket_overlay.py
+from discord.ext import commands
 """
 Prevents accidental writes to disallowed Upstash keys (e.g., xp:bucket:*).
 Non-invasive: only blocks, never writes.
@@ -6,7 +8,6 @@ Control via env:
   XP_UPSTASH_DENY_PREFIX: comma-separated prefixes (default: "xp:bucket:")
 """
 import os, logging, inspect
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +65,5 @@ class UpstashBlockBucketOverlay(commands.Cog):
                 if fn and inspect.iscoroutinefunction(fn):
                     setattr(mod, name, _wrap_call(fn))
             log.info("[upstash-block] guard active on %s (deny=%s)", modname, ",".join(DENY))
-
 async def setup(bot):
     await bot.add_cog(UpstashBlockBucketOverlay(bot))

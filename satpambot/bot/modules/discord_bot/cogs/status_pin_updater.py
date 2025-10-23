@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio
 import discord
-from discord.ext import commands
+
 class StatusPinUpdater(commands.Cog):
     _started = False
     def __init__(self, bot: commands.Bot):

@@ -1,6 +1,7 @@
+
 # a09_xp_bridge_kv_init_overlay.py
-import os, logging, json, httpx, asyncio
 from discord.ext import commands
+import os, logging, json, httpx, asyncio
 
 log = logging.getLogger(__name__)
 
@@ -36,6 +37,5 @@ class XpBridgeKvInit(commands.Cog):
             # SETNX
             r2 = await x.post(self.url, headers={"Authorization": f"Bearer {self.tok}", "Content-Type": "application/json"}, json=["SETNX", key, str(default_val)])
             r2.raise_for_status()
-
 async def setup(bot):
     await bot.add_cog(XpBridgeKvInit(bot))

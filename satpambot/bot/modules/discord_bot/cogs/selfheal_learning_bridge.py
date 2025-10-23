@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # satpambot/bot/modules/discord_bot/cogs/selfheal_learning_bridge.py
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +42,5 @@ class SelfhealLearningBridge(commands.Cog):
                         senior.update_metric(phase, name, delta=delta)
                         log.info("[bridge] bump senior: %s-%s +%s", phase, name, delta)
                         return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfhealLearningBridge(bot))

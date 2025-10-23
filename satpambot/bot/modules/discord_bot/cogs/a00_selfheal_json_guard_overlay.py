@@ -1,6 +1,7 @@
+
 # patched a00_selfheal_json_guard_overlay.py
-import re, json as _stdlib_json, logging, importlib, types
 from discord.ext import commands
+import re, json as _stdlib_json, logging, importlib, types
 
 LOG = logging.getLogger(__name__)
 
@@ -65,6 +66,5 @@ class SelfHealJsonGuardScoped(commands.Cog):
             LOG.info("[selfheal-json-guard-scoped] scoped shim installed")
         except Exception as e:
             LOG.warning("[selfheal-json-guard-scoped] patch fail: %r", e)
-
 async def setup(bot):
     await bot.add_cog(SelfHealJsonGuardScoped(bot))

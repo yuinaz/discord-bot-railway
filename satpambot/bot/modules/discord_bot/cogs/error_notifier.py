@@ -1,3 +1,5 @@
+
+from discord.ext import commands
 \
 # satpambot/bot/modules/discord_bot/cogs/error_notifier.py
 import os
@@ -7,7 +9,7 @@ import logging
 from typing import Dict
 
 import aiohttp
-from discord.ext import commands, tasks
+from discord.ext import tasks
 import discord
 
 log = logging.getLogger(__name__)
@@ -118,6 +120,5 @@ class ErrorNotifier(commands.Cog):
             return
         await _send_channel(self.bot, "🔁 Bot resumed")
         await _send_webhook("🔁 Bot resumed")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ErrorNotifier(bot))

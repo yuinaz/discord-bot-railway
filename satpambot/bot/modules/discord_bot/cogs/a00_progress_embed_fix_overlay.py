@@ -1,7 +1,9 @@
-# a00_progress_embed_fix_overlay.py
 from __future__ import annotations
-import sys, logging, inspect, types
+
+# a00_progress_embed_fix_overlay.py
+
 from discord.ext import commands
+import sys, logging, inspect, types
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +37,5 @@ class ProgressEmbedFix(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         _patch_progress_embed_solo()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProgressEmbedFix(bot))

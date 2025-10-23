@@ -1,7 +1,9 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging, os, json
 from pathlib import Path
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg_int
 log = logging.getLogger(__name__)
 MARK = Path("data/neuro-lite/bonus_applied_satpam_unified_v1.txt")

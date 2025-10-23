@@ -1,10 +1,11 @@
+from __future__ import annotations
 
 """
 EmbedScribe async wrapper:
 - Ensures EmbedScribe.update/post/edit are awaitable even if the original is sync.
 - Avoids 'object NoneType can't be used in await expression' in callers.
 """
-from __future__ import annotations
+
 import logging, inspect, asyncio
 
 log = logging.getLogger(__name__)
@@ -18,7 +19,6 @@ async def _awaitable_call(fn, *a, **k):
     except Exception as e:
         log.warning("[embedscribe-async] call failed: %r", e)
         raise
-
 async def setup(bot):
     try:
         from satpambot.bot.utils.embed_scribe import EmbedScribe

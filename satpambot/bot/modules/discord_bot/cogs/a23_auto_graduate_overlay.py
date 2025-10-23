@@ -1,6 +1,9 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import asyncio, logging, os
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 from satpambot.bot.modules.discord_bot.helpers.phase_utils import get_phase, set_phase, get_tk_total
 
 log = logging.getLogger(__name__)
@@ -50,6 +53,5 @@ class AutoGraduateOverlay(commands.Cog):
     @check_loop.before_loop
     async def _wait_ready(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(AutoGraduateOverlay(bot))

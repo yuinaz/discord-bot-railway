@@ -1,6 +1,7 @@
+from discord.ext import commands
 import discord
 from discord import app_commands
-from discord.ext import commands
+
 class DiagPublic(commands.Cog):
     def __init__(self, bot): self.bot = bot
     @app_commands.command(name="diag-public", description="Daftar cepat nama slash command (global & guild).")

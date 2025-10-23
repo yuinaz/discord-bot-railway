@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import os
 from discord.ext import commands
+
+import os
+
 from ..helpers import env_store
 
 class EnvImportAll(commands.Cog):
@@ -29,6 +31,5 @@ class EnvImportAll(commands.Cog):
     async def env_get(self, ctx: commands.Context, key: str):
         v = env_store.get(key)
         await ctx.reply(f"{key} = {v!r}", mention_author=False)
-
 async def setup(bot):
     await bot.add_cog(EnvImportAll(bot))

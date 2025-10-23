@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging
 import discord
-from discord.ext import commands
+
 from satpambot.bot.modules.discord_bot.helpers.thread_utils import find_thread_by_name, DEFAULT_THREAD_NAME
 
 log = logging.getLogger(__name__)
@@ -45,6 +47,5 @@ def _install_create_wrappers():
 class ThreadCreateGuard(commands.Cog):
     def __init__(self, bot: commands.Bot):
         _install_create_wrappers()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ThreadCreateGuard(bot))

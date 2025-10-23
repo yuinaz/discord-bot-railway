@@ -1,8 +1,11 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import asyncio, logging, os, re
 from typing import Optional, Iterable
 import discord
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 from satpambot.bot.modules.discord_bot.helpers.phase_utils import get_phase, add_tk_xp, add_senior_xp, upstash_set, upstash_get
 
 log = logging.getLogger(__name__)
@@ -102,6 +105,5 @@ class PassiveShadowObserver(commands.Cog):
     @backfill_loop.before_loop
     async def _wait_ready(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(PassiveShadowObserver(bot))

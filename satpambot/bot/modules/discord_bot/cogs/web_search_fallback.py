@@ -1,6 +1,8 @@
 from __future__ import annotations
-import discord
+
 from discord.ext import commands
+import discord
+
 from satpambot.config.local_cfg import cfg
 
 HELP = ("Pencarian web belum dikonfigurasi. "
@@ -19,5 +21,4 @@ class WebSearchFallback(commands.Cog):
         emb.add_field(name="SEARCH_SAFE_MODE", value="`true` untuk safe search default", inline=False)
         emb.set_footer(text="Setelah diisi, load cog web_search asli. Fallback ini aman & tidak error.")
         await ctx.reply(embed=emb)
-
 async def setup(bot): await bot.add_cog(WebSearchFallback(bot))

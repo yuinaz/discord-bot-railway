@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import shutil, platform
 try:
     import psutil
 except Exception:
     psutil = None
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from .selfheal_router import send_selfheal
 
 def _mk_embed(title: str, desc: str, color: int):
@@ -38,5 +40,4 @@ class ResourceMonitor(commands.Cog):
         em.add_field(name='Mem', value=f'{mem:.1f}%  {_percent_bar(mem)}', inline=True)
         em.add_field(name='Disk', value=f'{disk:.1f}%  {_percent_bar(disk)}', inline=True)
         await send_selfheal(self.bot, em)
-
 async def setup(bot): await bot.add_cog(ResourceMonitor(bot))

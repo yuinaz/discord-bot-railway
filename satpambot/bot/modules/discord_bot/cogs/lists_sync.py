@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, os, re, json, logging
 from typing import Optional, List, Tuple
 import discord
-from discord.ext import commands
 
 from satpambot.bot.modules.discord_bot.helpers import lists_loader, modlog, github_sync
 
@@ -289,6 +290,5 @@ class ListsSync(commands.Cog):
                     await message.add_reaction("✅")
                 except Exception as e:
                     await modlog.send_error(message.guild, content=f"Parse attachment gagal: {e}")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ListsSync(bot))

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, io, logging, asyncio, sqlite3, time, hashlib
 from typing import Optional
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 from ..helpers import discord_state_io as dsio
 
@@ -305,6 +307,5 @@ class DiscordStateCheckpoint(commands.Cog):
                 log.info("[state] FORCE checkpoint saved to thread pin (%d bytes)", len(data))
         except Exception:
             log.exception("[state] force watcher error")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(DiscordStateCheckpoint(bot))

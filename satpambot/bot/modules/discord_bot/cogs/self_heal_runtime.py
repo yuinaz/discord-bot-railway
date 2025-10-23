@@ -1,6 +1,6 @@
+from discord.ext import commands
 import os
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +16,5 @@ class SelfHealRuntime(commands.Cog):
             return
         log.warning("[self-heal] SelfHealRuntime aktif (Groq)")
         # start tasks here if any (omitted for brevity)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfHealRuntime(bot))

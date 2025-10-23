@@ -5,10 +5,11 @@ Keeps imports lazy to avoid psutil dependency unless enabled.
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, logging, importlib
 from satpambot.config.local_cfg import cfg_bool
 from typing import Any
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +19,6 @@ async def _maybe_import(module: str):
     except Exception as e:
         log.exception("[neuro_gov_bootstrap] import failed for %s: %r", module, e)
         raise
-
 async def setup(bot: commands.Bot):
     flag = cfg_bool("NEURO_GOVERNOR_ENABLE", False) or ((os.getenv("NEURO_GOVERNOR_ENABLE") or "").lower() in {"1","true","yes","on"})
     if not flag:

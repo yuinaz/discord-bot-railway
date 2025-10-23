@@ -37,3 +37,6 @@ class _TTSShimFinder:
 if not any(getattr(x, "__class__", None).__name__ == "_TTSShimFinder" for x in sys.meta_path):
     sys.meta_path.insert(0, _TTSShimFinder())
     log.info("[tts_import_shim] active (TTS_ENABLED=%s)", bool(_cfg("TTS_ENABLED", False)))
+
+async def setup(bot):
+    return None

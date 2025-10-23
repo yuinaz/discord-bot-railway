@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import logging
 from discord.ext import commands
+
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,5 @@ class FriendlyCheckErrors(commands.Cog):
                 return
         except Exception:
             pass  # jangan sampai error handler mematikan bot
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(FriendlyCheckErrors(bot))

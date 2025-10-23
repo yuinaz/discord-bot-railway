@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, time, asyncio
 import discord
-from discord.ext import commands
+
 from typing import Dict, List
 
 try:
@@ -137,6 +139,5 @@ class ChatNeuroLite(commands.Cog):
             await message.reply(reply[:1900], mention_author=False, allowed_mentions=allowed)
         except Exception as e:
             await _selfheal(self.bot, 'Chat Error', f'{type(e).__name__}: {e}', color=0xe67e22)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ChatNeuroLite(bot))

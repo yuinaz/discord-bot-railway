@@ -1,6 +1,7 @@
+from discord.ext import commands
 import hashlib, datetime as dt
 import discord
-from discord.ext import commands
+
 from satpambot.bot.utils import embed_scribe, phash_db as PDB
 def _load_conf_map() -> dict:
     # Legacy providers
@@ -196,6 +197,5 @@ class PhishWatcher(commands.Cog):
                 await log_ch.send(embed=discord.Embed(title="Phish Watch Error", description=str(e), color=0xe74c3c))
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishWatcher(bot))

@@ -1,6 +1,6 @@
+from discord.ext import commands
 import os
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,5 @@ class MinerEnvLogger(commands.Cog):
             _g("SLANG_MINER_PER_CHANNEL", "?"),
             _g("PUBLIC_REPORT_CHANNEL_ID", _g("LOG_CHANNEL_ID", "?"))
         )
-
 async def setup(bot):
     await bot.add_cog(MinerEnvLogger(bot))

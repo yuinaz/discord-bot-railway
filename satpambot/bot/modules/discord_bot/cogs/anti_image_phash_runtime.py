@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio
 import json
 import os
@@ -423,6 +425,7 @@ class AntiImagePhashRuntime(commands.Cog):
         if ch is not None:
             try:
                 import discord
+
                 # Exempt true Thread objects
                 if isinstance(ch, getattr(discord, "Thread", tuple())):
                     return
@@ -515,6 +518,5 @@ class AntiImagePhashRuntime(commands.Cog):
 
         except Exception:
             return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhashRuntime(bot))

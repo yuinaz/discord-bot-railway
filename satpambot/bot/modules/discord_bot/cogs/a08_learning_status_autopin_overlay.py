@@ -1,3 +1,4 @@
+from discord.ext import commands
 import os, json, logging
 from datetime import datetime, timezone
 
@@ -27,6 +28,7 @@ class LearningStatusAutopin(commands.Cog):
         try:
             from discord import Game, Status
             import aiohttp
+
             now = datetime.now(timezone.utc)
             if int(now.timestamp()) % self.period != 0:
                 return
@@ -47,6 +49,5 @@ class LearningStatusAutopin(commands.Cog):
     @loop.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(LearningStatusAutopin(bot))

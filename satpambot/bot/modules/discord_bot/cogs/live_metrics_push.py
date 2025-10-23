@@ -1,6 +1,8 @@
+from discord.ext import commands
 import datetime as dt, platform
 import discord
 from discord.ext import tasks, commands
+
 try:
     from satpambot.config.compat_conf import get_conf  # prefer new compat layer
 except Exception:  # pragma: no cover
@@ -47,6 +49,5 @@ class LiveMetricsPush(commands.Cog):
     @task.before_loop
     async def _wait_ready(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LiveMetricsPush(bot))

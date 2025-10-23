@@ -1,8 +1,10 @@
+
 # reload_control.py (GroupCog version with auto guild sync once)
+from discord.ext import commands
 import asyncio
 import traceback
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 COG_PREFIX = "satpambot.bot.modules.discord_bot.cogs."
@@ -133,7 +135,6 @@ async def _sync_all_guilds_once(bot: commands.Bot):
                 pass
     except Exception:
         pass
-
 async def setup(bot: commands.Bot):
     # Register the GroupCog
     await bot.add_cog(ReloadControl(bot))

@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from discord.ext import commands
+
 import importlib, logging
 log = logging.getLogger(__name__)
 
@@ -15,6 +17,5 @@ class UpsertAutoload(commands.Cog):
                 log.info("[upsert_autoload] imported %s", m)
             except Exception as e:
                 log.warning("[upsert_autoload] %s: %s", m, e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(UpsertAutoload(bot))

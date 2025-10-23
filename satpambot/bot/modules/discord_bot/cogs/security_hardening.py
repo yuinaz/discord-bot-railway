@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, time, asyncio
 from collections import defaultdict, deque
 import discord
-from discord.ext import commands
 
 # Simple in-memory cooldown for risky commands (by user)
 _last_call = defaultdict(lambda: 0.0)
@@ -47,6 +48,5 @@ class SecurityHardening(commands.Cog):
                 await ctx.reply("⚠️ Terjadi kesalahan saat menjalankan perintah.", mention_author=False)
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SecurityHardening(bot))

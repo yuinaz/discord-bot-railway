@@ -1,6 +1,6 @@
 
-import os, json
 from discord.ext import commands
+import os, json
 
 def _flatten(d, prefix=""):
     flat = {}
@@ -41,7 +41,6 @@ class EnvOverridesLoader(commands.Cog):
                 print(f"[env_overrides] failed loading {p}: {e!r}")
         if not used:
             print("[env_overrides] no overrides file found (skip)")
-
 async def setup(bot):
     await bot.add_cog(EnvOverridesLoader(bot))
     print("[env_overrides] overlay ready (CONFIG_OVERRIDES_PATH / overrides.json)")

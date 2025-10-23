@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 """
 Ensure Upstash KV base keys exist so downstream bridge doesn't stop with 'KV missing; stop'.
@@ -6,7 +7,7 @@ Keys:
   - xp:bot:senior_total (int or {"senior_total_xp": int})
   - xp:ladder:TK        ({"L1": int, "L2": int})
 """
-from __future__ import annotations
+
 import os, logging, json, httpx, time
 
 log = logging.getLogger(__name__)
@@ -14,7 +15,6 @@ log = logging.getLogger(__name__)
 URL = os.getenv("UPSTASH_REDIS_REST_URL")
 TOK = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 HDR = {"Authorization": f"Bearer {TOK}", "Content-Type": "application/json"} if TOK else {}
-
 async def setup(bot):
     if not URL or not TOK:
         log.warning("[xp-kv-init] upstash env missing; skip")

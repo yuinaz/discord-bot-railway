@@ -47,7 +47,6 @@ async def _run(bot):
                     "If needed, set the correct PREFERRED_THREAD_ID via your progress overlay.", e)
     except Exception as e:
         log.error("[xp_force_seed] failed to upsert XP snapshot: %s", e)
-
 async def setup(bot):
     # schedule background task, no side effects on import
     asyncio.create_task(_run(bot))

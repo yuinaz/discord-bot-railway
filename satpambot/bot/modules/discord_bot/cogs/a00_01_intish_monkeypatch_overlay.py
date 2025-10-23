@@ -1,7 +1,10 @@
-# a00_01_intish_monkeypatch_overlay.py
 from __future__ import annotations
-import sys, types, json, logging
+
+# a00_01_intish_monkeypatch_overlay.py
+
 from discord.ext import commands
+import sys, types, json, logging
+
 log = logging.getLogger(__name__)
 
 def intish(x, default=0):
@@ -40,5 +43,4 @@ class IntishOverlay(commands.Cog):
         for m in TARGETS:
             if _patch_module_int(m): ok = True
         if ok: log.info("[intish] int() patched for a08* modules")
-
 async def setup(bot: commands.Bot): await bot.add_cog(IntishOverlay(bot))

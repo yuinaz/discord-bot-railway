@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import json, os
 from pathlib import Path
 import discord
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg
 
 ROOT = Path(__file__).resolve().parents[5]
@@ -64,5 +66,4 @@ class XPCommand(commands.Cog):
             await ctx.reply(embed=emb)
         except Exception:
             await ctx.send(embed=emb)
-
 async def setup(bot): await bot.add_cog(XPCommand(bot))

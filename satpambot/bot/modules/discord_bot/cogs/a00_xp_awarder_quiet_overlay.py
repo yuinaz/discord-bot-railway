@@ -1,6 +1,7 @@
 
-import logging, time, importlib
 from discord.ext import commands
+import logging, time, importlib
+
 LOG = logging.getLogger(__name__)
 _LAST = 0
 def _allow_log():

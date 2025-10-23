@@ -144,7 +144,6 @@ class StickyKeeperOverlay:
         _scribe.upsert = _scribe_upsert_sticky
         _log_utils.upsert_status_embed = _upsert_status_embed_sticky
         _logger.info("[sticky] overlay active (scribe+status patched)")
-
 async def setup(bot):
     await bot.add_cog(StickyKeeperOverlay(bot))
 

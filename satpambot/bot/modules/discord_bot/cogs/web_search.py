@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging, json
 from typing import List, Dict, Any, Optional
 import discord
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg
 
 log = logging.getLogger(__name__)
@@ -111,6 +113,5 @@ class WebSearch(commands.Cog):
             await ctx.reply(msg, delete_after=15)
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(WebSearch(bot))

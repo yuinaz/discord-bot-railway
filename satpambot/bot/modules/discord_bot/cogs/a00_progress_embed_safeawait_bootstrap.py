@@ -1,6 +1,6 @@
 
-import importlib, logging, inspect
 from discord.ext import commands
+import importlib, logging, inspect
 
 LOG = logging.getLogger(__name__)
 
@@ -41,6 +41,5 @@ class ProgressEmbedSafeAwait(commands.Cog):
                     LOG.info("[safeawait] patched EmbedScribe.upsert")
         except Exception as e:
             LOG.debug("[safeawait] skip EmbedScribe.upsert: %r", e)
-
 async def setup(bot):
     await bot.add_cog(ProgressEmbedSafeAwait(bot))

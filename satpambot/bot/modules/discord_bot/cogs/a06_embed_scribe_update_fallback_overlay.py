@@ -1,6 +1,7 @@
+
 # a06_embed_scribe_update_fallback_overlay.py
-import logging
 from discord.ext import commands
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +55,5 @@ class EmbedScribeUpdateFallback(commands.Cog):
             ES.update = _safe_update
         setattr(ES, "_update_patched_by_fallback", True)
         log.info("[embed-fallback] EmbedScribe.update patched with safe fallback")
-
 async def setup(bot):
     await bot.add_cog(EmbedScribeUpdateFallback(bot))

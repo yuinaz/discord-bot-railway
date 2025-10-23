@@ -1,6 +1,6 @@
+from discord.ext import commands
 import os
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +34,5 @@ class PublicGateChannelOverlay(commands.Cog):
             except Exception:
                 continue
         log.warning("[public_gate_overlay] No matching channel by name; set PUBLIC_REPORT_CHANNEL_ID/LOG_CHANNEL_ID manually.")
-
 async def setup(bot):
     await bot.add_cog(PublicGateChannelOverlay(bot))

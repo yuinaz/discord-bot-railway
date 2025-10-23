@@ -1,3 +1,4 @@
+from discord.ext import commands
 import asyncio
 import logging
 import random
@@ -10,6 +11,7 @@ from discord.ext import commands, tasks
 
 try:
     from ..helpers.memory_upsert import upsert_pinned_memory
+
 except Exception:  # pragma: no cover
     upsert_pinned_memory = None
 
@@ -139,6 +141,5 @@ class PhishTextHourlyMiner(commands.Cog):
             await scan_channel(ch)
 
         return found
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishTextHourlyMiner(bot))

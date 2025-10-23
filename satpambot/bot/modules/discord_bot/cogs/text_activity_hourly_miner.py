@@ -1,8 +1,9 @@
 
 # text_activity_hourly_miner.py
 # Miner ringan untuk pesan teks umum; snapshot ke JSON agar pengetahuan bertambah
+from discord.ext import commands
 import asyncio, json, os, time, logging
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -115,6 +116,5 @@ class TextActivityMiner(commands.Cog):
     @job.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(TextActivityMiner(bot))

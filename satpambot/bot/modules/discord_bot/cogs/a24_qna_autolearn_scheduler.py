@@ -1,4 +1,5 @@
 
+from discord.ext import commands
 import os
 import json
 import random
@@ -168,7 +169,6 @@ class QnAAutoLearnScheduler(commands.Cog):
         await self.bot.wait_until_ready()
         # random initial delay 10-60s to avoid competing with other loops
         await asyncio.sleep(random.randint(10, 60))
-
 async def setup(bot):
     # Prefer modern discord.py setup
     await bot.add_cog(QnAAutoLearnScheduler(bot))

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # -*- coding: utf-8 -*-
 """
 memory_guard.py
@@ -24,6 +26,7 @@ HARD_MB = 480
 def _get_mem_mb() -> int:
     try:
         import psutil, os
+
         p = psutil.Process(os.getpid())
         return int(p.memory_info().rss / (1024*1024))
     except Exception:
@@ -49,6 +52,5 @@ class MemoryGuard(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         LOG.info("[memory-guard] started (interval=%ss soft=%dMB hard=%dMB)", INTERVAL_SEC, SOFT_MB, HARD_MB)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemoryGuard(bot))

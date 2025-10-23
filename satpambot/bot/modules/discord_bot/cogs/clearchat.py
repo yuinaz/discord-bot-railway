@@ -1,4 +1,5 @@
 
+from discord.ext import commands
 def _is_deletable(msg, *, keep_pinned=True, keep_sticky=True):
     if keep_pinned and getattr(msg, 'pinned', False):
         return False
@@ -14,7 +15,6 @@ from typing import Optional
 
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +57,6 @@ class ClearChat(commands.Cog):
                 await interaction.user.send(msg)
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ClearChat(bot))
 async def _fallback_delete(channel, limit=200):

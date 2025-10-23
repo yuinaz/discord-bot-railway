@@ -7,10 +7,11 @@ Version: v11.4+ (combined v11.3 + v11.4)
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import json, os, hashlib, re, io
 from typing import Optional, Dict, Any, Set, List, Tuple
 import discord
-from discord.ext import commands
 
 HARD = {
     "enabled": True,
@@ -525,7 +526,6 @@ class FirstTouchAttachmentBan(commands.Cog):
         fp.url = getattr(message,"jump_url", discord.Embed.Empty)
         fp.set_footer(text="SatpamBot • FTAB v11.4+")
         await self._send_log(guild, fp, thread=fp_thread, delete_after=self._delete_after_for("fp"))
-
 async def setup(bot: commands.Bot):
     if bot.get_cog("FirstTouchAttachmentBan") is None:
         await bot.add_cog(FirstTouchAttachmentBan(bot))

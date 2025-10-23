@@ -1,9 +1,9 @@
+from discord.ext import commands
 import os
 import json
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +100,6 @@ class XPAwardEventPersistOverlay(commands.Cog):
     @commands.Cog.listener()
     async def on_xp_award(self, *args, **kwargs):
         return await self.on_xp_add(*args, **kwargs)
-
 async def setup(bot: commands.Bot):
     name = XPAwardEventPersistOverlay.__name__
     if getattr(bot, "cogs", None) and name in bot.cogs:

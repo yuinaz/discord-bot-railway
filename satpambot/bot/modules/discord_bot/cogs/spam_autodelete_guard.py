@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging
 import re
-from discord.ext import commands
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +42,5 @@ class SpamAutoDeleteGuard(commands.Cog):
                 await message.delete()
             except Exception as e:
                 LOGGER.debug("Failed to delete spam: %s", e)
-
 async def setup(bot):
     await bot.add_cog(SpamAutoDeleteGuard(bot))

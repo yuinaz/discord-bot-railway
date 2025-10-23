@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import discord
 from discord.ext import commands
 
+import discord
 
 class RuntimeCfgFromMessage(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -67,7 +67,5 @@ class RuntimeCfgFromMessage(commands.Cog):
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         # Jangan apply di edit — supaya tidak spam
         return
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RuntimeCfgFromMessage(bot))

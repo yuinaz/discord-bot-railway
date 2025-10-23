@@ -1,8 +1,8 @@
+from discord.ext import commands
 import os, json, logging
 from datetime import datetime, timezone
 
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +48,5 @@ class LearningPassiveObserverPersist(commands.Cog):
             _write_local(d)
         except Exception as e:
             log.debug("[persist] write failed: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningPassiveObserverPersist(bot))

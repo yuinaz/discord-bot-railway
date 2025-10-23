@@ -1,9 +1,11 @@
+
 # a23_curriculum_admin_bridge.py
+from discord.ext import commands
 import re, json, logging
 from pathlib import Path
 from importlib import import_module
 import discord
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 def _cfg_path(): return Path("config/curriculum.json")
 def _load_cfg():

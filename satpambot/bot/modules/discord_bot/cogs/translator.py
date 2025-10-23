@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from discord.ext import commands
 
 import os
 from typing import Optional, Literal
 
 import discord
 from discord import app_commands, Interaction
-from discord.ext import commands
 
 # --- Simple translation backend (deep-translator then googletrans as fallback) ---
 def _translate(text: str, target: str) -> str:
@@ -60,7 +60,6 @@ class Translator(commands.Cog):
     """Lightweight translator commands & context menu."""
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-
 async def setup(bot: commands.Bot) -> None:
     # Add cog (even though it has no listeners; keeps parity with other cogs).
     await bot.add_cog(Translator(bot))

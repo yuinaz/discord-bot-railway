@@ -1,9 +1,9 @@
+
 # PATCHED setup: register slash groups to tree (guild-first), override existing /repo if any
-import os, logging, discord
 from discord.ext import commands
+import os, logging, discord
 
 log = logging.getLogger(__name__)
-
 async def setup(bot: commands.Bot):
     from .remote_sync_restart import RemoteSyncRestart  # local import to avoid circular
     cog = RemoteSyncRestart(bot)

@@ -1,11 +1,12 @@
 
+from discord.ext import commands
 """
 a06_skills_registry_overlay.py
 - Exposes skills via Cog and registers a few safe examples.
 - Hooks for QnA/Autolearn can import registry.call("skill_name", ...).
 """
 import logging
-from discord.ext import commands
+
 from satpambot.bot.skills.registry import skill, all_skills, call
 
 log = logging.getLogger(__name__)
@@ -38,7 +39,6 @@ class SkillsOverlay(commands.Cog):
     async def skill_cmd(self, ctx, name: str, *rest):
         res = await call(name, self.bot, *rest)
         await ctx.send(f"{name}: {res}")
-
 async def setup(bot):
     await bot.add_cog(SkillsOverlay(bot))
 

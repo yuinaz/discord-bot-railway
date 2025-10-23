@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # NOTE:
 # Modul ini DISABLED untuk mencegah embed sticky dobel.
 # Gunakan jalur resmi di helpers/log_utils + presence_fix untuk update status.
 # Jika ingin mengaktifkan kembali, set env: STICKY_SIMPLE_ENABLE=1 (tidak direkomendasikan).
 import os
 import discord
-from discord.ext import commands
 
 ENABLED = str(os.getenv("STICKY_SIMPLE_ENABLE","")).lower() in ("1","true","yes","on")
 
@@ -14,7 +15,6 @@ class StatusEmbedSimple(commands.Cog):
     """Placeholder saja; tidak melakukan apa-apa saat disabled."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
 async def setup(bot: commands.Bot):
     if not ENABLED:
         # Jangan load apapun supaya tidak bikin embed kedua.

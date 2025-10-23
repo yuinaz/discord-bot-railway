@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, re, logging
 from typing import Set, List
 import discord
-from discord.ext import commands
+
 from satpambot.bot.modules.discord_bot.helpers.runtime_cfg import ConfigManager
 
 log = logging.getLogger(__name__)
@@ -72,6 +74,5 @@ class ReactionAllowlistStatic(commands.Cog):
             await msg.remove_reaction(payload.emoji, self.bot.user)
         except Exception as e:
             log.info("[reaction-allowlist] remove failed: %r", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ReactionAllowlistStatic(bot))

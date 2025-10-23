@@ -6,9 +6,11 @@ Memastikan pesan penting di #log-botphising tidak hilang & selalu pinned:
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, asyncio, logging, contextlib
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +74,5 @@ class LogKeeperUpserter(commands.Cog):
                     log.info("[log_keeper_upserter] pinned %s", mk)
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LogKeeperUpserter(bot))

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 from satpambot.config.runtime import cfg, set_cfg
 
@@ -106,6 +108,5 @@ class SelfHealRouter(commands.Cog):
     async def selfheal_info(self, interaction: 'discord.Interaction'):
         cid = cfg('SELF_HEAL_CHANNEL_ID'); cname = cfg('SELF_HEAL_CHANNEL_NAME', DEFAULT_NAME)
         await interaction.response.send_message(embed=_mk('Self-Heal', f'Channel: `{cname}` (ID: `{cid}`)', 0x3498db), ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfHealRouter(bot))

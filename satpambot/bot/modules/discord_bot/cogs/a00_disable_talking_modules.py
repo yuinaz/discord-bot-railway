@@ -1,4 +1,6 @@
+
 # a00_disable_talking_modules.py
+
 from discord.ext import commands
 import logging
 log = logging.getLogger(__name__)

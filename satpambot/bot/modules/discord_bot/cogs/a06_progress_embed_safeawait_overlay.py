@@ -1,6 +1,6 @@
 
-import inspect
 from discord.ext import commands
+import inspect
 
 class ProgressEmbedSafeAwaitOverlay(commands.Cog):
     def __init__(self, bot): self.bot = bot
@@ -46,7 +46,6 @@ class ProgressEmbedSafeAwaitOverlay(commands.Cog):
             print("[progress_embed_safeawait] patched: EmbedScribe.upsert")
         else:
             print("[progress_embed_safeawait] nothing patched — could not find EmbedScribe.upsert")
-
 async def setup(bot):
     await bot.add_cog(ProgressEmbedSafeAwaitOverlay(bot))
     print("[progress_embed_safeawait] overlay loaded")

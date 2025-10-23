@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging, random, importlib
 log = logging.getLogger(__name__)
 
@@ -31,6 +32,5 @@ def _install():
         _apply_jitter(mod_name, d, p, tag)
 
 _install()
-
 async def setup(_bot):  # overlay only
     return

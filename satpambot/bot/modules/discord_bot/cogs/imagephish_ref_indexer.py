@@ -1,9 +1,10 @@
+
 # satpambot/bot/modules/discord_bot/cogs/imagephish_ref_indexer.py
+from discord.ext import commands
 import io, json, asyncio, math
 from typing import Set
 from PIL import Image
 import discord
-from discord.ext import commands
 
 LOG_CHANNEL_NAME = "log-botphising"
 REF_THREAD_NAME  = "imagephising"
@@ -128,6 +129,5 @@ class ImagePhishRefIndexer(commands.Cog):
             pass
 
         print(f"[ref_indexer] total pHash cached: {len(self.ref_phash)}")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ImagePhishRefIndexer(bot))

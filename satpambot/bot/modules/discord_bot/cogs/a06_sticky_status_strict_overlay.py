@@ -1,3 +1,4 @@
+from discord.ext import commands
 import inspect, logging, asyncio
 
 log = logging.getLogger(__name__)
@@ -14,7 +15,6 @@ async def _maybe_add_cog(bot, cog):
         log.exception("failed to add cog %s: %s", type(cog).__name__, e)
 
 import json, logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,6 @@ class _StickyStatusStrict(commands.Cog):
         cfg = _load_local_json().get("overlays", {})
         self.titles = cfg.get("strict_sticky_titles", ["Periodic Status", "Maintenance", "Heartbeat"])
         log.info("[sticky_status.strict] active; titles=%s", self.titles)
-
 async def setup(bot):
     if bot.get_cog("_StickyStatusStrict"):
         return

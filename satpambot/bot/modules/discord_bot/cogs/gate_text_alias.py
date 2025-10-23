@@ -1,9 +1,12 @@
-# cogs/gate_text_alias.py
 from __future__ import annotations
+
+# cogs/gate_text_alias.py
+
+from discord.ext import commands
 import json
 from pathlib import Path
 import discord
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg
 
 LOCAL_PATH = Path(__file__).resolve().parents[5] / "local.json"
@@ -66,6 +69,5 @@ class GateTextAlias(commands.Cog):
             return await ctx.reply("🔒 Gate dikunci (PUBLIC_MODE_ENABLE = false).", mention_author=False)
 
         return await ctx.reply("Format: `!gate status` | `!gate lock` | `!gate unlock`", mention_author=False)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(GateTextAlias(bot))

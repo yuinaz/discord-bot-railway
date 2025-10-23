@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import re, os
 from typing import Optional
 
 import discord
-from discord.ext import commands
 
 from satpambot.bot.modules.discord_bot.helpers import static_cfg
 from satpambot.bot.modules.discord_bot.helpers.lists_loader import load_lists, url_to_host
@@ -112,6 +113,5 @@ class FastRaidAutoban(commands.Cog):
         # Hard blacklist hits OR generic mass-mention
         await message.delete()
         await self._ban_author(message, "Mass mention + external URL (non-whitelist)")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(FastRaidAutoban(bot))

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import logging, re
 from discord.ext import commands
+
+import logging, re
+
 import discord
 
 log = logging.getLogger(__name__)
@@ -46,6 +48,5 @@ class AntiImagePhishAdvanced(commands.Cog):
                 pass
         # Placeholder: no-op to keep compilation stable
         return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImagePhishAdvanced(bot))

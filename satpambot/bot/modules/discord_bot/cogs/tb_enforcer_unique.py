@@ -1,12 +1,12 @@
 
 # -*- coding: utf-8 -*-
+from discord.ext import commands
 """
 TB Enforcer Unique — menjaga supaya hanya SATU command 'tb' yang aktif.
 Implementasi aman untuk test runner (tidak akses bot.loop).
 Tidak memaksa urutan loader; bila ada multiple add, yang terakhir dari loader akan menang,
 namun kita cek saat ready dan memastikan yang aktif adalah satu saja.
 """
-from discord.ext import commands
 
 class TBEnforcerUnique(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -21,6 +21,5 @@ class TBEnforcerUnique(commands.Cog):
         # Di sini cukup pastikan 'tb' ada (opsional) lalu selesai.
         # (Tidak menghapus apa pun supaya tidak bentrok dengan loader kamu.)
         self._done = True
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(TBEnforcerUnique(bot))

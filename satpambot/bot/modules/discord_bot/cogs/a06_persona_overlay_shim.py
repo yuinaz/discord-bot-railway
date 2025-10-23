@@ -1,14 +1,14 @@
+from __future__ import annotations
 
 """
 Persona overlay compatibility shim.
 - Adds PersonaOverlay.get_active_persona() if missing (back-compat).
 Safe to load multiple times; idempotent.
 """
-from __future__ import annotations
+
 import logging
 
 log = logging.getLogger(__name__)
-
 async def setup(bot):
     # Attempt to find PersonaOverlay in likely modules
     targets = [

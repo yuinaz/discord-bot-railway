@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 """
 Graceful shutdown handler:
 - Handles SIGTERM (Render) and Ctrl+C (Windows/Linux) without changing main.py
@@ -11,7 +13,7 @@ import signal
 import sys
 import atexit
 from typing import Optional
-from discord.ext import commands
+
 import discord
 
 log = logging.getLogger("satpambot.graceful_shutdown")
@@ -88,6 +90,5 @@ class GracefulShutdown(commands.Cog):
                     pass
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(GracefulShutdown(bot))

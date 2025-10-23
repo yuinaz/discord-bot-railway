@@ -11,9 +11,11 @@ Auto-delete pesan di channel log HANYA dari sesi saat ini (session-scope).
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, asyncio, logging, time, contextlib
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +109,5 @@ class LogAutoDeleteScoped(commands.Cog):
             except Exception:
                 pass
         log.debug("[log_autodelete_scoped] scanned channel %s", getattr(ch, "name", LOG_CH_ID))
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LogAutoDeleteScoped(bot))

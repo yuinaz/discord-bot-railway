@@ -1,6 +1,8 @@
+
 # patched a06_autolearn_qna_answer_overlay.py
+from discord.ext import commands
 import logging, asyncio, json, os
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from satpambot.bot.utils.json import tolerant_loads, tolerant_dumps
 
 LOG = logging.getLogger(__name__)
@@ -75,6 +77,5 @@ class AutoLearnQnAAnswerOverlay(commands.Cog):
                 pass
         # fallback: Groq/Gemini raw calls if configured (omitted here; rely on existing cogs)
         return None
-
 async def setup(bot):
     await bot.add_cog(AutoLearnQnAAnswerOverlay(bot))

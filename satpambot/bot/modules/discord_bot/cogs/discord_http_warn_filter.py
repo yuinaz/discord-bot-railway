@@ -1,7 +1,7 @@
 
+from discord.ext import commands
 import logging
 import os
-from discord.ext import commands
 
 class _DropDiscord429(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
@@ -22,6 +22,5 @@ class DiscordHttpWarnFilter(commands.Cog):
         if level in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}:
             http_logger.setLevel(level)
         logging.getLogger(__name__).info("[warn-filter] discord.http warnings filtered (level=%s)", level or "inherit")
-
 async def setup(bot):
     await bot.add_cog(DiscordHttpWarnFilter(bot))

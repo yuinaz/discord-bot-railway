@@ -1,5 +1,6 @@
-import re, logging
 from discord.ext import commands
+import re, logging
+
 from ..helpers.phrasebook import Phrasebook
 
 log = logging.getLogger(__name__)
@@ -19,6 +20,5 @@ class SlangMiner(commands.Cog):
                 continue
             self.pb.add_slang(tok)
         self.pb.save()
-
 async def setup(bot):
     await bot.add_cog(SlangMiner(bot))

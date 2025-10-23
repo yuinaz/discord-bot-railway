@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging, functools
 from typing import Iterable, Set
 from satpambot.config.local_cfg import cfg

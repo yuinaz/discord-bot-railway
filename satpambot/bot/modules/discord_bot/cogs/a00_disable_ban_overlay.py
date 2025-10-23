@@ -1,7 +1,10 @@
-# satpambot/bot/modules/discord_bot/cogs/a00_disable_ban_overlay.py
 from __future__ import annotations
-import logging
+
+# satpambot/bot/modules/discord_bot/cogs/a00_disable_ban_overlay.py
+
 from discord.ext import commands
+import logging
+
 try:
     from discord import app_commands
 except Exception:
@@ -64,6 +67,5 @@ class DisableBanOverlay(commands.Cog):
             await ctx.reply("❌ Fitur ban di Leina dimatikan. Gunakan **Nixe** untuk ban/unban.", mention_author=False)
             ctx.command.reset_cooldown(ctx)  # avoid cooldown effect
             raise commands.CheckFailure("ban disabled")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(DisableBanOverlay(bot))

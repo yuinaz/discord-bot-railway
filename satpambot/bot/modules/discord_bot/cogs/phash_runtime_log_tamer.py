@@ -4,9 +4,9 @@ Cog: PhashRuntimeLogTamer
 - Meredam spam log dari modul pHash runtime dengan ENV `PHASH_RUNTIME_LOG_LEVEL`.
 - Tidak menyentuh konfigurasi lain; aman untuk digabung.
 """
+from discord.ext import commands
 import os
 import logging
-from discord.ext import commands
 
 class PhashRuntimeLogTamer(commands.Cog):
     def __init__(self, bot):
@@ -35,6 +35,5 @@ class PhashRuntimeLogTamer(commands.Cog):
             seen.add(name)
             logger = logging.getLogger(name)
             logger.setLevel(self.level)
-
 async def setup(bot):
     await bot.add_cog(PhashRuntimeLogTamer(bot))

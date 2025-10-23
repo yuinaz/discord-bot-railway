@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging, json
 from pathlib import Path
 import discord
@@ -143,6 +145,5 @@ class OwnerNotifyRedirect(discord.ext.commands.Cog):
         _wrap_send_on(discord.Member)
         _wrap_dmchannel_send()
         log.info("[owner_notify_redirect] wrappers installed; base=%s", cfg_int("OWNER_NOTIFY_CHANNEL_ID", 0) or cfg_int("LOG_CHANNEL_ID", 0))
-
 async def setup(bot):
     await bot.add_cog(OwnerNotifyRedirect(bot))

@@ -1,5 +1,5 @@
-import os, traceback, datetime as dt, discord
 from discord.ext import commands
+import os, traceback, datetime as dt, discord
 
 WIB = dt.timezone(dt.timedelta(hours=7))
 def _now_wib(): return dt.datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S WIB")
@@ -58,6 +58,5 @@ class ErrorLogBridge(commands.Cog):
                 await ch.send(embed=_embed_from_error(f"❌ Unhandled Exception (slash) • /{name}", error))
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ErrorLogBridge(bot))

@@ -1,5 +1,5 @@
-import importlib
 from discord.ext import commands
+import importlib
 
 class LlmProviderBootstrapQuietOverlay(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -11,6 +11,5 @@ class LlmProviderBootstrapQuietOverlay(commands.Cog):
                 bot.llm_ask = ask_fn
         except Exception:
             pass
-
 async def setup(bot):
     await bot.add_cog(LlmProviderBootstrapQuietOverlay(bot))

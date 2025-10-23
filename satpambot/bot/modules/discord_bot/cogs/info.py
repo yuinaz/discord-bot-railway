@@ -1,5 +1,6 @@
-import discord
 from discord.ext import commands
+import discord
+
 import platform, psutil, datetime
 
 class Info(commands.Cog):
@@ -29,5 +30,4 @@ class Info(commands.Cog):
     async def servers(self, ctx):
         names = ", ".join(g.name for g in self.bot.guilds[:20])
         await ctx.reply(f"Guilds: {names} {'...' if len(self.bot.guilds)>20 else ''}", mention_author=False)
-
 async def setup(bot): await bot.add_cog(Info(bot))

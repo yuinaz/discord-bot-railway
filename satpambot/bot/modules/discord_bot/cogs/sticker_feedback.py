@@ -1,5 +1,6 @@
-import logging
 from discord.ext import commands
+import logging
+
 import discord
 
 from ..helpers.sticker_learner import StickerLearner
@@ -51,6 +52,5 @@ class StickerFeedback(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         await self._handle(payload, add=False)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(StickerFeedback(bot))

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import logging
 from discord.ext import commands
+
+import logging
 
 log = logging.getLogger("commands_probe")
 
@@ -32,6 +33,5 @@ class CommandsProbe(commands.Cog):
             log.info("[probe] slash=%s", ", ".join(sorted(tree_cmds)))
         except Exception as e:
             log.warning("[probe] failed: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(CommandsProbe(bot))

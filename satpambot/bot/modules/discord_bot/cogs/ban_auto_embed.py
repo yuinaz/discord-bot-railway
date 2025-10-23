@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from discord.ext import commands
 
 import asyncio
 import os
@@ -8,7 +9,6 @@ import datetime
 from typing import Optional, Union
 
 import discord
-from discord.ext import commands
 
 # Helpers to respect existing config without changing anything
 try:
@@ -111,6 +111,5 @@ class BanAutoEmbed(commands.Cog):
         except Exception:
             # best-effort only
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(BanAutoEmbed(bot))

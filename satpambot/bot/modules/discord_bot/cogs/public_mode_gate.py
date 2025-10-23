@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from discord.ext import commands
 
 import os
 import asyncio
 from typing import List
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 from . import __name__ as pkg_name  # just to please import tools
 from ..helpers import progress_gate as gate
@@ -121,6 +122,5 @@ class PublicModeGate(commands.Cog):
                 gate.set_open_request_sent(True)
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PublicModeGate(bot))

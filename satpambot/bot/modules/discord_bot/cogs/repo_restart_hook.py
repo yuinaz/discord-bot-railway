@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # SPDX-License-Identifier: MIT
 # Runtime hook that finds /repo pull_and_restart and wraps its callback to mark a restart sentinel.
 import asyncio
 from typing import Optional
 
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 from satpambot.bot.modules.discord_bot.helpers import log_utils  # optional, for logging if present
@@ -81,6 +83,5 @@ class RepoRestartHook(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         await self._find_and_wrap()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RepoRestartHook(bot))

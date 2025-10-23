@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import asyncio, logging, time
 from typing import Dict, Any, Tuple, List
 from satpambot.config.local_cfg import cfg_int, cfg

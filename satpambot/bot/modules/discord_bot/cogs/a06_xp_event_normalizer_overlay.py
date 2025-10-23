@@ -1,4 +1,5 @@
 
+from discord.ext import commands
 """
 a06_xp_event_normalizer_overlay.py
 - Listens to xp events with variable signatures and writes to Upstash if present.
@@ -6,7 +7,6 @@ a06_xp_event_normalizer_overlay.py
 - Handles Member/User/int id; kwargs reason optional.
 """
 import logging, os, httpx, asyncio
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +59,6 @@ class XPNormalizer(commands.Cog):
     @commands.Cog.listener("on_xp_award")
     async def on_xp_award(self, *args, **kwargs):
         await self._handle(*args, **kwargs)
-
 async def setup(bot):
     await bot.add_cog(XPNormalizer(bot))
 

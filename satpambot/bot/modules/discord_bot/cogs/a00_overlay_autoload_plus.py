@@ -1,6 +1,7 @@
 from __future__ import annotations
-import logging, importlib
+
 from discord.ext import commands
+import logging, importlib
 
 log = logging.getLogger(__name__)
 MODULES = [
@@ -43,6 +44,5 @@ class OverlayAutoloadPlus(commands.Cog):
                     log.info("[autoload_plus] imported overlay %s", mod)
             except Exception as e:
                 log.warning("[autoload_plus] skip %s: %s", mod, e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(OverlayAutoloadPlus(bot))

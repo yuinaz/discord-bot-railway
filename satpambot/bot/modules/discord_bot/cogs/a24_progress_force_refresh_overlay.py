@@ -1,6 +1,6 @@
 
-import asyncio
 from discord.ext import commands
+import asyncio
 
 class ProgressForceRefreshOverlay(commands.Cog):
     def __init__(self, bot):
@@ -19,6 +19,5 @@ class ProgressForceRefreshOverlay(commands.Cog):
                 await asyncio.sleep(1800)  # 30 min
         except asyncio.CancelledError:
             return
-
 async def setup(bot):
     await bot.add_cog(ProgressForceRefreshOverlay(bot))

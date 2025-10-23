@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, os, time, math, sqlite3, logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple, List, Dict
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -420,7 +422,6 @@ class LearningProgress(commands.Cog):
     @weekly_task.before_loop
     async def before_weekly(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningProgress(bot))
 

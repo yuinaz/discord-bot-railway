@@ -1,3 +1,4 @@
+from discord.ext import commands
 import asyncio
 import logging
 import random
@@ -11,6 +12,7 @@ from discord.ext import commands, tasks
 try:
     # prefer project helper if available
     from ..helpers.memory_upsert import upsert_pinned_memory
+
 except Exception:  # pragma: no cover
     upsert_pinned_memory = None  # fallback handled below
 
@@ -136,7 +138,6 @@ class SlangHourlyMiner(commands.Cog):
             "channels": sum(per_channel_scanned.values()),
             "unique_terms": len(freq),
         }
-
 async def setup(bot: commands.Bot):
     # async setup to be compatible with smoke tools awaiting it
     await bot.add_cog(SlangHourlyMiner(bot))

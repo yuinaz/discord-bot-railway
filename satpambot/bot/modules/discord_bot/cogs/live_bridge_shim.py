@@ -1,5 +1,6 @@
-import logging
 from discord.ext import commands
+import logging
+
 from satpambot.dashboard.discord_bridge import set_bot
 log=logging.getLogger(__name__)
 class LiveBridgeShim(commands.Cog):

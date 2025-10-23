@@ -1,6 +1,7 @@
 
+from discord.ext import commands
 import os, logging
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 def _intish(x, default=0):
     if x is None:
@@ -66,6 +67,5 @@ class XPStateBootstrap(commands.Cog):
     @refresh.before_loop
     async def before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot):
     await bot.add_cog(XPStateBootstrap(bot))

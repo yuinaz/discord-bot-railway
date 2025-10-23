@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import json
 import os
 import re
@@ -8,7 +10,6 @@ from typing import List, Optional
 
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 # Optional deps
 try:
@@ -196,7 +197,6 @@ class PhashAdmin(commands.Cog):
                         except Exception:
                             pass
         await interaction.followup.send(f"Reseed done. Hashed images: {total_imgs}, new pHash appended: ~{total_new}.", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhashAdmin(bot))
     try:

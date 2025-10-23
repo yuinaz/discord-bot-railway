@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging, os, httpx, asyncio, time
 from typing import List, Dict, Any
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 log = logging.getLogger(__name__)
@@ -126,6 +128,5 @@ class WebSearchGroq(commands.Cog):
         if summary:
             text = f"**Ringkasan:**\n{summary}\n\n{text}"
         await ctx.reply(text[:1900], suppress_embeds=False, mention_author=False)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(WebSearchGroq(bot))

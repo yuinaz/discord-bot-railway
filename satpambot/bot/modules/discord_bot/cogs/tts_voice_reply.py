@@ -1,5 +1,6 @@
-import asyncio, io, logging
 from discord.ext import commands
+import asyncio, io, logging
+
 import discord
 import edge_tts
 from satpambot.bot.utils import profanity as prof
@@ -55,8 +56,6 @@ class TTSVoiceReply(commands.Cog):
             if chunk["type"] == "audio":
                 out.write(chunk["data"])
         return out.getvalue()
-
-
 async def setup(bot: commands.Bot):
     # auto-register Cog classes defined in this module
     for _name, _obj in list(globals().items()):

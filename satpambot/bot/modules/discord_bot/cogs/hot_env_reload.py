@@ -1,14 +1,16 @@
+
 # hot_env_reload.py — safe async reload for discord.py variants
 # - Watches SatpamBot.env (or custom path via SATPAMBOT_ENV_FILE) and reloads all extensions on change.
 # - Supports both sync/async reload_extension API via reload_extensions_safely helper.
 # - Gracefully disables itself if SATPAMBOT_ENV_FILE is set to /dev/null (Linux) or NUL (Windows) or HOTENV_ENABLE=0.
 # - Warns at most once if the env file is missing (prevents log spam).
 
+from discord.ext import commands
 import os
 import asyncio
 import logging
 from typing import List
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 from satpambot.bot.modules.discord_bot.helpers.hotenv_reload_helpers import reload_extensions_safely
 
@@ -92,6 +94,5 @@ class HotEnvReload(commands.Cog):
         except Exception:
             log.exception("[hotenv] scheduling reload failed")
         await asyncio.sleep(0.05)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(HotEnvReload(bot))

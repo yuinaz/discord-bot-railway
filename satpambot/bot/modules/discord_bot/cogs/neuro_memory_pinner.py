@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, asyncio, json, logging, contextlib
 from pathlib import Path
 from typing import Optional, List, Tuple
@@ -110,6 +112,7 @@ class NeuroLiteMemoryPinner(commands.Cog):
         # import allowlist API lazily to avoid cycles
         try:
             from satpambot.bot.modules.discord_bot.cogs.delete_safe_shim import allow_delete_for
+
         except Exception:
             allow_delete_for = None
         for m in dups:
@@ -175,6 +178,5 @@ class NeuroLiteMemoryPinner(commands.Cog):
     @watch_task.before_loop
     async def _before_watch(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(NeuroLiteMemoryPinner(bot))

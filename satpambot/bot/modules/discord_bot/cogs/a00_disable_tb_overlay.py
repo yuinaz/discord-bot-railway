@@ -1,6 +1,9 @@
-# a00_disable_tb_overlay.py
 from __future__ import annotations
+
+# a00_disable_tb_overlay.py
+
 from discord.ext import commands
+
 try:
     from discord import app_commands
 except Exception:
@@ -39,6 +42,5 @@ class DisableTB(commands.Cog):
         if ctx.command and ctx.command.name in DISABLED:
             await ctx.reply("❌ Perintah **tb/testban** dimatikan di Leina. Gunakan **Nixe** untuk moderasi.", mention_author=False)
             raise commands.CheckFailure("tb disabled")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(DisableTB(bot))

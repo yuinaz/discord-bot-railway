@@ -1,7 +1,8 @@
+
 # a00_prefer_upstash_bootstrap.py
 # Force "Upstash as source of truth" for XP at boot and align pinned snapshot.
-import asyncio, json, os, numbers
 from discord.ext import commands
+import asyncio, json, os, numbers
 
 try:
     import httpx
@@ -167,6 +168,5 @@ class PreferUpstashBootstrap(commands.Cog):
             asyncio.create_task(self.on_ready_do())
         except Exception:
             pass
-
 async def setup(bot):
     await bot.add_cog(PreferUpstashBootstrap(bot))

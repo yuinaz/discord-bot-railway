@@ -37,3 +37,5 @@ def _patch_tts():
     setattr(mod, "setup", safe_setup)
 
 _patch_tts()
+async def setup(bot):
+    return None

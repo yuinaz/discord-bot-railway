@@ -120,3 +120,5 @@ def _wrap():
     log.info("[scope_filter] wrapper installed at memory_upsert.upsert_pinned_memory")
 
 _wrap()
+async def setup(bot):
+    return None

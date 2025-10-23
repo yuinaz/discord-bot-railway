@@ -1,6 +1,7 @@
 
-import logging, inspect
 from discord.ext import commands
+import logging, inspect
+
 LOG = logging.getLogger(__name__)
 def _guarded(fn):
     async def w(*a, **k):

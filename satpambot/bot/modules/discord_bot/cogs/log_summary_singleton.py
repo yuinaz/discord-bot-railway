@@ -1,10 +1,10 @@
 
+from discord.ext import commands
 """
 Ensure delete_safe_shim_plus.summary logger does not duplicate messages.
 Forces propagate=False so summaries appear only once.
 """
 import logging
-from discord.ext import commands
 
 class LogSummarySingleton(commands.Cog):
     def __init__(self, bot):
@@ -16,6 +16,5 @@ class LogSummarySingleton(commands.Cog):
             # Set level to INFO (or keep if stricter) without adding extra handlers
             if logger.level == logging.NOTSET:
                 logger.setLevel(logging.INFO)
-
 async def setup(bot):
     await bot.add_cog(LogSummarySingleton(bot))

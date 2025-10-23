@@ -1,9 +1,10 @@
+
 # a09_interval_overlay_cog.py
 # Cog with setup() that applies balanced intervals to miner modules.
+from discord.ext import commands
 import os
 import logging
 from importlib import import_module
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,5 @@ class IntervalOverlay(commands.Cog):
     async def on_ready(self):
         # Re-apply on_ready to be safe
         _apply()
-
 async def setup(bot):
     await bot.add_cog(IntervalOverlay(bot))

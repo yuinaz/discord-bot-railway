@@ -1,6 +1,6 @@
+from discord.ext import commands
 import asyncio
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,5 @@ class TBPriorityFix(commands.Cog):
                         return
         except Exception as e:
             log.debug("[tb_priority_fix] noop due to: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(TBPriorityFix(bot))

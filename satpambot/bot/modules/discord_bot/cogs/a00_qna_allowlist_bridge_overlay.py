@@ -58,7 +58,6 @@ class _UpstashMini:
         except Exception as e:
             log.warning("[qna-allowlist-bridge] fetch failed: %r", e)
             return lst or []
-
 async def setup(bot):
     # monkeypatch target function
     try:

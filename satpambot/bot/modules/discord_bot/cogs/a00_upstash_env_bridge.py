@@ -7,9 +7,9 @@ Normalize Render/Upstash env names so downstream cogs can always rely on:
   - UPSTASH_REST_TOKEN
 and set UPSTASH_ENABLE=1 when credentials exist.
 """
+from discord.ext import commands
 import os
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +47,5 @@ class UpstashEnvBridge(commands.Cog):
         else:
             log.warning("[upstash-overlay] Upstash credentials incomplete (url=%s, token=%s)",
                         bool(url), bool(token))
-
 async def setup(bot):
     await bot.add_cog(UpstashEnvBridge(bot))

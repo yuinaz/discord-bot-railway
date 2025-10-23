@@ -1,7 +1,8 @@
 
 # a00_strict_warning_filter_overlay.py (v7.4)
-import os, warnings, logging
 from discord.ext import commands
+import os, warnings, logging
+
 logger = logging.getLogger(__name__)
 class StrictWarnFilter(commands.Cog):
     def __init__(self, bot): self.bot=bot

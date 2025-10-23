@@ -5,12 +5,14 @@
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging
 from typing import Any
 
 try:
     import discord
-    from discord.ext import commands
+
 except Exception:  # pragma: no cover
     discord = None  # type: ignore
     commands = None  # type: ignore
@@ -47,7 +49,6 @@ class IntentsProbe:
                            "Intents.message_content = True")
         else:
             log.debug("[intents-probe] OK (message_content=True).")
-
 async def setup(bot: Any) -> None:
     # Cogs-less utility; just run the probe on setup.
     IntentsProbe(bot)

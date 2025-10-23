@@ -1,7 +1,6 @@
+
 from discord.ext import commands
-
 OWNER_ID = 228126085160763392
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProfanityToggle(bot))
 

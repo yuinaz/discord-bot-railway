@@ -1,10 +1,10 @@
 
 # a02_autolearn_yaml_hooks_overlay.py (v7.8)
 # Parse satpambot/config/autolearn.yaml in detail (regex, channels, memory)
+from discord.ext import commands
 import os, logging, types, re
 from pathlib import Path
 from typing import List, Dict, Any
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 CFG_DIR = Path(os.getenv("CONFIG_DIR", "satpambot/config"))
@@ -152,6 +152,5 @@ class AutoLearnYamlHooks(commands.Cog):
         # initial load if file exists
         if CFG_PATH.exists():
             await self.on_config_reloaded("autolearn.yaml", {"autolearn":"boot"})
-
 async def setup(bot):
     await bot.add_cog(AutoLearnYamlHooks(bot))

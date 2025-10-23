@@ -1,3 +1,4 @@
+from discord.ext import commands
 import os, asyncio, logging, json
 from datetime import datetime, timezone
 
@@ -70,6 +71,7 @@ class LearningPassiveObserver(commands.Cog):
             return
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 await upstash.incrby(session, "xp:bot:senior_total", int(delta))
         except Exception as e:
@@ -94,6 +96,5 @@ class LearningPassiveObserver(commands.Cog):
         if self._allow_guilds and message.guild and (message.guild.id not in self._allow_guilds):
             return
         self._bucket = min(self._bucket + self._per_msg, self._daily_cap)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningPassiveObserver(bot))

@@ -1,5 +1,5 @@
-import logging
 from discord.ext import commands
+import logging
 
 log = logging.getLogger(__name__.split(".")[-1])
 
@@ -35,7 +35,6 @@ async def _try_add(bot: commands.Bot, mod_name: str, cls_name: str) -> bool:
     except Exception as e:
         log.info("import/add skipped: %s.%s -> %r", mod_name, cls_name, e)
         return False
-
 async def setup(bot: commands.Bot):
     candidates = [
         ("satpambot.bot.modules.discord_bot.cogs.learning_passive_observer", "LearningPassiveObserver"),

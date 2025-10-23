@@ -1,8 +1,9 @@
 
 # a00_cog_add_guard_overlay.py (v7.5)
 # Wrap bot.add_cog to skip duplicates by cog name to avoid "already loaded" warnings.
-import logging, asyncio, inspect
 from discord.ext import commands
+import logging, asyncio, inspect
+
 log = logging.getLogger(__name__)
 
 class CogAddGuard(commands.Cog):
@@ -27,7 +28,6 @@ class CogAddGuard(commands.Cog):
         bot.add_cog = add_cog_guard
         bot._add_cog_guard_patched = True
         log.info("[cog-guard] add_cog patched")
-
 async def setup(bot):
     try:
         await bot.add_cog(CogAddGuard(bot))

@@ -1,5 +1,4 @@
 import logging, asyncio
-
 async def setup(bot):
     log = logging.getLogger(__name__)
 

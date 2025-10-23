@@ -1,8 +1,9 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import os, json
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from discord.ext import commands
 
 TK_FILE = Path("data/learn/tk_xp.json")
 DEFAULT_KEY = "xp:bot:tk_total"
@@ -73,6 +74,5 @@ class TKXPOverlay(commands.Cog):
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning("[TKXPOverlay] failed to write TK progress: %r", e)
-
 async def setup(bot):
     await bot.add_cog(TKXPOverlay(bot))

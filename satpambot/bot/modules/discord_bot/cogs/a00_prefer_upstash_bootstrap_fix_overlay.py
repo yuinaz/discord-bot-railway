@@ -1,10 +1,11 @@
 
+from discord.ext import commands
 """
 a00_prefer_upstash_bootstrap_fix_overlay.py
 - Monkeypatch parser in prefer_upstash_bootstrap to handle JSON-like values gracefully.
 """
 import json, logging
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 def _parse_intish(v):
@@ -52,7 +53,6 @@ class PreferUpstashBootstrapFix(commands.Cog):
                 log.info("[prefer-upstash-fix] patched _fetch_state_from_upstash")
         except Exception as e:
             log.debug("[prefer-upstash-fix] module not available: %r", e)
-
 async def setup(bot):
     await bot.add_cog(PreferUpstashBootstrapFix(bot))
 

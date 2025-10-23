@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging
 import os
 from typing import Set, Optional
 
 import discord
-from discord.ext import commands
+
 from discord.abc import Messageable
 
 log = logging.getLogger(__name__)
@@ -136,7 +138,5 @@ class ShadowPublicSilencer(commands.Cog):
         if _ORIG_SEND is not None:
             Messageable.send = _ORIG_SEND  # type: ignore
             _ORIG_SEND = None
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ShadowPublicSilencer(bot))

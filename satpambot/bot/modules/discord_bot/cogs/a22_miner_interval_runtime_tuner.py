@@ -1,8 +1,9 @@
+
 # a22_miner_interval_runtime_tuner.py
 # Runtime tuner to normalize miner intervals without editing miner source files.
 
-import logging, importlib
 from discord.ext import commands
+import logging, importlib
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +86,5 @@ class MinerIntervalRuntimeTuner(commands.Cog):
         key = self._match_miner_key(cog)
         if key:
             self._retune_cog(key, cog)
-
 async def setup(bot):
     await bot.add_cog(MinerIntervalRuntimeTuner(bot))

@@ -1,6 +1,9 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 from satpambot.config.auto_local_sync import unify_env_and_json_to_local, RESCAN_INTERVAL_SEC
 
 log = logging.getLogger(__name__)
@@ -33,6 +36,5 @@ class AutoLocalSync(commands.Cog):
             log.info("[auto_local_sync] periodic refresh local.json (keys=%d)", len(data.keys()))
         except Exception as e:
             log.warning("[auto_local_sync] periodic refresh failed: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoLocalSync(bot))

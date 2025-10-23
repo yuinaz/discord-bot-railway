@@ -6,9 +6,10 @@ a02_status_card_embed_overlay (enhanced)
 - Pretty-print JSON otomatis; rate-limit + coalesce edit; persist via Upstash
 Commands: !statuscard pin|set|json|clear|rate|show
 """
+from discord.ext import commands
 import os, re, time, json, logging, asyncio
 from typing import Optional, Dict, Tuple
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 FIELD_LIMIT=1024
@@ -223,7 +224,6 @@ class StatusCardOverlay(commands.Cog):
     @g_root.command(name="show")
     async def g_show(self, ctx):
         ok=await self._render(force=True); await ctx.reply("🔄 refreshed" if ok else "❌ gagal render", mention_author=False)
-
 async def setup(bot):
     await bot.add_cog(StatusCardOverlay(bot))
 def setup(bot):

@@ -1,10 +1,11 @@
+from discord.ext import commands
 import os
 import asyncio
 import logging
 from datetime import datetime, timezone
 
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 log = logging.getLogger(__name__)
 
@@ -97,7 +98,6 @@ class AutoCleanLogChannel(commands.Cog):
     @loop.before_loop
     async def before_loop(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     # v2 style: setup async + wajib di-await
     await bot.add_cog(AutoCleanLogChannel(bot))

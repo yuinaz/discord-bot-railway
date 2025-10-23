@@ -1,3 +1,4 @@
+from discord.ext import commands
 import os, json, logging
 from datetime import datetime, timezone
 
@@ -45,6 +46,7 @@ class PresenceFromUpstash(commands.Cog):
             return
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 raw = await self.client.get("learning:status_json")
                 if raw:
@@ -77,6 +79,5 @@ class PresenceFromUpstash(commands.Cog):
     @loop.before_loop
     async def _before(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PresenceFromUpstash(bot))

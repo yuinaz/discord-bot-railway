@@ -1,7 +1,8 @@
+from discord.ext import commands
 import asyncio
 import json
 import discord
-from discord.ext import commands
+
 from discord import AllowedMentions
 
 from satpambot.bot.modules.discord_bot.helpers import img_hashing, static_cfg
@@ -162,7 +163,6 @@ class PhishHashInbox(commands.Cog):
 
         except Exception:
             return
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishHashInbox(bot))
 def legacy_setup(bot: commands.Bot):

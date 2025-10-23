@@ -1,8 +1,9 @@
 
+from discord.ext import commands
 import asyncio, json, logging, os, re, inspect, importlib, time
 from typing import Optional, Dict, Any, Tuple
 import httpx
-from discord.ext import commands
+
 from urllib.parse import quote as _q
 
 LOG = logging.getLogger(__name__)
@@ -331,7 +332,6 @@ class SelfHealQuorumV2(commands.Cog):
         setattr(wrapped, "__quorum_v2_rl__", True)
         setattr(Cog, target_name, wrapped)
         LOG.info("[quorum-v2] wrapped %s.%s (rate-limit + quorum)", Cog.__name__, target_name)
-
 async def setup(bot):
     await bot.add_cog(SelfHealQuorumV2(bot))
     print("[quorum-v2] overlay loaded — rate-limit + quorum (≥90 both)")

@@ -1,6 +1,6 @@
 
-import os, logging, importlib, inspect
 from discord.ext import commands
+import os, logging, importlib, inspect
 
 LOG = logging.getLogger(__name__)
 ENABLE = os.getenv("SELFHEAL_QUORUM_ENABLE", "1") == "1"
@@ -41,6 +41,5 @@ class SelfHealQuorumOverlay(commands.Cog):
 
         setattr(wrapped, "__quiet_quorum__", True)
         setattr(Cog, name, wrapped)
-
 async def setup(bot):
     await bot.add_cog(SelfHealQuorumOverlay(bot))

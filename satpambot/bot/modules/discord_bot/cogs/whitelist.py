@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import json, os
 from pathlib import Path
 import discord
-from discord.ext import commands
 
 DATA_DIR = Path(os.getenv("DATA_DIR") or "data")
 WL_FILE = Path(os.getenv("WHITELIST_DOMAINS_FILE") or (DATA_DIR / "whitelist_domains.json"))
@@ -41,5 +42,4 @@ class WhiteList(commands.Cog):
             return await ctx.reply(f"**Whitelist domains:**\n{items}", mention_author=False)
 
         return await ctx.reply("Gunakan: `!whitelist add <domain>` / `!whitelist remove <domain>` / `!whitelist list`", mention_author=False)
-
 async def setup(bot): await bot.add_cog(WhiteList(bot))

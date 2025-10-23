@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import os, json, discord
 from discord.ext import commands
+
+import os, json, discord
+
 from satpambot.bot.modules.discord_bot.helpers.banlog_helper import get_banlog_thread
 RECENT_PATH = os.getenv("RECENT_BANS_PATH", "data/recent_bans.json")
 def _append_recent_ban(user: discord.abc.User, guild: discord.Guild | None):

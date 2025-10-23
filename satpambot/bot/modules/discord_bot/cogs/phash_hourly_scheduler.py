@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, logging, discord
 from discord.ext import commands, tasks
 from satpambot.bot.modules.discord_bot.config.self_learning_cfg import (
@@ -47,6 +49,7 @@ class PhashHourlyScheduler(commands.Cog):
 
         try:
             from satpambot.ml.phash_reconcile import collect_phash_from_log
+
             hashes = await collect_phash_from_log(ch, limit_msgs=PHASH_LOG_SCAN_LIMIT)  # type: ignore
             n = 0
             try: n = len(hashes)
@@ -61,6 +64,5 @@ class PhashHourlyScheduler(commands.Cog):
         await asyncio.sleep(PHASH_FIRST_DELAY_SECONDS)
         log.info("[phash_hourly] started (first_delay=%ss, every=%ss, limit=%s)",
                  PHASH_FIRST_DELAY_SECONDS, PHASH_INTERVAL_SECONDS, PHASH_LOG_SCAN_LIMIT)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhashHourlyScheduler(bot))

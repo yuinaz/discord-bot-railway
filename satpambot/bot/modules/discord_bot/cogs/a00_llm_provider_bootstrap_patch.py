@@ -1,17 +1,17 @@
+from __future__ import annotations
 
 """
 LLM provider bootstrap patch:
 - Guarantees bot.llm_ask is available.
 - Picks sane defaults for model IDs via env or constants.
 """
-from __future__ import annotations
+
 import os, logging
 
 log = logging.getLogger(__name__)
 
 DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL_ID", "llama-3.1-8b-instant")
 DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL_ID", "gemini-2.5-flash-lite")
-
 async def setup(bot):
     # Prefer native provider 'ask' if present
     try:

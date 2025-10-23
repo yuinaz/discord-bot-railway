@@ -1,5 +1,7 @@
+from discord.ext import commands
 import os, json, asyncio, pathlib, datetime as dt, discord
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 
 WIB = dt.timezone(dt.timedelta(hours=7))
 def _now_wib(): return dt.datetime.now(WIB).strftime("%Y-%m-%d %H:%M:%S WIB")
@@ -114,6 +116,5 @@ class BanQueueWatcher(commands.Cog):
     @process_queue.before_loop
     async def before_loop(self):
         await self.bot.wait_until_ready()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(BanQueueWatcher(bot))

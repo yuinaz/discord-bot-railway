@@ -1,9 +1,10 @@
+
 # a21_curriculum_autoload.py
 # Ensures a20_curriculum_tk_sd is loaded, shortens first loop interval, and writes first tick.
 
+from discord.ext import commands
 import json
 import logging
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +64,5 @@ class CurriculumAutoload(commands.Cog):
             await self._first_tick()
         except Exception as e:
             log.warning("[curriculum_autoload] on_ready failed: %r", e)
-
 async def setup(bot):
     await bot.add_cog(CurriculumAutoload(bot))

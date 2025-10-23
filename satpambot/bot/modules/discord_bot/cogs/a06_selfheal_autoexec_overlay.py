@@ -1,9 +1,10 @@
 
 # a06_selfheal_autoexec_overlay.py (v7.4)
+from discord.ext import commands
 import os, re, json, asyncio, logging, shlex, subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from discord.ext import commands
+
 logger = logging.getLogger(__name__)
 def _env(k, default=None):
     v = os.getenv(k, default)

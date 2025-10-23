@@ -1,10 +1,10 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, re, logging, asyncio
 from typing import List, Optional
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 LOG = logging.getLogger("satpambot.bot.modules.discord_bot.cogs.vision_captioner")
 
@@ -109,6 +109,5 @@ class VisionCaptioner(commands.Cog):
         except Exception as e:
             LOG.exception("vision failed: %r", e)
             await interaction.followup.send(f"Vision gagal: {e}", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(VisionCaptioner(bot))

@@ -1,10 +1,10 @@
-import logging, asyncio
 from discord.ext import commands
+import logging, asyncio
+
 import discord
 from satpambot.bot.utils import profanity as prof
 
 log = logging.getLogger(__name__)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProfanityFilterOverlay(bot))
 

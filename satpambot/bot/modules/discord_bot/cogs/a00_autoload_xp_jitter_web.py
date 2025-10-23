@@ -1,6 +1,7 @@
-
 from __future__ import annotations
+
 from discord.ext import commands
+
 import logging
 log = logging.getLogger(__name__)
 MODULES = [

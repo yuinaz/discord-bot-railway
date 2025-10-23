@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, time, re, sqlite3, logging, os
 from typing import Optional
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -125,6 +126,5 @@ class StickerTextFeedback(commands.Cog):
 
         except Exception:
             log.exception("[sticker-text] error while processing reply text")
-
 async def setup(bot):
     await bot.add_cog(StickerTextFeedback(bot))

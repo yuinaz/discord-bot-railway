@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
 
 import logging
 from typing import Optional
 
 import discord
-from discord.ext import commands
 
 try:
     # keep imports identical so other code stays happy
@@ -121,7 +121,6 @@ class BanSecure(commands.Cog):
             em.set_footer(text=f"Moderator: {ctx.author}")
         await ctx.reply(embed=em, mention_author=False)
         await self._log(ctx.guild, em)
-
 async def setup(bot: commands.Bot):
     # Jangan hapus command lain; cukup tambah cog ini
     await bot.add_cog(BanSecure(bot))

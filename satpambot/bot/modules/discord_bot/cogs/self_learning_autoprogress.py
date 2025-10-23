@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # satpambot/bot/modules/discord_bot/cogs/self_learning_autoprogress.py
 
 import contextlib
@@ -116,6 +118,7 @@ class _Stats:
 # Try import embedded Groq client (code-only version). If not available, we fall back gracefully.
 try:
     from satpambot.ai.groq_client import make_groq_client, GroqLLM  # type: ignore
+
 except Exception:  # pragma: no cover
     make_groq_client = None  # type: ignore
     GroqLLM = None  # type: ignore
@@ -294,7 +297,5 @@ class SelfLearningAutoProgress(commands.Cog):
         # Periodic light persist
         if self.stats.seen % 50 == 0:
             self.stats.save(STORE_STATS)
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfLearningAutoProgress(bot))

@@ -1,4 +1,6 @@
+
 # a00_quiet_shadow_public_silencer.py
+
 from discord.ext import commands
 import logging
 TARGET_LOGGER = "satpambot.bot.modules.discord_bot.cogs.shadow_public_silencer"

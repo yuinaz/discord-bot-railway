@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 """
 Groq guard:
 - If GROQ API key is missing/empty, disable Groq-dependent cogs to avoid 403 spam.
@@ -7,7 +9,6 @@ Groq guard:
 """
 import os
 import logging
-from discord.ext import commands
 
 log = logging.getLogger("satpambot.groq_guard")
 
@@ -50,6 +51,5 @@ class GroqGuard(commands.Cog):
                     log.info("[groq-guard] disabled %s (no GROQ key) — preventing httpx 403 spam", name)
                 except Exception as e:
                     log.debug("[groq-guard] remove_cog %s failed: %r", name, e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(GroqGuard(bot))

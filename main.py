@@ -52,6 +52,14 @@ def _serve_web():
         httpd.serve_forever()
 
 def main():
+
+    # --- Render Free preflight (non-fatal) ---
+    try:
+        import importlib
+        _pre = importlib.import_module("scripts.preflight_render_free")
+        _pre.main()
+    except Exception as _e:
+        logging.getLogger("entry.main").warning("[preflight] WARN: %r", _e)
     # Start web (unless disabled)
     if os.getenv("RUN_WEB", "1") != "0":
         log.info(f"🌐 Serving web on {HOST}:{PORT}")

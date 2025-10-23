@@ -1,6 +1,7 @@
+
 # a00_yaml_log_quieter_overlay.py
-import logging
 from discord.ext import commands
+import logging
 
 class YamlLogQuieter(commands.Cog):
     def __init__(self, bot):
@@ -16,6 +17,5 @@ class YamlLogQuieter(commands.Cog):
         for name in noisy:
             lg = logging.getLogger(name)
             lg.setLevel(logging.DEBUG)
-
 async def setup(bot):
     await bot.add_cog(YamlLogQuieter(bot))

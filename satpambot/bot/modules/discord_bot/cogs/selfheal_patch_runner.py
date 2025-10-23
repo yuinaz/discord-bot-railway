@@ -1,10 +1,12 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import fnmatch
 import discord
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg
 from satpambot.shared.selfheal_queue import list_tickets, update_ticket
 
@@ -96,6 +98,5 @@ class SelfHealPatchRunner(commands.Cog):
         smoke = await _run_smoke()
         update_ticket(ticket_id, status="applied" if not dry else "dry-run", logs={"apply": logs, "smoke": smoke})
         await ctx.reply(f"Ticket {ticket_id} {'applied' if not dry else 'dry-run'}.")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfHealPatchRunner(bot))

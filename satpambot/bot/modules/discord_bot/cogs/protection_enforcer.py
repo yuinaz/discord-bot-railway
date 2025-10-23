@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # -*- coding: utf-8 -*-
 """
 protection_enforcer.py
@@ -13,7 +15,6 @@ Tidak memakai ENV; nama channel & role bisa diubah di konstanta.
 
 import logging
 import discord
-from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
 
@@ -43,7 +44,6 @@ class ProtectionEnforcer(commands.Cog):
             discord.Message.delete = _wrap_delete(discord.Message.delete)
             setattr(discord.Message.delete, "_patched_by_satpambot", True)
             LOG.info("[protection_enforcer] Patched Message.delete untuk channel aman: %s", ", ".join(SAFE_CHANNEL_NAMES))
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProtectionEnforcer(bot))
     LOG.info("[protection_enforcer] aktif")

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import json, os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from discord.ext import commands
 
 LOG_DIR = Path("data/mod"); LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / "ban_log.json"
@@ -41,5 +42,4 @@ class BanLogger(commands.Cog):
         items = _load(); ts = _now_epoch()
         items.append({"type":"unban","user":getattr(user,"name","?"),"user_id":getattr(user,"id",None),"guild_id":getattr(guild,"id",None),"ts":ts,"when":_wib_str(ts)})
         _save(items)
-
 async def setup(bot): await bot.add_cog(BanLogger(bot))

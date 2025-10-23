@@ -1,7 +1,8 @@
 
+from discord.ext import commands
 """a06_prompt_templates_overlay.py (v8.2)"""
 import os, time, logging, threading
-from discord.ext import commands
+
 DEFAULT_PATH = "satpambot/config/prompts/system.md"
 POLL_SEC = int(os.getenv("PROMPT_POLL_SEC", "5"))
 log = logging.getLogger(__name__)
@@ -26,7 +27,6 @@ class PromptKeeper:
 class PromptTemplatesOverlay(commands.Cog):
     def __init__(self, bot): self.bot = bot; self.keeper = PromptKeeper(DEFAULT_PATH)
     def get_system_prompt(self): return self.keeper.get()
-
 async def setup(bot): await bot.add_cog(PromptTemplatesOverlay(bot))
 def setup(bot):
     try:

@@ -1,5 +1,5 @@
-
 from __future__ import annotations
+
 import logging
 log = logging.getLogger(__name__)
 try:
@@ -9,6 +9,5 @@ try:
     log.info("[intents_probe_quiet] applied")
 except Exception as e:
     log.debug("[intents_probe_quiet] not applied: %s", e)
-
 async def setup(_bot):
     return

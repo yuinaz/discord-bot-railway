@@ -1,7 +1,7 @@
+from discord.ext import commands
 import asyncio, json, os, time, logging
 from typing import Optional, List
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -145,6 +145,5 @@ class AutoPruneEditMode(commands.Cog):
                 await m.delete()
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoPruneEditMode(bot))

@@ -1,5 +1,6 @@
-import logging
 from discord.ext import commands
+import logging
+
 from ..helpers.send_queue import SendQueue
 
 log = logging.getLogger(__name__)
@@ -17,6 +18,5 @@ class DurableOutbox(commands.Cog):
 
     async def send(self, channel_id: int, **kwargs):
         await self.q.enqueue(channel_id, **kwargs)
-
 async def setup(bot):
     await bot.add_cog(DurableOutbox(bot))

@@ -1,12 +1,14 @@
-# a00_xp_kv_selfheal_overlay.py
 from __future__ import annotations
+
+# a00_xp_kv_selfheal_overlay.py
+
+from discord.ext import commands
 import os, json, asyncio, logging
 from typing import Optional
 try:
     import httpx
 except Exception:
     httpx = None
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 UPSTASH_URL = os.getenv("UPSTASH_REDIS_REST_URL")
@@ -52,6 +54,5 @@ class XpKvSelfHeal(commands.Cog):
                     log.info("[xp-selfheal] Normalized %s to %d", KEY, coerced)
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(XpKvSelfHeal(bot))

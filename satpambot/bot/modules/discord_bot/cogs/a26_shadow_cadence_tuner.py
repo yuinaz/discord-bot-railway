@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging, random
 from satpambot.config.local_cfg import cfg_int
 

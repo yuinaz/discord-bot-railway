@@ -1,9 +1,9 @@
+from discord.ext import commands
 import os
 import time
 import subprocess
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 _PROC_START = time.time()
 
@@ -29,7 +29,5 @@ class StatusCheck(commands.Cog):
         guilds = len(self.bot.guilds)
         msg = f"✅ **Online** | guilds: **{guilds}** | uptime: **{uptime}s** | commit: `{_git_rev_short()}`"
         await inter.response.send_message(msg, ephemeral=True)
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(StatusCheck(bot))

@@ -1,6 +1,7 @@
+from discord.ext import commands
 import discord
 from discord import app_commands
-from discord.ext import commands
+
 MAX_LIMIT = 1000
 @app_commands.command(name="clearchat", description="Bersihkan sejumlah pesan dari channel ini.")
 @app_commands.describe(jumlah=f"Jumlah pesan yang dihapus (1–{MAX_LIMIT})")

@@ -1,10 +1,11 @@
 
+from discord.ext import commands
 """
 a06_providers_facade_overlay.py
 - Expose LLM/STT/TTS providers via Cog so other cogs can access easily.
 """
 import logging
-from discord.ext import commands
+
 from satpambot.bot.providers.llm import LLM
 from satpambot.bot.providers.stt import STT
 from satpambot.bot.providers.tts import TTS
@@ -17,7 +18,6 @@ class ProvidersOverlay(commands.Cog):
         self.llm = LLM()
         self.stt = STT()
         self.tts = TTS()
-
 async def setup(bot):
     await bot.add_cog(ProvidersOverlay(bot))
 

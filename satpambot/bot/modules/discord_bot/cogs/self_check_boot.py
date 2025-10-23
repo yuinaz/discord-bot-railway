@@ -1,6 +1,6 @@
+from discord.ext import commands
 import time, logging
 import discord
-from discord.ext import commands
 
 from ..helpers import health_probe
 from ..helpers.upgrade_engine_ext import attempt_rollback_last, last_snapshot
@@ -74,6 +74,5 @@ class SelfCheckBoot(commands.Cog):
                     await th.send(embed=emb2)
         except Exception as e:
             log.warning("thread logging failed: %s", e)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(SelfCheckBoot(bot))

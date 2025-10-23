@@ -1,8 +1,9 @@
 
 # a06_upstash_intish_parser_overlay.py (v7.9)
 # Makes _fetch_state_from_upstash robust to JSON-ish values.
-import logging, json, asyncio
 from discord.ext import commands
+import logging, json, asyncio
+
 log = logging.getLogger(__name__)
 
 def _intish(x, default=0):
@@ -33,6 +34,5 @@ class UpstashIntishParser(commands.Cog):
     async def on_ready(self):
         # nothing to patch explicitly; consumers can import _intish if needed
         log.info("[upstash-intish] active")
-
 async def setup(bot):
     await bot.add_cog(UpstashIntishParser(bot))

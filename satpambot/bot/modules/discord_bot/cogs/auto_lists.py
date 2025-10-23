@@ -23,12 +23,13 @@ Fokus:
 """
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, re, json, asyncio
 from pathlib import Path
 from typing import List, Set, Optional, Dict
 
 import discord
-from discord.ext import commands
 
 from ..helpers import lists_loader
 from ..helpers import memory_wb
@@ -252,7 +253,6 @@ class AutoLists(commands.Cog):
                 )
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoLists(bot))
 def setup_old(bot: commands.Bot):

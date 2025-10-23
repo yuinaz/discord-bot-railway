@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # remote_sync_restart.py — hardened /repo (NO-ENV)
 import asyncio, json, os, sys, io, zipfile, logging, aiohttp
 from pathlib import Path
 from typing import Dict, Any, List
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 from satpambot.bot.modules.discord_bot.helpers import restart_guard as rg
 
@@ -106,7 +108,6 @@ async def _sync_all_guilds_once(bot: commands.Bot):
             try: await bot.tree.sync(guild=g)
             except Exception: pass
     except Exception: pass
-
 async def setup(bot: commands.Bot):
     cog = RemoteSyncRestart(bot)
     await bot.add_cog(cog)

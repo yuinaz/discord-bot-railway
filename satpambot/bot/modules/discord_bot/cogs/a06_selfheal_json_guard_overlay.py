@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json, re, logging
 log = logging.getLogger(__name__)
 def _strip_fences(s: str) -> str:

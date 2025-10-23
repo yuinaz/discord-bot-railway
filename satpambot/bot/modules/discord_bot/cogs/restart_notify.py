@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # SPDX-License-Identifier: MIT
 # Posts a "Restart complete" embed ONLY if a sentinel from a command-triggered restart is present.
 
@@ -9,7 +11,6 @@ import datetime as dt
 from typing import Optional
 
 import discord
-from discord.ext import commands
 
 try:
     from satpambot.bot.modules.discord_bot.helpers.restart_sentinel import pop as pop_restart  # type: ignore
@@ -94,6 +95,5 @@ class RestartNotify(commands.Cog):
             await ch.send(embed=emb)
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RestartNotify(bot))

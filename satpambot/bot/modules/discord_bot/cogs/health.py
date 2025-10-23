@@ -1,3 +1,4 @@
+
 from discord.ext import commands
 import discord, os, platform, socket, asyncio
 
@@ -106,6 +107,5 @@ class Health(commands.Cog):
         await ctx.message.add_reaction("✅")
         if ctx.channel.id != log_ch.id:
             await ctx.send(f"Heartbeat diaktifkan di {log_ch.mention}. (Loop dikunci ke channel log)", delete_after=8)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(Health(bot))

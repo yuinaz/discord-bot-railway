@@ -1,10 +1,10 @@
 
 # a02_selfheal_yaml_hooks_overlay.py (v7.8)
 # Parse satpambot/config/selfheal.yaml with detailed watchers/rules
+from discord.ext import commands
 import os, logging, re
 from pathlib import Path
 from typing import List, Dict, Any
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 CFG_DIR = Path(os.getenv("CONFIG_DIR", "satpambot/config"))
@@ -116,6 +116,5 @@ class SelfHealYamlHooks(commands.Cog):
     async def on_ready(self):
         if CFG_PATH.exists():
             await self.on_config_reloaded("selfheal.yaml", {"selfheal":"boot"})
-
 async def setup(bot):
     await bot.add_cog(SelfHealYamlHooks(bot))

@@ -18,9 +18,10 @@ Environment flags (all optional):
   SELFHEAL_ALLOW_RESTART=1         # allow process restart after pull
   SELFHEAL_QNA_CHANNEL_ID=...      # optional log target channel
 """
+from discord.ext import commands
 import os, json, logging, asyncio, traceback, pathlib, base64
 from typing import Any, Dict, List, Optional, Tuple
-from discord.ext import commands
+
 import discord
 
 from .a00_llm_provider_bootstrap import LLMProviderBootstrap  # ensure provider is loaded
@@ -185,6 +186,5 @@ class LLMSelfHeal(commands.Cog):
         tb = traceback.format_exc()
         summary = f"event={event_method}\n\n{tb[-2000:]}"
         await self._do_selfheal(summary)
-
 async def setup(bot):
     await bot.add_cog(LLMSelfHeal(bot))

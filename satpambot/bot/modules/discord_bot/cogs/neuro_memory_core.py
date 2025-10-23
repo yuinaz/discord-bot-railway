@@ -1,10 +1,10 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, sqlite3, time, logging
 from dataclasses import dataclass
 from typing import Optional, List
 import discord
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 DB_PATH = os.environ.get("NEURO_DB", "data/neuro_memory.sqlite3")
@@ -88,6 +88,5 @@ class MemoryStore:
                 (channel_id or 0, guild_id, f"%{q}%", f"%{q}%", top_k),
             ).fetchall()
             return [MemoryItem(r["id"], r["guild_id"], r["channel_id"], r["user_id"], r["content"], r["tags"] or "", float(r["s"])) for r in rows]
-
 async def setup(bot: commands.Bot):
     setattr(bot, "_neuro_db", MemoryStore())

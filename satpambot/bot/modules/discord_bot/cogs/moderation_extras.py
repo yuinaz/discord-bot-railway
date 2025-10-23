@@ -1,5 +1,5 @@
-import discord
 from discord.ext import commands
+import discord
 
 class ModerationExtras(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -12,6 +12,5 @@ class ModerationExtras(commands.Cog):
             await ctx.send("Diag OK. Loaded extensions: " + ", ".join(exts))
         except Exception as e:
             await ctx.send(f"Diag error: {e}")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ModerationExtras(bot))

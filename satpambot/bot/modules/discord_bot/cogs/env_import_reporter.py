@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import discord
 from discord.ext import commands
+
+import discord
+
 from satpambot.config.runtime import cfg, set_cfg
 
 def _mk_embed(title: str, desc: str, color: int):
@@ -60,7 +62,6 @@ class EnvImportReporter(commands.Cog):
         finally:
             # reset notify flag
             set_cfg('IMPORTED_ENV_NOTIFY', False)
-
 async def setup(bot):
     try:
         from satpambot.config.runtime import cfg

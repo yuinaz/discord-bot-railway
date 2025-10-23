@@ -1,8 +1,7 @@
-
 # -*- coding: utf-8 -*-
-# Tiny shim to ensure learning:phase follows status_json.label (KULIAH -> kuliah)
-import os, json, urllib.request
 from discord.ext import commands
+import os, json, urllib.request, asyncio
+
 BASE=(os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")); TOK=os.getenv("UPSTASH_REDIS_REST_TOKEN","")
 HDR={"Authorization": f"Bearer {TOK}"} if TOK else {}
 def _get(k):
@@ -31,4 +30,14 @@ class Phase(commands.Cog):
             try: cur=(json.loads(ph) if isinstance(ph,str) else ph or {}).get("phase")
             except Exception: cur=None
             if cur!=want: _set("learning:phase", json.dumps({"phase":want}))
-async def setup(bot): await bot.add_cog(Phase(bot))
+
+async def setup_async(bot): await bot.add_cog(Phase(bot))
+
+def setup(bot):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop and loop.is_running():
+            return loop.create_task(setup_async(bot))
+    except Exception:
+        pass
+    return asyncio.run(setup_async(bot))

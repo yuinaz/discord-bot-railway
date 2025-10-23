@@ -1,7 +1,8 @@
 
 # a08_xp_upstash_exact_keys_overlay.py (v7.4 stub-safe)
-import logging
 from discord.ext import commands
+import logging
+
 log = logging.getLogger(__name__)
 class UpstashExactKeysOverlay(commands.Cog):
     def __init__(self, bot): self.bot=bot

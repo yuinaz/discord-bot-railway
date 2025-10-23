@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os
 import asyncio
 from typing import Set
-from discord.ext import commands
 
 DEFAULT_BLOCKLIST = {"⚠️", "⚠"}  # emoji variants
 
@@ -44,6 +45,5 @@ class WarnReactionBlocker(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         await self._remove_if_blocked(payload)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(WarnReactionBlocker(bot))

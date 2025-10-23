@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging, os, asyncio, time, re
 from typing import Optional, Iterable, Tuple, Set
 import discord
-from discord.ext import commands
 
 from ..helpers.hash_utils import sha256_bytes
 from ..helpers.safety_utils import extract_urls, norm_domain, is_suspicious_domain

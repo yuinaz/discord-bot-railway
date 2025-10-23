@@ -26,7 +26,6 @@ def _deep_merge(a, b):
         else:
             out[k] = v
     return out
-
 async def setup(bot):
     # Patch only once
     try:

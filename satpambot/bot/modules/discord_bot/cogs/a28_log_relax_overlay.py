@@ -1,7 +1,9 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging
 import discord
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg_int
 
 log = logging.getLogger(__name__)
@@ -50,6 +52,5 @@ class LogChannelRelaxer(commands.Cog):
         from discord import TextChannel, Thread
         for c in (TextChannel, Thread):
             wrap_purge(c)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LogChannelRelaxer(bot))

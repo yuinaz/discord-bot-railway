@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import inspect
 from typing import Optional
 import discord
-from discord.ext import commands
 
 LOG_CHANNEL_NAME = "log-botphising"
 
@@ -89,6 +90,5 @@ discord.Guild.ban = _safe_guild_ban
 class AutobanSafetyInterceptor(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutobanSafetyInterceptor(bot))

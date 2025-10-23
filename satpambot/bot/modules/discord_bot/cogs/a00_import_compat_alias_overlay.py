@@ -1,7 +1,8 @@
 
 # a00_import_compat_alias_overlay.py (v7.5)
-import sys, importlib, logging
 from discord.ext import commands
+import sys, importlib, logging
+
 log = logging.getLogger(__name__)
 
 def _alias(path: str, target: str) -> bool:
@@ -36,7 +37,6 @@ class ImportCompatAlias(commands.Cog):
             ("modules.discord_bot.cogs.a00_autoload_selfheal_autofix", "satpambot.bot.modules.discord_bot.cogs.a00_autoload_selfheal_autofix"),
         ])
         log.info("[import-alias] compat active: modules=%s discord_bot=%s cogs=%s", ok1, ok2, ok3)
-
 async def setup(bot):
     try:
         await bot.add_cog(ImportCompatAlias(bot))

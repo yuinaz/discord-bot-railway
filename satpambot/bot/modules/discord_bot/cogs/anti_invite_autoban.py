@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging, os, re, time
 from typing import Optional
 import discord
-from discord.ext import commands
+
 from ..helpers.ban_utils import safe_ban_7d
 
 log = logging.getLogger(__name__)

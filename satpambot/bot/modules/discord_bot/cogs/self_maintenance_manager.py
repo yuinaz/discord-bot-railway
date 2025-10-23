@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from .selfheal_router import send_selfheal
 
 def _mk(title, desc, color=0x2ecc71): return discord.Embed(title=title, description=desc, color=color)
@@ -28,5 +30,4 @@ class SelfMaintenanceManager(commands.Cog):
             try:
                 await self._maybe_await(self.bot.load_extension(ext))
             except Exception: pass
-
 async def setup(bot): await bot.add_cog(SelfMaintenanceManager(bot))

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import os, logging
 from discord.ext import commands
+
+import os, logging
+
 from ..helpers import env_store
 
 log = logging.getLogger(__name__)
@@ -24,6 +26,5 @@ class EnvBootstrap(commands.Cog):
                     env_store.set(k, v, source="import-all")
                 except Exception:
                     pass
-
 async def setup(bot):
     await bot.add_cog(EnvBootstrap(bot))

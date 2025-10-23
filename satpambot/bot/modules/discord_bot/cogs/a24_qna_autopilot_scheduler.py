@@ -1,7 +1,8 @@
 
+from discord.ext import commands
 import os, asyncio, random, time, re, hashlib
 import discord
-from discord.ext import commands
+
 import httpx
 
 QNA_CH_ID = int(os.getenv("QNA_CHANNEL_ID","0") or "0")
@@ -81,6 +82,5 @@ class QnaAutopilot(commands.Cog):
                 await asyncio.sleep(20)
 
             await asyncio.sleep(random.randint(MIN_SEC, MAX_SEC))
-
 async def setup(bot):
     await bot.add_cog(QnaAutopilot(bot))

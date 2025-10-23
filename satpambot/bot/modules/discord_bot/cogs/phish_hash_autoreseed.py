@@ -1,7 +1,9 @@
+from discord.ext import commands
 import asyncio
 import json
 import discord
-from discord.ext import commands, tasks
+
+from discord.ext import tasks
 from discord import AllowedMentions
 
 from satpambot.bot.modules.discord_bot.helpers import img_hashing, static_cfg
@@ -166,7 +168,6 @@ class PhishHashAutoReseed(commands.Cog):
                 await m.delete()
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(PhishHashAutoReseed(bot))
 def legacy_setup(bot: commands.Bot):

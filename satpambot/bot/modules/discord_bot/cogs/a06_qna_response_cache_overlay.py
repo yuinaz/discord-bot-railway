@@ -1,8 +1,9 @@
 
+from discord.ext import commands
 """a06_qna_response_cache_overlay.py (v8.2)"""
 import os, json, hashlib, logging
 import httpx
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 class UpstashClient:
@@ -38,7 +39,6 @@ class QnAResponseCache(commands.Cog):
         return await self.cli.get(self._key(question))
     async def cache_answer(self, question: str, answer: str):
         await self.cli.setex(self._key(question), self.cli.ttl, answer)
-
 async def setup(bot): await bot.add_cog(QnAResponseCache(bot))
 def setup(bot):
     try:

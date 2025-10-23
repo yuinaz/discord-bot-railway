@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging, time, json
 from pathlib import Path
 import discord
@@ -63,6 +64,5 @@ async def install_embed_bridge(bot):
     # Monkeypatch the _post used by selfheal_autofix
     setattr(mod, "_post", _post_embed)
     log.info("[selfheal_embed] _post bridged to embed coalescer")
-
 async def setup(bot):  # this is a standalone extension
     await install_embed_bridge(bot)

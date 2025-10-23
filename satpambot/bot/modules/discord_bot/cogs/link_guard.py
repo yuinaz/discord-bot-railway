@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging, os
 from typing import Iterable, Set
 import discord
-from discord.ext import commands
+
 from urllib.parse import urlparse
 
 try:

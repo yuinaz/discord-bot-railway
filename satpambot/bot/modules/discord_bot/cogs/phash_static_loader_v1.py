@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # -*- coding: utf-8 -*-
 """
 Static pHash DB Loader (v1)
@@ -13,8 +15,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Iterable, Set
-
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +64,5 @@ class StaticPhashDB(commands.Cog):
         except Exception:
             # Optional feature only
             pass
-
 async def setup(bot: commands.Bot) -> None:  # discord.py 2.x style
     await bot.add_cog(StaticPhashDB(bot))

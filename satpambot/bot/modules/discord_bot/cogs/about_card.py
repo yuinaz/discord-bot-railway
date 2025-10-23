@@ -1,9 +1,8 @@
+from discord.ext import commands
 import os
 import subprocess
 import discord
 from discord import app_commands
-from discord.ext import commands
-
 
 def _git_rev_short() -> str:
     try:
@@ -35,7 +34,5 @@ class AboutCard(commands.Cog):
         embed.add_field(name="Versi", value=f"`{_git_rev_short()}`", inline=True)
         embed.add_field(name="Server", value=str(len(self.bot.guilds)), inline=True)
         await inter.response.send_message(embed=embed, ephemeral=True)
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AboutCard(bot))

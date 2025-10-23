@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import logging, time, asyncio
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from ..helpers import mood_state
 
 log = logging.getLogger(__name__)
@@ -30,6 +32,5 @@ class MoodWatcher(commands.Cog):
                     mood_state.set_mood("neutral", con)
         finally:
             con.close()
-
 async def setup(bot):
     await bot.add_cog(MoodWatcher(bot))

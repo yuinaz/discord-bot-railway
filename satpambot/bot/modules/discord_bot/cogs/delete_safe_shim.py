@@ -6,9 +6,10 @@
 - **NEW**: allowlist API `allow_delete_for(message_id: int)` so trusted cog
   (e.g., neuro_memory_pinner) can cleanup duplicates safely.
 """
+from discord.ext import commands
 import logging
 import discord
-from discord.ext import commands
+
 from satpambot.bot.modules.discord_bot.helpers.thread_utils import DEFAULT_THREAD_NAME
 
 log = logging.getLogger(__name__)
@@ -71,6 +72,5 @@ def _install_safe_delete_wrapper():
 class DeleteSafeShim(commands.Cog):
     def __init__(self, bot: commands.Bot):
         _install_safe_delete_wrapper()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(DeleteSafeShim(bot))

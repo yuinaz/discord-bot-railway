@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from discord.ext import commands
 
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 
 from ..helpers import progress_gate as gate
 
@@ -72,6 +73,5 @@ class LearningProgressReporter(commands.Cog):
                 await user.send(text)
             except Exception:
                 pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningProgressReporter(bot))

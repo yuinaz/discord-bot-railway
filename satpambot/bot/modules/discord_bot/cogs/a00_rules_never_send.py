@@ -1,6 +1,8 @@
+
 # satpambot/bot/modules/discord_bot/cogs/a00_rules_never_send.py
 # Hard‑deny kirim ke channel tertentu TANPA tergantung ENV.
 # Drop di level Messageable.send → tidak ada kirim dan tidak ada error.
+
 from discord.ext import commands
 import discord, logging
 
@@ -40,6 +42,5 @@ class RulesNeverSend(commands.Cog):
         # kembalikan original
         discord.abc.Messageable.send = self._orig_send
         log.info("[rules-never-send] uninstalled")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RulesNeverSend(bot))

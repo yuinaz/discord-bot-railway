@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import logging
 from discord.ext import commands
+
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -11,7 +12,6 @@ class DisableAutoUpdate(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         log.info("[disable-talking] active; removed=[] blocked_prefixes=[]")
-
 async def setup(bot: commands.Bot):
     # discord.py v2 uses async load/unload
     try:

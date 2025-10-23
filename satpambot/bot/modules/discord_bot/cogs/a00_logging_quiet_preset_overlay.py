@@ -1,6 +1,7 @@
+
 # a00_logging_quiet_preset_overlay.py
-import logging
 from discord.ext import commands
+import logging
 
 TARGETS = {
     # demote noisy-but-harmless duplicates
@@ -20,6 +21,5 @@ class LoggingQuietPreset(commands.Cog):
     async def cog_load(self):
         for name, lvl in TARGETS.items():
             logging.getLogger(name).setLevel(lvl)
-
 async def setup(bot):
     await bot.add_cog(LoggingQuietPreset(bot))

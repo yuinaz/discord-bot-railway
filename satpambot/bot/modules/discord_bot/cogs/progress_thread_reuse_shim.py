@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-import logging, types, asyncio
 from discord.ext import commands
+
+import logging, types, asyncio
+
 from satpambot.bot.modules.discord_bot.helpers.thread_utils import ensure_neuro_thread, DEFAULT_THREAD_NAME
 
 log = logging.getLogger(__name__)
@@ -31,6 +33,5 @@ class ProgressThreadReuseShim(commands.Cog):
 
         inst.ensure_thread = types.MethodType(lambda _self: wrapped_ensure_thread(), inst)
         log.info("[reuse_shim] LearningProgress.ensure_thread patched to reuse by name first")
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(ProgressThreadReuseShim(bot))

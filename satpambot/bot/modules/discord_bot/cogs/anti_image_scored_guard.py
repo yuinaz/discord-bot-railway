@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import io, json, time, asyncio
 from datetime import timedelta
 from pathlib import Path
 from typing import Optional, Dict
 
 import discord
-from discord.ext import commands
 
 from ..helpers.score_utils import extract_text_ocr, extract_urls, is_bad_url, simple_bytes_hash, contains_phish_keywords
 
@@ -317,6 +318,5 @@ class AntiImageScoredGuard(commands.Cog):
             await message.author.edit(communication_disabled_until=until)
         except: pass
         await self._send_to_fp_thread(message.guild, embed, view)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AntiImageScoredGuard(bot))

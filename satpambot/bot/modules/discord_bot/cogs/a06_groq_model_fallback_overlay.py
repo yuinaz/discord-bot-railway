@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging, os
 from satpambot.config.local_cfg import cfg
 log = logging.getLogger(__name__)

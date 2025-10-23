@@ -10,6 +10,5 @@ class LlmBootstrapFixOverlay(commands.Cog):
             prov, text = await llm_facade.ask(prompt, system=system, prefer=prefer)
             return {"provider": prov, "text": text}
         bot.llm_ask = _llm_ask  # unify signature across cogs
-
 async def setup(bot): 
     await bot.add_cog(LlmBootstrapFixOverlay(bot))

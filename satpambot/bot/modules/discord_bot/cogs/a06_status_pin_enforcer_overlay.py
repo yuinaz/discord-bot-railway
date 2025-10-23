@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+from discord.ext import commands
 import logging, asyncio
 from typing import Optional
 import discord
-from discord.ext import commands
+
 from satpambot.config.local_cfg import cfg, cfg_int
 
 log = logging.getLogger(__name__)
@@ -49,7 +51,6 @@ class _StatusPinEnforcer(commands.Cog):
             await _enforce_pin(m, title)
         except Exception:
             pass
-
 async def setup(bot): 
     await bot.add_cog(_StatusPinEnforcer(bot))
     # Suggest a long coalesce window so edits happen instead of new messages

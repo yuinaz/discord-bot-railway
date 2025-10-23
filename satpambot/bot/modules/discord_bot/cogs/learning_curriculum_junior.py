@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # satpambot/bot/modules/discord_bot/cogs/learning_curriculum_junior.py
 import json, asyncio
 from pathlib import Path
 from typing import Dict, List
 
 import discord
-from discord.ext import commands
 
 try:
     from satpambot.config.runtime import cfg, set_cfg
@@ -116,7 +117,5 @@ class JuniorLearningPolicy(commands.Cog):
         on = str(mode).lower() in ("1","true","on","ya","y","enable","enabled")
         self.autolock = on; set_cfg("JUNIOR_AUTOLOCK", on)
         await ctx.reply(f"[OK] AutoLock={on}", mention_author=False)
-
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(JuniorLearningPolicy(bot))

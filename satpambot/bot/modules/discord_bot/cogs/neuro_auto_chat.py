@@ -1,11 +1,12 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, json, time, asyncio, logging
 from pathlib import Path
 from typing import Dict, Set
 
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 from satpambot.bot.llm.groq_client import groq_chat
@@ -135,6 +136,5 @@ class NeuroAutoChat(commands.Cog):
                 self.db.upsert(m.guild.id, m.channel.id, m.author.id, query, tags="dialogue,user")
         except Exception:
             pass
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(NeuroAutoChat(bot))

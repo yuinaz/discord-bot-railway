@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, json, subprocess, sys, os, time
 from typing import List, Dict, Any
 import discord
-from discord.ext import commands, tasks
+from discord.ext import tasks
 from satpambot.config.runtime import cfg
 from .selfheal_router import send_selfheal
 
@@ -76,5 +78,4 @@ class AutoUpdateManager(commands.Cog):
             ('Total Outdated', str(len(outs)), True),
         ])
         await send_selfheal(self.bot, em)
-
 async def setup(bot): await bot.add_cog(AutoUpdateManager(bot))

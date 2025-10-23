@@ -1,12 +1,12 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import asyncio, os, sys
 from pathlib import Path
 from typing import Optional
 import aiohttp
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 def _owner_ids():
     raw = os.getenv("BOT_OWNER_IDS","") or os.getenv("OWNER_IDS","")
@@ -84,7 +84,6 @@ class RepoPullAndRestart(commands.Cog):
             try: os._exit(0)
             except Exception: sys.exit(0)
         asyncio.create_task(_do_exit())
-
 async def setup(bot):
     res = await bot.add_cog(RepoPullAndRestart(bot))
     import asyncio as _aio

@@ -1,4 +1,6 @@
+
 # a00_rules_total_block.py
+
 from discord.ext import commands
 import discord, logging
 log = logging.getLogger(__name__)

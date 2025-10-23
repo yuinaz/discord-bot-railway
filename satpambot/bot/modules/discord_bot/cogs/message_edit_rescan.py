@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from discord.ext import commands
+
 import discord
 class MessageEditRescan(commands.Cog):
     def __init__(self, bot: commands.Bot):

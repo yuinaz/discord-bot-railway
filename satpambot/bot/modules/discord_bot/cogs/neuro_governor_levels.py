@@ -1,10 +1,11 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import os, json, time, logging
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 log = logging.getLogger(__name__)
@@ -86,6 +87,5 @@ class NeuroGovernorLevels(commands.Cog):
     @app_commands.command(name="neuro_gate_status", description="Status GATE (selalu terkunci untuk publik).")
     async def neuro_gate_status(self, itx: discord.Interaction):
         await itx.response.send_message("GATE: **LOCKED** — tidak ada chat/reply/react publik sampai human-like ready.", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(NeuroGovernorLevels(bot))

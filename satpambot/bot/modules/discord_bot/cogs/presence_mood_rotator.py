@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+from discord.ext import commands
+
 import os, json, random, asyncio, datetime, contextlib, logging
 from typing import Optional
 import discord
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 
 CFG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "..", "..", "config", "presence_mood_rotator.json")
@@ -81,7 +83,6 @@ class PresenceMoodRotator(commands.Cog):
     async def on_ready(self):
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self._runner())
-
 async def setup(bot: commands.Bot):
     if bot.get_cog("PresenceMoodRotator") is None:
         await bot.add_cog(PresenceMoodRotator(bot))

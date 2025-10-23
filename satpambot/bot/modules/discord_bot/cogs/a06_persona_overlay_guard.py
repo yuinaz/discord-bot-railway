@@ -1,6 +1,7 @@
+
 # a06_persona_overlay_guard.py
-import logging
 from discord.ext import commands
+import logging
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +23,5 @@ class PersonaOverlayGuard(commands.Cog):
             log.info("[persona-guard] injected PersonaOverlay.get_active_persona()")
         else:
             log.debug("[persona-guard] PersonaOverlay already has get_active_persona")
-
 async def setup(bot):
     await bot.add_cog(PersonaOverlayGuard(bot))

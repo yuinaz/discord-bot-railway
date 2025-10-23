@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # satpambot/bot/modules/discord_bot/cogs/ban_local_notify.py
 import logging, time, inspect, importlib
 from typing import Dict, Tuple, Optional, Callable, Any
 import discord
-from discord.ext import commands
+
 log = logging.getLogger(__name__)
 TOUCH_TTL_SEC = 10 * 60
 NAME_KEYWORDS = ("ban", "tb", "test", "simul", "embed")

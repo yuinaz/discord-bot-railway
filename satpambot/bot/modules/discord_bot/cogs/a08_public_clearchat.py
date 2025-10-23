@@ -1,10 +1,10 @@
-
 from __future__ import annotations
+
+from discord.ext import commands
 import asyncio
 from typing import Optional, Union
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 LOG = __import__("logging").getLogger("satpambot.bot.modules.discord_bot.cogs.a08_public_clearchat")
 TargetChoice = app_commands.Choice[str]
@@ -122,7 +122,6 @@ class ClearChatHybrid(commands.Cog):
         if dry_run: detail += " [dry-run]"
         if errors: detail += f" — ⚠️ {errors} gagal (izin/limit)."
         await interaction.followup.send(detail, ephemeral=True)
-
 async def setup(bot: commands.Bot):
     res = await bot.add_cog(ClearChatHybrid(bot))
     import asyncio as _aio

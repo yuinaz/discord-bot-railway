@@ -1,6 +1,6 @@
+from discord.ext import commands
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 class Diag(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -32,6 +32,5 @@ class Diag(commands.Cog):
         flags.append("clearchat: " + ("✅" if any(x.endswith(".cogs.clearchat") for x in exts) else "❌"))
         flags.append("slash_sync: " + ("✅" if any(x.endswith(".cogs.slash_sync") for x in exts) else "❌"))
         await interaction.followup.send("Loaded extensions ({}):\n- ".format(len(exts)) + "\n- ".join(exts) + "\n\n" + ", ".join(flags), ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(Diag(bot))

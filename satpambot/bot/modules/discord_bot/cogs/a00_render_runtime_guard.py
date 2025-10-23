@@ -1,4 +1,5 @@
 
+from discord.ext import commands
 import asyncio
 import json
 import logging
@@ -7,8 +8,6 @@ import platform
 import sys
 from pathlib import Path
 from typing import Any, Dict
-
-from discord.ext import commands
 
 LOG = logging.getLogger(__name__)
 
@@ -138,6 +137,5 @@ class RenderRuntimeGuard(commands.Cog):
                     LOG.warning("[render-guard] wrote default JSON: %s", p)
 
         LOG.info("[render-guard] preflight complete")
-
 async def setup(bot):
     await bot.add_cog(RenderRuntimeGuard(bot))

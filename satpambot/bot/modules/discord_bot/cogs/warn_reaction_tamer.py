@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 # -*- coding: utf-8 -*-
 """
 WarnReactionTamer
@@ -17,7 +19,6 @@ import os
 from typing import Optional
 
 import discord
-from discord.ext import commands
 
 WARN_SET = {"\u26a0", "\u26a0\ufe0f", "⚠", "⚠️"}  # variasi unicode
 
@@ -94,6 +95,5 @@ class WarnReactionTamer(commands.Cog):
         if _is_warning_emoji(payload.emoji, self.warn_emoji):
             # jadwalkan penghapusan cepat
             asyncio.create_task(self._remove(payload))
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(WarnReactionTamer(bot))

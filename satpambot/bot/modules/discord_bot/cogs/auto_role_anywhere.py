@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from discord.ext import commands
+
 import asyncio, json, time, os
 from datetime import timedelta
 from pathlib import Path
 from typing import Dict, Optional, Set, DefaultDict, List, Tuple
 from collections import defaultdict
 import discord
-from discord.ext import commands
+
 from discord import app_commands
 
 CFG_PATH = Path("config") / "auto_role_anywhere.json"
@@ -396,6 +398,5 @@ class AutoRoleAnywhere(commands.Cog):
             except Exception:
                 pass
         await itx.followup.send(f"Backfill selesai. Ditambahkan: {added}", ephemeral=True)
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(AutoRoleAnywhere(bot))

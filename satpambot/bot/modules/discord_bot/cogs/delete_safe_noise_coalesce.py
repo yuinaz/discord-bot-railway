@@ -1,3 +1,4 @@
+from discord.ext import commands
 import asyncio
 import logging
 import os
@@ -7,7 +8,7 @@ from typing import Optional
 
 try:
     import discord  # noqa: F401
-    from discord.ext import commands, tasks
+    from discord.ext import tasks
 except Exception:
     # keep import-light for smoke checks; this file is a "soft" addon
     discord = None
@@ -128,7 +129,6 @@ class DeleteSafeNoiseCoalesce(commands.Cog if commands else object):
         async def _before(self):
             if self.bot and hasattr(self.bot, "wait_until_ready"):
                 await self.bot.wait_until_ready()
-
 async def setup(bot):
     # New-style extension loader
     cog = DeleteSafeNoiseCoalesce(bot)

@@ -1,8 +1,9 @@
+
 # satpambot/bot/modules/discord_bot/cogs/repo_slash_simple.py
+from discord.ext import commands
 import asyncio, os, sys, subprocess, logging, importlib, json, time
 import discord
 from discord import app_commands
-from discord.ext import commands
 
 log = logging.getLogger(__name__)
 TICKET_PATH = "/tmp/restart_ticket.json"
@@ -63,6 +64,5 @@ class RepoSlashSimple(commands.Cog):
 
         await asyncio.sleep(2.0)
         await self._hard_restart()
-
 async def setup(bot: commands.Bot):
     await bot.add_cog(RepoSlashSimple(bot))
