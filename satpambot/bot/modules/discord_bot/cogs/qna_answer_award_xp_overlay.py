@@ -1,7 +1,7 @@
 try:
     import discord
     from discord.ext import commands
-except Exception:  # allow smoke import even without discord installed
+except Exception:
     class discord:  # type: ignore
         class Message: ...
     class commands:  # type: ignore
@@ -24,27 +24,21 @@ try:
 except Exception:
     UpstashClient = None
 
-_ANSWER_PATTERNS = [
-    r"\banswer\b", r"\bjawaban\b", r"^answer\s*by\b", r"^jawaban\s*oleh\b",
-    r"\banswer from\b", r"\bresponse\b"
-]
-_QUESTION_PATTERNS = [r"\bquestion\b", r"\bpertanyaan\b"]
+_ANS_PROVIDER = re.compile(r"\banswer\s+by\s+(groq|gemini)\b", re.I)
+_QUE_PAT = re.compile(r"\b(question|pertanyaan)\b", re.I)
 
-def _looks_like_answer_embed(e: "discord.Embed") -> bool:
-    def safe_lower(x):
-        return (x or "").strip().lower()
-    title = safe_lower(getattr(e, "title", ""))
-    author = safe_lower(getattr(getattr(e, "author", None), "name", None))
-    desc = safe_lower(getattr(e, "description", ""))
-
-    # Heuristic: skip clear "Question" embeds
-    if any(re.search(p, title) for p in _QUESTION_PATTERNS) and not any(re.search(p, title) for p in _ANSWER_PATTERNS):
+def _is_provider_answer_embed(e: "discord.Embed") -> bool:
+    def g(x): return (x or "").strip().lower()
+    title = g(getattr(e, "title",""))
+    author = g(getattr(getattr(e,"author",None),"name",None))
+    desc = g(getattr(e,"description",""))
+    foot = g(getattr(getattr(e,"footer",None),"text",None))
+    hay = " ".join([title, author, desc, foot])
+    if _QUE_PAT.search(hay):  # safeguard
         return False
-    if any(re.search(p, author) for p in _QUESTION_PATTERNS) and not any(re.search(p, author) for p in _ANSWER_PATTERNS):
-        return False
-
-    hay = " ".join([title, author, desc])
-    return any(re.search(p, hay) for p in _ANSWER_PATTERNS)
+    if "qna_provider:" in foot:
+        return any(p in foot for p in ["groq","gemini"])
+    return _ANS_PROVIDER.search(hay) is not None
 
 class QnaAnswerAwardXP(commands.Cog):
     def __init__(self, bot):
@@ -75,11 +69,11 @@ class QnaAnswerAwardXP(commands.Cog):
             if not getattr(m, "embeds", None): return
             if len(m.embeds) == 0: return
             e = m.embeds[0]
-            if not _looks_like_answer_embed(e): return
+            if not _is_provider_answer_embed(e): return
             if not await self._mark_once(int(m.id)): return
             if not self.client or not getattr(self.client, "enabled", False): return
             await self.client.incrby(self.senior_key, int(self.delta))
-            log.info("[qna-award] +%s XP to BOT (key=%s) msg=%s", self.delta, self.senior_key, m.id)
+            log.info("[qna-award] +%s XP (provider-answer) key=%s msg=%s", self.delta, self.senior_key, m.id)
         except Exception as exc:
             log.warning("[qna-award] failed: %r", exc)
 
