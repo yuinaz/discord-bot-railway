@@ -1,41 +1,102 @@
-import os, json, aiohttp, asyncio
+
+from __future__ import annotations
+import os, asyncio, logging
+from typing import Optional
+
+log = logging.getLogger(__name__)
+
+def _cfg(key: str, default: str = "") -> str:
+    try:
+        from satpambot.config.auto_defaults import cfg_str as _cs
+        return _cs(key, default)
+    except Exception:
+        return os.getenv(key, default)
+
+def _first_nonempty(*names: str, default: str = "") -> str:
+    for n in names:
+        v = _cfg(n, "").strip()
+        if v:
+            return v
+    return default
 
 class UpstashClient:
     def __init__(self):
-        self.base = os.getenv("UPSTASH_REDIS_REST_URL","").rstrip("/")
-        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN","")
-        self.enabled = bool(self.base and self.token and os.getenv("KV_BACKEND","").lower()=="upstash_rest")
-
-    async def _req_json(self, method: str, path: str, json_body=None):
-        if not self.enabled: return None
-        headers = {"Authorization": f"Bearer {self.token}"}
-        if method == "POST":
-            headers["Content-Type"] = "application/json"
+        url = _first_nonempty("UPSTASH_REDIS_REST_URL", "REDIS_REST_URL", "UPSTASH_URL")
+        tok = _first_nonempty("UPSTASH_REDIS_REST_TOKEN", "REDIS_REST_TOKEN", "UPSTASH_TOKEN")
+        self.url = url.rstrip("/") if url else ""
+        self.token = tok
+        self.enabled = bool(self.url and self.token)
+        self._httpx = None
         try:
-            async with aiohttp.ClientSession() as session:
-                if method == "GET":
-                    async with session.get(f"{self.base}{path}", headers=headers, timeout=15) as r:
-                        r.raise_for_status()
-                        try: return await r.json()
-                        except Exception: return None
-                else:
-                    async with session.post(f"{self.base}{path}", headers=headers, json=json_body, timeout=15) as r:
-                        r.raise_for_status()
-                        try: return await r.json()
-                        except Exception: return True
+            import httpx  # type: ignore
+            self._httpx = httpx
         except Exception:
+            self._httpx = None
+        log.info("[upstash-client] enabled=%s url=%s", self.enabled, ("..."+self.url[-24:] if self.url else ""))
+
+    async def _aget(self, path: str):
+        if not self.enabled:
             return None
+        target = f"{self.url}{path}"
+        headers = {"Authorization": f"Bearer {self.token}"}
+        if self._httpx:
+            async with self._httpx.AsyncClient(timeout=20) as cli:
+                r = await cli.get(target, headers=headers)
+                r.raise_for_status()
+                return r.json()
+        else:
+            import requests  # type: ignore
+            def _do():
+                rr = requests.get(target, headers=headers, timeout=20)
+                rr.raise_for_status()
+                return rr.json()
+            return await asyncio.to_thread(_do)
+
+    async def _apost(self, path: str):
+        if not self.enabled:
+            return None
+        target = f"{self.url}{path}"
+        headers = {"Authorization": f"Bearer {self.token}"}
+        if self._httpx:
+            async with self._httpx.AsyncClient(timeout=20) as cli:
+                r = await cli.post(target, headers=headers)
+                r.raise_for_status()
+                return r.json()
+        else:
+            import requests  # type: ignore
+            def _do():
+                rr = requests.post(target, headers=headers, timeout=20)
+                rr.raise_for_status()
+                return rr.json()
+            return await asyncio.to_thread(_do)
 
     async def get_raw(self, key: str):
-        data = await self._req_json("GET", f"/get/{key}")
-        if not data: return None
-        return data.get("result")
+        try:
+            d = await self._aget(f"/get/{key}")
+            if not isinstance(d, dict): return None
+            return d.get("result")
+        except Exception as e:
+            log.debug("[upstash-client] get_raw fail: %r", e)
+            return None
 
-    async def get_json(self, key: str):
-        raw = await self.get_raw(key)
-        if raw is None: return None
-        try: return json.loads(raw)
-        except Exception: return None
+    async def setex(self, key: str, ttl_sec: int, value: str) -> bool:
+        try:
+            d = await self._apost(f"/set/{key}/{value}?EX={int(ttl_sec)}")
+            ok = isinstance(d, dict) and str(d.get("result", "")).upper() == "OK"
+            if not ok:
+                log.debug("[upstash-client] setex unexpected resp: %r", d)
+            return ok
+        except Exception as e:
+            log.debug("[upstash-client] setex fail: %r", e)
+            return False
 
-    async def pipeline(self, commands):
-        return await self._req_json("POST", "/pipeline", json_body=commands)
+    async def incrby(self, key: str, n: int) -> bool:
+        try:
+            d = await self._apost(f"/incrby/{key}/{int(n)}")
+            ok = isinstance(d, dict) and "result" in d
+            if not ok:
+                log.debug("[upstash-client] incrby unexpected resp: %r", d)
+            return ok
+        except Exception as e:
+            log.debug("[upstash-client] incrby fail: %r", e)
+            return False
