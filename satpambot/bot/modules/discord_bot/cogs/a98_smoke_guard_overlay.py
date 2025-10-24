@@ -16,11 +16,11 @@ except Exception:
         class Message: ...
 log = logging.getLogger(__name__)
 
-class SelfhealQuorumV2Overlay(commands.Cog):
+class SmokeGuardOverlay(commands.Cog):
     def __init__(self, bot: Any):
         self.bot = bot
-        log.info("a00_selfheal_quorum_v2_overlay loaded (stub active)")
+        log.info("a98_smoke_guard_overlay loaded (stub active)")
 async def setup(bot):
-    await bot.add_cog(SelfhealQuorumV2Overlay(bot))
+    await bot.add_cog(SmokeGuardOverlay(bot))
 def setup_old(bot):
-    bot.add_cog(SelfhealQuorumV2Overlay(bot))
+    bot.add_cog(SmokeGuardOverlay(bot))
