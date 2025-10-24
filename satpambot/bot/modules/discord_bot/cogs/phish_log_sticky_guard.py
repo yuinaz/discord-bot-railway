@@ -1,8 +1,7 @@
-
 try:
     import discord
     from discord.ext import commands
-except Exception:  # allow smoke without discord installed
+except Exception:  # allow smoke import without discord installed
     class discord:  # type: ignore
         class Message: ...
     class commands:  # type: ignore
@@ -43,8 +42,10 @@ class PhishLogStickyGuard(commands.Cog):
         if not self.cid: return
         ch = self.bot.get_channel(self.cid)
         if ch is None:
-            try: ch = await self.bot.fetch_channel(self.cid)
-            except Exception: return
+            try:
+                ch = await self.bot.fetch_channel(self.cid)
+            except Exception:
+                return
         if StickyEmbed is None:
             log.info("[sticky] StickyEmbed util missing; skip"); return
         se = StickyEmbed()
@@ -52,14 +53,21 @@ class PhishLogStickyGuard(commands.Cog):
         FOOTER_MARK = "LEINA_LOG_STICKY"
         try:
             keep_id = msg.id
-            async for m in ch.history(limit=50, oldest_first=False):
+            # tolerate both async-iterator and coroutine returns
+            ait = ch.history(limit=50, oldest_first=False)
+            if asyncio.iscoroutine(ait):
+                ait = await ait
+            async for m in ait:
                 if m.id == keep_id: continue
                 if m.author.id != getattr(self.bot.user, "id", None): continue
                 if not m.embeds: continue
                 ft = (getattr(getattr(m.embeds[0], "footer", None), "text", None) or "")
                 if FOOTER_MARK in ft:
-                    try: await m.delete(); await asyncio.sleep(0.2)
-                    except Exception: pass
+                    try:
+                        await m.delete()
+                        await asyncio.sleep(0.2)
+                    except Exception:
+                        pass
         except Exception:
             pass
         try:
@@ -69,7 +77,8 @@ class PhishLogStickyGuard(commands.Cog):
             try:
                 if not getattr(msg, "pinned", False):
                     await msg.pin(reason="auto-pin log-botphising sticky")
-            except Exception: pass
+            except Exception:
+                pass
         except Exception as e:
             log.warning("[sticky] update failed: %r", e)
 
