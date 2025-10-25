@@ -105,6 +105,7 @@
     "PHASE_TRANSITION_ENABLE": "1",
     "BOT_OWNER_ID": "0",
     "GATE_NOTIFY_CHANNEL_ID": "1426571542627614772",
-    "DISABLE_MODULE_PATTERNS": "phash,phish,phishash,reseed,ban"
+    "DISABLE_MODULE_PATTERNS": "phash,phish,phishash,reseed,ban",
+    "DISABLED_COGS": "a00_disable_ban_overlay,a06_phash_runtime_warmup_overlay,a99_smoke_banner_overlay,anti_image_phash_runtime,anti_image_phash_runtime_strict,anti_image_phish_advanced,anti_image_phish_blocklist,anti_image_phish_guard,anti_image_phish_signature,anti_invite_autoban,anti_url_phish_guard,anti_url_phish_guard_bootstrap,autoban_safety_interceptor,ban_auto_embed,ban_local_notify,ban_logger,ban_queue_watcher,ban_secure,banlog_route,banlog_thread,fast_raid_autoban,first_touch_attachment_ban,first_touch_autoban_pack_mime,imagephish_ref_indexer,imagephish_ref_indexer_v2,patch_collect_phash_wrapper,phash_admin,phash_auto_ban,phash_compactify,phash_db_command_single,phash_hourly_scheduler,phash_runtime_log_tamer,phash_static_loader_v1,phish_hash_autoreseed,phish_hash_inbox,phish_log_sticky_example,phish_log_sticky_guard,phish_reward_listener,phish_text_hourly_miner,phish_watcher"
   }
 }
