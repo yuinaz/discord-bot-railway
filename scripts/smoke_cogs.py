@@ -66,6 +66,23 @@ async def load_one(modname: str) -> tuple[bool, str]:
 
     try:
         bot = DummyBot()
+
+
+        # smoke stub: ensure wait_until_ready exists before any tasks.before_loop()
+
+
+        if not hasattr(bot, "wait_until_ready"):
+
+
+            async def _noop_wait():
+
+
+                return None
+
+
+            bot.wait_until_ready = _noop_wait
+
+
         if inspect.iscoroutinefunction(setup_fn):
             await setup_fn(bot)
         else:
@@ -118,3 +135,15 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# --- smoke stub: ensure wait_until_ready exists (EOF safe, do not alter config) ---
+try:
+    _bot = bot  # noqa
+except NameError:
+    _bot = None
+if _bot is not None and not hasattr(_bot, "wait_until_ready"):
+    async def _noop_wait():  # pragma: no cover
+        return None
+    _bot.wait_until_ready = _noop_wait
+# -------------------------------------------------------------------------------

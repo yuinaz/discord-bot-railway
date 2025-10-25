@@ -7,7 +7,7 @@
     "AUTOLRN_REPLY_MODE": "embed",
     "CHAT_ENABLE": "1",
     "COGS_FORCE_INCLUDE": "a00_selfheal_quiet_quorum_overlay,a00_progress_embed_safeawait_bootstrap,a00_selfheal_json_guard_overlay,a08_xp_state_bootstrap_overlay,a08_passive_total_offset_overlay,a08_ladder_segment_mode_overlay",
-    "COGS_FORCE_INCLUDE_EXTRA": "a06_autolearn_qna_answer_overlay,a24_autolearn_qna_autoreply_fix_overlay,a24_qna_dedup_guard_overlay,a24_qna_dual_provider_runtime_overlay,neuro_autolearn_moderated_v2",
+    "COGS_FORCE_INCLUDE_EXTRA": "a00_feature_killswitch_overlay,a06_autolearn_qna_answer_overlay,a09_work_xp_overlay,a24_autolearn_qna_autoreply_fix_overlay,a24_qna_dedup_guard_overlay,a24_qna_dual_provider_runtime_overlay,a27_phase_transition_overlay,neuro_autolearn_moderated_v2",
     "CONFIG_OVERRIDES_PATH": "data/config/overrides.render-free.json",
     "DISABLE_TALKING": "0",
     "DISCORD_GUILD_ID": "761163966030151701",
@@ -88,6 +88,23 @@
     "XP_STATE_REFRESH_MIN": "10",
     "XP_UPSTASH_EVENTS_ENABLE": "1",
     "XP_UPSTASH_VERBOSE": "1",
-    "LEARNING_MIN_LABEL": "KULIAH-S2"
+    "LEARNING_MIN_LABEL": "KULIAH-S2",
+    "QNA_ENABLE": "1",
+    "QNA_INTERVAL_MIN": "15",
+    "QNA_AUTOPILOT": "0",
+    "PERSONA_ENABLE": "1",
+    "PERSONA_PROFILE_PATH": "data/config/persona/teen_tsundere.json",
+    "OPENAI_BASE_URL": "https://api.groq.com/openai/v1",
+    "WORK_XP_ENABLE": "1",
+    "WORK_XP_KEY": "xp:work:total",
+    "WORK_XP_LADDER_KEY": "xp:work:ladder",
+    "WORK_XP_LEVELS_PATH": "data/config/xp_work_ladder.json",
+    "WORK_XP_AWARD_PER_QNA_ANSWER": "1000",
+    "GOVERNOR_POLICY_PATH": "data/config/governor.policy.json",
+    "NEURO_GOVERNOR_ENABLE": "1",
+    "PHASE_TRANSITION_ENABLE": "1",
+    "BOT_OWNER_ID": "0",
+    "GATE_NOTIFY_CHANNEL_ID": "1426571542627614772",
+    "DISABLE_MODULE_PATTERNS": "phash,phish,phishash,reseed,ban"
   }
 }
