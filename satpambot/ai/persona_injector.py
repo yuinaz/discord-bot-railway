@@ -1,34 +1,41 @@
-import json, os
-from pathlib import Path
 
-def _load_persona():
-    path = os.getenv("PERSONA_PROFILE_PATH","data/config/persona/teen_tsundere.json")
-    try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except Exception:
-        return None
+import os, json, pathlib
+
+BASE_DIR = pathlib.Path(__file__).resolve().parents[2]
+PERSONA_DIR = BASE_DIR / "data" / "config" / "persona"
+
+_DEFAULT = {
+  "name": "teen_tsundere",
+  "style": [
+    "Nada tsundere remaja: tegas, to the point, kadang malu-malu, tapi tetap sopan.",
+    "Jangan spam, jangan over-emoji, hindari CAPS berlebihan.",
+    "Ucapkan ide secara ringkas, beri contoh praktis.",
+    "Saat tidak yakin, minta klarifikasi singkat."
+  ],
+  "lingua": [
+    "Bahasa Indonesia santai; boleh sisipkan 'uhm', 'hmph' secukupnya (maks 1x).",
+    "Hindari bahasa yang menyinggung atau konten dewasa."
+  ]
+}
+
+def _load_persona_dict(name: str):
+  try:
+    p = PERSONA_DIR / f"{name}.json"
+    if p.exists():
+      return json.loads(p.read_text(encoding="utf-8"))
+  except Exception:
+    pass
+  return _DEFAULT
 
 def build_system(base: str = "") -> str:
-    p = _load_persona() or {}
-    name = p.get("name","Leina")
-    style = p.get("style",{})
-    tone = style.get("tone","ramah, tegas, teknis")
-    length = style.get("length","ringkas")
-    emoji = style.get("emoji","hemat")
-    bounds = p.get("boundaries",{})
-    goals = p.get("goals",[])
-    addon = p.get("system_addendum","")
-
-    parts = [base or ""]
-    parts.append(f"[Persona::{name}] Tone={tone}; Panjang={length}; Emoji={emoji}.")
-    if goals:
-        parts.append("Tujuan: " + "; ".join(goals))
-    if bounds.get("respect_gates"):
-        parts.append("Ikuti gate/policy Governor jika aktif.")
-    if bounds.get("no_nsfw"):
-        parts.append("Jangan membuat konten NSFW.")
-    if bounds.get("no_harassment"):
-        parts.append("Hindari nada yang menyerang atau melecehkan.")
-    if addon:
-        parts.append(addon)
-    return "\n".join([s for s in parts if s]).strip()
+  persona_name = (os.getenv("PERSONA_PROFILE") or "teen_tsundere").strip()
+  d = _load_persona_dict(persona_name)
+  blocks = []
+  if base:
+    blocks.append(base)
+  if d.get("style"):
+    blocks.append("Gaya persona:\n- " + "\n- ".join(d["style"]))
+  if d.get("lingua"):
+    blocks.append("Bahasa:\n- " + "\n- ".join(d["lingua"]))
+  blocks.append("Guard:\n- Jangan spam; satu jawaban ringkas, jelas, dan relevan.\n- Jika belum yakin, tanya 1 klarifikasi.")
+  return "\n\n".join(blocks)
