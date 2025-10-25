@@ -1,3 +1,76 @@
+import sys as _sys, types as _types
+def _ensure_discord_stubs():
+    try:
+        import discord; from discord.ext import commands, tasks  # noqa
+        return
+    except Exception:
+        pass
+    import types as _types, sys as _sys
+    discord = _types.ModuleType("discord"); _sys.modules["discord"] = discord
+
+    # Submodule: discord.errors
+    errors = _types.ModuleType("discord.errors"); _sys.modules["discord.errors"] = errors
+    class HTTPException(Exception): pass
+    class Forbidden(HTTPException): pass
+    class NotFound(HTTPException): pass
+    errors.HTTPException = HTTPException
+    errors.Forbidden = Forbidden
+    errors.NotFound = NotFound
+
+    # Submodule: discord.abc
+    abc = _types.ModuleType("discord.abc"); _sys.modules["discord.abc"] = abc; discord.abc = abc
+    class Messageable:
+        async def history(self, *args, **kwargs):
+            if False:
+                yield None
+            return
+    abc.Messageable = Messageable
+
+    class User: 
+        def __init__(self): self.sent=[]
+        async def send(self, text): self.sent.append(text)
+    discord.User=User
+    class TextChannel:
+        def __init__(self): self.sent=[]
+        async def send(self, text): self.sent.append(text)
+    discord.TextChannel=TextChannel
+
+    # discord.ext.*
+    ext = _types.ModuleType("discord.ext"); _sys.modules["discord.ext"] = ext
+    commands = _types.ModuleType("commands"); _sys.modules["discord.ext.commands"] = commands
+    tasks = _types.ModuleType("tasks"); _sys.modules["discord.ext.tasks"] = tasks
+
+    class _Cog: pass
+    def _listener(*a, **k):
+        def deco(fn): return fn
+        return deco
+    _Cog.listener = staticmethod(_listener)
+    commands.Cog=_Cog
+
+    class Bot: pass
+    commands.Bot=Bot
+    class Context: pass
+    commands.Context=Context
+
+    def command(*a, **k):
+        def deco(fn): return fn
+        return deco
+    commands.command=command
+
+    # Proper Loop object with before_loop()
+    class _Loop:
+        def __init__(self, fn):
+            self.fn = fn
+        def start(self): pass
+        def before_loop(self, f): return f
+
+    def loop(**kw):
+        def deco(fn):
+            return _Loop(fn)
+        return deco
+    tasks.loop = loop
+_ensure_discord_stubs()
+
 
 import os, sys, compileall, importlib, traceback, json, re
 from pathlib import Path

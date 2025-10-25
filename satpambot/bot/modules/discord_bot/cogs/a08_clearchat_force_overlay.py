@@ -1,17 +1,15 @@
-from __future__ import annotations
-
-from discord.ext import commands
-
 import logging
-
 import discord
 from discord import app_commands
+from discord.ext import commands
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_LIMIT = 50  # fallback aman; jika modul asli punya, akan override ketika merged
 
-DEFAULT_LIMIT = 100  # can edit in-file
+def _skip_pinned(m: discord.Message) -> bool:
+    return not getattr(m, "pinned", False)
 
-class ClearChatForce(commands.Cog):
+class ClearChatForceOverlay(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -19,27 +17,24 @@ class ClearChatForce(commands.Cog):
     @commands.has_permissions(manage_messages=True)
     async def clearchat_cmd(self, ctx: commands.Context, limit: int = DEFAULT_LIMIT):
         try:
-            await ctx.message.delete()
-        except Exception:
-            pass
-        try:
-            await ctx.channel.purge(limit=limit)
+            deleted = await ctx.channel.purge(limit=limit, check=_skip_pinned, bulk=True)
+            await ctx.reply(f"🧹 {len(deleted)} pesan (non-pinned) dihapus.", delete_after=3)
         except Exception as e:
             LOGGER.exception("clearchat purge failed: %s", e)
+            await ctx.reply("⚠️ Gagal purge.", delete_after=5)
 
     @app_commands.command(name="clearchat", description="Delete recent messages immediately.")
-    @app_commands.describe(limit="How many messages to delete (default 100)")
+    @app_commands.default_permissions(manage_messages=True)
     async def clearchat_slash(self, interaction: discord.Interaction, limit: int = DEFAULT_LIMIT):
-        if not interaction.user.guild_permissions.manage_messages:
-            await interaction.response.send_message("No permission.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True, thinking=False)
+        channel = interaction.channel
         try:
-            channel = interaction.channel
-            if isinstance(channel, (discord.TextChannel, discord.Thread)):
-                await channel.purge(limit=limit)
-                await interaction.followup.send(f"Deleted {{limit}} messages.", ephemeral=True)
+            deleted = await channel.purge(limit=limit, check=_skip_pinned, bulk=True)
+            await interaction.response.send_message(
+                f"🧹 {len(deleted)} pesan (non-pinned) dihapus.", ephemeral=True
+            )
         except Exception as e:
             LOGGER.exception("clearchat slash purge failed: %s", e)
+            await interaction.response.send_message("⚠️ Gagal purge.", ephemeral=True)
+
 async def setup(bot: commands.Bot):
-    await bot.add_cog(ClearChatForce(bot))
+    await bot.add_cog(ClearChatForceOverlay(bot))
