@@ -5,6 +5,14 @@
 from discord.ext import commands
 import json
 import logging
+import asyncio
+async def awaitable_safe_int(val, default=0):
+    if asyncio.iscoroutine(val):
+        val = await val
+    if isinstance(val, (int, float)): return int(val)
+    s = str(val or "").strip()
+    try: return int(float(s))
+    except Exception: return default
 
 log = logging.getLogger(__name__)
 

@@ -1,12 +1,13 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
-import os, re, logging, asyncio
-from typing import Optional
+import os, re, logging, asyncio, inspect
+from typing import Optional, Set
 
 try:
     import discord
     from discord.ext import commands
 except Exception:
-    class discord:  # minimal stubs for tests
+    class discord:
         class Embed: ...
         class Message: ...
     class commands:
@@ -16,21 +17,16 @@ except Exception:
                 def _w(f): return f
                 return _w
 
-log = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
-# Patterns
 _QUE = re.compile(r"\bquestion\b.*\bleina\b", re.I)
 _ANS = re.compile(r"\banswer\b", re.I)
 _NAME_TRIG = re.compile(r"^\s*(leina[,:\s]|<@!?(\d+)>|@leina)", re.I)
 
 def _iso_id() -> Optional[int]:
-    # Accept either QNA_ISOLATION_CHANNEL_ID or QNA_CHANNEL_ID
-    for var in ("QNA_ISOLATION_CHANNEL_ID", "QNA_CHANNEL_ID"):
-        v = os.getenv(var) or ""
-        v = v.strip()
-        if v.isdigit():
-            return int(v)
-    return None
+    raw = (os.getenv("QNA_ISOLATION_CHANNEL_ID") or os.getenv("QNA_CHANNEL_ID") or "").strip()
+    raw = re.sub(r"[^\d]", "", raw)
+    return int(raw) if raw.isdigit() else None
 
 def _pick_provider_label() -> str:
     prov = (os.getenv("AI_PROVIDER", "auto") or "auto").lower()
@@ -38,96 +34,110 @@ def _pick_provider_label() -> str:
     if prov in ("gemini","google","gai"): return "Gemini"
     return "Groq" if os.getenv("GROQ_API_KEY") else "Gemini"
 
-async def _call_llm(prompt: str, provider_label: str) -> Optional[str]:
-    if provider_label == "Groq":
+def _resolve_groq_func():
+    try:
+        from satpambot.ml import groq_helper as gh  # type: ignore
+    except Exception as e:
+        LOG.debug("[qna] groq_helper import failed: %r", e); return None
+    for name in ("get_groq_answer","groq_answer","ask_groq","groq_chat","get_answer","get_text"):
+        fn = getattr(gh, name, None)
+        if callable(fn): return fn
+    return None
+
+async def _call_llm(prompt: str, provider: str) -> Optional[str]:
+    if provider == "Groq":
+        fn = _resolve_groq_func()
+        if not fn:
+            LOG.warning("[qna] Groq helper not found"); return None
         try:
-            from satpambot.ml.groq_helper import get_groq_answer as _groq_answer
-            return await asyncio.to_thread(_groq_answer, prompt)
+            if inspect.iscoroutinefunction(fn): return await fn(prompt)  # type: ignore
+            return await asyncio.to_thread(fn, prompt)                   # type: ignore
+        except TypeError:
+            try:
+                if inspect.iscoroutinefunction(fn): return await fn(prompt=prompt)  # type: ignore
+                return await asyncio.to_thread(fn, prompt=prompt)                   # type: ignore
+            except Exception as e:
+                LOG.warning("[qna] Groq signature mismatch: %r", e); return None
         except Exception as e:
-            log.warning("[qna] Groq call failed: %r", e)
-            return None
+            LOG.warning("[qna] Groq call failed: %r", e); return None
     else:
         try:
-            from satpambot.ai.gemini_client import generate_text as _gemini_answer
+            from satpambot.ai.gemini_client import generate_text as _gemini_answer  # type: ignore
             return await asyncio.to_thread(_gemini_answer, prompt)
         except Exception as e:
-            log.warning("[qna] Gemini call failed: %r", e)
-            return None
+            LOG.warning("[qna] Gemini call failed: %r", e); return None
 
 def _gate_public_allowed() -> bool:
-    # Soft dependency; if ProgressGate is missing, allow
     try:
         from pathlib import Path as _Path
-        from satpambot.shared.progress_gate import ProgressGate
+        from satpambot.shared.progress_gate import ProgressGate  # type: ignore
         return ProgressGate(_Path("data/progress_gate.json")).is_public_allowed()
     except Exception:
         return True
 
 def _strip_mention(text: str, me_id: Optional[int]) -> str:
     text = text or ""
-    if me_id:
-        text = re.sub(fr"<@!?\s*{me_id}\s*>", "", text, flags=re.I).strip()
-    # Remove 'leina,' at the start
+    if me_id: text = re.sub(fr"<@!?\s*{me_id}\s*>", "", text, flags=re.I).strip()
     return re.sub(r"^\s*leina[,:\s]+", "", text, flags=re.I).strip()
 
 class QnaPublicAutoAnswer(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._answered_ids: Set[int] = set()
 
     @commands.Cog.listener()
     async def on_message(self, m: "discord.Message"):
         try:
-            # ignore our own followup messages
-            if getattr(m.author, "id", None) == getattr(getattr(self.bot, "user", None), "id", None):
-                pass  # continue checks below (needed to inspect embeds from autoprompt)
             iso = _iso_id()
             ch_id = getattr(getattr(m, "channel", None), "id", None)
+            if not ch_id: return
 
-            # MODE A: isolation channel -> Answer provider to "Question by Leina"
-            if iso and ch_id == iso and getattr(m, "embeds", None):
-                e = m.embeds[0] if m.embeds else None
-                if e:
-                    def g(x): return (x or "").strip().lower()
-                    txt = " ".join([g(getattr(e,"title","")), g(getattr(getattr(e,"author",None),"name",None)), g(getattr(e,"description",""))])
-                    if _QUE.search(txt) and not _ANS.search(txt):
-                        provider = _pick_provider_label()
-                        prompt = getattr(e, "description", "") or getattr(e, "title", "")
-                        if not prompt:
-                            return
-                        try:
-                            await m.channel.typing().__aenter__()
-                        except Exception: pass
-                        ans = await _call_llm(prompt, provider)
-                        try: await m.channel.typing().__aexit__(None, None, None)
-                        except Exception: pass
-                        if not ans: return
-                        emb = discord.Embed(title=f"Answer by {provider}", description=ans)
-                        await m.channel.send(embed=emb, reference=m)
-                        return
+            # ===== MODE A: channel isolasi =====
+            if iso and ch_id == iso:
+                e = m.embeds[0] if getattr(m, "embeds", None) else None
+                title = (getattr(e,"title","") or "").strip()
+                author = (getattr(getattr(e,"author",None),"name","") or "").strip()
+                desc = (getattr(e,"description","") or "").strip()
+                combo = " ".join([title, author, desc]).lower()
 
-            # MODE B: public mention -> Answer by Leina (content from LLM), gated
-            if ch_id != iso and not getattr(m.author, "bot", False):
+                if not e or not _QUE.search(combo) or _ANS.search(combo) or m.id in self._answered_ids:
+                    return
+
+                provider = _pick_provider_label()
+                prompt = desc or title
+                if not prompt: return
+
+                try: await m.channel.typing().__aenter__();  ans = await _call_llm(prompt, provider)
+                finally:
+                    try: await m.channel.typing().__aexit__(None,None,None)
+                    except Exception: pass
+                if not ans: return
+                self._answered_ids.add(m.id)
+                emb = discord.Embed(title=f"Answer by {provider}", description=ans)
+                await m.channel.send(embed=emb, reference=m)
+                return
+
+            # ===== MODE B: channel publik =====
+            if not getattr(m.author, "bot", False):
                 content = getattr(m, "content", "") or ""
                 me_id = getattr(getattr(self.bot, "user", None), "id", None)
-                if (getattr(m, "mentions", None) and any(getattr(u, "id", None) == me_id for u in m.mentions)) or _NAME_TRIG.search(content):
-                    if not _gate_public_allowed():
-                        return
+                mentioned = any(getattr(u, "id", None) == me_id for u in (getattr(m, "mentions", None) or []))
+                if iso and ch_id == iso: return  # safety
+                if mentioned or _NAME_TRIG.search(content):
+                    if not _gate_public_allowed(): return
                     provider = _pick_provider_label()
                     prompt = _strip_mention(content, me_id)
-                    if not prompt:
-                        return
-                    try:
-                        await m.channel.typing().__aenter__()
-                    except Exception: pass
-                    ans = await _call_llm(prompt, provider)
-                    try: await m.channel.typing().__aexit__(None, None, None)
-                    except Exception: pass
+                    if not prompt: return
+                    try: await m.channel.typing().__aenter__();  ans = await _call_llm(prompt, provider)
+                    finally:
+                        try: await m.channel.typing().__aexit__(None,None,None)
+                        except Exception: pass
                     if not ans: return
                     emb = discord.Embed(title="Answer by Leina", description=ans)
                     emb.set_footer(text=f"Powered by {provider}")
                     await m.channel.send(embed=emb, reference=m)
         except Exception as ex:
-            log.warning("[qna-dualmode] fail: %r", ex)
+            LOG.warning("[qna-dualmode] fail: %r", ex)
 
 async def setup(bot):
     await bot.add_cog(QnaPublicAutoAnswer(bot))
