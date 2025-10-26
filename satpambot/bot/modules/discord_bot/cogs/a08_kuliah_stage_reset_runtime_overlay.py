@@ -10,7 +10,7 @@ except Exception:
 log = logging.getLogger(__name__)
 
 S_NAMES = ("S1","S2","S3","S4","S5","S6","S7","S8")
-S_TH    = (19000,35000,58000,70000,96500,158000,220000,262500)
+S_TH = (0,19000,35000,58000,70000,96500,158000,220000,262500)
 
 def _env_pick(name: str) -> str | None:
     if name == "UPSTASH_REST_URL":
@@ -58,12 +58,14 @@ async def _heal_once():
         log.warning("[a08-runtime] UPSTASH env missing; skip"); return
     keyA=os.getenv("XP_SENIOR_KEY") or "xp:bot:senior_total"; keyB=None
     code,res=_http_pipeline([["GET",keyA],["GET","learning:status"],["GET","learning:status_json"]])
-    if code<=0 or not isinstance(res,list) or len(res)<4:
+    if code<=0 or not isinstance(res,list) or len(res)<3:
         log.warning("[a08-runtime] read failed: %s %s", code, res); return
-    A=_to_int(res[0].get("result")); B=_to_int(res[1].get("result"))
-    s_raw=(res[2].get("result") or ""); j_raw=(res[3].get("result") or "{}")
-    total=max(A,B); label,status,payload=_calc_kuliah(total)
-    need=(A!=B)
+    A=_to_int(res[0].get("result"))
+    s_raw=(res[1].get("result") or "")
+    j_raw=(res[2].get("result") or "{}")
+    total=A
+    label,status,payload=_calc_kuliah(total)
+    need=False
     try:
         lbl_s=(s_raw.split(" ",1)[0] if s_raw else ""); lbl_j=json.loads(j_raw).get("label","")
         if lbl_s!=label or lbl_j!=label: need=True

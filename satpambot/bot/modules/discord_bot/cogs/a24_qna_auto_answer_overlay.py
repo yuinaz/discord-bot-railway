@@ -3,6 +3,33 @@ from __future__ import annotations
 import os, re, logging, asyncio, inspect
 from typing import Optional, Set
 
+def _fit_embed_text(s, lim=4096):
+    s = str(s or "")
+    if len(s) <= lim:
+        return s
+    return s[: lim-1] + "…"
+
+def _qna_provider_order():
+    raw = (os.getenv("QNA_PROVIDER", "gemini,groq") or "gemini,groq").lower()
+    order = [p.strip() for p in raw.split(",") if p.strip()]
+    return order or ["gemini","groq"]
+
+def _qna_norm_provider(p: str) -> str:
+    p = (p or "").strip().lower()
+    if p.startswith(("gemini","google","gai")): return "gemini"
+    if p.startswith(("groq","llama","mixtral")): return "groq"
+    return p or "gemini"
+
+def _qna_mode_for(provider: str) -> str:
+    order = _qna_provider_order()
+    return "primary" if (provider and order and provider == order[0]) else "fallback"
+
+def _qna_marker(provider_label: str) -> str:
+    prov = _qna_norm_provider(provider_label)
+    mode = _qna_mode_for(prov)
+    return f"markers: [QNA][PROVIDER:{prov}][MODE:{mode}]"
+
+
 try:
     import discord
     from discord.ext import commands
@@ -185,7 +212,13 @@ class QnaPublicAutoAnswer(commands.Cog):
                     except Exception: pass
                 if not ans: return
                 self._answered_ids.add(m.id)
-                emb = discord.Embed(title=f"Answer by {provider}", description=ans)
+                desc=_fit_embed_text(ans,4096)
+                emb = discord.Embed(title=f"Answer by {provider}", description=desc)
+                try:
+                    mk=_qna_marker(str(provider))
+                    emb.set_footer(text=(f"Powered by {provider}" + (f" | {mk}" if mk else "")))
+                except Exception:
+                    pass
                 await m.channel.send(embed=emb, reference=m)
                 return
 
@@ -204,7 +237,13 @@ class QnaPublicAutoAnswer(commands.Cog):
                         try: await m.channel.typing().__aexit__(None,None,None)
                         except Exception: pass
                     if not ans: return
-                    emb = discord.Embed(title=f"Answer by {provider.upper()}", description=ans)
+                    desc=_fit_embed_text(ans,4096)
+                    emb = discord.Embed(title=f"Answer by {provider.upper()}", description=desc)
+                    try:
+                        mk=_qna_marker(str(provider))
+                        emb.set_footer(text=(f"Powered by {provider}" + (f" | {mk}" if mk else "")))
+                    except Exception:
+                        pass
                     emb.set_footer(text=f"Powered by {provider}")
                     await m.channel.send(embed=emb, reference=m)
         except Exception as ex:

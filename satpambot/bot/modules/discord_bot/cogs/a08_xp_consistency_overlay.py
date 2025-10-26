@@ -47,7 +47,7 @@ def _pipeline(cmds: List[List[str]]) -> tuple[int, Any]:
         return (-1, str(e))
 
 S_NAMES = ("S1","S2","S3","S4","S5","S6","S7","S8")
-S_TH = (19000, 35000, 58000, 70000, 96500, 158000, 220000, 262500)
+S_TH = (0,19000, 35000, 58000, 70000, 96500, 158000, 220000, 262500)
 
 def _to_int(x)->int:
     try:
@@ -79,9 +79,9 @@ async def _heal():
     code,res = _pipeline([["GET",keyA],["GET","learning:status"],["GET","learning:status_json"]])
     if code<=0: log.warning("[xp-autoheal] read failed: %s",res); return
     try:
-        A=_to_int(res[0].get("result")); B=_to_int(res[1].get("result"))
-        status_raw = res[2].get("result") or ""
-        json_raw = res[3].get("result") or "{}"
+        A=_to_int(res[0].get("result"))
+        status_raw = res[1].get("result") or ""
+        json_raw = res[2].get("result") or "{}"
     except Exception:
         A=B=0; status_raw=""; json_raw="{}"
     total=max(A,B)

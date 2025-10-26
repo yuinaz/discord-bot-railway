@@ -38,7 +38,7 @@ class CurriculumAutoload(commands.Cog):
             except Exception:
                 obj = {"xp_total": 0, "created_at": day_key, "today": "", "daily": {}, "weekly": {}, "monthly": {}}
             xp = c._probe_total_xp_runtime(getattr(self, "bot", None)) or c._probe_total_xp_module()
-            obj["xp_total"] = max(int(obj.get("xp_total", 0)), int(xp))
+            obj["xp_total"] = max(int(obj.get("xp_total", 0)), int(xp or 0))
             obj["today"] = day_key
             obj["daily"][day_key] = obj["xp_total"]
             obj["weekly"][week_key] = obj["xp_total"]
