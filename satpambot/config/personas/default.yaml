@@ -21,3 +21,10 @@ prompt_suffix: |
   Format jawaban:
   - Jawaban utama dulu
   - Tambahkan langkah/opsi bila perlu
+# === Leina general QnA fallback (added by patch v30) ===
+fallback_general_qna: true
+llm_backends_priority: ["gemini", "groq", "fallback"]
+guidelines:
+  - "Jika pertanyaan user tidak ada dalam qna_topics, jawab tetap dengan sopan dan ringkas menggunakan LLM (Gemini/Groq)."
+  - "Prioritaskan channel QnA isolasi; hindari menjawab di publik kecuali diarahkan admin."
+  - "Hindari spekulasi; jika ragu, minta clarifikasi singkat."

@@ -1,10 +1,30 @@
-import os, json, random, asyncio, logging
+import os
+import time, json, random, asyncio, logging
 from pathlib import Path
 import discord
 from discord.ext import commands, tasks
-def _fit_embed_text(s, lim=4096):
-    s=str(s or "")
-    return s if len(s)<=lim else (s[:lim-1]+"…")
+
+_QNA_ISO_COOLDOWN_SEC = int(os.getenv("QNA_ISOLATION_COOLDOWN_SEC", "180"))
+_QNA_ISO_COOLDOWN_SCOPE = (os.getenv("QNA_ISOLATION_COOLDOWN_SCOPE", "channel") or "channel").lower()
+_QNA_ISO_LAST = {}
+
+def _iso_cooldown_ok(message):
+    try:
+        ch_id = int(getattr(getattr(message, "channel", None), "id", 0) or 0)
+    except Exception:
+        ch_id = 0
+    try:
+        user_id = int(getattr(getattr(message, "author", None), "id", 0) or 0)
+    except Exception:
+        user_id = 0
+    key = ch_id if _QNA_ISO_COOLDOWN_SCOPE != "user" else (ch_id, user_id)
+    now = time.time()
+    last = _QNA_ISO_LAST.get(key, 0)
+    if last and (now - last) < _QNA_ISO_COOLDOWN_SEC:
+        remain = int(_QNA_ISO_COOLDOWN_SEC - (now - last))
+        return False, max(1, remain)
+    _QNA_ISO_LAST[key] = now
+    return True, 0
 
 
 log = logging.getLogger(__name__)
@@ -86,6 +106,14 @@ class NeuroAutolearnModeratedV2(commands.Cog):
             pass
 
     async def _one_round(self, *, force_prompt: str | None = None):
+        # isolation cooldown gate
+        _ok, _remain = _iso_cooldown_ok(message)
+        if not _ok:
+            try:
+                await message.add_reaction("⏱️")
+            except Exception:
+                pass
+            return
         if not self.enable:
             return
         ch = await self._get_qna_channel()
