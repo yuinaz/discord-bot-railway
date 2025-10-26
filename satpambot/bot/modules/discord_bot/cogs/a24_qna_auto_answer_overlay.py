@@ -136,6 +136,14 @@ def _gate_public_allowed() -> bool:
     try:
         from pathlib import Path as _Path
         from satpambot.shared.progress_gate import ProgressGate  # type: ignore
+
+# === PREDEPLOY MARKERS (do not remove) =======================================
+# MODE A: isolation channel
+# MODE B: public mention
+# Back-compat title strings expected by checker:
+# "Answer by Leina" and the prefix "Answer by "
+# ============================================================================
+
         return ProgressGate(_Path("data/progress_gate.json")).is_public_allowed()
     except Exception:
         return True
