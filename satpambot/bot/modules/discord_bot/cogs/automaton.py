@@ -49,6 +49,24 @@ class Automaton(commands.Cog):
             except Exception: pass
 
     async def _dm_owner(self, content: str, embed: Optional[discord.Embed]=None):
+
+        # Guard: do not DM owner unless explicitly enabled
+
+        try:
+
+            from satpambot.config.runtime import cfg as _cfg
+
+            _flag = _cfg('AUTOMATON_DM_OWNER', False)
+
+        except Exception:
+
+            import os as _os  # ensure os available in fallback
+
+            _flag = _os.getenv('AUTOMATON_DM_OWNER', '0')
+
+        if not (str(_flag).strip().lower() in {'1','true','yes','on'}):
+
+            return
         try:
             owner = await self.bot.fetch_user(_owner_id())
             if owner:
