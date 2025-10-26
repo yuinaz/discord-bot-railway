@@ -83,14 +83,14 @@ async def _heal():
         status_raw = res[1].get("result") or ""
         json_raw = res[2].get("result") or "{}"
     except Exception:
-        A=B=0; status_raw=""; json_raw="{}"
-    total=max(A,B)
+        A=0; B=0; status_raw=""; json_raw="{}"
+    total = A if (("B" not in locals()) or (B is None)) else max(A,B)
     label,status,j=_calc(total)
     need=True
     try:
         lbl_s = (status_raw.split(" ",1)[0] if status_raw else "")
         import json as _j; lbl_j = _j.loads(json_raw).get("label","")
-        need = (A!=B) or (lbl_s!=label) or (lbl_j!=label)
+        need = (("B" in locals()) and (B is not None) and (A!=B)) or (lbl_s!=label) or (lbl_j!=label)
     except Exception: need=True
     if not need:
         log.info("[xp-autoheal] consistent: %s",label); return

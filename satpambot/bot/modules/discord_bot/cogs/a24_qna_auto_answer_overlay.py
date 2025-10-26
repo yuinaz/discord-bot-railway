@@ -213,12 +213,7 @@ class QnaPublicAutoAnswer(commands.Cog):
                 if not ans: return
                 self._answered_ids.add(m.id)
                 desc=_fit_embed_text(ans,4096)
-                emb = discord.Embed(title=f"Answer by {provider}", description=desc)
-                try:
-                    mk=_qna_marker(str(provider))
-                    emb.set_footer(text=(f"Powered by {provider}" + (f" | {mk}" if mk else "")))
-                except Exception:
-                    pass
+                emb = discord.Embed(title="Answer by Leina", description=desc)
                 await m.channel.send(embed=emb, reference=m)
                 return
 
@@ -238,13 +233,8 @@ class QnaPublicAutoAnswer(commands.Cog):
                         except Exception: pass
                     if not ans: return
                     desc=_fit_embed_text(ans,4096)
-                    emb = discord.Embed(title=f"Answer by {provider.upper()}", description=desc)
-                    try:
-                        mk=_qna_marker(str(provider))
-                        emb.set_footer(text=(f"Powered by {provider}" + (f" | {mk}" if mk else "")))
-                    except Exception:
-                        pass
-                    emb.set_footer(text=f"Powered by {provider}")
+                    emb = discord.Embed(title="Answer by Leina", description=desc)
+
                     await m.channel.send(embed=emb, reference=m)
         except Exception as ex:
             LOG.warning("[qna-dualmode] fail: %r", ex)

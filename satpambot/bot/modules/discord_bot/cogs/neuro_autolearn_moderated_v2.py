@@ -2,6 +2,10 @@ import os, json, random, asyncio, logging
 from pathlib import Path
 import discord
 from discord.ext import commands, tasks
+def _fit_embed_text(s, lim=4096):
+    s=str(s or "")
+    return s if len(s)<=lim else (s[:lim-1]+"…")
+
 
 log = logging.getLogger(__name__)
 
