@@ -10,6 +10,16 @@ def _get(key: str, default: str = "") -> str:
     v = os.getenv(key, "")
     return v if v else default
 
+
+def _get_gemini_model():
+    return os.getenv("LLM_GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-lite"
+
+
+
+def _get_groq_model():
+    return os.getenv("LLM_GROQ_MODEL") or "llama-3.1-8b-instant"
+
+
 class GeminiClient:
     def __init__(self, api_key: Optional[str]=None, model: Optional[str]=None, api_base: Optional[str]=None):
         self.key = api_key or _get("GEMINI_API_KEY")

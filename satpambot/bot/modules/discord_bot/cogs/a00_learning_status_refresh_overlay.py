@@ -109,8 +109,7 @@ class A00LearningStatusRefreshOverlay(commands.Cog):
                 await upstash.pipeline(session, [
                     # Guard writes to avoid conflicting with KuliahStageResetOverlay
                     # Enable via LEARNING_STATUS_REFRESH_WRITE=true
-                    *([["SET","learning:status", data["status"]],
-                       ["SET","learning:status_json", data["status_json"]]]
+                    *([["PING","noop"]]
                       if os.getenv("LEARNING_STATUS_REFRESH_WRITE","").lower() in ("1","true","yes") else []),
                     ["SET", "learning:phase", data["phase"]],
                 ])

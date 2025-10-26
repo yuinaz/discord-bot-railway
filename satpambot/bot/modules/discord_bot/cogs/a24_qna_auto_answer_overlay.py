@@ -29,7 +29,6 @@ def _iso_id() -> Optional[int]:
     return int(raw) if raw.isdigit() else None
 
 def _pick_provider_label() -> str:
-    # New: QNA_PROVIDER order (default gemini,groq). Fallback to AI_PROVIDER/auto.
     raw = (os.getenv("QNA_PROVIDER", "gemini,groq") or "gemini,groq").lower()
     order = [p.strip() for p in raw.split(",") if p.strip()]
     if not order: order = ["gemini","groq"]
@@ -45,12 +44,10 @@ def _pick_provider_label() -> str:
         if p.startswith(("groq","llama","mixtral")) and has_groq():
             return "Groq"
 
-    # Legacy env override
     prov = (os.getenv("AI_PROVIDER", "auto") or "auto").lower()
     if prov in ("groq","g","llama","mixtral"): return "Groq"
     if prov in ("gemini","google","gai"): return "Gemini"
 
-    # Auto fallback by key presence
     return "Groq" if has_groq() else "Gemini"
 def _resolve_groq_func():
     try:

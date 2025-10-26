@@ -56,8 +56,8 @@ async def _heal_once():
     base=_env_pick("UPSTASH_REST_URL"); tok=_env_pick("UPSTASH_REST_TOKEN")
     if not base or not tok:
         log.warning("[a08-runtime] UPSTASH env missing; skip"); return
-    keyA=os.getenv("XP_SENIOR_KEY") or "xp:bot:senior_total"; keyB="xp:bot:senior_total_v2"
-    code,res=_http_pipeline([["GET",keyA],["GET",keyB],["GET","learning:status"],["GET","learning:status_json"]])
+    keyA=os.getenv("XP_SENIOR_KEY") or "xp:bot:senior_total"; keyB=None
+    code,res=_http_pipeline([["GET",keyA],["GET","learning:status"],["GET","learning:status_json"]])
     if code<=0 or not isinstance(res,list) or len(res)<4:
         log.warning("[a08-runtime] read failed: %s %s", code, res); return
     A=_to_int(res[0].get("result")); B=_to_int(res[1].get("result"))
@@ -70,7 +70,7 @@ async def _heal_once():
     except Exception: need=True
     if not need:
         log.info("[a08-runtime] consistent already: %s", label); return
-    cmds=[["SET",keyA,str(total)],["SET",keyB,str(total)],
+    cmds=[["SET",keyA,str(total)],
           ["SET","learning:status",status],
           ["SET","learning:status_json", json.dumps(payload,separators=(',',':'))]]
     code2,res2=_http_pipeline(cmds)

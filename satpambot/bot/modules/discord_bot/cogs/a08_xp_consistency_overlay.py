@@ -75,8 +75,8 @@ async def _heal():
     if not base or not tok:
         log.warning("[xp-autoheal] UPSTASH env missing"); return
     keyA = os.getenv("XP_SENIOR_KEY") or os.getenv("SENIOR_XP_KEY") or "xp:bot:senior_total"
-    keyB = "xp:bot:senior_total_v2"
-    code,res = _pipeline([["GET",keyA],["GET",keyB],["GET","learning:status"],["GET","learning:status_json"]])
+    keyB=None
+    code,res = _pipeline([["GET",keyA],["GET","learning:status"],["GET","learning:status_json"]])
     if code<=0: log.warning("[xp-autoheal] read failed: %s",res); return
     try:
         A=_to_int(res[0].get("result")); B=_to_int(res[1].get("result"))
@@ -95,7 +95,7 @@ async def _heal():
     if not need:
         log.info("[xp-autoheal] consistent: %s",label); return
     import json as _j
-    cmds=[["SET",keyA,str(total)],["SET",keyB,str(total)],
+    cmds=[["SET",keyA,str(total)],
           ["SET","learning:status",status],
           ["SET","learning:status_json", _j.dumps(j,separators=(',',':'))]]
     code2,res2=_pipeline(cmds)

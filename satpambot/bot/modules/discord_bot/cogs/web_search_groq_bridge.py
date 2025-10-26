@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 import discord
 
 from discord import app_commands
+import os
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +100,16 @@ async def groq_summarize(q: str, items: List[Dict[str,Any]]) -> str:
         r.raise_for_status()
         data = r.json()
         return (data.get("choices",[{}])[0].get("message",{}).get("content") or "").strip()
+
+
+def _get_gemini_model():
+    return os.getenv("LLM_GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-lite"
+
+
+
+def _get_groq_model():
+    return os.getenv("LLM_GROQ_MODEL") or "llama-3.1-8b-instant"
+
 
 class WebSearchGroq(commands.Cog):
     def __init__(self, bot: commands.Bot):

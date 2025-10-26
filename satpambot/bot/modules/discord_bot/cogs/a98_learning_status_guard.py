@@ -91,3 +91,31 @@ class LearningStatusGuard(commands.Cog):
         await self.bot.wait_until_ready()
 async def setup(bot: commands.Bot):
     await bot.add_cog(LearningStatusGuard(bot))
+
+def _calc_kuliah(total:int):
+    th=[0,19000,35000,58000,70000,96500,158000,220000,262500]
+    nm=["S1","S2","S3","S4","S5","S6","S7","S8"]
+    i=max([j for j in range(0,8) if total>=th[j]] or [0])
+    cur=th[i]; nxt=th[i+1] if i+1<len(th) else cur
+    pct=100.0 if nxt<=cur else round(((total-cur)/(nxt-cur))*100.0,1)
+    rem=0 if total>=nxt else (nxt-total)
+    return f"KULIAH-{nm[i]}", pct, rem
+
+async def _guard_set(status: str, status_json: str, session):
+    import json as _j
+    from satpambot.bot.modules.discord_bot.helpers.upstash import UpstashClient as _U
+    upstash=_U()
+    try:
+        j=_j.loads(status_json) if status_json else {}
+    except Exception:
+        j={}
+    tot=int(j.get("senior_total") or j.get("senior_total_xp") or 0)
+    lbl, pct, rem = _calc_kuliah(tot)
+    desired_status = f"{lbl} ({pct}%)"
+    desired_json   = _j.dumps({"label": lbl, "percent": pct, "remaining": rem, "senior_total": tot}, separators=(",",":"))
+    if (status or "").strip()!=desired_status or (status_json or "").strip()!=desired_json:
+        status, status_json = desired_status, desired_json
+    await upstash.pipeline(session, [
+        ["SET","learning:status", status],
+        ["SET","learning:status_json", status_json]
+    ])

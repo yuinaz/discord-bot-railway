@@ -8,6 +8,16 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GEMINI_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 
+
+
+def _get_groq_model():
+    return os.getenv("LLM_GROQ_MODEL") or "llama-3.1-8b-instant"
+
+
+def _get_gemini_model():
+    return os.getenv("LLM_GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash-lite"
+
+
 def _normalize_messages_for_openai(messages: List[Dict[str, str]], system: Optional[str]) -> List[Dict[str, str]]:
     mm = []
     if system:
