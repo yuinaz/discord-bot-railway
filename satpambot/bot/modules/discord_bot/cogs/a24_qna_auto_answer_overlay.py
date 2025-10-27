@@ -159,6 +159,60 @@ async def _call_llm(prompt: str, provider: str) -> Optional[str]:
             LOG.warning("[qna] Gemini call failed: %r", e)
             return None
 
+
+
+# === Provider race for isolation channel =====================================
+import asyncio, os
+_QNA_SEMA = asyncio.Semaphore(int(os.getenv("QNA_MAX_CONCURRENCY", "2") or "2"))
+async def _call_llm_race(prompt: str):
+    """
+    Run Gemini and Groq in parallel; return (answer_text, provider_name).
+    Respects:
+      QNA_RACE_DEADLINE (soft overall timeout, default 12s)
+      QNA_RACE_PROVIDER_TIMEOUT (per-provider timeout, default 8s)
+    """
+    from contextlib import suppress
+    deadline = float(os.getenv("QNA_RACE_DEADLINE", "12") or "12")
+    ptimeout = float(os.getenv("QNA_RACE_PROVIDER_TIMEOUT", "8") or "8")
+
+    async def _one(name: str):
+        try:
+            async with asyncio.timeout(ptimeout):
+                t = await _call_llm(prompt, name)
+                if t and str(t).strip():
+                    return (name, str(t).strip())
+        except Exception as e:
+            LOG.debug("[qna-race] %s failed: %r", name, e)
+        return (name, None)
+
+    async with _QNA_SEMA:
+        tasks = {asyncio.create_task(_one("Gemini")), asyncio.create_task(_one("Groq"))}
+        ans_txt = None
+        prov = "LLM"
+        try:
+            async with asyncio.timeout(deadline):
+                while tasks:
+                    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                    for t in done:
+                        name, text = await t
+                        if text:
+                            for p in pending: p.cancel()
+                            ans_txt, prov = text, name
+                            tasks = set()
+                            break
+                    else:
+                        tasks = pending
+        except Exception:
+            LOG.debug("[qna-race] deadline reached")
+        # Fallback: try order from env if nothing yet
+        if not ans_txt:
+            with suppress(Exception):
+                prov_env = _pick_provider_label()
+                t = await _call_llm(prompt, prov_env)
+                if t and str(t).strip():
+                    return (str(t).strip(), prov_env)
+        return (ans_txt or "Maaf, aku lagi macet. Coba ulang sebentar ya.", prov)
+
 def _gate_public_allowed() -> bool:
     try:
         from pathlib import Path as _Path
@@ -206,14 +260,14 @@ class QnaPublicAutoAnswer(commands.Cog):
                 prompt = desc or title
                 if not prompt: return
 
-                try: await m.channel.typing().__aenter__();  ans = await _call_llm(prompt, provider)
+                try: await m.channel.typing().__aenter__(); ans, provider = await _call_llm_race(prompt)
                 finally:
                     try: await m.channel.typing().__aexit__(None,None,None)
                     except Exception: pass
                 if not ans: return
                 self._answered_ids.add(m.id)
                 desc=_fit_embed_text(ans,4096)
-                emb = discord.Embed(title="Answer by Leina", description=desc)
+                emb = discord.Embed(title=f"Answer by {provider.title() if isinstance(provider,str) else 'LLM'}", description=desc)
                 await m.channel.send(embed=emb, reference=m)
                 return
 
@@ -227,13 +281,13 @@ class QnaPublicAutoAnswer(commands.Cog):
                     provider = _pick_provider_label()
                     prompt = _strip_mention(content, me_id)
                     if not prompt: return
-                    try: await m.channel.typing().__aenter__();  ans = await _call_llm(prompt, provider)
+                    try: await m.channel.typing().__aenter__(); ans, provider = await _call_llm_race(prompt)
                     finally:
                         try: await m.channel.typing().__aexit__(None,None,None)
                         except Exception: pass
                     if not ans: return
                     desc=_fit_embed_text(ans,4096)
-                    emb = discord.Embed(title="Answer by Leina", description=desc)
+                    emb = discord.Embed(title=f"Answer by {provider.title() if isinstance(provider,str) else 'LLM'}", description=desc)
 
                     await m.channel.send(embed=emb, reference=m)
         except Exception as ex:

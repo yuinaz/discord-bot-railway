@@ -2,6 +2,11 @@ import os, json, asyncio, time
 from typing import Optional
 import discord
 from discord.ext import commands, tasks
+import os
+
+def _env_true(name: str) -> bool:
+    v = os.getenv(name, '')
+    return str(v).strip() not in ('', '0', 'false', 'False', 'no', 'None')
 
 class _Upstash:
     def __init__(self):
