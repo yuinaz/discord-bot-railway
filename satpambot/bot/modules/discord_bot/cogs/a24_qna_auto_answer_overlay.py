@@ -140,12 +140,12 @@ class QnaAutoAnswerOverlay(commands.Cog):
                 ans = get_groq_answer(messages)
                 if ans:
                     self._last_provider = "groq"
-                    return ans
+                    return format_message(ans)
             elif prov == "gemini":
                 ans = get_gemini_answer(question)
                 if ans:
                     self._last_provider = "gemini"
-                    return ans
+                    return format_message(ans)
         return None
 
 async def setup(bot: commands.Bot):

@@ -1,90 +1,40 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
-import sqlite3
-import json
-import logging
-from pathlib import Path
-from typing import List, Dict, Optional, Any
+import json, random, pathlib
 from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
 
-log = logging.getLogger(__name__)
+_DATA_DIR = pathlib.Path(__file__).resolve().parent.parent.parent / "data" / "persona"
 
 @dataclass
 class LoreEntry:
-    category: str
-    content: str
-    timestamp: float
-    importance: int = 1
-    tags: Optional[List[str]] = None
+    topic: str
+    fact: str
+    weight: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "category": self.category,
-            "content": self.content,
-            "timestamp": self.timestamp,
-            "importance": self.importance,
-            "tags": self.tags or []
-        }
-
-class LeinaLoreDB:
-    def __init__(self, db_path: str = "data/leina/lore.sqlite3"):
-        self.db_path = db_path
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
-
-    def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS lore (
-                    id INTEGER PRIMARY KEY,
-                    category TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    timestamp REAL NOT NULL,
-                    importance INTEGER DEFAULT 1,
-                    tags TEXT,
-                    UNIQUE(category, content)
-                )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_category ON lore(category)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_importance ON lore(importance)")
-
-    async def add_lore(self, entry: LoreEntry) -> bool:
+def _load_json(name: str) -> Dict[str, Any]:
+    p = _DATA_DIR / name
+    if p.exists():
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    "INSERT OR REPLACE INTO lore (category, content, timestamp, importance, tags) VALUES (?, ?, ?, ?, ?)",
-                    (entry.category, entry.content, entry.timestamp, entry.importance, json.dumps(entry.tags or []))
-                )
-            return True
-        except Exception as e:
-            log.error(f"Error adding lore: {e}")
-            return False
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
 
-    async def get_lore(self, category: str, limit: int = 5) -> List[LoreEntry]:
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute(
-                    "SELECT category, content, timestamp, importance, tags FROM lore WHERE category = ? ORDER BY importance DESC, timestamp DESC LIMIT ?",
-                    (category, limit)
-                )
-                return [
-                    LoreEntry(
-                        category=row[0],
-                        content=row[1],
-                        timestamp=row[2],
-                        importance=row[3],
-                        tags=json.loads(row[4]) if row[4] else []
-                    )
-                    for row in cursor.fetchall()
-                ]
-        except Exception as e:
-            log.error(f"Error getting lore: {e}")
-            return []
+def random_catchphrase() -> Optional[str]:
+    data = _load_json("leina_lore.json")
+    phrases: List[str] = data.get("catchphrases", [])
+    return random.choice(phrases) if phrases else None
 
-    CATEGORIES = [
-        "master_interactions",    # Interaksi dengan Master
-        "community_moments",      # Momen-momen special dengan komunitas
-        "character_growth",       # Perkembangan karakter Leina
-        "stream_memories",        # Kenangan dari stream
-        "learned_behaviors",      # Perilaku yang dipelajari
-    ]
+def random_mood() -> Optional[str]:
+    data = _load_json("leina_lore.json")
+    moods: List[str] = data.get("moods", [])
+    return random.choice(moods) if moods else None
+
+def apply_glitch(text: str) -> str:
+    data = _load_json("leina_lore.json")
+    pats = data.get("glitch_patterns", [])
+    prob = float((data.get("constraints") or {}).get("apply_glitch_prob", 0.15))
+    if not pats: return text
+    if random.random() < prob:
+        return f"{text} {random.choice(pats)}"
+    return text
