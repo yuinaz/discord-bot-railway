@@ -1,3 +1,17 @@
+
+def _groq_try_models(_client, _messages, _primary: str) -> str:
+    fallbacks = os.getenv("GROQ_MODEL_FALLBACKS", "llama-3.1-8b-instant").split(",")
+    order = [_primary] + [m.strip() for m in fallbacks if m.strip()]
+    last = None
+    for m in order:
+        try:
+            resp = _client.chat.completions.create(model=m, messages=_messages, temperature=0.6)
+            return resp.choices[0].message.content
+        except Exception as e:
+            last = e
+            continue
+    raise last or RuntimeError("All Groq models failed")
+
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 import os, re, logging, asyncio, inspect
@@ -89,7 +103,7 @@ def _resolve_groq_func():
 async def _call_groq_direct(prompt: str) -> Optional[str]:
     api_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if not api_key: return None
-    model = (os.getenv("GROQ_MODEL") or "llama-3.2-70b").strip()
+    model = (os.getenv("GROQ_MODEL") or os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')).strip()
     try:
         from groq import Groq  # type: ignore
         client = Groq(api_key=api_key)

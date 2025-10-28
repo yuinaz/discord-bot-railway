@@ -61,7 +61,7 @@
     "GITHUB_URL_WL_JSON_PATH": "data/url_whitelist.json",
     "GITHUB_WHITELIST_TXT_PATH": "whitelist.txt",
     "GROQ_BASE_URL": "https://api.groq.com",
-    "GROQ_MODEL": "llama-3.2-70b",
+    "GROQ_MODEL": "llama-3.1-8b-instant",
     "GUILD_METRICS_ID": "761163966030151701",
     "HOTENV_ENABLE": "0",
     "IMG_AHASH_MAX_DIST": "12",
@@ -286,9 +286,8 @@
     "AUTOMATON_DM_OWNER": "0",
     "UPSTASH_REST_URL": "https://moving-weasel-24261.upstash.io",
     "LADDER_REFRESH_SECS": "60",
-    "PHASE_TRANSITION_ENABLE": "0"
-  
+    "PHASE_TRANSITION_ENABLE": "0",
     "QNA_ISOLATION_CHANNEL_ID": "1426571542627614772",
     "LEARNING_QNA_CHANNEL_ID": "1426571542627614772",
-    "QNA_ISOLATION_COOLDOWN_SEC": "180",}
+    "QNA_ISOLATION_COOLDOWN_SEC": "180"
 }

@@ -8,7 +8,7 @@ _QNA_ISO_COOLDOWN_SEC = int(os.getenv("QNA_ISOLATION_COOLDOWN_SEC", "180"))
 _QNA_ISO_COOLDOWN_SCOPE = (os.getenv("QNA_ISOLATION_COOLDOWN_SCOPE", "channel") or "channel").lower()
 _QNA_ISO_LAST = {}
 
-def _iso_cooldown_ok(message):
+def _iso_cooldown_ok(types.SimpleNamespace(channel=types.SimpleNamespace(id=getattr(ch,'id',0)))):
     try:
         ch_id = int(getattr(getattr(message, "channel", None), "id", 0) or 0)
     except Exception:
