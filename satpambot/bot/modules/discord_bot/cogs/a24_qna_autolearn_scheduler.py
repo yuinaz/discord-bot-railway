@@ -17,6 +17,7 @@ DEFAULT_INTERVAL_SECS = int(os.getenv("QNA_AUTOLEARN_INTERVAL", "1800"))  # 30m
 DEFAULT_MAX_PER_HOUR = int(os.getenv("QNA_AUTOLEARN_MAX_PER_HOUR", "2"))
 DEFAULT_ENABLE = os.getenv("QNA_AUTOLEARN_ENABLE", "1") not in ("0", "false", "False")
 SEED_PATH = os.getenv("QNA_AUTOLEARN_SEED_PATH", "data/neuro-lite/qna_autoseed.json")
+DEFAULT_QNA_TOPICS_PATH = os.getenv("QNA_TOPICS_PATH", "data/config/qna_topics.json")
 
 # Provider env (optional; if not set we'll just ask the built-in QnA cog via channel message)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -59,6 +60,7 @@ class QnAAutoLearnScheduler(commands.Cog):
         self.max_per_hour = DEFAULT_MAX_PER_HOUR
         self.enabled = DEFAULT_ENABLE
         self._seeds = _load_seeds()
+        self._topics = self._load_topics()
         self._sent_ts = []  # ring buffer timestamps for rate
         self._lock = asyncio.Lock()
 
@@ -117,6 +119,27 @@ class QnAAutoLearnScheduler(commands.Cog):
                     log.warning("[qna_autolearn] provider.%s failed: %r", meth, e)
         return None
 
+    def _load_topics(self) -> list:
+        """Load qna topics from JSON file (data/config/qna_topics.json) if present.
+        The file is expected to be a mapping of categories to list of questions.
+        We flatten into a single list of strings. Falls back to seeds.
+        """
+        try:
+            p = os.getenv("QNA_TOPICS_PATH", DEFAULT_QNA_TOPICS_PATH)
+            with open(p, "r", encoding="utf-8") as f:
+                j = json.load(f)
+            if isinstance(j, dict):
+                items = []
+                for k, v in j.items():
+                    if isinstance(v, list):
+                        items.extend([s for s in v if isinstance(s, str) and s.strip()])
+                if items:
+                    return items
+        except Exception:
+            pass
+        # fallback to seeds
+        return _load_seeds()
+
     async def _groq_gemini_fallback(self, question: str) -> str | None:
         """Optional direct API fallback if provider isn't callable. Only runs if keys present.
         Keep super simple to reduce deps; safe to no-op if keys unset.
@@ -142,13 +165,18 @@ class QnAAutoLearnScheduler(commands.Cog):
                     log.warning("[qna_autolearn] cannot get QnA channel %s: %r", self.qna_channel_id, e)
                     return
 
-            seed = random.choice(self._seeds)
-            q_text = f"[auto-learn]\nQ: {seed}"
+            # choose from topics when available (preferred) else seeds
+            pool = self._topics or self._seeds
+            seed = random.choice(pool)
+
+            # Post as an embed: Question by Leina
             try:
-                msg = await channel.send(q_text)
+                emb = discord.Embed(description=seed)
+                emb.set_author(name="Question by Leina")
+                await channel.send(embed=emb)
                 self._sent_ts.append(datetime.utcnow())
             except Exception as e:
-                log.warning("[qna_autolearn] failed to send seed: %r", e)
+                log.warning("[qna_autolearn] failed to send seed embed: %r", e)
                 return
 
             # Try to get an answer explicitly if provider ignores bot-authored messages
@@ -159,10 +187,19 @@ class QnAAutoLearnScheduler(commands.Cog):
                 answer = None
 
             if answer:
+                # Choose label by configured API keys (Gemini preferred)
+                if GEMINI_API_KEY:
+                    label = "Gemini"
+                elif GROQ_API_KEY:
+                    label = "Groq"
+                else:
+                    label = "Provider"
                 try:
-                    await channel.send(f"A: {answer}")
+                    a_emb = discord.Embed(description=answer)
+                    a_emb.set_author(name=f"Answer by {label}")
+                    await channel.send(embed=a_emb)
                 except Exception as e:
-                    log.warning("[qna_autolearn] failed to post answer: %r", e)
+                    log.warning("[qna_autolearn] failed to post answer embed: %r", e)
 
     @poster.before_loop
     async def before_poster(self):

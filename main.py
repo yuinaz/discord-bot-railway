@@ -6,6 +6,40 @@ import os
 import logging
 import threading
 import asyncio
+from pathlib import Path
+
+# Load local .env file if present. Prefer python-dotenv when available; fall back
+# to a simple parser so running `main.py` locally with a .env works without extra
+# setup. We avoid printing any secret values.
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    dotenv_path = Path(".env")
+    if dotenv_path.exists():
+        load_dotenv(dotenv_path)
+except Exception:
+    # Fallback: naive .env loader (KEY=VALUE lines, ignores comments/blank)
+    dotenv_path = Path(".env")
+    if dotenv_path.exists():
+        try:
+            for raw in dotenv_path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip()
+                # Remove surrounding quotes if present
+                if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                    v = v[1:-1]
+                # Only set env var if not already present in the environment
+                if os.getenv(k) is None:
+                    os.environ[k] = v
+        except Exception:
+            # If anything goes wrong, proceed without halting; main will validate required envs
+            pass
 
 # ------------------------------------------------------------------
 # Logging config — keep the format the user expects:

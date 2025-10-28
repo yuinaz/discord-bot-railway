@@ -121,8 +121,11 @@ async def _heal():
           ["SET","learning:status",status],
           ["SET","learning:status_json", _j3.dumps(j,separators=(',',':'))]]
     code2,res2=_pipeline(cmds)
-    if 200<=code2<300: log.info("[xp-autoheal] fixed -> %s (total=%s)",label,total)
-    else: log.warning("[xp-autoheal] write failed: %s %s",code2,res2)
+    # 'chosen' is the computed senior_total we just wrote; avoid referencing undefined names
+    if 200<=code2<300:
+        log.info("[xp-autoheal] fixed -> %s (total=%s)", label, chosen)
+    else:
+        log.warning("[xp-autoheal] write failed: %s %s", code2, res2)
 
 class XPConsistencyOverlay(commands.Cog if commands!=object else object):
     def __init__(self, bot=None): self.bot=bot; self._task=None

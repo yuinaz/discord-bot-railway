@@ -1,4 +1,1 @@
-{
-  "version": 1,
-  "notes": "stub metrics file to satisfy smoketest"
-}
+{"version":1,"notes":"stub metrics file to satisfy smoketest","exposures_total":7.0,"per_user":{"704822303355043890":3.0,"1331765056974753934":3.0,"404668488347680768":1.0}}
