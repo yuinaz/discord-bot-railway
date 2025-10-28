@@ -1,4 +1,4 @@
-import asyncio, logging, os, time, traceback
+import asyncio, logging, os, time, traceback, inspect
 try:
     from .modules.discord_bot.shim_runner import start_bot
 except Exception:
@@ -8,7 +8,19 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL","INFO"))
 log = logging.getLogger("satpambot.bot.main")
 
 async def _run_once():
-    await start_bot()
+    # start_bot may be an async function (coroutine) or in rare cases a sync shim.
+    # Call it and await only if it's awaitable to avoid "None is not awaitable" errors
+    try:
+        res = start_bot()
+    except TypeError:
+        # start_bot might be a coroutine function descriptor or not callable; try calling without args
+        res = start_bot
+
+    if inspect.isawaitable(res):
+        await res
+    else:
+        # not awaitable — assume it's a sync function that already ran or returned None
+        return
 
 def main():
     backoff = 5  # seconds, doubles up to 60s
