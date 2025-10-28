@@ -1,11 +1,8 @@
-# legacy vendor v1 adapter (removed)
+"""Legacy shim — canonical implementation moved to `satpambot.ai.openai_v1_adapter`.
+
+This module re-exports the new location and emits a DeprecationWarning.
+"""
 from __future__ import annotations
-
-class LegacyAdapterRemoved(Exception):
-    pass
-
-def chat(*args, **kwargs):
-    raise LegacyAdapterRemoved("Legacy adapter removed. Use satpambot.ai.groq_client.")
-
-def stream(*args, **kwargs):
-    raise LegacyAdapterRemoved("Legacy adapter removed. Use satpambot.ai.groq_client.")
+import warnings
+warnings.warn("Importing 'ai.openai_v1_adapter' is deprecated; use 'satpambot.ai.openai_v1_adapter' instead", DeprecationWarning)
+from satpambot.ai.openai_v1_adapter import *  # type: ignore

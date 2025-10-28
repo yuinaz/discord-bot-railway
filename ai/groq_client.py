@@ -1,52 +1,13 @@
-# satpambot/ai/groq_client.py
-# -*- coding: utf-8 -*-
-"""
-Groq client helper — code-embedded controls (tidak perlu ENV Render):
-- MODEL dipilih via konstanta di bawah
-- Logging pemanggil LLM selalu aktif (bisa dimatikan di konstanta)
-- Throttle global antar-call diatur via konstanta
-- API key diambil dari secrets/local (get_secret), bukan ENV
+"""Legacy shim — canonical implementation moved to `satpambot.ai.groq_client`.
 
-Kalau mau ubah perilaku, edit konstanta di bawah lalu restart bot.
+This module exists for backward compatibility. Importing from `ai.groq_client`
+will re-export the symbols from `satpambot.ai.groq_client` but will emit a
+DeprecationWarning so callers switch to the new package path.
 """
 from __future__ import annotations
-import time, inspect, threading
-from typing import List, Dict, Optional
-
-# ==== KONSTANTA (edit di sini jika perlu) ====
-MODEL: str = "llama-3.1-8b-instant"   # Model Groq default
-LOG_LLM_CALLS: bool = True            # Log pemanggil LLM
-LLM_MIN_INTERVAL_S: float = 2.0       # Throttle global (detik). Set 0 untuk nonaktif.
-# ============================================
-
-try:
-    from groq import Groq  # type: ignore
-except Exception:  # pragma: no cover
-    Groq = None  # biarkan import sukses saat SDK belum terpasang (smoke-safe)
-
-# Ambil API key dari secrets/local (bukan ENV)
-try:
-    from satpambot.config.runtime import get_secret  # type: ignore
-except Exception:
-    def get_secret(name: str) -> Optional[str]:  # fallback super minimal
-        return None
-
-_lock = threading.RLock()
-_last_call_ts = 0.0
-
-def _maybe_wait():
-    """Throttle global supaya tidak spam ke API."""
-    global _last_call_ts
-    gap = float(LLM_MIN_INTERVAL_S or 0.0)
-    if gap <= 0:
-        return
-    with _lock:
-        now = time.time()
-        wait = _last_call_ts + gap - now
-        if wait > 0:
-            time.sleep(wait if wait < gap else gap)
-            now = time.time()
-        _last_call_ts = now
+import warnings
+warnings.warn("Importing 'ai.groq_client' is deprecated; use 'satpambot.ai.groq_client' instead", DeprecationWarning)
+from satpambot.ai.groq_client import *  # type: ignore
 
 def _log_call(messages: List[Dict]):
     if not LOG_LLM_CALLS:

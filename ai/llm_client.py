@@ -1,11 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Unified LLM entrypoint for SatpamBot (Groq-only, patched).
+"""Legacy shim — canonical implementation moved to `satpambot.ai.llm_client`.
+
+This module re-exports the public API from `satpambot.ai.llm_client` and
+emits a DeprecationWarning to encourage using the new import path.
 """
 from __future__ import annotations
-
-from .groq_client import make_groq_client, GroqLLM
-
-def make_client():
-    cli = make_groq_client()
-    return GroqLLM(cli)
+import warnings
+warnings.warn("Importing 'ai.llm_client' is deprecated; use 'satpambot.ai.llm_client' instead", DeprecationWarning)
+from satpambot.ai.llm_client import *  # type: ignore

@@ -1,20 +1,9 @@
-# satpambot/ai/gemini_client.py
-import os
-from google import genai
+"""Legacy shim — canonical implementation moved to `satpambot.ai.gemini_client`.
 
-_client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-)
-
-def generate_text(prompt: str, model: str = "gemini-2.5-flash") -> str:
-    resp = _client.models.generate_content(model=model, contents=prompt)
-    return resp.text or ""
-
-# optional: setting gaya output
-def generate_system(prompt: str, sys: str = "Kamu asisten ramah. Jawab singkat."):
-    resp = _client.models.generate_content(
-        model="gemini-2.5-flash",
-        config={"system_instruction": sys},
-        contents=prompt,
-    )
-    return resp.text or ""
+Importing `ai.gemini_client` re-exports from `satpambot.ai.gemini_client` and emits a
+DeprecationWarning to guide developers to the new package path.
+"""
+from __future__ import annotations
+import warnings
+warnings.warn("Importing 'ai.gemini_client' is deprecated; use 'satpambot.ai.gemini_client' instead", DeprecationWarning)
+from satpambot.ai.gemini_client import *  # type: ignore
