@@ -5,15 +5,38 @@
 - No side effects on import; respects on_ready bootstrap rule.
 """
 from __future__ import annotations
-import os, json, asyncio, logging
-from typing import Any, List, Tuple
+import os
+import json
+import asyncio
+import logging
+from __future__ import annotations
+from typing import Any, Dict, List, TypedDict, Union, Optional
+
 try:
-    import discord  # noqa: F401
     from discord.ext import commands  # type: ignore
+    USE_DISCORD = True
 except Exception:
     commands = object  # type: ignore
+    USE_DISCORD = False
 
-import urllib.request, urllib.error
+import urllib.request
+import urllib.error
+
+# Type definitions for runtime safety
+XPMetaDict = Dict[str, Any]
+JsonDict = Dict[str, Any]
+
+# Type definitions
+class XPMeta(TypedDict, total=False):
+    required: int
+    current: int
+
+class XPStatusJson(TypedDict):
+    label: str
+    percent: float
+    remaining: int
+    senior_total: int
+    stage: XPMeta
 # --- autoheal source selection ---
 def _pick_total(raw_a: int, sj_total: int) -> tuple[int, str]:
     mode = (os.getenv('XP_AUTOHEAL_MODE','prefer_status_json') or 'prefer_status_json').lower()
@@ -62,18 +85,28 @@ def _pipeline(cmds: List[List[str]]) -> tuple[int, Any]:
 S_NAMES = ("S1","S2","S3","S4","S5","S6","S7","S8")
 S_TH = (0,19000, 35000, 58000, 70000, 96500, 158000, 220000, 262500)
 
-def _to_int(x)->int:
+def _to_int(x: Union[str, int, float, None]) -> int:
+    """Convert any value to int safely."""
     try:
         return int(float(str(x).strip()))
     except Exception:
         return 0
 
-def _calc(total:int):
+def _calc(total: int) -> tuple[str, str, XPStatusJson]:
+    """Calculate XP stage and status from total XP."""
     try:
         from ..helpers.xp_total_resolver import stage_from_total
-        lbl, pct, meta = stage_from_total(int(total))
+        lbl, pct, meta_raw = stage_from_total(int(total))
         status = f"{lbl} ({pct}%)"
-        j = {"label": lbl, "percent": pct, "remaining": int(max(0, meta.get('required',1)-meta.get('current',0))), "senior_total": int(total), "stage": meta}
+        # Convert meta to proper type
+        meta: XPMeta = {"required": int(meta_raw.get("required", 1)), "current": int(meta_raw.get("current", 0))}
+        j: XPStatusJson = {
+            "label": lbl,
+            "percent": float(pct),
+            "remaining": int(max(0, meta["required"] - meta["current"])),
+            "senior_total": int(total),
+            "stage": meta
+        }
         return lbl, status, j
     except Exception:
         # fallback (legacy thresholds)
@@ -84,8 +117,14 @@ def _calc(total:int):
         pct=100.0 if nxt<=cur else round(max(0.0,(total-cur)/float(nxt-cur)*100.0),1)
         rem=max(0,nxt-total)
         label=f"KULIAH-{S_NAMES[idx]}"; status=f"{label} ({pct}%)"
-        j={"label":label,"percent":pct,"remaining":rem,"senior_total":total}
-        return label,status,j
+        j: XPStatusJson = {
+            "label": label,
+            "percent": float(pct),
+            "remaining": int(rem),
+            "senior_total": int(total),
+            "stage": {"required": nxt, "current": total}
+        }
+        return label, status, j
 
 async def _heal():
     base=_upstash_base(); tok=_upstash_auth()
@@ -127,30 +166,42 @@ async def _heal():
     else:
         log.warning("[xp-autoheal] write failed: %s %s", code2, res2)
 
-class XPConsistencyOverlay(commands.Cog if commands!=object else object):
-    def __init__(self, bot=None): self.bot=bot; self._task=None
-    @getattr(commands,"Cog",object).listener()
-    async def on_ready(self):
+class XPConsistencyOverlay(Cog):
+    """XP consistency overlay cog for auto-heal functionality."""
+    
+    def __init__(self, bot: Optional[Bot] = None) -> None:
+        self.bot: Optional[Bot] = bot
+        self._task: Optional[asyncio.Task] = None
+
+    @Cog.listener() if HAS_DISCORD else staticmethod
+    async def on_ready(self) -> None:
+        """Handle on_ready event to start auto-heal task."""
         if os.getenv("XP_DISABLE_AUTOHEAL"): 
-            log.info("[xp-autoheal] disabled"); return
+            log.info("[xp-autoheal] disabled")
+            return
         if self._task is None:
             self._task = asyncio.create_task(self._once())
-    async def _once(self):
-        await asyncio.sleep(2.0)
-        try: await _heal()
-        except Exception as e: log.exception("[xp-autoheal] error: %s",e)
 
-def setup(bot):
+    async def _once(self) -> None:
+        """Run one auto-heal cycle with delay."""
+        await asyncio.sleep(2.0)
+        try:
+            await _heal()
+        except Exception as e:
+            log.exception("[xp-autoheal] error: %s", e)
+
+def setup(bot: Bot) -> None:
+    """Legacy sync setup for the cog."""
     try:
-        bot.add_cog(XPConsistencyOverlay(bot))
+        bot.add_cog(XPConsistencyOverlay(bot))  # type: ignore
         log.info("✅ Loaded cog: %s", __name__)
     except Exception as e:
         log.exception("Failed to load XPConsistencyOverlay: %s", e)
 
-
-async def setup(bot):
+async def setup(bot: Bot) -> None:
+    """Async setup for the cog."""
     try:
-        await bot.add_cog(XPConsistencyOverlay(bot))
+        await bot.add_cog(XPConsistencyOverlay(bot))  # type: ignore
         log.info('✅ Loaded cog (async): %s', __name__)
     except Exception as e:
         log.exception('Failed to load XPConsistencyOverlay (async): %s', e)
