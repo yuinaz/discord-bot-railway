@@ -25,6 +25,7 @@ opencv-python-headless==4.12.0.88
 # LLM providers
 google-genai==1.44.0
 groq>=0.32,<1.0
+google-generativeai>=0.7.2
 # Translators (stick to known-stable majors)
 googletrans-py>=4.0.0,<5.0.0
 deep-translator>=1.11.4,<2.0.0
