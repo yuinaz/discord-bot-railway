@@ -45,7 +45,7 @@ def _maybe_wait():
         now = time.time()
         wait = _last_call_ts + gap - now
         if wait > 0:
-            time.sleep(wait if wait < gap else gap)
+            threading.Event().wait(wait if wait < gap else gap)
             now = time.time()
         _last_call_ts = now
 

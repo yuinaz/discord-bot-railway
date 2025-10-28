@@ -44,13 +44,12 @@ def _guarded_loop(callable_main):
             ok, score, reason = asyncio.run(guard.approve_restart(err_txt))
             if not ok:
                 LOG.error("[selfheal] restart VETO (score=%.2f): %s", score, reason)
-                time.sleep(90)
+                asyncio.run(asyncio.sleep(90))
                 continue
             delay = guard.next_backoff()
             guard.record_crash()
             LOG.warning("[selfheal] restart APPROVED (score=%.2f). sleep %ss...", score, delay)
-            time.sleep(delay)
-
+            asyncio.run(asyncio.sleep(delay))
 def main():
     fn = _find_entry_callable()
     if fn is None:

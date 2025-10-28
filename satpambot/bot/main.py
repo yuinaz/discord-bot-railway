@@ -12,18 +12,23 @@ async def _run_once():
 
 def main():
     backoff = 5  # seconds, doubles up to 60s
-    while True:
-        try:
-            log.info("🤖 Starting Discord bot process...")
-            asyncio.run(_run_once())
-            log.warning("Bot returned gracefully; restarting in 3s...")
-            time.sleep(3)
-            backoff = 5  # reset backoff after clean return
-        except Exception as e:
-            log.error("Bot crashed: %s\n%s", e, traceback.format_exc())
-            log.info("Restarting in %ss...", backoff)
-            time.sleep(backoff)
-            backoff = min(backoff * 2, 60)
+
+    async def _runner():
+        nonlocal backoff
+        while True:
+            try:
+                log.info("🤖 Starting Discord bot process...")
+                await _run_once()
+                log.warning("Bot returned gracefully; restarting in 3s...")
+                await asyncio.sleep(3)
+                backoff = 5
+            except Exception as e:
+                log.error("Bot crashed: %s\n%s", e, traceback.format_exc())
+                log.info("Restarting in %ss...", backoff)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+
+    asyncio.run(_runner())
 
 if __name__ == "__main__":
     main()

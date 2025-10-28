@@ -6,7 +6,8 @@ Neuro Smoketest Suite (v6 — single namespace, no alt 'modules.*')
 - Gate policy simulation
 - Works even if an asyncio loop is already running (Jupyter/IDE)
 """
-import os, sys, json, importlib, glob, types, asyncio, threading
+import os, sys, json, importlib, glob, types, asyncio
+from threading import Thread as _Thread
 
 def env(k, d=None): return os.getenv(k, d)
 def ok(m): print("[OK]", m)
@@ -49,7 +50,7 @@ def run_coro(coro):
             result["value"] = loop.run_until_complete(coro)
         finally:
             loop.close()
-    t = threading.Thread(target=_runner, daemon=True)
+    t = _Thread(target=_runner, daemon=True)
     t.start(); t.join()
     return result.get("value")
 

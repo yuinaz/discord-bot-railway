@@ -1,9 +1,11 @@
 from discord.ext import commands
+from discord import Message, Member, User
+from typing import Union, Optional
 
 # --- PATCH: robust fallback that does not import XPStore class ---
 import logging as _logging
 _log = _logging.getLogger(__name__)
-async def _award_via_event(bot, author, amount: int, message=None, reason="qna/thread"):
+async def _award_via_event(bot: commands.Bot, author: Union[Member, User], amount: int, message: Optional[Message] = None, reason: str = "qna/thread"):
     try:
         guild_id = getattr(getattr(message, "guild", None), "id", None) if message else None
         channel_id = getattr(getattr(message, "channel", None), "id", None) if message else None
@@ -19,16 +21,38 @@ async def _award_via_event(bot, author, amount: int, message=None, reason="qna/t
         _log.exception("[xp_force] event dispatch failed: %r", e)
         return False
 
-import logging, asyncio, time
-
+import logging
 import os
-from typing import Optional
+import time
+from typing import Optional, Dict, Any, Type, cast, Protocol, TypedDict, runtime_checkable, Final
 
 log = logging.getLogger(__name__)
+
+class UserData(TypedDict):
+    """User data in XP store"""
+    xp: int
+
+class XPStoreData(TypedDict):
+    """XP store data structure"""
+    users: Dict[str, UserData]
+
+# Define XPStore protocol for type hints
+@runtime_checkable
+class XPStoreProtocol(Protocol):
+    """Protocol for XP store operations"""
+    @staticmethod
+    def load() -> Any: ...  # Return Any to avoid type conflicts
+    @staticmethod
+    def save(data: Any) -> None: ...  # Accept Any to avoid type conflicts
+
 try:
     from satpambot.bot.modules.discord_bot.services.xp_store import XPStore  # type: ignore
+    XPStore = cast('Type[XPStoreProtocol]', XPStore)
 except Exception:
     XPStore = None  # type: ignore
+
+# Default user data
+EMPTY_USER_DATA: Final[Dict[str, int]] = {"xp": 0}
 
 FORCE_INCLUDE_QNA = True
 COOLDOWN_SEC = 6
@@ -36,9 +60,9 @@ COOLDOWN_SEC = 6
 class XPForceIncludeOverlay(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._last = {}  # author_id -> ts
+        self._last: dict[int, float] = {}  # author_id -> ts
 
-    def _allowed(self, message) -> bool:
+    def _allowed(self, message: Message) -> bool:
         # Always include threads
         if getattr(message.channel, "type", None) and str(message.channel.type).endswith("thread"):
             return True
@@ -51,14 +75,14 @@ class XPForceIncludeOverlay(commands.Cog):
 
     def _cool(self, author_id: int) -> bool:
         now = time.time()
-        last = self._last.get(author_id, 0)
+        last = self._last.get(author_id, 0.0)
         if now - last >= COOLDOWN_SEC:
             self._last[author_id] = now
             return True
         return False
 
     @commands.Cog.listener("on_message")
-    async def on_message(self, message):
+    async def on_message(self, message: Message) -> None:
         try:
             if message.author.bot:
                 return
@@ -78,17 +102,38 @@ class XPForceIncludeOverlay(commands.Cog):
                 except Exception:
                     pass
 
-            if dispatched == 0 and XPStore and hasattr(XPStore, "load"):
-                data = XPStore.load()
-                users = data.setdefault("users", {})
-                u = users.setdefault(str(message.author.id), {"xp": 0})
-                u["xp"] = int(u.get("xp", 0)) + amt
-                XPStore.save(data)
-                log.info("[xp_force] fallback awarded +%s via XPStore compat (uid=%s)", amt, message.author.id)
+            if dispatched == 0 and XPStore is not None and all(hasattr(XPStore, attr) for attr in ["load", "save"]):
+                try:
+                    # Load and validate store data
+                    data = XPStore.load()  # type: ignore
+                    if not isinstance(data, dict):
+                        raise TypeError("XPStore.load() must return a dict")
+                    
+                    # Ensure users dict exists
+                    if "users" not in data or not isinstance(data["users"], dict):
+                        data["users"] = {}
+                    users = data["users"]  # type: ignore
+                    
+                    # Handle user data update
+                    user_id = str(message.author.id)
+                    if user_id not in users or not isinstance(users[user_id], dict):
+                        users[user_id] = EMPTY_USER_DATA.copy()
+                    
+                    try:
+                        # Safe XP update with validation
+                        current_xp = int(users[user_id].get("xp", 0))  # type: ignore
+                        users[user_id]["xp"] = current_xp + amt  # type: ignore
+                        XPStore.save(data)  # type: ignore
+                        log.info("[xp_force] fallback awarded +%s via XPStore (uid=%s)", amt, user_id)
+                    except (ValueError, TypeError, KeyError) as e:
+                        log.warning("[xp_force] XP update failed: %s", e)
+                    log.info("[xp_force] fallback awarded +%s via XPStore compat (uid=%s)", amt, message.author.id)
+                except Exception as e:
+                    log.warning("[xp_force] XPStore fallback failed: %s", e)
             else:
                 log.debug("[xp_force] dispatched award events=%d (uid=%s)", dispatched, message.author.id)
         except Exception as e:
             log.warning("[xp_force] error: %s", e)
 
-async def setup(bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(XPForceIncludeOverlay(bot))
