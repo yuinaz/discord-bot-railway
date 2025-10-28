@@ -89,7 +89,7 @@ def _resolve_groq_func():
 async def _call_groq_direct(prompt: str) -> Optional[str]:
     api_key = (os.getenv("GROQ_API_KEY") or "").strip()
     if not api_key: return None
-    model = (os.getenv("GROQ_MODEL") or "llama-3.1-70b-versatile").strip()
+    model = (os.getenv("GROQ_MODEL") or "llama-3.2-70b").strip()
     try:
         from groq import Groq  # type: ignore
         client = Groq(api_key=api_key)

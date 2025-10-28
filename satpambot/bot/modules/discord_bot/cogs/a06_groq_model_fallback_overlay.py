@@ -6,7 +6,7 @@ log = logging.getLogger(__name__)
 def _candidates():
     raw = cfg("GROQ_MODEL_CANDIDATES", "") or ""
     xs = [x.strip() for x in raw.replace(",", " ").split() if x.strip()]
-    return xs or [os.getenv("GROQ_MODEL","llama-3.1-8b-instant"), "llama-3.1-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"]
+    return xs or [os.getenv("GROQ_MODEL","llama-3.1-8b-instant"), "llama-3.2-70b", "mixtral-8x7b-32768", "gemma2-9b-it"]
 def _install():
     try:
         gh = __import__("satpambot.ml.groq_helper", fromlist=["*"])

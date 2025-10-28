@@ -106,11 +106,18 @@ class NeuroAutolearnModeratedV2(commands.Cog):
             pass
 
     async def _one_round(self, *, force_prompt: str | None = None):
-        # isolation cooldown gate
-        _ok, _remain = _iso_cooldown_ok(message)
+        if not self.enable:
+            return
+        ch = await self._get_qna_channel()
+        if not isinstance(ch, (discord.TextChannel, discord.Thread)):
+            log.warning("QNA: channel not found or invalid. Set QNA_CHANNEL_ID or QNA_CHANNEL_NAME.")
+            return
+        import types
+        stub = types.SimpleNamespace(channel=types.SimpleNamespace(id=getattr(ch, 'id', 0)))
+        _ok, _remain = _iso_cooldown_ok(stub)
         if not _ok:
             try:
-                await message.add_reaction("⏱️")
+                await ch.send("⏱️ QNA cooldown {}s".format(_remain))
             except Exception:
                 pass
             return
