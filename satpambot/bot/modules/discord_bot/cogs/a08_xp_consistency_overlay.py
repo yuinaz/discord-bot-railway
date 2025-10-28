@@ -56,19 +56,23 @@ def _to_int(x)->int:
         return 0
 
 def _calc(total:int):
-    idx=0
-    for i,th in enumerate(S_TH):
-        if total>=th: idx=i
-    cur=S_TH[idx]; nxt=S_TH[idx] if idx==len(S_TH)-1 else S_TH[idx+1]
-    if nxt<=cur:
-        pct=100.0; rem=0
-    else:
-        pct=round(max(0.0,(total-cur)/float(nxt-cur)*100.0),1)
+    try:
+        from ..helpers.xp_total_resolver import stage_from_total
+        lbl, pct, meta = stage_from_total(int(total))
+        status = f"{lbl} ({pct}%)"
+        j = {"label": lbl, "percent": pct, "remaining": int(max(0, meta.get('required',1)-meta.get('current',0))), "senior_total": int(total), "stage": meta}
+        return lbl, status, j
+    except Exception:
+        # fallback (legacy thresholds)
+        S_NAMES=['S1','S2','S3','S4','S5','S6','S7','S8']
+        S_TH=[0,19000,35000,58000,70000,96500,158000,220000,262500]
+        idx=max([i for i,t in enumerate(S_TH) if total>=t] or [0])
+        cur=S_TH[idx]; nxt=S_TH[idx] if idx==len(S_TH)-1 else S_TH[idx+1]
+        pct=100.0 if nxt<=cur else round(max(0.0,(total-cur)/float(nxt-cur)*100.0),1)
         rem=max(0,nxt-total)
-    label=f"KULIAH-{S_NAMES[idx]}"
-    status=f"{label} ({pct}%)"
-    j={"label":label,"percent":pct,"remaining":rem,"senior_total":total}
-    return label,status,j
+        label=f"KULIAH-{S_NAMES[idx]}"; status=f"{label} ({pct}%)"
+        j={"label":label,"percent":pct,"remaining":rem,"senior_total":total}
+        return label,status,j
 
 async def _heal():
     base=_upstash_base(); tok=_upstash_auth()

@@ -6,11 +6,11 @@ from discord.ext import commands
 log = logging.getLogger(__name__)
 
 try:
-    from ..helpers.xp_total_resolver import resolve_senior_total, stage_from_total
+    from ..helpers.xp_total_resolver import stage_preferred, resolve_senior_total
 except Exception as e:
     log.warning("[autorank] helper import failed: %s; using fallbacks", e)
-    async def resolve_senior_total(): return None
-    def stage_from_total(total: int): return "KULIAH-S1", 0.0, {"start_total": 0, "required": 19000}
+    async def stage_preferred(): return ("KULIAH-S1", 0.0, {"start_total":0,"required":19000,"current":0})
+    async def resolve_senior_total(): return 0
 
 class LadderRuntimeAutorankOverlay(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -25,14 +25,9 @@ class LadderRuntimeAutorankOverlay(commands.Cog):
         await asyncio.sleep(5.0)
         while not self.bot.is_closed():
             try:
+                label, pct, _meta = await stage_preferred()
                 total = await resolve_senior_total()
-                if total is None:
-                    await asyncio.sleep(60)
-                    continue
-                label, pct, meta = stage_from_total(int(total))
-                # Fokus Kuliah saja
                 log.warning("[autorank] %s (%.1f%%) xp=%s", label, pct, total)
-                # TODO: mapping role berdasarkan label 'KULIAH-Sx' bila diperlukan
             except Exception as e:
                 log.warning("[autorank] soft-fail: %s", e)
             await asyncio.sleep(180)
