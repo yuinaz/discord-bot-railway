@@ -71,6 +71,12 @@ class LearningStatusGuard(commands.Cog):
                 max_label = await upstash.get(session, "learning:last_max_label")
                 if max_label and isinstance(max_label, str):
                     max_label = max_label.strip('"')
+                allow_down = (os.getenv("LEARNING_ALLOW_DOWNGRADE","0").lower() in ("1","true","yes","on","y"))
+                if allow_down:
+                    # When downgrades are allowed, just track latest live label and skip force-upgrade
+                    if (not max_label) or is_lower(max_label, live):
+                        await upstash.pipeline(session, [["SET","learning:last_max_label", live]])
+                    return
                 if not max_label or is_lower(max_label, live):
                     await upstash.pipeline(session, [["SET","learning:last_max_label", live]])
                     return

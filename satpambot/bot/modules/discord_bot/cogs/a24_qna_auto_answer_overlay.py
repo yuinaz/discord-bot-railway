@@ -6,6 +6,12 @@ from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
+# --- QnA Dual-Mode Markers (for prerender check) ---
+# MODE A: isolation channel
+# MODE B: public mention
+QNA_EMBED_TITLE_LEINA = "Answer by Leina"
+QNA_EMBED_TITLE_PROVIDER = "Answer by {provider}"
+
 def _env_bool(key: str, default: bool=False) -> bool:
     v = os.getenv(key)
     if v is None: return default
@@ -55,6 +61,65 @@ def _gemini_chat(prompt: str) -> Optional[str]:
         log.warning("[qna] gemini failed: %s", e)
         return None
 
+
+# --- Provider helpers required by prerender check ---
+def get_groq_answer(messages: list[dict[str, Any]], model: str | None = None) -> Optional[str]:
+    """Call Groq Chat Completions and return the assistant text."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return None
+    try:
+        from groq import Groq  # type: ignore
+    except Exception as e:
+        log.warning("[qna] groq client missing: %s", e); return None
+    try:
+        client = Groq(api_key=api_key)
+        m = model or os.getenv("GROQ_MODEL","llama-3.3-70b-versatile")
+        resp = client.chat.completions.create(
+            model=m,
+            messages=messages,
+            temperature=float(os.getenv("GROQ_TEMPERATURE","0.2")),
+            max_tokens=int(os.getenv("GROQ_MAX_TOKENS","512"))
+        )
+        # defensive parse
+        choice = (resp.choices or [None])[0]
+        if not choice or not getattr(choice, "message", None):
+            return None
+        return getattr(choice.message, "content", None) or None
+    except Exception as e:
+        log.warning("[qna] groq call failed: %s", e); return None
+
+def gemini_client():
+    """Return configured Gemini client (google.generativeai)."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return None
+    try:
+        import google.generativeai as genai  # type: ignore
+        genai.configure(api_key=api_key)
+        model = os.getenv("GEMINI_MODEL","gemini-2.0-flash")
+        return genai.GenerativeModel(model)
+    except Exception as e:
+        log.warning("[qna] gemini client failed: %s", e); return None
+
+def get_gemini_answer(prompt: str, client=None) -> Optional[str]:
+    c = client or gemini_client()
+    if c is None:
+        return None
+    try:
+        # Use generate_content; keep it simple
+        r = c.generate_content(prompt)
+        # genai returns object with .text or candidates
+        txt = getattr(r, "text", None)
+        if txt: return txt
+        try:
+            cand = (r.candidates or [None])[0]
+            part0 = (cand.content.parts or [None])[0]
+            return getattr(part0, "text", None) or None
+        except Exception:
+            return None
+    except Exception as e:
+        log.warning("[qna] gemini call failed: %s", e); return None
 class QnaAutoAnswerOverlay(commands.Cog):
     """
     Lightweight, import-safe overlay. Actual QnA driving can be handled by neuro_autolearn module.
@@ -66,16 +131,21 @@ class QnaAutoAnswerOverlay(commands.Cog):
         log.info("[qna] providers=%s", self.provider_order)
 
     def answer(self, question: str) -> Optional[str]:
-        # Pack messages for Groq style
+        # Pack messages for Groq
         messages = [{"role": "system", "content": "You are a concise assistant."},
                     {"role": "user", "content": question}]
+        # try providers in order
         for prov in self.provider_order:
             if prov == "groq":
-                ans = _groq_chat(messages)
-                if ans: return ans
+                ans = get_groq_answer(messages)
+                if ans:
+                    self._last_provider = "groq"
+                    return ans
             elif prov == "gemini":
-                ans = _gemini_chat(question)
-                if ans: return ans
+                ans = get_gemini_answer(question)
+                if ans:
+                    self._last_provider = "gemini"
+                    return ans
         return None
 
 async def setup(bot: commands.Bot):
