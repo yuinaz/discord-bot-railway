@@ -8,11 +8,9 @@ log = logging.getLogger(__name__)
 try:
     from ..helpers.xp_total_resolver import resolve_senior_total, stage_from_total
 except Exception as e:
-    log.warning("[autorank] helper import failed: %s; using naive fallbacks", e)
-    async def resolve_senior_total():
-        return None
-    def stage_from_total(total: int):
-        return "KULIAH-S1", 0.0, {"start_total": 0, "required": 19000}
+    log.warning("[autorank] helper import failed: %s; using fallbacks", e)
+    async def resolve_senior_total(): return None
+    def stage_from_total(total: int): return "KULIAH-S1", 0.0, {"start_total": 0, "required": 19000}
 
 class LadderRuntimeAutorankOverlay(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -32,8 +30,9 @@ class LadderRuntimeAutorankOverlay(commands.Cog):
                     await asyncio.sleep(60)
                     continue
                 label, pct, meta = stage_from_total(int(total))
+                # Fokus Kuliah saja
                 log.warning("[autorank] %s (%.1f%%) xp=%s", label, pct, total)
-                # TODO: if role mapping exists, apply it here
+                # TODO: mapping role berdasarkan label 'KULIAH-Sx' bila diperlukan
             except Exception as e:
                 log.warning("[autorank] soft-fail: %s", e)
             await asyncio.sleep(180)

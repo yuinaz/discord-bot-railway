@@ -5,15 +5,12 @@ from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
-# Optional import of helper; define fallbacks if missing
 try:
     from ..helpers.xp_total_resolver import resolve_senior_total, stage_from_total
 except Exception as e:
-    log.warning("[xp-ladder] helper import failed: %s; using naive fallbacks", e)
-    async def resolve_senior_total():
-        return None
-    def stage_from_total(total: int):
-        return "KULIAH-S1", 0.0, {"start_total": 0, "required": 19000}
+    log.warning("[xp-ladder] helper import failed: %s; using fallbacks", e)
+    async def resolve_senior_total(): return None
+    def stage_from_total(total: int): return "KULIAH-S1", 0.0, {"start_total": 0, "required": 19000}
 
 class XpLadderReporterOverlay(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -33,6 +30,7 @@ class XpLadderReporterOverlay(commands.Cog):
                     await asyncio.sleep(30)
                     continue
                 label, pct, meta = stage_from_total(int(total))
+                # HANYA laporan KULIAH
                 log.info("[xp-ladder] total=%s -> %s (band %s..%s, %.1f%%)", total, label, meta.get("start_total"), meta.get("required"), pct)
             except Exception as e:
                 log.warning("[xp-ladder] reporter soft-fail: %s", e)
