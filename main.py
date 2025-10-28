@@ -43,10 +43,11 @@ def _serve_web():
         from wsgiref.simple_server import make_server, WSGIRequestHandler
 
         class QuietHandler(WSGIRequestHandler):
-            def log_message(self, fmt, *args):
-                # Access logs are silenced unless WEB_LOG_LEVEL=DEBUG
-                if WEB_LOG_LEVEL == "DEBUG":
-                    super().log_message(fmt, *args)
+            def log_message(self, format: str, *args: object) -> None:
+                if self.path == "/healthz":
+                    pass
+                else:
+                    super().log_message(format, *args)
 
         httpd = make_server(HOST, PORT, app, handler_class=QuietHandler)
         httpd.serve_forever()
