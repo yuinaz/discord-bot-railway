@@ -1,311 +1,82 @@
 
-def _groq_try_models(_client, _messages, _primary: str) -> str:
-    fallbacks = os.getenv("GROQ_MODEL_FALLBACKS", "llama-3.1-8b-instant").split(",")
-    order = [_primary] + [m.strip() for m in fallbacks if m.strip()]
-    last = None
-    for m in order:
-        try:
-            resp = _client.chat.completions.create(model=m, messages=_messages, temperature=0.6)
-            return resp.choices[0].message.content
-        except Exception as e:
-            last = e
-            continue
-    raise last or RuntimeError("All Groq models failed")
-
-# -*- coding: utf-8 -*-
 from __future__ import annotations
-import os, re, logging, asyncio, inspect
-from typing import Optional, Set
+import os, logging
+from typing import Any, Optional, List
+from discord.ext import commands
 
-def _fit_embed_text(s, lim=4096):
-    s = str(s or "")
-    if len(s) <= lim:
-        return s
-    return s[: lim-1] + "…"
+log = logging.getLogger(__name__)
 
-def _qna_provider_order():
-    raw = (os.getenv("QNA_PROVIDER", "gemini,groq") or "gemini,groq").lower()
-    order = [p.strip() for p in raw.split(",") if p.strip()]
-    return order or ["gemini","groq"]
+def _env_bool(key: str, default: bool=False) -> bool:
+    v = os.getenv(key)
+    if v is None: return default
+    return str(v).strip().lower() in {"1","true","yes","on"}
 
-def _qna_norm_provider(p: str) -> str:
-    p = (p or "").strip().lower()
-    if p.startswith(("gemini","google","gai")): return "gemini"
-    if p.startswith(("groq","llama","mixtral")): return "groq"
-    return p or "gemini"
+def _get_groq_model() -> str:
+    return os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
-def _qna_mode_for(provider: str) -> str:
-    order = _qna_provider_order()
-    return "primary" if (provider and order and provider == order[0]) else "fallback"
+def _get_groq_fallbacks() -> List[str]:
+    raw = os.getenv("GROQ_MODEL_FALLBACKS", "llama-3.1-8b-instant")
+    return [m.strip() for m in raw.split(",") if m.strip()]
 
-def _qna_marker(provider_label: str) -> str:
-    prov = _qna_norm_provider(provider_label)
-    mode = _qna_mode_for(prov)
-    return f"markers: [QNA][PROVIDER:{prov}][MODE:{mode}]"
-
-
-try:
-    import discord
-    from discord.ext import commands
-except Exception:
-    class discord:
-        class Embed: ...
-        class Message: ...
-    class commands:
-        class Cog:
-            @staticmethod
-            def listener(*a, **k):
-                def _w(f): return f
-                return _w
-
-LOG = logging.getLogger(__name__)
-
-_QUE = re.compile(r"\bquestion\b.*\bleina\b", re.I)
-_ANS = re.compile(r"\banswer\b", re.I)
-_NAME_TRIG = re.compile(r"^\s*(leina[,:\s]|<@!?(\d+)>|@leina)", re.I)
-
-def _iso_id() -> Optional[int]:
-    raw = (os.getenv("QNA_ISOLATION_CHANNEL_ID") or os.getenv("QNA_CHANNEL_ID") or "").strip()
-    raw = re.sub(r"[^\d]", "", raw)
-    return int(raw) if raw.isdigit() else None
-
-def _pick_provider_label() -> str:
-    raw = (os.getenv("QNA_PROVIDER", "gemini,groq") or "gemini,groq").lower()
-    order = [p.strip() for p in raw.split(",") if p.strip()]
-    if not order: order = ["gemini","groq"]
-
-    def has_gemini():
-        return bool((os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip())
-    def has_groq():
-        return bool((os.getenv("GROQ_API_KEY") or "").strip())
-
-    for p in order:
-        if p.startswith(("gemini","google","gai")) and has_gemini():
-            return "Gemini"
-        if p.startswith(("groq","llama","mixtral")) and has_groq():
-            return "Groq"
-
-    prov = (os.getenv("AI_PROVIDER", "auto") or "auto").lower()
-    if prov in ("groq","g","llama","mixtral"): return "Groq"
-    if prov in ("gemini","google","gai"): return "Gemini"
-
-    return "Groq" if has_groq() else "Gemini"
-def _resolve_groq_func():
-    try:
-        from satpambot.ml import groq_helper as gh  # type: ignore
-    except Exception as e:
-        LOG.debug("[qna] groq_helper import failed: %r", e); return None
-    for name in ("get_groq_answer","groq_answer","ask_groq","groq_chat","get_answer","get_text"):
-        fn = getattr(gh, name, None)
-        if callable(fn): return fn
-    return None
-
-async def _call_groq_direct(prompt: str) -> Optional[str]:
-    api_key = (os.getenv("GROQ_API_KEY") or "").strip()
-    if not api_key: return None
-    model = (os.getenv("GROQ_MODEL") or os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')).strip()
+def _groq_chat(messages: list[dict[str, Any]]) -> Optional[str]:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return None
     try:
         from groq import Groq  # type: ignore
-        client = Groq(api_key=api_key)
-        def _sdk_call():
-            return client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=float(os.getenv("GROQ_TEMPERATURE", "0.8")),
-                max_tokens=int(os.getenv("GROQ_MAX_TOKENS", "512")),
-            )
-        resp = await asyncio.to_thread(_sdk_call)
-        content = None
+    except Exception as e:
+        log.warning("[qna] groq helper not found: %s", e)
+        return None
+    client = Groq(api_key=api_key)
+    try_order = [_get_groq_model()] + _get_groq_fallbacks()
+    last_err = None
+    for m in try_order:
         try:
-            content = resp.choices[0].message.content
-        except Exception:
-            content = None
-        if content:
-            return str(content).strip()
-    except Exception as e:
-        LOG.debug("[qna] groq sdk fallback failed: %r", e)
-    try:
-        import requests  # type: ignore
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": float(os.getenv("GROQ_TEMPERATURE", "0.8")),
-            "max_tokens": int(os.getenv("GROQ_MAX_TOKENS", "512")),
-        }
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        def _http_call():
-            return requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=20)
-        r = await asyncio.to_thread(_http_call)
-        if getattr(r, "status_code", 0) >= 200 and r.status_code < 300:
-            data = r.json()
-            content = data["choices"][0]["message"]["content"]
-            return str(content).strip()
-        LOG.warning("[qna] groq http status: %s %s", getattr(r, "status_code", None), getattr(r, "text", "")[:200])
-    except Exception as e:
-        LOG.debug("[qna] groq http fallback failed: %r", e)
+            resp = client.chat.completions.create(model=m, messages=messages, temperature=0.6)
+            return resp.choices[0].message.content
+        except Exception as e:  # 4xx/5xx or network
+            last_err = e
+            continue
+    log.warning("[qna] groq failed: %s", last_err)
     return None
 
-async def _call_llm(prompt: str, provider: str) -> Optional[str]:
-    if provider == "Groq":
-        fn = _resolve_groq_func()
-        if fn:
-            try:
-                if inspect.iscoroutinefunction(fn): return await fn(prompt)  # type: ignore
-                return await asyncio.to_thread(fn, prompt)                   # type: ignore
-            except TypeError:
-                try:
-                    if inspect.iscoroutinefunction(fn): return await fn(prompt=prompt)  # type: ignore
-                    return await asyncio.to_thread(fn, prompt=prompt)                   # type: ignore
-                except Exception as e:
-                    LOG.warning("[qna] Groq helper signature mismatch: %r", e)
-            except Exception as e:
-                LOG.warning("[qna] Groq helper failed: %r", e)
-        ans = await _call_groq_direct(prompt)
-        if ans:
-            return ans
-        LOG.warning("[qna] Groq helper not found and direct call failed")
+def _gemini_chat(prompt: str) -> Optional[str]:
+    key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not key:
         return None
-    else:
-        try:
-            from satpambot.ai.gemini_client import generate_text as _gemini_answer  # type: ignore
-            return await asyncio.to_thread(_gemini_answer, prompt)
-        except Exception as e:
-            LOG.warning("[qna] Gemini call failed: %r", e)
-            return None
-
-
-
-# === Provider race for isolation channel =====================================
-import asyncio, os
-_QNA_SEMA = asyncio.Semaphore(int(os.getenv("QNA_MAX_CONCURRENCY", "2") or "2"))
-async def _call_llm_race(prompt: str):
-    """
-    Run Gemini and Groq in parallel; return (answer_text, provider_name).
-    Respects:
-      QNA_RACE_DEADLINE (soft overall timeout, default 12s)
-      QNA_RACE_PROVIDER_TIMEOUT (per-provider timeout, default 8s)
-    """
-    from contextlib import suppress
-    deadline = float(os.getenv("QNA_RACE_DEADLINE", "12") or "12")
-    ptimeout = float(os.getenv("QNA_RACE_PROVIDER_TIMEOUT", "8") or "8")
-
-    async def _one(name: str):
-        try:
-            async with asyncio.timeout(ptimeout):
-                t = await _call_llm(prompt, name)
-                if t and str(t).strip():
-                    return (name, str(t).strip())
-        except Exception as e:
-            LOG.debug("[qna-race] %s failed: %r", name, e)
-        return (name, None)
-
-    async with _QNA_SEMA:
-        tasks = {asyncio.create_task(_one("Gemini")), asyncio.create_task(_one("Groq"))}
-        ans_txt = None
-        prov = "LLM"
-        try:
-            async with asyncio.timeout(deadline):
-                while tasks:
-                    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                    for t in done:
-                        name, text = await t
-                        if text:
-                            for p in pending: p.cancel()
-                            ans_txt, prov = text, name
-                            tasks = set()
-                            break
-                    else:
-                        tasks = pending
-        except Exception:
-            LOG.debug("[qna-race] deadline reached")
-        # Fallback: try order from env if nothing yet
-        if not ans_txt:
-            with suppress(Exception):
-                prov_env = _pick_provider_label()
-                t = await _call_llm(prompt, prov_env)
-                if t and str(t).strip():
-                    return (str(t).strip(), prov_env)
-        return (ans_txt or "Maaf, aku lagi macet. Coba ulang sebentar ya.", prov)
-
-def _gate_public_allowed() -> bool:
     try:
-        from pathlib import Path as _Path
-        from satpambot.shared.progress_gate import ProgressGate  # type: ignore
+        import google.generativeai as genai  # type: ignore
+        genai.configure(api_key=key)
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+        model = genai.GenerativeModel(model_name)
+        resp = model.generate_content(prompt)
+        return getattr(resp, "text", None) or None
+    except Exception as e:
+        log.warning("[qna] gemini failed: %s", e)
+        return None
 
-# === PREDEPLOY MARKERS (do not remove) =======================================
-# MODE A: isolation channel
-# MODE B: public mention
-# Back-compat title strings expected by checker:
-# "Answer by Leina" and the prefix "Answer by "
-# ============================================================================
-
-        return ProgressGate(_Path("data/progress_gate.json")).is_public_allowed()
-    except Exception:
-        return True
-
-def _strip_mention(text: str, me_id: Optional[int]) -> str:
-    text = text or ""
-    if me_id: text = re.sub(fr"<@!?\\s*{me_id}\\s*>", "", text, flags=re.I).strip()
-    return re.sub(r"^\\s*leina[,:\\s]+", "", text, flags=re.I).strip()
-
-class QnaPublicAutoAnswer(commands.Cog):
-    def __init__(self, bot):
+class QnaAutoAnswerOverlay(commands.Cog):
+    """
+    Lightweight, import-safe overlay. Actual QnA driving can be handled by neuro_autolearn module.
+    This overlay only exposes safe helpers; no background loops at import-time.
+    """
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._answered_ids: Set[int] = set()
+        self.provider_order = [s.strip() for s in os.getenv("QNA_PROVIDER", os.getenv("QNA_PROVIDER_ORDER", "groq,gemini")).split(",") if s.strip()]
+        log.info("[qna] providers=%s", self.provider_order)
 
-    @commands.Cog.listener()
-    async def on_message(self, m: "discord.Message"):
-        try:
-            iso = _iso_id()
-            ch_id = getattr(getattr(m, "channel", None), "id", None)
-            if not ch_id: return
+    def answer(self, question: str) -> Optional[str]:
+        # Pack messages for Groq style
+        messages = [{"role": "system", "content": "You are a concise assistant."},
+                    {"role": "user", "content": question}]
+        for prov in self.provider_order:
+            if prov == "groq":
+                ans = _groq_chat(messages)
+                if ans: return ans
+            elif prov == "gemini":
+                ans = _gemini_chat(question)
+                if ans: return ans
+        return None
 
-            if iso and ch_id == iso:
-                e = m.embeds[0] if getattr(m, "embeds", None) else None
-                title = (getattr(e,"title","") or "").strip()
-                author = (getattr(getattr(e,"author",None),"name","") or "").strip()
-                desc = (getattr(e,"description","") or "").strip()
-                combo = " ".join([title, author, desc]).lower()
-
-                if not e or not _QUE.search(combo) or _ANS.search(combo) or m.id in self._answered_ids:
-                    return
-
-                provider = _pick_provider_label()
-                prompt = desc or title
-                if not prompt: return
-
-                try: await m.channel.typing().__aenter__(); ans, provider = await _call_llm_race(prompt)
-                finally:
-                    try: await m.channel.typing().__aexit__(None,None,None)
-                    except Exception: pass
-                if not ans: return
-                self._answered_ids.add(m.id)
-                desc=_fit_embed_text(ans,4096)
-                emb = discord.Embed(title=f"Answer by {provider.title() if isinstance(provider,str) else 'LLM'}", description=desc)
-                await m.channel.send(embed=emb, reference=m)
-                return
-
-            if not getattr(m.author, "bot", False):
-                content = getattr(m, "content", "") or ""
-                me_id = getattr(getattr(self.bot, "user", None), "id", None)
-                mentioned = any(getattr(u, "id", None) == me_id for u in (getattr(m, "mentions", None) or []))
-                if iso and ch_id == iso: return
-                if mentioned or _NAME_TRIG.search(content):
-                    if not _gate_public_allowed(): return
-                    provider = _pick_provider_label()
-                    prompt = _strip_mention(content, me_id)
-                    if not prompt: return
-                    try: await m.channel.typing().__aenter__(); ans, provider = await _call_llm_race(prompt)
-                    finally:
-                        try: await m.channel.typing().__aexit__(None,None,None)
-                        except Exception: pass
-                    if not ans: return
-                    desc=_fit_embed_text(ans,4096)
-                    emb = discord.Embed(title=f"Answer by {provider.title() if isinstance(provider,str) else 'LLM'}", description=desc)
-
-                    await m.channel.send(embed=emb, reference=m)
-        except Exception as ex:
-            LOG.warning("[qna-dualmode] fail: %r", ex)
-
-async def setup(bot):
-    await bot.add_cog(QnaPublicAutoAnswer(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(QnaAutoAnswerOverlay(bot))

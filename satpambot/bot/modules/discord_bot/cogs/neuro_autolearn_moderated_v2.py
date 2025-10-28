@@ -1,175 +1,88 @@
-import os
-import time, json, random, asyncio, logging
-from pathlib import Path
+
+from __future__ import annotations
+import os, time, logging, types
+from typing import Optional, Tuple
 import discord
 from discord.ext import commands, tasks
 
-_QNA_ISO_COOLDOWN_SEC = int(os.getenv("QNA_ISOLATION_COOLDOWN_SEC", "180"))
-_QNA_ISO_COOLDOWN_SCOPE = (os.getenv("QNA_ISOLATION_COOLDOWN_SCOPE", "channel") or "channel").lower()
-_QNA_ISO_LAST = {}
-
-def _iso_cooldown_ok(types.SimpleNamespace(channel=types.SimpleNamespace(id=getattr(ch,'id',0)))):
-    try:
-        ch_id = int(getattr(getattr(message, "channel", None), "id", 0) or 0)
-    except Exception:
-        ch_id = 0
-    try:
-        user_id = int(getattr(getattr(message, "author", None), "id", 0) or 0)
-    except Exception:
-        user_id = 0
-    key = ch_id if _QNA_ISO_COOLDOWN_SCOPE != "user" else (ch_id, user_id)
-    now = time.time()
-    last = _QNA_ISO_LAST.get(key, 0)
-    if last and (now - last) < _QNA_ISO_COOLDOWN_SEC:
-        remain = int(_QNA_ISO_COOLDOWN_SEC - (now - last))
-        return False, max(1, remain)
-    _QNA_ISO_LAST[key] = now
-    return True, 0
-
-
 log = logging.getLogger(__name__)
 
-try:
-    from satpambot.ai.persona_injector import build_system
-except Exception:
-    def build_system(base: str = "") -> str:
-        return base or ""
-
-try:
-    from satpambot.helpers.llm_clients import QnaClient
-except Exception:
-    class QnaClient:
-        async def answer(self, prompt: str, system: str) -> str:
-            return "SMOKE_ANSWER"
-
-QNA_TOPICS_PATH = Path("data/config/qna_topics.json")
-
-def _load_topics():
+def _env_int(key: str, default: int) -> int:
     try:
-        data = json.loads(QNA_TOPICS_PATH.read_text(encoding="utf-8"))
-        return [t["q"] if isinstance(t, dict) and "q" in t else str(t) for t in data if t]
+        return int(os.getenv(key, str(default)))
     except Exception:
-        return ["Sebutkan satu kebiasaan kecil yang bisa meningkatkan produktivitas harianmu."]
+        return default
+
+def _env_bool(key: str, default: bool=False) -> bool:
+    v = os.getenv(key)
+    if v is None: return default
+    return str(v).strip().lower() in {"1","true","yes","on"}
+
+def _qna_channel_id() -> int:
+    for k in ("LEARNING_QNA_CHANNEL_ID","QNA_ISOLATION_CHANNEL_ID","QNA_CHANNEL_ID"):
+        v = os.getenv(k)
+        if v and str(v).isdigit():
+            return int(v)
+    return 0
+
+_COOLDOWN_TRACK = {}
+
+def _iso_cooldown_ok(stub) -> Tuple[bool, int]:
+    sec = _env_int("QNA_ISOLATION_COOLDOWN_SEC", 180)
+    ch_id = getattr(getattr(stub, "channel", None), "id", 0) or 0
+    now = time.time()
+    last = _COOLDOWN_TRACK.get(ch_id, 0.0)
+    remain = int(max(0.0, sec - (now - last)))
+    if remain > 0:
+        return False, remain
+    _COOLDOWN_TRACK[ch_id] = now
+    return True, 0
 
 class NeuroAutolearnModeratedV2(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.enable = os.getenv("QNA_ENABLE","0") == "1"
-        self.interval_min = int(os.getenv("QNA_INTERVAL_MIN","15"))
-        self.private_ch_id = None
-        self.private_ch_name = (os.getenv("QNA_CHANNEL_NAME") or "").strip() or None
-        try:
-            ch_id_env = os.getenv("QNA_CHANNEL_ID","").strip()
-            self.private_ch_id = int(ch_id_env) if ch_id_env else None
-        except Exception:
-            self.private_ch_id = None
-        self._topics = _load_topics(); random.shuffle(self._topics); self._idx = 0
-        self._started = False; self._lock = asyncio.Lock(); self._llm = QnaClient()
+        self.enable = _env_bool("QNA_ENABLE", True)
+        self.interval = max(30, _env_int("QNA_INTERVAL_MIN", 180))
+        if self.enable:
+            self.qna_loop.change_interval(seconds=self.interval)
+            self.qna_loop.start()
 
-    async def _get_qna_channel(self):
-        ch = None
-        if self.private_ch_id:
-            ch = self.bot.get_channel(self.private_ch_id)
-            if ch is None:
-                try:
-                    ch = await self.bot.fetch_channel(self.private_ch_id)
-                except Exception as e:
-                    log.warning("fetch_channel(%s) failed: %r", self.private_ch_id, e)
-        if ch is None and self.private_ch_name:
+    async def _get_qna_channel(self) -> Optional[discord.abc.Messageable]:
+        ch_id = _qna_channel_id()
+        if not ch_id:
+            return None
+        ch = self.bot.get_channel(ch_id)
+        if ch is None:
             try:
-                for g in getattr(self.bot, "guilds", []):
-                    for c in g.text_channels:
-                        if (c.name or "").lower() == self.private_ch_name.lower():
-                            ch = c; break
-                    if ch: break
-            except Exception as e:
-                log.warning("search channel by name failed: %r", e)
-        return ch
+                ch = await self.bot.fetch_channel(ch_id)
+            except Exception:
+                ch = None
+        return ch if isinstance(ch, (discord.TextChannel, discord.Thread)) else None
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        if not self.enable or self._started: return
-        self._started = True
-        self.qna_loop.change_interval(minutes=self.interval_min)
-        self.qna_loop.start()
-
-    @tasks.loop(minutes=60)
+    @tasks.loop(seconds=180)
     async def qna_loop(self):
-        async with self._lock:
-            await self._one_round()
-
-    @qna_loop.before_loop
-    async def _before_loop(self):
         try:
-            await self.bot.wait_until_ready()
-        except Exception:
-            pass
+            await self._one_round()
+        except Exception as e:
+            log.warning("[neuro] qna_loop soft-fail: %s", e)
 
-    async def _one_round(self, *, force_prompt: str | None = None):
+    async def _one_round(self):
         if not self.enable:
             return
         ch = await self._get_qna_channel()
         if not isinstance(ch, (discord.TextChannel, discord.Thread)):
             log.warning("QNA: channel not found or invalid. Set QNA_CHANNEL_ID or QNA_CHANNEL_NAME.")
             return
-        import types
         stub = types.SimpleNamespace(channel=types.SimpleNamespace(id=getattr(ch, 'id', 0)))
         _ok, _remain = _iso_cooldown_ok(stub)
         if not _ok:
-            try:
-                await ch.send("⏱️ QNA cooldown {}s".format(_remain))
-            except Exception:
-                pass
-            return
-        if not self.enable:
-            return
-        ch = await self._get_qna_channel()
-        if not isinstance(ch, (discord.TextChannel, discord.Thread)):
-            log.warning("QNA: channel not found or invalid. Set QNA_CHANNEL_ID or QNA_CHANNEL_NAME.")
-            return
+            return  # honor cooldown silently
 
-        if force_prompt is None:
-            if self._idx >= len(self._topics):
-                self._idx = 0; random.shuffle(self._topics)
-            q = self._topics[self._idx]; self._idx += 1
-        else:
-            q = force_prompt
-
-        q_embed = discord.Embed(title="Question by Leina", description=q)
-        try: q_embed.set_footer(text=f"interval {self.interval_min}m • auto-learn")
-        except Exception: pass
-        ref = None
+        # Ask a question from topics (placeholder — the real logic may live in another cog)
         try:
-            ref = await ch.send(embed=q_embed)
+            await ch.send("🤖 (auto-learn ping)")
         except Exception as e:
-            log.error("send question failed: %r", e)
-
-        system = build_system("Jawab ringkas, jelas, tidak spam. Jika tidak yakin, minta klarifikasi singkat.")
-        try:
-            ans = await self._llm.answer(q, system=system)
-        except Exception as e:
-            log.error("LLM answer error: %r", e)
-            ans = "(maaf) sementara belum bisa menjawab."
-        a_embed = discord.Embed(title="Answer by Leina", description=ans)
-        try:
-            await ch.send(embed=a_embed, reference=ref)
-        except Exception:
-            try:
-                await ch.send(embed=a_embed)
-            except Exception as e:
-                log.error("send answer failed: %r", e)
-
-    @commands.command(name="qna_now", help="Jalankan 1 putaran QnA sekarang")
-    async def qna_now(self, ctx: commands.Context):
-        await self._one_round()
-        try: await ctx.message.add_reaction("✅")
-        except Exception: pass
-
-    @commands.command(name="qna_test", help="Tes QnA dengan prompt custom")
-    async def qna_test(self, ctx: commands.Context, *, prompt: str):
-        await self._one_round(force_prompt=prompt)
-        try: await ctx.message.add_reaction("🧪")
-        except Exception: pass
+            log.debug("[neuro] send failed: %s", e)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(NeuroAutolearnModeratedV2(bot))
