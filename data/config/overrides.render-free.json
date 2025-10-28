@@ -252,6 +252,7 @@
     "WARN_REACTION_BLOCKLIST": "\"default: \u26a0\ufe0f,\u26a0\"",
     "WARN_REACTION_DISABLE": "1",
     "WARN_REACTION_REMOVE_DELAY_S": "0.0",
+	"XP_AWARD_DEFAULT_DELTA": "15",
     "XP_CHAIN_ENABLE": "1",
     "XP_CHAIN_PERIOD_SEC": "120",
     "XP_MAGANG_DONE_KEY": "leina:xp:magang:done",
