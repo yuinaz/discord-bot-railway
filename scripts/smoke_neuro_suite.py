@@ -8,6 +8,7 @@ Neuro Smoketest Suite (v6 — single namespace, no alt 'modules.*')
 """
 import os, sys, json, importlib, glob, types, asyncio
 from threading import Thread as _Thread
+from typing import cast, Any
 
 def env(k, d=None): return os.getenv(k, d)
 def ok(m): print("[OK]", m)
@@ -83,14 +84,18 @@ def install_discord_stub():
         def group(self, *a, **kw):
             def deco(f): return _Group(f)
             return deco
-    commands.Cog = Cog
-    commands.command = _decorator
-    commands.group = lambda *a, **kw: (lambda f: _Group(f))
-    commands.has_permissions = _decorator
-    commands.bot_has_permissions = _decorator
-    discord.abc = abc
-    discord.ext = ext
-    ext.commands = commands
+    # assign attributes dynamically; cast modules to Any to satisfy static checkers
+    c_mod = cast(Any, commands)
+    c_mod.Cog = Cog
+    c_mod.command = _decorator
+    c_mod.group = lambda *a, **kw: (lambda f: _Group(f))
+    c_mod.has_permissions = _decorator
+    c_mod.bot_has_permissions = _decorator
+    d_mod = cast(Any, discord)
+    d_mod.abc = abc
+    d_mod.ext = ext
+    e_mod = cast(Any, ext)
+    e_mod.commands = commands
     sys.modules["discord"] = discord
     sys.modules["discord.abc"] = abc
     sys.modules["discord.ext"] = ext

@@ -12,7 +12,7 @@ Groq client helper — code-embedded controls (tidak perlu ENV Render):
 Kalau mau ubah perilaku, edit konstanta di bawah lalu restart bot.
 """
 import time, inspect, threading
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 # ==== KONSTANTA (edit di sini jika perlu) ====
 MODEL: str = "llama-3.1-8b-instant"   # Model Groq default
@@ -67,7 +67,7 @@ def _log_call(messages: List[Dict]):
     print(f"[LLM] caller={mod}:{func} content_len={content_len} model={MODEL}", flush=True)
 
 class GroqLLM:
-    def __init__(self, client: "Groq", model: Optional[str] = None, max_tokens: int = 256, timeout_s: int = 60):
+    def __init__(self, client: Any, model: Optional[str] = None, max_tokens: int = 256, timeout_s: int = 60):
         if client is None:
             raise RuntimeError("Groq client unavailable; install groq SDK or set secret GROQ_API_KEY.")
         self.client = client
@@ -96,7 +96,7 @@ class GroqLLM:
             if delta and getattr(delta, "content", None):
                 yield delta.content
 
-def make_groq_client() -> "Groq":
+def make_groq_client() -> Any:
     """Buat client Groq. API key diambil dari secrets/local (get_secret)."""
     if Groq is None:
         raise RuntimeError("Package 'groq' tidak tersedia. `pip install groq`.")

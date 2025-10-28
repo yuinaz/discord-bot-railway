@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 
 import discord
 from discord.ext import tasks, commands
+import inspect
+from typing import cast
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +111,28 @@ class QnAAutoLearnScheduler(commands.Cog):
             fn = getattr(provider, meth, None)
             if callable(fn):
                 try:
-                    resp = await fn(question=question) if "question" in fn.__code__.co_varnames else await fn(question)
+                    # Call the function; it may be sync or async. Use inspect to
+                    # handle both kinds safely.
+                    try:
+                        # Prefer keyword if supported
+                        sig = inspect.signature(fn)
+                        if "question" in sig.parameters:
+                            res = fn(question=question)
+                        else:
+                            res = fn(question)
+                    except (ValueError, TypeError):
+                        # Fallback if signature introspection fails (builtins/partial)
+                        try:
+                            res = fn(question=question)
+                        except TypeError:
+                            res = fn(question)
+
+                    # Await only if the result is awaitable
+                    if inspect.isawaitable(res):
+                        resp = await res
+                    else:
+                        resp = res
+
                     if isinstance(resp, str):
                         return resp
                     # some providers return dict
@@ -173,7 +196,9 @@ class QnAAutoLearnScheduler(commands.Cog):
             try:
                 emb = discord.Embed(description=seed)
                 emb.set_author(name="Question by Leina")
-                await channel.send(embed=emb)
+                # channel may be various channel subclasses; treat as Messageable
+                msg_target = cast(discord.abc.Messageable, channel)
+                await msg_target.send(embed=emb)
                 self._sent_ts.append(datetime.utcnow())
             except Exception as e:
                 log.warning("[qna_autolearn] failed to send seed embed: %r", e)
@@ -197,7 +222,8 @@ class QnAAutoLearnScheduler(commands.Cog):
                 try:
                     a_emb = discord.Embed(description=answer)
                     a_emb.set_author(name=f"Answer by {label}")
-                    await channel.send(embed=a_emb)
+                    msg_target = cast(discord.abc.Messageable, channel)
+                    await msg_target.send(embed=a_emb)
                 except Exception as e:
                     log.warning("[qna_autolearn] failed to post answer embed: %r", e)
 
