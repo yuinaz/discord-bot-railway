@@ -14,6 +14,7 @@ Safe for smoke import: only installs listeners; no slash commands; no external d
 import asyncio
 import logging
 import time
+import os
 from typing import Optional, Dict
 
 import discord
@@ -21,8 +22,9 @@ import discord
 log = logging.getLogger(__name__)
 
 # ==== CONFIG (edit here if needed) =========================================
-PER_MESSAGE_XP: int = 5                  # how many XP per eligible message
-USER_COOLDOWN_SEC: int = 45              # per-user cooldown
+# Default per-message XP; prefer environment override for flexibility
+PER_MESSAGE_XP: int = int(os.getenv("PER_MESSAGE_XP", "15"))  # consistent +15 XP per message
+USER_COOLDOWN_SEC: int = int(os.getenv("USER_COOLDOWN_SEC", "45"))  # per-user cooldown
 CHANNEL_ALLOWLIST: Optional[set[int]] = None  # e.g., {1234567890123, 2345678901234}, or None for all guild text chans
 IGNORE_BOTS: bool = True                 # ignore bot & webhook messages
 # ==========================================================================

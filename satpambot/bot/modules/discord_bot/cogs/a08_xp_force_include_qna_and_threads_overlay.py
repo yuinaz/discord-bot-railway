@@ -21,6 +21,7 @@ async def _award_via_event(bot, author, amount: int, message=None, reason="qna/t
 
 import logging, asyncio, time
 
+import os
 from typing import Optional
 
 log = logging.getLogger(__name__)
@@ -68,9 +69,11 @@ class XPForceIncludeOverlay(commands.Cog):
 
             # Prefer direct award events; else fallback to XPStore file/upstash via compat overlay
             dispatched = 0
+            # use configured per-message XP (fall back to normalizer target env or 15)
+            amt = int(os.getenv("PER_MESSAGE_XP", os.getenv("XP_NORMALIZER_TARGET_PER_MESSAGE", "15")))
             for evt in ("xp_add", "xp.award", "satpam_xp"):
                 try:
-                    self.bot.dispatch(evt, message.author.id, +5, reason="force-include")
+                    self.bot.dispatch(evt, message.author.id, amt, reason="force-include")
                     dispatched += 1
                 except Exception:
                     pass
@@ -79,9 +82,9 @@ class XPForceIncludeOverlay(commands.Cog):
                 data = XPStore.load()
                 users = data.setdefault("users", {})
                 u = users.setdefault(str(message.author.id), {"xp": 0})
-                u["xp"] = int(u.get("xp", 0)) + 5
+                u["xp"] = int(u.get("xp", 0)) + amt
                 XPStore.save(data)
-                log.info("[xp_force] fallback awarded +5 via XPStore compat (uid=%s)", message.author.id)
+                log.info("[xp_force] fallback awarded +%s via XPStore compat (uid=%s)", amt, message.author.id)
             else:
                 log.debug("[xp_force] dispatched award events=%d (uid=%s)", dispatched, message.author.id)
         except Exception as e:
