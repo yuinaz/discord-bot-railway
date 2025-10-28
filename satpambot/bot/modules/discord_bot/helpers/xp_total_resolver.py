@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 import os, json, logging, inspect, asyncio, re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -15,13 +15,15 @@ def _cfg_str(key: str, default: str) -> str:
     except Exception:
         return os.getenv(key, default)
 
+try:
+    from ..helpers.upstash_rest import cmd as _upstash_cmd  # type: ignore
+except Exception:
+    _upstash_cmd = None  # type: ignore
+
 def _call_cmd(*args, **kwargs):
-    try:
-        from ..helpers.upstash_rest import cmd as upstash_cmd
-    except Exception:
-        def upstash_cmd(*a, **k):
-            return {"result": None}
-    return upstash_cmd(*args, **kwargs)
+    if _upstash_cmd is None:
+        return {"result": None}
+    return _upstash_cmd(*args, **kwargs)
 
 def _parse_result(obj) -> Optional[str]:
     try:

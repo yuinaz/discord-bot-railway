@@ -45,11 +45,12 @@ class XPStoreProtocol(Protocol):
     @staticmethod
     def save(data: Any) -> None: ...  # Accept Any to avoid type conflicts
 
+from typing import Any as _Any
 try:
-    from satpambot.bot.modules.discord_bot.services.xp_store import XPStore  # type: ignore
-    XPStore = cast('Type[XPStoreProtocol]', XPStore)
+    from satpambot.bot.modules.discord_bot.services.xp_store import XPStore as _XPStoreImpl  # type: ignore
+    XPStore: _Any = cast(_Any, _XPStoreImpl)
 except Exception:
-    XPStore = None  # type: ignore
+    XPStore: _Any = None  # type: ignore
 
 # Default user data
 EMPTY_USER_DATA: Final[Dict[str, int]] = {"xp": 0}

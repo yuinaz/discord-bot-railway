@@ -13,7 +13,7 @@ import asyncio
 import logging
 import urllib.request
 import urllib.error
-from typing import Any, Dict, List, TypedDict, Union, Optional
+from typing import Any, Dict, List, TypedDict, Union, Optional, cast
 
 # Type definitions for XP data structures
 class XPMeta(TypedDict, total=False):
@@ -98,13 +98,13 @@ def _calc(total: int) -> tuple[str, str, XPStatusJson]:
         # TypedDict is for typing only; construct a plain dict at runtime and
         # annotate it as XPMeta for type-checkers.
         meta: XPMeta = {"required": int(meta_raw.get("required", 1)), "current": int(meta_raw.get("current", 0))}
-        j: XPStatusJson = {
+        j = cast(XPStatusJson, {
             "label": str(lbl),
             "percent": float(pct),
             "remaining": int(max(0, meta["required"] - meta["current"])),
             "senior_total": int(total),
             "stage": meta
-        }
+        })
         return lbl, status, j
     except Exception:
         # fallback (legacy thresholds)
@@ -114,13 +114,13 @@ def _calc(total: int) -> tuple[str, str, XPStatusJson]:
         rem = max(0, nxt-total)
         label = f"KULIAH-{S_NAMES[idx]}"
         status = f"{label} ({pct}%)"
-        j: XPStatusJson = {
+        j = cast(XPStatusJson, {
             "label": label,
             "percent": float(pct),
             "remaining": int(rem),
             "senior_total": int(total),
             "stage": {"required": nxt, "current": total}
-        }
+        })
         return label, status, j
 
 async def _heal() -> None:

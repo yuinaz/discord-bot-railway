@@ -1,12 +1,14 @@
 from __future__ import annotations
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Any
 import os, json, re
 from pathlib import Path
 
 try:
     from satpambot.config.runtime import cfg
 except Exception:
-    def cfg(k, d=None): import os; return os.getenv(k, d)
+    def cfg(key: str, default: Any = None) -> Any:
+        import os
+        return os.getenv(key, default)
 
 from satpambot.bot.modules.discord_bot.utils.kv_backend import get_kv_for
 
