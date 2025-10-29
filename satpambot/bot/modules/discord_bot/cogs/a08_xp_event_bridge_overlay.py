@@ -1,105 +1,88 @@
-
 from __future__ import annotations
-import logging, os, json, urllib.request, re
-from typing import Optional, Any
+import os, logging, asyncio
+from typing import Optional
 from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
-def _env(k: str, d: Optional[str]=None) -> Optional[str]:
-    v = os.getenv(k); return v if v not in (None,"") else d
-
-def _xp_key() -> str:
-    return _env("XP_TOTAL_KEY","xp:bot:senior_total") or "xp:bot:senior_total"
-
-def _pipe(cmds):
-    base=_env("UPSTASH_REDIS_REST_URL"); tok=_env("UPSTASH_REDIS_REST_TOKEN")
-    if not base or not tok:
-        return [{"error":"missing upstash env"}]
-    out=[]
-    for c in cmds:
-        url = base.rstrip("/") + "/" + "/".join([c[0].lower()] + [str(x) for x in c[1:]])
+def _int(v, d=0):
+    try:
+        return int(v)
+    except Exception:
         try:
-            r = urllib.request.Request(url, headers={"Authorization": f"Bearer {tok}"})
-            with urllib.request.urlopen(r, timeout=15) as resp:
-                try: out.append(json.loads(resp.read().decode()))
-                except Exception as e: out.append({"result": None, "raw": str(e)})
-        except Exception as e:
-            out.append({"error": str(e)})
-    return out
-
-def _smart_coerce(raw):
-    try:
-        j = json.loads(raw)
-        if isinstance(j,(int,float)): return int(j)
-        if isinstance(j,str) and re.fullmatch(r"[-+]?\d+", j): return int(j)
-        if isinstance(j,dict):
-            for k in ("senior_total","total","xp","amount","value"):
-                v = j.get(k)
-                if isinstance(v,(int,float)): return int(v)
-                if isinstance(v,str) and re.fullmatch(r"[-+]?\d+", v): return int(v)
-    except Exception: pass
-    ints = re.findall(r"[-+]?\d+", str(raw))
-    if ints:
-        ints.sort(key=lambda s: (len(s.lstrip("+-")), int(s)), reverse=True)
-        return int(ints[0])
-    return 0
-
-def _coerce_key_numeric(key: str) -> bool:
-    r = _pipe([["GET", key]])
-    raw = None
-    try:
-        raw = r[0].get("result")
-    except Exception:
-        pass
-    if raw is None:
-        ok = _pipe([["SET", key, "0"]])
-        return not (ok and isinstance(ok,list) and "error" in ok[0])
-    val = _smart_coerce(raw)
-    ok = _pipe([["SET", key, str(val)]])
-    return not (ok and isinstance(ok,list) and "error" in ok[0])
-
-def _clamp(amt: int) -> int:
-    try:
-        a=int(amt)
-        return 0 if a>10_000 or a<-10_000 else a
-    except Exception:
-        return 0
+            return int(float(v))
+        except Exception:
+            return d
 
 class XpEventBridgeOverlay(commands.Cog):
+    """
+    Bridge XP events to Upstash INCRBY with guards:
+    - Skip if delta <= 0 (avoid 400 Bad Request)
+    - Soft-fail if Upstash env missing
+    - Do NOT write pinned JSON here (handled by dual mirror overlay)
+    """
     def __init__(self, bot):
         self.bot = bot
+        self.url = os.getenv("UPSTASH_REDIS_REST_URL") or ""
+        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
+        self.key = os.getenv("XP_SENIOR_KEY","xp:bot:senior_total")
 
-    @commands.Cog.listener("on_xp_add")
-    @commands.Cog.listener("on_xp.award")
+    async def _incr(self, delta: int) -> Optional[int]:
+        if not self.url or not self.token:
+            log.debug("[xp-bridge] Upstash ENV missing; skip INCR")
+            return None
+        if delta <= 0:
+            log.info("[xp-bridge] skip INCR (delta=%s)", delta)
+            return None
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as s:
+                incr_url = f"{self.url}/incrby/{self.key}/{delta}"
+                async with s.get(incr_url, headers={"Authorization": f"Bearer {self.token}"} ) as r:
+                    if r.status != 200:
+                        txt = await r.text()
+                        raise RuntimeError(f"HTTP {r.status}: {txt}")
+                    j = await r.json()
+                    # Upstash returns {"result":"<new_value>"} typically
+                    try:
+                        return int(j.get("result"))
+                    except Exception:
+                        return None
+        except Exception as e:
+            log.warning("[xp-bridge] INCR err: %r (delta=%s) key=%s", e, delta, self.key)
+            return None
+
+    def _extract_delta(self, *args, **kwargs) -> int:
+        for k in ("amount","delta","xp","value"):
+            if k in kwargs:
+                return _int(kwargs.get(k), 0)
+        # Fallback: sometimes first arg is amount
+        if args:
+            return _int(args[0], 0)
+        return 0
+
+    async def _handle(self, *args, **kwargs):
+        d = self._extract_delta(*args, **kwargs)
+        newv = await self._incr(d)
+        if newv is not None:
+            log.info("[xp-bridge] xp_add +%s () -> %s", d, self.key)
+
+    @commands.Cog.listener()
+    async def on_xp_add(self, *args, **kwargs):
+        await self._handle(*args, **kwargs)
+
+    @commands.Cog.listener()
+    async def on_xp_award(self, *args, **kwargs):
+        await self._handle(*args, **kwargs)
+
     @commands.Cog.listener("on_satpam_xp")
-    async def _on_xp(self, *args, **kwargs):
-        evt = kwargs.get("event") or "xp_add"
-        amt = kwargs.get("amount") or kwargs.get("delta") or kwargs.get("xp") or None
-        if amt is None:
-            for a in args:
-                try:
-                    amt=int(a); break
-                except Exception: pass
-        if not isinstance(amt, int) or amt == 0:
-            log.debug("[xp-bridge] %s ignored amt=%r args=%r kwargs=%r", evt, amt, args, kwargs)
-            return
-        amt = _clamp(amt)
-        r = _pipe([["INCRBY", _xp_key(), str(amt)]])
-        if r and isinstance(r,list) and len(r)>0 and "error" in r[0]:
-            log.warning("[xp-bridge] %s INCR err: %s (amt=%s) key=%s", evt, r[0]["error"], amt, _xp_key())
-            if _coerce_key_numeric(_xp_key()):
-                r2 = _pipe([["INCRBY", _xp_key(), str(amt)]])
-                if r2 and isinstance(r2,list) and len(r2)>0 and "error" in r2[0]:
-                    log.warning("[xp-bridge] retry failed: %s", r2[0]["error"])
-                else:
-                    why = kwargs.get("reason") or kwargs.get("tag") or kwargs.get("why") or ""
-                    log.info("[xp-bridge] %s +%s (%s) -> %s [after-fix]", evt, amt, why, _xp_key())
-                    return
-            return
-        else:
-            why = kwargs.get("reason") or kwargs.get("tag") or kwargs.get("why") or ""
-            log.info("[xp-bridge] %s +%s (%s) -> %s", evt, amt, why, _xp_key())
+    async def on_satpam_xp(self, *args, **kwargs):
+        await self._handle(*args, **kwargs)
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
+    # ensure older version removed to prevent duplicate handling
+    try:
+        bot.remove_cog("XpEventBridgeOverlay")
+    except Exception:
+        pass
     await bot.add_cog(XpEventBridgeOverlay(bot))
