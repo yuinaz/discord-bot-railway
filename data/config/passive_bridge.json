@@ -1,0 +1,12 @@
+{
+  "env": {
+    "UPSTASH_REDIS_REST_URL": "https://<your-upstash-endpoint>",
+    "UPSTASH_REDIS_REST_TOKEN": "<your-upstash-rest-token>",
+    "XP_TOTAL_KEY": "xp:bot:senior_total",
+    "PASSIVE_TO_BOT_ENABLE": "1",
+    "PASSIVE_TO_BOT_SHARE": "1.0",
+    "PASSIVE_TO_BOT_REASONS": "passive_message,shadow_message,passive,shadow",
+    "PASSIVE_TO_BOT_LOCK_TTL": "5",
+    "PASSIVE_TO_BOT_LOCK_PREFIX": "xp:lock:botbridge"
+  }
+}
