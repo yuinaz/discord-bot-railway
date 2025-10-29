@@ -677,12 +677,222 @@
           "reason": "normalize:chat:message"
         }
       ]
+    },
+    "674135265182482432": {
+      "xp": 150,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:56:39.806339+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:40.173318+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:40.909007+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:40.936477+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-29T10:56:41.404103+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-29T10:56:46.535174+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:46.671952+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:47.189078+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:47.219980+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-29T10:56:47.472162+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        }
+      ]
+    },
+    "___shin___": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:56:41.922088+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-29T10:56:42.166328+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "897654545423945758": {
+      "xp": 45,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:56:44.631233+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:44.992249+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:45.505409+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "terumi612": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:56:45.533338+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-29T10:56:45.775231+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "338699287141810176": {
+      "xp": 150,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:56:48.046191+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:48.194399+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:48.722192+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:48.752107+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-29T10:56:49.217214+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-29T10:56:57.428280+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:57.861348+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:58.570145+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:56:58.598141+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-29T10:56:58.850246+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        }
+      ]
+    },
+    "wedakyun": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:56:50.391670+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-29T10:56:50.853465+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "226392878375632896": {
+      "xp": 45,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:57:18.258352+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:57:18.945101+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-29T10:57:19.451433+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "hitorushinku": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-29T10:57:19.481327+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-29T10:57:19.729150+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
     }
   },
   "stats": {
     "total_awards": 8,
     "total_users": 1
   },
-  "updated_at": "2025-10-28T13:17:25.438461+00:00",
+  "updated_at": "2025-10-29T10:57:19.729150+00:00",
   "awards": {}
 }
