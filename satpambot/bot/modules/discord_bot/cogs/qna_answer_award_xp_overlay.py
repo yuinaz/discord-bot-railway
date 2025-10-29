@@ -46,7 +46,7 @@ class QnaAnswerAwardXP(commands.Cog):
         self.qna_id = cfg_int("QNA_CHANNEL_ID", 0) or None
         self.client = UpstashClient() if UpstashClient else None
         self.delta = int(cfg_str("QNA_XP_PER_ANSWER_BOT", "5") or "5")
-        self.senior_key = cfg_str("XP_SENIOR_KEY", "xp:bot:senior_total_v2")
+        self.senior_key = cfg_str("XP_SENIOR_KEY", "xp:bot:senior_total")
         self.ns = cfg_str("QNA_AWARD_IDEMP_NS", "qna:awarded:answer")
 
     async def _mark_once(self, mid: int) -> bool:
