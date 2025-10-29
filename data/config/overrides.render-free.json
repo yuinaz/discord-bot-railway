@@ -324,7 +324,7 @@
     "LADDER_REFRESH_SECS": "60",
 	"LEINA_PERSONA_FILE": "leina_lore.json",
 	"LEINA_PERSONA_WEIGHTS_KEY": "persona:leina:tone_policy:weights",
-	"XP_AUTOHEAL_MODE": "prefer_status_json",
+	"XP_AUTOHEAL_MODE": "prefer_total",
 	"LEARNING_ALLOW_DOWNGRADE": "1",
     "PHASE_TRANSITION_ENABLE": "0",
     "QNA_ISOLATION_CHANNEL_ID": "1426571542627614772",

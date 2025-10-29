@@ -1,46 +1,26 @@
 from __future__ import annotations
-
-# a00_01_intish_monkeypatch_overlay.py
-
+import logging
 from discord.ext import commands
-import sys, types, json, logging
-
+from satpambot.bot.modules.discord_bot.helpers.intish import parse_intish
 log = logging.getLogger(__name__)
-
-def intish(x, default=0):
-    try: return int(x)
-    except Exception:
-        s = str(x).strip()
-        if s.startswith("{") and s.endswith("}"):
-            try:
-                obj = json.loads(s)
-                for k in ("senior_total_xp","value","v"):
-                    if k in obj: return int(obj[k])
-            except Exception: pass
-        digits = "".join(ch for ch in s if ch.isdigit())
-        return int(digits or default)
-
-TARGETS = (
-    "satpambot.bot.modules.discord_bot.cogs.a08_xp_state_bootstrap_overlay",
-    "satpambot.bot.modules.discord_bot.cogs.a08_passive_total_offset_overlay",
-)
-
-def _patch_module_int(modname: str) -> bool:
-    mod = sys.modules.get(modname)
-    if not isinstance(mod, types.ModuleType): return False
-    try:
-        setattr(mod, "int", intish)
-        log.info("[intish] patched int() in %s", modname)
-        return True
-    except Exception as e:
-        log.debug("[intish] patch failed in %s: %r", modname, e); return False
-
-class IntishOverlay(commands.Cog):
-    def __init__(self, bot: commands.Bot): self.bot = bot
-    @commands.Cog.listener()
-    async def on_ready(self):
-        ok = False
-        for m in TARGETS:
-            if _patch_module_int(m): ok = True
-        if ok: log.info("[intish] int() patched for a08* modules")
-async def setup(bot: commands.Bot): await bot.add_cog(IntishOverlay(bot))
+class IntishMonkeypatchOverlay(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        try:
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            _orig_get_int = UpstashClient.get_int
+            async def _patched(self, key: str, default: int=0):
+                try:
+                    raw = await self.get_raw(key)
+                    ok, val = parse_intish(raw)
+                    return int(val if ok and val is not None else default)
+                except Exception:
+                    return int(default)
+            UpstashClient.get_int = _patched
+            log.info("[intish-monkey] UpstashClient.get_int patched for intish tolerance")
+        except Exception as e:
+            log.debug("[intish-monkey] skip patch: %r", e)
+async def setup(bot): await bot.add_cog(IntishMonkeypatchOverlay(bot))
+def setup(bot):
+    try: bot.add_cog(IntishMonkeypatchOverlay(bot))
+    except Exception: pass
