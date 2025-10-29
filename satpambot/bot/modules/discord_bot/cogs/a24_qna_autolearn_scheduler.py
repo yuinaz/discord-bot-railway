@@ -198,6 +198,17 @@ class QnAAutoLearnScheduler(commands.Cog):
                 emb.set_author(name="Question by Leina")
                 # channel may be various channel subclasses; treat as Messageable
                 msg_target = cast(discord.abc.Messageable, channel)
+                # --- begin: NX/EX emit guard ---
+                try:
+                    from satpambot.bot.modules.discord_bot.cogs.patch_helpers_qna_guard import _claim_qna_slot
+                except Exception:
+                    _claim_qna_slot = None
+                if _claim_qna_slot:
+                    if not _claim_qna_slot(max(60, self.interval_sec)):
+                        # another poster already emitted within interval; skip
+                        return
+                # --- end: NX/EX emit guard ---
+
                 await msg_target.send(embed=emb)
                 self._sent_ts.append(datetime.utcnow())
             except Exception as e:
