@@ -1,46 +1,69 @@
-
+from __future__ import annotations
+import os, json, glob, logging
+from pathlib import Path
+from typing import Dict, Any, Optional
 from discord.ext import commands
-import os, json
 
-def _flatten(d, prefix=""):
-    flat = {}
-    for k, v in d.items():
-        kk = f"{prefix}{k}" if not prefix else f"{prefix}{k}"
-        if isinstance(v, dict):
-            flat.update(_flatten(v, prefix=kk + "_"))
-        else:
-            flat[kk] = v
-    return flat
+log = logging.getLogger(__name__)
 
-class EnvOverridesLoader(commands.Cog):
-    def __init__(self, bot): self.bot = bot
+BASES = [
+    Path("data/config/overrides.json"),
+    Path("data/config/overrides.render-free.json"),
+]
+PATCH_GLOB = "data/config/overrides.*.patch.json"
+
+def _load_json(p: Path) -> Optional[Dict[str, Any]]:
+    try:
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning("[env_overrides] read %s failed: %r", p, e)
+    return None
+
+def _apply_env(d: Dict[str, Any]) -> int:
+    """Accepts either {'env': {...}} or flat {...}; writes to os.environ (strings only)."""
+    if not isinstance(d, dict): return 0
+    envmap = d.get("env", d)
+    cnt = 0
+    for k, v in envmap.items():
+        try:
+            if isinstance(v, (dict, list)):
+                v = json.dumps(v, ensure_ascii=False)
+            os.environ[str(k)] = str(v)
+            cnt += 1
+        except Exception as e:
+            log.warning("[env_overrides] skip %s: %r", k, e)
+    return cnt
+
+class EnvOverridesLoaderOverlay(commands.Cog):
+    """Loads overrides JSON files into process ENV. No side effects at import; runs on_ready once."""
+    def __init__(self, bot):
+        self.bot = bot
+        self._done = False
 
     @commands.Cog.listener()
     async def on_ready(self):
-        path = os.getenv("CONFIG_OVERRIDES_PATH", "data/config/overrides.json")
-        alt = os.getenv("CONFIG_OVERRIDES_FALLBACK", "data/config/overrides.render-free.json")
-        used = None
-        for p in (path, alt):
+        if self._done:
+            return
+        total = 0
+        # Base files in order
+        for p in BASES:
+            d = _load_json(p)
+            if d:
+                total += _apply_env(d)
+                log.info("[env_overrides] applied %s", p)
+        # Patch files (merge last, override previous)
+        for pf in sorted(glob.glob(PATCH_GLOB)):
             try:
-                if not os.path.exists(p): continue
-                with open(p, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                # allow plain key->value or nested under 'env'
-                envmap = data.get("env", data)
-                # convert all values to str for os.environ
-                cnt = 0
-                for k, v in envmap.items():
-                    if isinstance(v, (dict, list)):
-                        v = json.dumps(v, ensure_ascii=False)
-                    os.environ[str(k)] = str(v)
-                    cnt += 1
-                print(f"[env_overrides] loaded {cnt} keys from {p}")
-                used = p
-                break
+                d = _load_json(Path(pf))
+                if d:
+                    total += _apply_env(d)
+                    log.info("[env_overrides] merged %s", pf)
             except Exception as e:
-                print(f"[env_overrides] failed loading {p}: {e!r}")
-        if not used:
-            print("[env_overrides] no overrides file found (skip)")
-async def setup(bot):
-    await bot.add_cog(EnvOverridesLoader(bot))
-    print("[env_overrides] overlay ready (CONFIG_OVERRIDES_PATH / overrides.json)")
+                log.warning("[env_overrides] skip patch %s: %r", pf, e)
+        self._done = True
+        log.info("[env_overrides] done: %s entries", total)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(EnvOverridesLoaderOverlay(bot))
+    log.info("[env_overrides] loader ready")
