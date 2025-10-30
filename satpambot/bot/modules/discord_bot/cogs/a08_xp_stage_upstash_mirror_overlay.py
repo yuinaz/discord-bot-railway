@@ -1,14 +1,9 @@
-# satpambot/bot/modules/discord_bot/cogs/a08_xp_stage_upstash_mirror_overlay.py
+
 from __future__ import annotations
-import os, logging, asyncio, json
-from urllib.parse import quote
+import logging, asyncio, json
 from discord.ext import commands
 
 log = logging.getLogger(__name__)
-
-def _env(k, default=None):
-    v = os.getenv(k)
-    return v if v is not None else default
 
 def _int(v, d=0):
     try: return int(v)
@@ -16,75 +11,48 @@ def _int(v, d=0):
         try: return int(float(v))
         except Exception: return d
 
-def _extract_delta_and_user(*args, **kwargs):
-    # Prefer explicit kwargs
-    for k in ("amount","delta","xp","value"):
-        if k in kwargs:
-            try: return int(kwargs[k]), kwargs.get("user") or kwargs.get("member") or (args[0] if args else None)
-            except Exception: pass
-    # Positional patterns: (user, delta, ...), (delta, reason)
-    if len(args) >= 2:
-        try: return int(args[1]), args[0]
-        except Exception: pass
-    if len(args) >= 1:
-        try:
-            amt = int(args[0])
-            if -100_000 <= amt <= 100_000: return amt, None
-        except Exception: pass
-    return 0, None
-
 class XpStageUpstashMirrorOverlay(commands.Cog):
-    """
-    Mirror staged XP keys to Upstash on every XP event.
-    Writes:
-      - xp:stage:label/current/required/percent
-      - learning:status
-      - learning:status_json (as JSON string)
-    Skips delta <= 0 or |delta| > 100k.
-    """
+    """Force mirror of pinned KULIAH/MAGANG stage only; ignore others completely."""
     def __init__(self, bot):
         self.bot = bot
-        # Upstash ENV
-        self.url = _env("UPSTASH_REDIS_REST_URL","")
-        self.token = _env("UPSTASH_REDIS_REST_TOKEN","")
-        # Key names (override-able via ENV)
-        self.k_stage_label   = _env("XP_STAGE_LABEL_KEY",   "xp:stage:label")
-        self.k_stage_current = _env("XP_STAGE_CURRENT_KEY", "xp:stage:current")
-        self.k_stage_req     = _env("XP_STAGE_REQUIRED_KEY","xp:stage:required")
-        self.k_stage_pct     = _env("XP_STAGE_PERCENT_KEY", "xp:stage:percent")
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str
+        self.k_stage_label   = cfg_str("XP_STAGE_LABEL_KEY",   "xp:stage:label")
+        self.k_stage_current = cfg_str("XP_STAGE_CURRENT_KEY", "xp:stage:current")
+        self.k_stage_req     = cfg_str("XP_STAGE_REQUIRED_KEY","xp:stage:required")
+        self.k_stage_pct     = cfg_str("XP_STAGE_PERCENT_KEY", "xp:stage:percent")
         self.k_status        = "learning:status"
         self.k_status_json   = "learning:status_json"
-        self.total_key       = _env("XP_SENIOR_KEY","xp:bot:senior_total")
+        self.total_key       = cfg_str("XP_SENIOR_KEY","xp:bot:senior_total")
+        self._last_state     = None
 
-    async def _upstash_set(self, key: str, value: str):
-        if not self.url or not self.token:
-            return
+    async def _upstash_set(self, k: str, v):
         try:
-            import aiohttp
-            async with aiohttp.ClientSession() as s:
-                # URL-encode key & value agar aman untuk endpoint path-based
-                u = f"{self.url}/set/{quote(str(key), safe='')}/{quote(str(value), safe='')}"
-                async with s.get(u, headers={"Authorization": f"Bearer {self.token}"} ) as r:
-                    if r.status != 200:
-                        txt = await r.text()
-                        raise RuntimeError(f"HTTP {r.status}: {txt}")
-        except Exception as e:
-            log.debug("[xp-stage-upstash] set %s failed: %r", key, e)
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            cli = UpstashClient(); await cli.cmd("SET", k, str(v))
+        except Exception:
+            pass
 
     async def _apply(self, delta: int):
         if delta <= 0 or abs(delta) > 100_000:
             return
         try:
             from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
-            from satpambot.bot.modules.discord_bot.helpers.stage_tracker import StageTracker
             kv = PinnedJSONKV(self.bot)
-            tracker = StageTracker(kv, total_key=self.total_key)
-            # compute new stage using tracker.add (staging semantics)
-            m = await tracker.add(int(delta))
-            label = str(m.get("xp:stage:label"))
-            cur = _int(m.get("xp:stage:current", 0), 0)
-            req = _int(m.get("xp:stage:required", 1), 1)
-            pct = float(m.get("xp:stage:percent", 0) or 0)
+            m = await kv.get_map()
+
+            label = str(m.get(self.k_stage_label) or "")
+            cur = _int(m.get(self.k_stage_current, 0), 0)
+            req = _int(m.get(self.k_stage_req, 1), 1)
+            pct = float(m.get(self.k_stage_pct, 0) or 0.0)
+            if not label.startswith(("KULIAH-","MAGANG")):
+                # ignore non-KULIAH
+                log.info("[xp-stage-upstash] ignore non-KULIAH label: %r", label)
+                return
+
+            state = (label, cur, req, round(pct,1))
+            if self._last_state == state: return
+            self._last_state = state
+
             status = f"{label} ({pct}%)"
             status_json = json.dumps({
                 "label": label, "percent": pct, "remaining": max(0, req-cur),
@@ -92,7 +60,6 @@ class XpStageUpstashMirrorOverlay(commands.Cog):
                 "stage": {"start_total": _int(m.get("xp:stage:start_total", 0), 0),
                           "required": req, "current": cur}
             }, separators=(",",":"))
-            # mirror to Upstash
             await asyncio.gather(
                 self._upstash_set(self.k_stage_label,   label),
                 self._upstash_set(self.k_stage_current, str(cur)),
@@ -101,20 +68,31 @@ class XpStageUpstashMirrorOverlay(commands.Cog):
                 self._upstash_set(self.k_status,        status),
                 self._upstash_set(self.k_status_json,   status_json),
             )
-            log.info("[xp-stage-upstash] %s %s/%s (%.1f%%) -> mirrored", label, cur, req, pct)
+            log.info("[xp-stage-upstash] FORCED %s %s/%s (%.1f%%) -> mirrored", label, cur, req, pct)
         except Exception as e:
             log.debug("[xp-stage-upstash] apply failed: %r", e)
 
     async def _handle(self, *a, **k):
-        d, _ = _extract_delta_and_user(*a, **k)
+        # derive delta quickly
+        d = 0
+        if k and isinstance(k, dict):
+            for kk in ("amount","delta","xp","value"):
+                if kk in k:
+                    try: d = int(k[kk]); break
+                    except Exception: pass
+        if not d and a:
+            try: d = int(a[1] if len(a) >= 2 else a[0])
+            except Exception: d = 0
         if d: await self._apply(d)
 
     @commands.Cog.listener()
     async def on_xp_add(self, *a, **k): await self._handle(*a, **k)
+
     @commands.Cog.listener()
-    async def on_xp_award(self, *a, **k): await self._handle(*a, **k)
+    async def on_xp_award(self, *a, **k): return
+
     @commands.Cog.listener("on_satpam_xp")
-    async def on_satpam_xp(self, *a, **k): await self._handle(*a, **k)
+    async def on_satpam_xp(self, *a, **k): return
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(XpStageUpstashMirrorOverlay(bot))

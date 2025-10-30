@@ -1,0 +1,18 @@
+
+SatpamLeina v44 — Hotfix: XP Ladder & QnA Noise
+------------------------------------------------
+- Prevent duplicate XP processing: disabled `on_xp_award` and `on_satpam_xp`
+  listeners in:
+    * cogs/a08_xp_event_dual_mirror_bridge.py
+    * cogs/a08_xp_stage_upstash_mirror_overlay.py
+  (keep `on_xp_add` as the single event source)
+- Stage mirror now only writes KULIAH/MAGANG to main keys:
+    xp:stage:{label,current,required,percent}, learning:status(_json)
+  Other labels (e.g., SMP-Lx miner) are mirrored under xp:miner:* keys.
+  Also adds in-process dedupe to reduce spam logs.
+- QNA: removed 🤖 placeholder ping from neuro_autolearn_moderated_v2.py
+  so the channel contains ONLY the embed Question by Leina and the Answer
+  by Gemini/Groq.
+- Added miner key ENV (optional overrides):
+    XP_MINER_LABEL_KEY, XP_MINER_CURRENT_KEY, XP_MINER_REQUIRED_KEY, XP_MINER_PERCENT_KEY
+  Defaults to xp:miner:{label,current,required,percent}.

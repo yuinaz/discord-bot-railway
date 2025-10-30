@@ -1,99 +1,66 @@
+
 from __future__ import annotations
-import json, urllib.request
-import logging, asyncio
+import logging, re
 from typing import Optional
 from discord.ext import commands
-
-from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_int, cfg_float, cfg_str
 from satpambot.bot.modules.discord_bot.helpers import xp_award
+from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str, cfg_float
 
 log = logging.getLogger(__name__)
 
-def _reasons() -> set[str]:
-    s = cfg_str("PASSIVE_TO_BOT_REASONS", "passive_message,shadow_message,passive,shadow") or ""
-    return {p.strip().lower() for p in s.replace(";",",").split(",") if p.strip()}
+def _coerce_ids(uid, amt):
+    if hasattr(uid, "id"): uid = uid.id
+    elif isinstance(uid, str):
+        import re
+        m = re.search(r"\d+", uid)
+        if not m: raise TypeError(f"uid string invalid: {uid!r}")
+        uid = int(m.group(0))
+    else:
+        uid = int(uid)
+    if amt is None: amt = 0
+    elif isinstance(amt, str):
+        m = re.search(r"-?\d+", amt)
+        if not m: raise TypeError(f"amt string invalid: {amt!r}")
+        amt = int(m.group(0))
+    else:
+        amt = int(amt)
+    return uid, amt
 
-ENABLE = cfg_int("PASSIVE_TO_BOT_ENABLE", 1)
-SHARE  = cfg_float("PASSIVE_TO_BOT_SHARE", 1.0)
-LOCK_TTL = cfg_int("PASSIVE_TO_BOT_LOCK_TTL", 5)
-LOCK_PREFIX = cfg_str("PASSIVE_TO_BOT_LOCK_PREFIX", "xp:lock:botbridge") or "xp:lock:botbridge"
-
-def _hdr() -> Optional[str]:
-    tok = cfg_str("UPSTASH_REDIS_REST_TOKEN", None)
-    return f"Bearer {tok}" if tok else None
-
-def _base() -> Optional[str]:
-    return cfg_str("UPSTASH_REDIS_REST_URL", None)
-
-async def _nx_lock(uid: int, reason: str) -> bool:
-    base, auth = _base(), _hdr()
-    if not base or not auth:
-        # Without Upstash creds in module JSON, still allow (no lock)
-        log.warning("[bot-bridge] Upstash creds missing in module JSON; awarding without NX lock")
-        return True
-    key = f"{LOCK_PREFIX}:{uid}:{reason}"
-    payload = json.dumps([["SET", key, "1", "EX", str(int(LOCK_TTL)), "NX"]]).encode("utf-8")
-    req = urllib.request.Request(f"{base}/pipeline", method="POST", data=payload)
-    req.add_header("Authorization", auth); req.add_header("Content-Type", "application/json")
-    loop = asyncio.get_running_loop()
-    try:
-        raw = await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=3.5).read())
-        return b"OK" in raw
-    except Exception as e:
-        log.debug("[bot-bridge] NX lock failed: %r", e)
-        return False
+ENABLE = int(cfg_str("PASSIVE_BRIDGE_ENABLE", "1") or "1")
+SHARE  = cfg_float("PASSIVE_BRIDGE_SHARE", 1.0)
 
 class PassiveToBotBridgeOverlay(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def _apply(self, uid: int, amount: int, reason: Optional[str]):
-        if ENABLE != 1:
-            return
-        r = (reason or "").strip().lower()
-        if r and _reasons() and (r not in _reasons()):
+    async def _apply(self, user_id: int, amount: int, reason: Optional[str] = None):
+        if not ENABLE or amount <= 0:
             return
         try:
-            delta = int(amount)
-        except Exception:
-            return
-        if delta <= 0:
-            return
-        if not await _nx_lock(uid, r or "passive"):
-            return
-        scaled = int(max(1, round(delta * SHARE)))
-        loop = asyncio.get_running_loop()
-        try:
-            new_total, meta = await loop.run_in_executor(None, xp_award.award_xp_sync, scaled)
-            log.info("[bot-bridge] +%s (from uid=%s reason=%s) -> total=%s", scaled, uid, r, new_total)
+            await xp_award.award(self.bot, int(user_id), int(amount), str(reason or "bridge"))
         except Exception as e:
-            log.warning("[bot-bridge] award failed: %r", e)
+            log.debug("[passive-bridge] apply failed: %r", e)
 
-    # Compatible listeners
     @commands.Cog.listener()
     async def on_xp_add(self, *args, **kwargs):
-        uid = kwargs.get("user_id") or kwargs.get("uid")
-        amt = kwargs.get("amount")
-        reason = kwargs.get("reason")
+        uid = kwargs.get("uid") if isinstance(kwargs, dict) else None
+        amt = kwargs.get("amt") if isinstance(kwargs, dict) else None
+        reason = kwargs.get("reason") if isinstance(kwargs, dict) else None
         if uid is None and len(args) >= 1: uid = args[0]
         if amt is None and len(args) >= 2: amt = args[1]
         if reason is None and len(args) >= 3: reason = args[2]
-        if uid is not None and amt is not None:
-            await self._apply(int(uid), int(amt), reason)
+        if uid is None or amt is None:
+            return
+        try:
+            _uid, _amt = _coerce_ids(uid, amt)
+        except Exception as e:
+            log.warning("[passive-bridge] bad payload uid=%r amt=%r reason=%r err=%r", uid, amt, reason, e)
+            return
+        await self._apply(_uid, _amt, reason)
 
-    @commands.Cog.listener()
+    @commands.Cog.listener("on_satpam_xp")
     async def on_satpam_xp(self, *args, **kwargs):
-        await self.on_xp_add(*args, **kwargs)
-
-    @commands.Cog.listener()
-    async def on_xp_award(self, *args, **kwargs):
         await self.on_xp_add(*args, **kwargs)
 
 async def setup(bot):
     await bot.add_cog(PassiveToBotBridgeOverlay(bot))
-
-def setup(bot):  # sync fallback
-    try:
-        bot.add_cog(PassiveToBotBridgeOverlay(bot))
-    except Exception:
-        pass

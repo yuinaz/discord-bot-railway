@@ -80,7 +80,7 @@ class NeuroAutolearnModeratedV2(commands.Cog):
 
         # Ask a question from topics (placeholder — the real logic may live in another cog)
         try:
-            await ch.send("🤖 ")
+            return  # disabled placeholder ping; only embed QnA allowed
         except Exception as e:
             log.debug("[neuro] send failed: %s", e)
 
