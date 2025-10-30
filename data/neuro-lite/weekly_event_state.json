@@ -5,6 +5,9 @@
   },
   "2025-W44": {
     "scheduled_ts": 1761752700,
-    "triggered": false
+    "triggered": true,
+    "award": 94,
+    "base": 94,
+    "weekend": false
   }
 }

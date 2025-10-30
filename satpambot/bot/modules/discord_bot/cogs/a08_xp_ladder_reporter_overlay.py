@@ -1,62 +1,66 @@
 from __future__ import annotations
-import logging, asyncio
-from discord.ext import commands, tasks
+import logging, asyncio, re
+from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
+def _is_int_str(s):
+    return isinstance(s, (str, bytes)) and re.fullmatch(r"-?\d+", s.decode() if isinstance(s, bytes) else s) is not None
+
+def _to_int(v, d=0):
+    try:
+        return int(v)
+    except Exception:
+        try:
+            return int(float(v))
+        except Exception:
+            return d
+
 class XpLadderReporterOverlay(commands.Cog):
-    """Report current staged progress (per-level) using StageResolver/KV (not cumulative bands)."""
     def __init__(self, bot):
         self.bot = bot
-        self._boot = False
-        self._task = self._periodic()
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str, cfg_int
+        self.total_key = cfg_str("XP_SENIOR_KEY","xp:bot:senior_total")
+        self.interval = cfg_int("XP_LADDER_REPORT_INTERVAL", 300)
+        self._last = None
 
-    @tasks.loop(minutes=10.0)
-    async def _periodic(self):
-        try:
-            label, pct, cur, req, total = await self._resolve()
-            log.info("[xp-ladder] %s %5.1f%%  (%s/%s)  total=%s", label, pct, cur, req, total)
-        except Exception as e:
-            log.debug("[xp-ladder] periodic report failed: %r", e)
-
-    @_periodic.before_loop
-    async def _before(self):
-        await self.bot.wait_until_ready()
-
-    async def _resolve(self):
-        # prefer stage_preferred(), fallback to pinned KV
-        label, percent, cur, req, total = "KULIAH-S1", 0.0, 0, 19000, 0
-        try:
-            from satpambot.bot.modules.discord_bot.helpers.xp_total_resolver import stage_preferred, resolve_senior_total
-            lbl, pct, meta = await stage_preferred()
-            label = str(lbl); percent = float(pct)
-            cur = int(meta.get("current", 0)); req = int(meta.get("required", 1))
-            total = int(await resolve_senior_total() or 0)
-            return label, percent, cur, req, total
-        except Exception:
-            pass
+    async def _tick(self):
         try:
             from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
-            kv = PinnedJSONKV(self.bot); m = await kv.get_map()
-            label = str(m.get("xp:stage:label", label))
-            percent = float(m.get("xp:stage:percent", percent))
-            cur = int(m.get("xp:stage:current", cur)); req = int(m.get("xp:stage:required", req))
-            total = int(m.get("xp:bot:senior_total", total))
-        except Exception:
-            pass
-        return label, percent, cur, req, total
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            kv = PinnedJSONKV(self.bot)
+            us = UpstashClient()
+
+            m = await kv.get_map()
+            label = str(m.get("xp:stage:label") or "")
+            cur   = _to_int(m.get("xp:stage:current",0),0)
+            req   = _to_int(m.get("xp:stage:required",1),1)
+            pct   = float(m.get("xp:stage:percent",0) or 0.0)
+
+            try:
+                total_raw = await us.cmd("GET", self.total_key)
+            except Exception:
+                total_raw = None
+            total = _to_int(total_raw, _to_int(m.get(self.total_key, 0), 0))
+
+            if label.startswith(("KULIAH-","MAGANG")):
+                state = (label, cur, req, round(pct,1), total)
+                if state != self._last:
+                    self._last = state
+                    log.info("[xp-ladder] %s  %4.1f%%  (%s/%s)  total=%s", label, pct, cur, req, total)
+            else:
+                if total != _to_int((self._last or (None, None, None, None, None))[4], 0):
+                    self._last = (None,None,None,None,total)
+                    log.info("[xp-ladder] total=%s (pinned stage not ready)", total)
+        except Exception as e:
+            log.debug("[xp-ladder] tick failed: %r", e)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if not self._boot:
-            self._boot = True
-            # one-shot report on boot
-            try:
-                label, pct, cur, req, total = await self._resolve()
-                log.info("[xp-ladder] %s %5.1f%%  (%s/%s)  total=%s", label, pct, cur, req, total)
-            finally:
-                if not self._periodic.is_running():
-                    self._periodic.start()
+        await self.bot.wait_until_ready()
+        while True:
+            await self._tick()
+            await asyncio.sleep(self.interval)
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(XpLadderReporterOverlay(bot))
