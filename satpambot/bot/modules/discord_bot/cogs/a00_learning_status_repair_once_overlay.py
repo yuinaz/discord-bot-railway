@@ -1,90 +1,107 @@
 
 from __future__ import annotations
-import os, json, logging, asyncio
+import json, logging, asyncio
+from urllib.parse import quote
 from discord.ext import commands
+
+# === injected helper: pinned-based payload for KULIAH/MAGANG ===
+def __kuliah_payload_from_pinned(__bot):
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
+        kv = PinnedJSONKV(__bot)
+        m = kv.get_map()
+        # If async, ignore
+        if hasattr(m, "__await__"): 
+            return None
+        def _to_int(v, d=0):
+            try: return int(v)
+            except Exception:
+                try: return int(float(v))
+                except Exception: return d
+        label = str(m.get("xp:stage:label") or "")
+        if not (label.startswith("KULIAH-") or label.startswith("MAGANG")):
+            return None
+        cur = _to_int(m.get("xp:stage:current", 0), 0)
+        req = _to_int(m.get("xp:stage:required", 1), 1)
+        pct = float(m.get("xp:stage:percent", 0) or 0.0)
+        total = _to_int(m.get("xp:bot:senior_total", 0), 0)
+        st0 = _to_int(m.get("xp:stage:start_total", max(0, total - cur)), max(0, total - cur))
+        status = f"{label} ({pct}%)"
+        import json as _json
+        status_json = _json.dumps({
+            "label": label, "percent": pct, "remaining": max(0, req-cur),
+            "senior_total": total,
+            "stage": {"start_total": st0, "required": req, "current": cur}
+        }, separators=(",",":"))
+        return status, status_json
+    except Exception:
+        return None
+# === end helper ===
 
 log = logging.getLogger(__name__)
 
-def _envb(k, d=True):
-    v = os.getenv(k)
-    if v is None: return d
-    return str(v).strip().lower() in {"1","true","on","yes"}
-
-def _int(v, d=0):
+def _to_int(v, d=0):
     try: return int(v)
     except Exception:
         try: return int(float(v))
         except Exception: return d
 
-class LearningStatusRepairOnce(commands.Cog):
-    """One-shot repair: ensure learning:status follows KULIAH/MAGANG pinned stage,
-    and migrate any SMP/SMA miner state to xp:miner:* keys.
-    Enabled when REPAIR_LEARNING_STATUS_ONCE=1 (default)."""
+class LearningStatusRepairOnceOverlay(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.enabled = _envb("REPAIR_LEARNING_STATUS_ONCE", True)
-        self.total_key = os.getenv("XP_SENIOR_KEY","xp:bot:senior_total")
-        self.k_miner_label   = os.getenv("XP_MINER_LABEL_KEY","xp:miner:label")
-        self.k_miner_current = os.getenv("XP_MINER_CURRENT_KEY","xp:miner:current")
-        self.k_miner_req     = os.getenv("XP_MINER_REQUIRED_KEY","xp:miner:required")
-        self.k_miner_pct     = os.getenv("XP_MINER_PERCENT_KEY","xp:miner:percent")
         self._done = False
 
-    async def _run_once(self):
-        if self._done or not self.enabled:
-            return
+    async def _get(self, client, key: str):
         try:
-            from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
-            kv = PinnedJSONKV(self.bot)
-            m = await kv.get_map()  # pinned KV snapshot (plus some mirrored keys)
-
-            # Read main stage (pinned)
-            stage_label   = str(m.get("xp:stage:label") or "")
-            stage_current = _int(m.get("xp:stage:current", 0), 0)
-            stage_req     = _int(m.get("xp:stage:required", 1), 1)
-            stage_pct     = float(m.get("xp:stage:percent", 0) or 0.0)
-            total         = _int(m.get(self.total_key, 0), 0)
-
-            # Read learning:status_json (may contain wrong SMP-* state)
-            raw = m.get("learning:status_json")
-            try: lj = json.loads(raw) if isinstance(raw, str) else (raw or {})
-            except Exception: lj = {}
-
-            learning_label = str(lj.get("label") or "")
-            # If learning label is non-KULIAH and main stage is KULIAH/MAGANG, repair it.
-            if stage_label.startswith(("KULIAH-","MAGANG")) and not learning_label.startswith(("KULIAH-","MAGANG")):
-                status = f"{stage_label} ({stage_pct}%)"
-                status_json = json.dumps({
-                    "label": stage_label, "percent": stage_pct, "remaining": max(0, stage_req - stage_current),
-                    "senior_total": total, "stage": {"start_total": max(0, total - stage_current), "required": stage_req, "current": stage_current}
-                }, separators=(",",":"))
-                await kv.set_multi({
-                    "learning:status": status,
-                    "learning:status_json": status_json,
-                })
-                log.warning("[repair-once] fixed learning:status -> %s %s/%s (%.1f%%)", stage_label, stage_current, stage_req, stage_pct)
-
-                # Migrate old learning SMP-* to xp:miner:* if present
-                if learning_label and not learning_label.startswith(("KULIAH-","MAGANG")):
-                    cur = _int(((lj.get("stage") or {}).get("current", 0)), 0)
-                    req = _int(((lj.get("stage") or {}).get("required", 0)), 0)
-                    pct = float(lj.get("percent", 0) or 0.0)
-                    await kv.set_multi({
-                        self.k_miner_label: learning_label,
-                        self.k_miner_current: cur,
-                        self.k_miner_req: req,
-                        self.k_miner_pct: pct,
-                    })
-                    log.warning("[repair-once] migrated learning miner -> %s %s/%s (%.1f%%)", learning_label, cur, req, pct)
-
-            self._done = True
+            return await client.get_raw(key)
         except Exception as e:
-            log.debug("[repair-once] skip: %r", e)
+            log.debug("[learning-repair-once] GET %s fail: %r", key, e); return None
+
+    async def _set(self, client, key: str, value: str):
+        try:
+            v = quote(str(value), safe="")
+            d = await client._apost(f"/set/{key}/{v}")
+            return isinstance(d, dict) and "result" in d
+        except Exception as e:
+            log.debug("[learning-repair-once] SET %s fail: %r", key, e); return False
+
+    async def _repair_once(self):
+        if self._done: return
+        self._done = True
+        try:
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            us = UpstashClient()
+            label = await self._get(us, "xp:stage:label")
+            cur   = _to_int(await self._get(us, "xp:stage:current"), 0)
+            req   = _to_int(await self._get(us, "xp:stage:required"), 1)
+            pct   = float(await self._get(us, "xp:stage:percent") or 0.0)
+            total = _to_int(await self._get(us, "xp:bot:senior_total"), 0)
+            if not (str(label or "").startswith(("KULIAH-","MAGANG"))):
+                log.info("[learning-repair-once] skip: stage label not KULIAH/MAGANG (%r)", label); return
+            st0 = _to_int(await self._get(us, "xp:stage:start_total"), max(0, total - cur))
+            if st0 <= 0: st0 = max(0, total - cur)
+            status = f"{label} ({pct}%)"
+            payload = {"label": str(label), "percent": pct, "remaining": max(0, req-cur),
+                       "senior_total": total,
+                       "stage": {"start_total": st0, "required": req, "current": cur}}
+            new_json = json.dumps(payload, separators=(",",":"))
+            cur_status = await self._get(us, "learning:status")
+            cur_json   = await self._get(us, "learning:status_json")
+            w = 0
+            if str(cur_status) != status:
+                if await self._set(us, "learning:status", status): w += 1
+            if str(cur_json) != new_json:
+                if await self._set(us, "learning:status_json", new_json): w += 1
+            if w: log.warning("[learning-repair-once] repaired %d key(s) -> %s", w, status)
+            else: log.info("[learning-repair-once] already consistent -> %s", status)
+        except Exception as e:
+            log.warning("[learning-repair-once] failed: %r", e)
 
     @commands.Cog.listener()
     async def on_ready(self):
         await self.bot.wait_until_ready()
-        asyncio.create_task(self._run_once())
+        await asyncio.sleep(1.5)
+        await self._repair_once()
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(LearningStatusRepairOnce(bot))
+async def setup(bot):
+    await bot.add_cog(LearningStatusRepairOnceOverlay(bot))

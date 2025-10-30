@@ -1,88 +1,33 @@
 
+from __future__ import annotations
+import logging, asyncio
 from discord.ext import commands
-import os, logging, importlib
-from discord.ext import tasks
-
-def _intish(x, default=0):
-    if x is None:
-        return default
-    try:
-        return int(x)
-    except Exception:
-        s = str(x).strip()
-        if s.startswith("{") and s.endswith("}"):
-            try:
-                obj = json.loads(s)
-                for k in ("senior_total_xp","value","v"):
-                    if k in obj:
-                        return int(obj[k])
-            except Exception:
-                pass
-        digits = "".join(ch for ch in s if ch.isdigit())
-        return int(digits or default)
-try:
-    import httpx
-except Exception:
-    httpx = None
+from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_int, cfg_str
 
 log = logging.getLogger(__name__)
 
-UPSTASH_URL = os.getenv("UPSTASH_REDIS_REST_URL")
-UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-PHASE_KEY = os.getenv("LEARNING_PHASE_KEY","learning:phase")
-TK_KEY = os.getenv("TK_XP_KEY","xp:bot:tk_total")
-SR_KEY = os.getenv("SENIOR_XP_KEY","xp:bot:senior_total")
-DEFAULT_PHASE = os.getenv("LEARNING_PHASE_DEFAULT","tk")
-REFRESH_MIN = int(os.getenv("XP_OFFSET_REFRESH_MIN","10"))
+BACKOFF = cfg_int("PASSIVE_TOTAL_OFFSET_BACKOFF_SEC", 180)
+ENABLE  = cfg_str("PASSIVE_TOTAL_OFFSET_ENABLE", "1") in ("1","true","on","yes","True")
 
-async def _get(client, key):
-    r = await client.get(f"{UPSTASH_URL}/get/{key}", headers={"Authorization": f"Bearer {UPSTASH_TOKEN}"})
-    if r.status_code == 200:
-        return (r.json() or {}).get("result")
-
-class PassiveLearningTotalOffset(commands.Cog):
+class PassiveTotalOffsetOverlay(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self._client = httpx.AsyncClient(timeout=8.0) if httpx else None
-        self._offset = 0
-        self.refresh.start()
 
-    def _current_phase(self):
-        st = getattr(self.bot, "_xp_state", {}) if hasattr(self.bot, "_xp_state") else {}
-        return (st.get("phase") or DEFAULT_PHASE).lower()
-
-    @tasks.loop(minutes=REFRESH_MIN)
-    async def refresh(self):
-        if not (UPSTASH_URL and UPSTASH_TOKEN and self._client):
-            return
+    async def _refresh_once(self):
+        if not ENABLE: return
         try:
-            phase = await _get(self._client, PHASE_KEY) or self._current_phase()
-            if str(phase).lower().startswith("senior"):
-                base = await _get(self._client, SR_KEY)
-            else:
-                base = await _get(self._client, TK_KEY)
-            self._offset = int(base or 0)
-            log.info("[passive-total-offset] phase=%s base_offset=%s", phase, self._offset)
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            us = UpstashClient()
+            await us.cmd("GET", "xp:bot:senior_total")
         except Exception as e:
-            log.warning("[passive-total-offset] refresh fail: %r", e)
-
-    @refresh.before_loop
-    async def before(self):
-        await self.bot.wait_until_ready()
+            log.warning("[passive-total-offset] refresh fail: %r (retry in %ss)", e, BACKOFF)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        try:
-            m = importlib.import_module("satpambot.bot.modules.discord_bot.cogs.learning_passive_observer")
-        except Exception as e:
-            log.debug("[passive-total-offset] import fail: %r", e); return
-        fn = getattr(m, "compute_label_from_group", None)
-        if callable(fn) and not getattr(fn, "__offset_patched__", False):
-            def wrapped(total_xp, ladder_map, phase=None):
-                total = int(total_xp or 0) + int(getattr(self, "_offset", 0))
-                return fn(total, ladder_map, phase=phase)
-            wrapped.__offset_patched__ = True
-            m.compute_label_from_group = wrapped
-            log.info("[passive-total-offset] hooked compute_label_from_group (+offset)")
+        await self.bot.wait_until_ready()
+        while True:
+            await self._refresh_once()
+            await asyncio.sleep(BACKOFF)
+
 async def setup(bot):
-    await bot.add_cog(PassiveLearningTotalOffset(bot))
+    await bot.add_cog(PassiveTotalOffsetOverlay(bot))

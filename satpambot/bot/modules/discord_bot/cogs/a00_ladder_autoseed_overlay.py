@@ -1,71 +1,62 @@
-import os, json, logging
-from discord.ext import commands, tasks
 
+from __future__ import annotations
+import logging, asyncio
+from typing import Optional
+from discord.ext import commands
 log = logging.getLogger(__name__)
-
-DEFAULT_LADDER = {
-    "SMP": {"L1": 2000, "L2": 4000, "L3": 6000},
-    "SMA": {"L1": 4000, "L2": 7500, "L3": 9000},
-    "KULIAH": {"S1": 19000, "S2": 35000, "S3": 58000, "S4": 70000, "S5": 96500, "S6": 158000, "S7": 220000, "S8": 262500}
-}
-
-class LadderAutoseed(commands.Cog):
+def _cfg_int(key: str, default: int = 0):
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_int
+        return int(cfg_int(key, default))
+    except Exception: return int(default)
+def _cfg_str(key: str, default: str = ""):
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str
+        return str(cfg_str(key, default))
+    except Exception: return str(default)
+class LadderAutoSeedOverlay(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self._task.start()
-
-    def cog_unload(self):
-        self._task.cancel()
-
-    @tasks.loop(count=1)
-    async def _task(self):
-        url = os.getenv("UPSTASH_REST_URL") or os.getenv("UPSTASH_REDIS_REST_URL")
-        tok = os.getenv("UPSTASH_REST_TOKEN") or os.getenv("UPSTASH_REDIS_REST_TOKEN")
-        if not (url and tok):
-            return
+        self.enabled = (_cfg_int("LADDER_AUTOSEED", 0) == 1)
+        log.info("[ladder_autoseed] %s", "enabled" if self.enabled else "disabled")
+    async def rtype(self,key: str)->Optional[str]:
         try:
             import httpx
-        except Exception:
-            log.info("[ladder_autoseed] httpx not available; skip")
-            return
-
-        ladder = DEFAULT_LADDER
-        try:
-            with open("data/neuro-lite/ladder.json", "r", encoding="utf-8") as f:
-                ladder = json.load(f)
-                for tier in ("SMP","SMA","KULIAH"):
-                    ladder[tier] = ladder.get(tier, DEFAULT_LADDER[tier])
-        except Exception:
-            pass
-
-        async with httpx.AsyncClient(timeout=5) as cli:
-            headers = {"Authorization": f"Bearer {tok}"}
-            async def hset(key, mapping):
-                parts = []
-                for k,v in mapping.items():
-                    parts += [str(k), str(v)]
-                path = "/".join(parts)
-                return await cli.get(f"{url}/hset/{key}/{path}", headers=headers)
-            async def rtype(key):
-                r = await cli.get(f"{url}/type/{key}", headers=headers)
-                return r.json().get("result")
-            async def delete(key):
-                await cli.get(f"{url}/del/{key}", headers=headers)
-
-            for key, mapping in (("xp:ladder:SMP", ladder["SMP"]), ("xp:ladder:SMA", ladder["SMA"]), ("xp:ladder:KULIAH", ladder["KULIAH"])):
-                try:
-                    t = await rtype(key)
-                    if t != "hash":
-                        if t in ("string","list","set","zset","stream",None):
-                            await delete(key)
-                        await hset(key, mapping)
-                        log.info("[ladder_autoseed] fixed %s -> hash fields=%d", key, len(mapping))
-                except Exception:
-                    log.warning("[ladder_autoseed] failed seed %s", key, exc_info=True)
-
-    @_task.before_loop
-    async def _wait_ready(self):
-        await self.bot.wait_until_ready()
-
-async def setup(bot):
-    await bot.add_cog(LadderAutoseed(bot))
+            url=_cfg_str("UPSTASH_REDIS_REST_URL","").rstrip("/")
+            tok=_cfg_str("UPSTASH_REDIS_REST_TOKEN","")
+            if not url or not tok: return None
+            timeout=httpx.Timeout(3.0, connect=2.0, read=2.0, write=2.0)
+            limits=httpx.Limits(max_connections=2, max_keepalive_connections=1)
+            async with httpx.AsyncClient(timeout=timeout, limits=limits) as cli:
+                r=await cli.get(f"{url}/type/{key}", headers={"Authorization": f"Bearer {tok}"})
+                if r.status_code!=200: return None
+                return str(r.json().get("result"))
+        except Exception: return None
+    async def _task(self):
+        if not self.enabled: return
+        keys=["xp:ladder:SMP","xp:ladder:KULIAH","xp:ladder:MAGANG"]
+        need=[]
+        for k in keys:
+            t=await self.rtype(k)
+            if t is None: return
+            if t.upper()=="NONE": need.append(k)
+        if not need: return
+        from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+        from urllib.parse import quote
+        cli=UpstashClient()
+        async def set_if_none(k, payload):
+            try:
+                enc=quote(payload, safe=""); await cli._apost(f"/set/{k}/{enc}")
+                log.warning("[ladder_autoseed] seeded %s", k)
+            except Exception: pass
+        SMP_DEF='["SMP-L1","2000","SMP-L2","4000","SMP-L3","8000"]'
+        KUL_DEF='["S1","19000","S2","35000","S3","58000","S4","70000","S5","96500","S6","158000","S7","220000","S8","262500"]'
+        MAG_DEF='["1TH","2000000"]'
+        if "xp:ladder:SMP" in need: await set_if_none("xp:ladder:SMP", SMP_DEF)
+        if "xp:ladder:KULIAH" in need: await set_if_none("xp:ladder:KULIAH", KUL_DEF)
+        if "xp:ladder:MAGANG" in need: await set_if_none("xp:ladder:MAGANG", MAG_DEF)
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.enabled: return
+        await self.bot.wait_until_ready(); await asyncio.sleep(1.0); await self._task()
+async def setup(bot): await bot.add_cog(LadderAutoSeedOverlay(bot))

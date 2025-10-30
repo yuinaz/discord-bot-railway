@@ -1,152 +1,47 @@
-
 from __future__ import annotations
-import logging, re, os, json, urllib.request, urllib.parse, asyncio
-from typing import Optional
-
-import discord
+import logging
+import re
 from discord.ext import commands
-
-try:
-    from satpambot.config.auto_defaults import cfg_str, cfg_int
-except Exception:
-    def cfg_str(k: str, d: str=""):
-        return os.getenv(k, d)
-    def cfg_int(k: str, d: int=0):
-        try: return int(os.getenv(k, str(d)))
-        except Exception: return d
-
 log = logging.getLogger(__name__)
 
-WAIT_KEY = "qna:waiting"
-LAST_A_KEY = "qna:last_answer_id"
+def _cfg_str(k, d=""):
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str
+        return str(cfg_str(k, d))
+    except Exception:
+        return str(d)
 
-class _UpstashLite:
-    def __init__(self):
-        self.base = (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
-        self.tok  = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
-        self.enabled = bool(self.base and self.tok)
+XP_STR = _cfg_str("QNA_XP_PER_ANSWER_BOT", "25")
+REASON = "qna-autolearn"
 
-    def _req(self, path: str) -> Optional[dict]:
-        if not self.enabled: return None
-        url = self.base + path
-        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {self.tok}"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            s = r.read().decode()
-            try:
-                return json.loads(s)
-            except Exception:
-                return {"result": s}
-
-    async def incrby(self, key: str, delta: int) -> bool:
-        if not self.enabled: return False
-        try:
-            from urllib.parse import quote
-            _ = self._req("/incrby/" + quote(key, safe="") + "/" + str(int(delta)))
-            return True
-        except Exception as e:
-            log.warning("[qna-award] incrby failed: %r", e)
-            return False
-
-    async def get(self, key: str) -> Optional[str]:
-        try:
-            from urllib.parse import quote
-            r = self._req("/get/" + quote(key, safe=""))
-            return None if r is None else r.get("result")
-        except Exception:
-            return None
-
-    async def set(self, key: str, val: str) -> bool:
-        try:
-            from urllib.parse import quote
-            _ = self._req("/set/" + quote(key, safe="") + "/" + quote(val, safe=""))
-            return True
-        except Exception:
-            return False
-
-    async def delete(self, key: str) -> bool:
-        try:
-            from urllib.parse import quote
-            _ = self._req("/del/" + quote(key, safe=""))
-            return True
-        except Exception:
-            return False
-
-_ANS_PROVIDER = re.compile(r"\banswer\s+by\s+(groq|gemini)\b", re.I)
-_QUE_PAT = re.compile(r"\b(question|pertanyaan)\b", re.I)
-
-def _is_provider_answer_embed(e: "discord.Embed") -> bool:
-    def g(x): return (x or "").strip().lower()
-    title = g(getattr(e, "title","")); author = g(getattr(getattr(e,"author",None),"name",None))
-    desc = g(getattr(e,"description","")); foot = g(getattr(getattr(e,"footer",None),"text",None))
-    hay = " ".join([title, author, desc, foot])
-    if _QUE_PAT.search(hay):
-        return False
-    return bool(_ANS_PROVIDER.search(hay))
+_ANS_PROVIDER = re.compile(r"^answer by (gemini|groq)", re.I)
 
 class QnaAnswerAwardXP(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.qna_id = cfg_int("QNA_CHANNEL_ID", 0) or cfg_int("LEARNING_QNA_CHANNEL_ID", 0) or None
-        self.delta = int(cfg_str("QNA_XP_PER_ANSWER_BOT", "5") or "5")
-        self.senior_key = cfg_str("XP_SENIOR_KEY", "xp:bot:senior_total")
-        try:
-            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient  # type: ignore
-            self.client = UpstashClient()
-            if not getattr(self.client, "enabled", False):
-                self.client = _UpstashLite()
-        except Exception:
-            self.client = _UpstashLite()
-        self.us2 = _UpstashLite()
-        self._seen = set()
 
-    async def _mark_once(self, mid: int) -> bool:
-        key = f"qna:awarded:answer:{mid}"
+    @commands.Cog.listener()
+    async def on_message(self, msg):
         try:
-            if await self.client.get(key) is not None:
-                return False
-            await self.client.set(key, "1")
-            return True
-        except Exception:
-            if mid in self._seen: return False
-            self._seen.add(mid)
+            if not getattr(msg, "embeds", None): return
+            e = msg.embeds[0]
+            ft = (getattr(getattr(e, "footer", None), "text", "") or "")
+            if not _ANS_PROVIDER.search(ft): return  # only provider answers
+            uid = getattr(getattr(msg, "author", None), "id", None)
+            if uid is None: return
+            # Dispatch XP (+25 by default). Bridge global will ignore due to reason "qna-..."
             try:
-                async def _clear():
-                    await asyncio.sleep(600)
-                    self._seen.discard(mid)
-                asyncio.create_task(_clear())
-            except Exception: pass
-            return True
-
-    @commands.Cog.listener("on_message")
-    async def _on_message(self, m: "discord.Message"):
-        try:
-            if self.qna_id and getattr(getattr(m,"channel",None),"id",None) != self.qna_id:
-                return
-            if not getattr(getattr(m,"author",None),"bot",False):
-                return
-            embeds = getattr(m, "embeds", None)
-            if not embeds: return
-            e = embeds[0]
-            if not _is_provider_answer_embed(e):
-                return
-            if not await self._mark_once(int(getattr(m,"id",0) or 0)):
-                return
-            if not getattr(self.client, "enabled", False):
-                log.warning("[qna-award] client disabled; skip award")
-                return
-            ok = await self.client.incrby(self.senior_key, int(self.delta))
-            if ok:
-                log.info("[qna-award] +%s XP key=%s msg=%s", self.delta, self.senior_key, getattr(m,"id",None))
-                # RELEASE waiting gate so autopilot can post next question
-                try:
-                    await self.us2.set(LAST_A_KEY, str(getattr(m,"id",None) or ""))
-                    await self.us2.delete(WAIT_KEY)
-                except Exception:
-                    pass
-            else:
-                log.warning("[qna-award] incrby failed (client returned False)")
-        except Exception as exc:
-            log.warning("[qna-award] failed: %r", exc)
+                self.bot.dispatch("xp_add", uid, int(XP_STR), REASON)
+            except Exception:
+                pass
+            # Release WAIT gate so scheduler boleh post pertanyaan baru
+            try:
+                from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+                await UpstashClient().delete("qna:waiting")
+            except Exception:
+                pass
+        except Exception as ex:
+            log.warning("[qna-award] fail: %r", ex)
 
 async def setup(bot):
     await bot.add_cog(QnaAnswerAwardXP(bot))

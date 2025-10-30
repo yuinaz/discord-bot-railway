@@ -3,6 +3,40 @@ from __future__ import annotations
 import logging, asyncio, json
 from discord.ext import commands
 
+# === injected helper: KULIAH/MAGANG payload from pinned ===
+def __kuliah_payload_from_pinned(__bot):
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
+        kv = PinnedJSONKV(__bot)
+        m = kv.get_map()
+        if hasattr(m, "__await__"):
+            # async version: caller must build asynchronously; skip here
+            return None
+        def _to_int(v, d=0):
+            try: return int(v)
+            except Exception:
+                try: return int(float(v))
+                except Exception: return d
+        label = str(m.get("xp:stage:label") or "")
+        if not (label.startswith("KULIAH-") or label.startswith("MAGANG")):
+            return None
+        cur = _to_int(m.get("xp:stage:current", 0), 0)
+        req = _to_int(m.get("xp:stage:required", 1), 1)
+        pct = float(m.get("xp:stage:percent", 0) or 0.0)
+        total = _to_int(m.get("xp:bot:senior_total", 0), 0)
+        st0 = _to_int(m.get("xp:stage:start_total", max(0, total - cur)), max(0, total - cur))
+        status = f"{label} ({pct}%)"
+        import json as _json
+        status_json = _json.dumps({
+            "label": label, "percent": pct, "remaining": max(0, req-cur),
+            "senior_total": total,
+            "stage": {"start_total": st0, "required": req, "current": cur}
+        }, separators=(",",":"))
+        return status, status_json
+    except Exception:
+        return None
+# === end helper ===
+
 log = logging.getLogger(__name__)
 
 def _int(v, d=0):

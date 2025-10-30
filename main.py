@@ -88,6 +88,15 @@ def _serve_web():
 
 def main():
 
+    # --- shim_runner import (minimal, non-breaking) ---
+    try:
+        from satpambot.bot.modules.discord_bot import shim_runner           # prefer canonical
+    except Exception:
+        try:
+            import satpambot.bot.shim_runner as shim_runner  # fallback 1
+        except Exception:
+            import satpambot.shim_runner as shim_runner      # fallback 2
+    # --- end shim_runner import ---
     # --- Render Free preflight (non-fatal) ---
     try:
         import importlib
@@ -107,7 +116,33 @@ def main():
     # Then start the Discord bot as usual
     log.info("🤖 Starting Discord bot (shim_runner.start_bot)...")
     from satpambot.bot.modules.discord_bot import shim_runner
-    asyncio.run(shim_runner.start_bot())
+
+    
+    # --- file logging to run_YYYYmmdd_HHMMSS.log ---
+    import time, logging.handlers, os
+# --- shim_runner import (top-level, minimal) ---
+try:
+    from satpambot.bot.modules.discord_bot import shim_runner           # canonical
+except Exception:
+    try:
+        import satpambot.bot.shim_runner as shim_runner  # fallback 1
+    except Exception:
+        import satpambot.shim_runner as shim_runner      # fallback 2
+# --- end shim_runner import ---
+    _ts = time.strftime("%Y%m%d_%H%M%S")
+    _log_name = f"run_{_ts}.log"
+    _root = logging.getLogger()
+    if not any(isinstance(h, logging.handlers.RotatingFileHandler) for h in _root.handlers):
+        _fh = logging.handlers.RotatingFileHandler(
+            _log_name, maxBytes=5_000_000, backupCount=3, encoding="utf-8"
+        )
+        _fh.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+        _root.addHandler(_fh)
+        if _root.level > logging.INFO:
+            _root.setLevel(logging.INFO)
+        logging.getLogger("entry.main").info("📄 file log => %s", os.path.abspath(_log_name))
+    # --- end file logging ---
+asyncio.run(shim_runner.start_bot())
 
 if __name__ == "__main__":
     main()

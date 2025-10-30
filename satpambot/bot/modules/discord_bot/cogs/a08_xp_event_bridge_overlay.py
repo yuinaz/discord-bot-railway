@@ -1,35 +1,70 @@
-
 from __future__ import annotations
 import logging
 from discord.ext import commands
-from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str
-
 log = logging.getLogger(__name__)
 
-ENABLED = (cfg_str("XP_EVENT_BRIDGE_ENABLE", "0") in ("1","true","on","yes","True"))
+_ALLOWED_GLOBAL_PREFIX = ("chat:", "passive_", "force-include", "system:")
 
-class XpEventBridgeOverlay(commands.Cog):
-    """Disabled by default to avoid duplicate INCR/mirror. Set XP_EVENT_BRIDGE_ENABLE=1 to re-enable."""
-    def __init__(self, bot):
-        self.bot = bot
+def _to_int(v, d=None):
+    try:
+        return int(v)
+    except Exception:
+        try:
+            return int(float(v))
+        except Exception:
+            return d
 
-    async def _handle(self, *a, **k):
-        if not ENABLED:
+class XPEventBridgeOverlay(commands.Cog):
+    def __init__(self, bot): self.bot = bot
+
+    async def _ensure_integer_key(self):
+        from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+        cli = UpstashClient()
+        cur = await cli.get_raw("xp:bot:senior_total")
+        n = _to_int(cur, None)
+        if n is None:
+            try:
+                from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
+                pin = PinnedJSONKV(self.bot).get_map()
+                n = _to_int(pin.get("xp:bot:senior_total"), 0)
+            except Exception:
+                n = 0
+            await cli._apost(f"/set/xp:bot:senior_total/{n}")
+            log.warning("[xp-bridge] normalized senior_total -> %d", n)
+
+    async def _incrby(self, delta: int):
+        from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+        cli = UpstashClient()
+        try:
+            await self._ensure_integer_key()
+            newv = await cli._apost(f"/incrby/xp:bot:senior_total/{int(delta)}")
+            log.info("[xp-bridge] INCR -> %s (+%s)", str(newv).strip(), delta)
+        except Exception as e:
+            log.warning("[xp-bridge] INCRBY fail: %r; fallback to set", e)
+            cur = await cli.get_raw("xp:bot:senior_total")
+            n = _to_int(cur, 0)
+            newv = n + int(delta)
+            await cli._apost(f"/set/xp:bot:senior_total/{newv}")
+            log.info("[xp-bridge] SET -> %s (+%s)", newv, delta)
+
+    @commands.Cog.listener()
+    async def on_xp_add(self, uid, amt, reason: str):
+        d = _to_int(amt, 0)
+        if not d: return
+        rs = (reason or "").strip().lower()
+        if rs.startswith("qna"):
+            log.debug("[xp-bridge] ignore qna reason: %s", rs)
             return
-        # Original logic intentionally disabled by default.
-        return
-
-    @commands.Cog.listener()
-    async def on_xp_add(self, *a, **k):
-        await self._handle(*a, **k)
-
-    @commands.Cog.listener()
-    async def on_xp_award(self, *a, **k):
-        await self._handle(*a, **k)
-
-    @commands.Cog.listener("on_satpam_xp")
-    async def on_satpam_xp(self, *a, **k):
-        await self._handle(*a, **k)
+        if not any(rs.startswith(p) for p in _ALLOWED_GLOBAL_PREFIX):
+            log.debug("[xp-bridge] ignore non-global reason: %s", rs)
+            return
+        await self._incrby(d)
 
 async def setup(bot):
-    await bot.add_cog(XpEventBridgeOverlay(bot))
+    try:
+        for name, cog in list(bot.cogs.items()):
+            if isinstance(cog, XPEventBridgeOverlay) or cog.__class__.__name__ == "XPEventBridgeOverlay":
+                bot.remove_cog(name)
+    except Exception:
+        pass
+    await bot.add_cog(XPEventBridgeOverlay(bot))

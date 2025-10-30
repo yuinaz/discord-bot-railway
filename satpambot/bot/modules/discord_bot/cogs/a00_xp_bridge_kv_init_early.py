@@ -1,57 +1,53 @@
+
 from __future__ import annotations
+import logging, asyncio
 from discord.ext import commands
-
-"""
-Ensure Upstash KV base keys exist so downstream bridge doesn't stop with 'KV missing; stop'.
-Keys:
-  - xp:store            (JSON with version/users/awards/stats/updated_at)
-  - xp:bot:senior_total (int or {"senior_total_xp": int})
-  - xp:ladder:TK        ({"L1": int, "L2": int})
-"""
-import os, logging, json, httpx, time
-
 log = logging.getLogger(__name__)
-
-URL = os.getenv("UPSTASH_REDIS_REST_URL")
-TOK = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-HDR = {"Authorization": f"Bearer {TOK}", "Content-Type": "application/json"} if TOK else {}
-
-async def setup(bot):
-    if not URL or not TOK:
-        log.warning("[xp-kv-init] upstash env missing; skip")
-        return
-
-    async with httpx.AsyncClient(timeout=8.0) as x:
-        async def cmd(*arr):
-            r = await x.post(URL, headers=HDR, json=list(arr))
-            r.raise_for_status()
-            return r.json()
-
-        # xp:store
+def _cfg_int(k,d=0):
+    try:
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_int
+        return int(cfg_int(k,d))
+    except Exception: return int(d)
+def _to_int(v,d=0):
+    try: return int(v)
+    except Exception:
+        try: return int(float(v))
+        except Exception: return d
+class XPBridgeKVInitEarly(commands.Cog):
+    def __init__(self, bot): self.bot=bot
+    async def _get(self,key):
         try:
-            res = await cmd("GET", "xp:store")
-            if not res.get("result"):
-                now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                empty = {"version": 2, "users": {}, "awards": [], "stats": {"total": 0}, "updated_at": now}
-                await cmd("SET", "xp:store", json.dumps(empty))
-                log.info("[xp-kv-init] created xp:store")
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            return await UpstashClient().get_raw(key)
         except Exception as e:
-            log.warning("[xp-kv-init] xp:store check failed: %r", e)
-
-        # xp:bot:senior_total
+            log.info("[xp-kv-init] get %s fail: %r", key, e); return None
+    async def _set(self,key,val):
         try:
-            res = await cmd("GET", "xp:bot:senior_total")
-            if not res.get("result"):
-                await cmd("SET", "xp:bot:senior_total", "0")
-                log.info("[xp-kv-init] created xp:bot:senior_total=0")
+            from urllib.parse import quote
+            from satpambot.bot.modules.discord_bot.helpers.upstash_client import UpstashClient
+            enc = quote(str(val), safe=""); await UpstashClient()._apost(f"/set/{key}/{enc}"); return True
         except Exception as e:
-            log.warning("[xp-kv-init] senior_total check failed: %r", e)
-
-        # xp:ladder:TK
+            log.info("[xp-kv-init] set %s fail: %r", key, e); return False
+    def _pinned_total(self):
         try:
-            res = await cmd("GET", "xp:ladder:TK")
-            if not res.get("result"):
-                await cmd("SET", "xp:ladder:TK", json.dumps({"L1": 0, "L2": 500}))
-                log.info("[xp-kv-init] created xp:ladder:TK")
-        except Exception as e:
-            log.warning("[xp-kv-init] ladder TK check failed: %r", e)
+            from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
+            kv = PinnedJSONKV(self.bot).get_map()
+            n = _to_int(kv.get("xp:bot:senior_total"), -1)
+            return n if n>=0 else None
+        except Exception: return None
+    @commands.Cog.listener()
+    async def on_ready(self):
+        await self.bot.wait_until_ready()
+        cur = _to_int(await self._get("xp:bot:senior_total"), -1)
+        if cur>=0:
+            log.info("[xp-kv-init] senior_total exists -> %s", cur); return
+        p = self._pinned_total()
+        if p is not None:
+            if await self._set("xp:bot:senior_total", str(p)):
+                log.warning("[xp-kv-init] restored senior_total from pinned -> %s", p)
+            return
+        if _cfg_int("XP_FORCE_RESET_ON_BOOT",0)==1:
+            if await self._set("xp:bot:senior_total","0"):
+                log.warning("[xp-kv-init] forced reset to 0"); return
+        log.info("[xp-kv-init] unknown senior_total; skip reset (safe no-op)")
+async def setup(bot): await bot.add_cog(XPBridgeKVInitEarly(bot))
