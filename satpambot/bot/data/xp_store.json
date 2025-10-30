@@ -474,7 +474,7 @@
       ]
     },
     "228126085160763392": {
-      "xp": 315,
+      "xp": 360,
       "awards": [
         {
           "ts": "2025-10-28T13:15:36.839153+00:00",
@@ -590,11 +590,26 @@
           "ts": "2025-10-30T02:10:05.976753+00:00",
           "amount": 15,
           "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-30T02:39:51.707891+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-30T02:39:52.065510+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-30T02:39:52.547883+00:00",
+          "amount": 15,
+          "reason": "passive_message"
         }
       ]
     },
     "zenarius": {
-      "xp": 140,
+      "xp": 170,
       "awards": [
         {
           "ts": "2025-10-28T13:15:37.849424+00:00",
@@ -648,6 +663,16 @@
         },
         {
           "ts": "2025-10-30T02:10:06.139642+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-30T02:39:52.571912+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-30T02:39:52.709695+00:00",
           "amount": 15,
           "reason": "chat:message"
         }
@@ -2022,12 +2047,47 @@
           "reason": "chat:message"
         }
       ]
+    },
+    "277251507726974976": {
+      "xp": 45,
+      "awards": [
+        {
+          "ts": "2025-10-30T02:37:46.710787+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-30T02:37:46.850338+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-30T02:37:47.531277+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "wishfulgamingid": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-30T02:37:47.556824+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-30T02:37:47.913888+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
     }
   },
   "stats": {
     "total_awards": 8,
     "total_users": 1
   },
-  "updated_at": "2025-10-30T02:10:06.139642+00:00",
+  "updated_at": "2025-10-30T02:39:52.709695+00:00",
   "awards": {}
 }

@@ -5,34 +5,53 @@ from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
-try:
-    from ..helpers.xp_total_resolver import stage_preferred, resolve_senior_total
-except Exception as e:
-    log.warning("[autorank] helper import failed: %s; using fallbacks", e)
-    async def stage_preferred(): return ("KULIAH-S1", 0.0, {"start_total":0,"required":19000,"current":0})
-    async def resolve_senior_total(): return 0
+def _to_int(v, d=0):
+    try: return int(v)
+    except Exception:
+        try: return int(float(v))
+        except Exception: return d
 
-class LadderRuntimeAutorankOverlay(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+class XpLadderRuntimeAutorankOverlay(commands.Cog):
+    """Autorank that trusts pinned stage (KULIAH/MAGANG). Avoids bogus S1 logs at boot."""
+    def __init__(self, bot):
         self.bot = bot
-        self._task = None
+        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_int
+        self.interval = cfg_int("XP_AUTORANK_INTERVAL", 300)
+        self._last = None
 
-    async def start(self):
-        if self._task is None:
-            self._task = asyncio.create_task(self._periodic())
+    async def _tick(self):
+        try:
+            from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
+            kv = PinnedJSONKV(self.bot)
+            m = await kv.get_map()
 
-    async def _periodic(self):
-        await asyncio.sleep(5.0)
-        while not self.bot.is_closed():
-            try:
-                label, pct, _meta = await stage_preferred()
-                total = await resolve_senior_total()
-                log.warning("[autorank] %s (%.1f%%) xp=%s", label, pct, total)
-            except Exception as e:
-                log.warning("[autorank] soft-fail: %s", e)
-            await asyncio.sleep(180)
+            label = str(m.get("xp:stage:label") or "")
+            cur   = _to_int(m.get("xp:stage:current", 0), 0)
+            req   = _to_int(m.get("xp:stage:required", 1), 1)
+            pct   = float(m.get("xp:stage:percent", 0) or 0.0)
 
-async def setup(bot: commands.Bot):
-    cog = LadderRuntimeAutorankOverlay(bot)
-    await bot.add_cog(cog)
-    await cog.start()
+            # Only operate/log when KULIAH/MAGANG + sane numbers
+            if not label.startswith(("KULIAH-","MAGANG")) or req <= 0:
+                return
+
+            state = (label, cur, req, round(pct,1))
+            if state == self._last:
+                return
+            self._last = state
+
+            # Here you'd adjust roles/ranks; we only log sanitized status
+            log.info("[autorank] %s (%.1f%%) xp=%s", label, pct, cur)
+        except Exception as e:
+            log.debug("[autorank] tick failed: %r", e)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        await self.bot.wait_until_ready()
+        # Warm-up delay to let bootstrap/repair overlays finish
+        await asyncio.sleep(3)
+        while True:
+            await self._tick()
+            await asyncio.sleep(self.interval)
+
+async def setup(bot):
+    await bot.add_cog(XpLadderRuntimeAutorankOverlay(bot))
