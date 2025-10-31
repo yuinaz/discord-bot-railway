@@ -1,131 +1,167 @@
-
 from __future__ import annotations
-import logging, asyncio, json
+import asyncio, json, logging, os, re, time, urllib.parse
+from typing import Any, Dict, Optional, Tuple
+import discord
 from discord.ext import commands
 
-# === injected helper: KULIAH/MAGANG payload from pinned ===
-def __kuliah_payload_from_pinned(__bot):
-    try:
-        from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
-        kv = PinnedJSONKV(__bot)
-        m = kv.get_map()
-        if hasattr(m, "__await__"):
-            # async version: caller must build asynchronously; skip here
-            return None
-        def _to_int(v, d=0):
-            try: return int(v)
-            except Exception:
-                try: return int(float(v))
-                except Exception: return d
-        label = str(m.get("xp:stage:label") or "")
-        if not (label.startswith("KULIAH-") or label.startswith("MAGANG")):
-            return None
-        cur = _to_int(m.get("xp:stage:current", 0), 0)
-        req = _to_int(m.get("xp:stage:required", 1), 1)
-        pct = float(m.get("xp:stage:percent", 0) or 0.0)
-        total = _to_int(m.get("xp:bot:senior_total", 0), 0)
-        st0 = _to_int(m.get("xp:stage:start_total", max(0, total - cur)), max(0, total - cur))
-        status = f"{label} ({pct}%)"
-        import json as _json
-        status_json = _json.dumps({
-            "label": label, "percent": pct, "remaining": max(0, req-cur),
-            "senior_total": total,
-            "stage": {"start_total": st0, "required": req, "current": cur}
-        }, separators=(",",":"))
-        return status, status_json
-    except Exception:
-        return None
-# === end helper ===
-
 log = logging.getLogger(__name__)
-
-def _int(v, d=0):
-    try: return int(v)
-    except Exception:
-        try: return int(float(v))
-        except Exception: return d
-
-class XpEventDualMirrorBridge(commands.Cog):
-    """Force learning:status to KULIAH/MAGANG (from pinned KV). Any non-KULIAH label is ignored."""
-    def __init__(self, bot):
-        self.bot = bot
-        from satpambot.bot.modules.discord_bot.helpers.confreader import cfg_str
-        self.total_key = cfg_str("XP_SENIOR_KEY", "xp:bot:senior_total")
-        self.k_stage_label   = cfg_str("XP_STAGE_LABEL_KEY",   "xp:stage:label")
-        self.k_stage_current = cfg_str("XP_STAGE_CURRENT_KEY", "xp:stage:current")
-        self.k_stage_req     = cfg_str("XP_STAGE_REQUIRED_KEY","xp:stage:required")
-        self.k_stage_pct     = cfg_str("XP_STAGE_PERCENT_KEY", "xp:stage:percent")
-
-    async def _apply(self, delta: int):
-        if delta <= 0 or abs(delta) > 100_000:  # guard
-            return
-        try:
-            from satpambot.bot.modules.discord_bot.helpers.discord_pinned_kv import PinnedJSONKV
-            from satpambot.bot.modules.discord_bot.helpers.stage_tracker import StageTracker
-            kv = PinnedJSONKV(self.bot)
-            tracker = StageTracker(kv, total_key=self.total_key)
-
-            # read previous total
+ENABLE = os.getenv("XP_MIRROR_ENABLE", "1") == "1"
+INTERVAL_SEC = int(os.getenv("XP_MIRROR_INTERVAL_SEC", "1200"))
+SMOKE_MODE = os.getenv("SMOKE_TEST", "0") == "1" or os.getenv("UNIT_TEST", "0") == "1"
+UPSTASH_URL = os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
+UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
+PIN_CH_ID = int(os.getenv("XP_PIN_CHANNEL_ID", "0") or 0)
+PIN_MSG_ID = int(os.getenv("XP_PIN_MESSAGE_ID", "0") or 0)
+STRICT_EDIT_ONLY = os.getenv("XP_MIRROR_STRICT_EDIT", "1") == "1"
+KEYS = ["xp:stage:label","xp:stage:current","xp:stage:required","xp:stage:percent","xp:bot:senior_total","learning:status","learning:status_json"]
+JSON_BLOCK_RE = re.compile(r"```json\s*(?P<body>\{.*?\})\s*```", re.S)
+def _same(a,b): return (a or "").strip()==(b or "").strip()
+class XPEventDualMirrorBridge(commands.Cog):
+    def __init__(self, bot): self.bot=bot; self._loop=None; self._ok=False; self._src="none"; self._err=None; self._lock=asyncio.Lock()
+    async def cog_load(self): 
+        if not ENABLE or SMOKE_MODE: log.info("[xp-mirror] disabled"); return
+        log.info("[xp-mirror] loaded; waiting ready")
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not ENABLE or SMOKE_MODE: return
+        if not (UPSTASH_URL and UPSTASH_TOKEN) and not (PIN_CH_ID and PIN_MSG_ID): 
+            log.warning("[xp-mirror] no sources configured"); return
+        if not self._loop or self._loop.done():
+            self._loop=self.bot.loop.create_task(self._run(), name="xp_mirror_loop"); log.info("[xp-mirror] loop started (%ss)", INTERVAL_SEC)
+    async def cog_unload(self):
+        if self._loop and not self._loop.done(): self._loop.cancel(); 
+    @commands.group(name="xp_mirror", invoke_without_command=True)
+    @commands.is_owner()
+    async def root(self, ctx): await ctx.send(f"[xp-mirror] ok={self._ok} src={self._src} err={self._err}")
+    @root.command(name="sync")
+    @commands.is_owner()
+    async def sync(self, ctx):
+        async with self._lock: ok=await self._tick()
+        await ctx.send(f"[xp-mirror] sync -> {'OK' if ok else 'FAIL'} src={self._src} err={self._err}")
+    async def _run(self):
+        await asyncio.sleep(5)
+        while True:
+            st=time.time()
             try:
-                from satpambot.bot.modules.discord_bot.helpers.xp_total_resolver import resolve_senior_total
-                total0 = int(await resolve_senior_total() or 0)
-            except Exception:
-                m0 = await kv.get_map()
-                total0 = _int(m0.get(self.total_key, 0), 0)
-            new_total = total0 + int(delta)
-
-            # advance tracker (but we'll TRUST pinned stage values)
-            await tracker.add(int(delta))
-
-            # force use pinned stage (KULIAH/MAGANG only)
-            m = await kv.get_map()
-            label = str(m.get(self.k_stage_label) or "")
-            cur   = _int(m.get(self.k_stage_current, 0), 0)
-            req   = _int(m.get(self.k_stage_req, 1), 1)
-            pct   = float(m.get(self.k_stage_pct, 0) or 0.0)
-
-            if not label.startswith(("KULIAH-","MAGANG")):
-                # do not update learning:* if not KULIAH/MAGANG
-                log.info("[xp-dual-bridge] ignore non-KULIAH label: %r", label)
-                return
-
-            status = f"{label} ({pct}%)"
-            status_json = json.dumps({
-                "label": label, "percent": pct, "remaining": max(0, req - cur),
-                "senior_total": new_total,
-                "stage": {"start_total": max(0, new_total - cur), "required": req, "current": cur}
-            }, separators=(",",":"))
-
-            await kv.set_multi({
-                self.total_key: new_total,
-                "learning:status": status,
-                "learning:status_json": status_json,
-            })
-            log.info("[xp-dual-bridge] FORCED %s %s/%s (%.2f%%) total=%s", label, cur, req, pct, new_total)
-        except Exception as e:
-            log.debug("[xp-dual-bridge] apply failed: %r", e)
-
-    async def _handle(self, *a, **k):
-        # derive delta from common patterns
-        d = 0
-        if k and isinstance(k, dict):
-            for kk in ("amount","delta","xp","value"):
-                if kk in k:
-                    try: d = int(k[kk]); break
-                    except Exception: pass
-        if not d and a:
-            try: d = int(a[1] if len(a) >= 2 else a[0])
-            except Exception: d = 0
-        if d: await self._apply(d)
-
-    @commands.Cog.listener()
-    async def on_xp_add(self, *a, **k): await self._handle(*a, **k)
-
-    @commands.Cog.listener()
-    async def on_xp_award(self, *a, **k): return
-
-    @commands.Cog.listener("on_satpam_xp")
-    async def on_satpam_xp(self, *a, **k): return
+                async with self._lock: await self._tick()
+            except Exception as e: self._ok=False; self._err=repr(e); log.exception("[xp-mirror] tick err")
+            await asyncio.sleep(max(5, INTERVAL_SEC-(time.time()-st)))
+    async def _tick(self)->bool:
+        ok, up = await self._get_upstash()
+        if ok and self._valid(up):
+            self._src="upstash"
+            pok, pin = await self._get_pin()
+            if not pok or not self._same(up,pin): await self._set_pin(up)
+            self._ok=True; self._err=None; return True
+        pok, pin = await self._get_pin()
+        if pok and self._valid(pin):
+            self._src="pinned"
+            if UPSTASH_URL and UPSTASH_TOKEN: await self._set_upstash(pin)
+            self._ok=True; self._err=None; return True
+        self._ok=False; self._src="none"; self._err="no valid source"; return False
+    def _valid(self,s): 
+        if not s: return False
+        js=s.get("learning:status_json"); 
+        if not js: return False
+        try: json.loads(js); return True
+        except Exception: return False
+    def _same(self,a,b):
+        if not a or not b: return False
+        for k in KEYS:
+            if not _same(a.get(k), b.get(k)): return False
+        return True
+    async def _get_upstash(self):
+        if not (UPSTASH_URL and UPSTASH_TOKEN): return (False,None)
+        try: import aiohttp
+        except Exception as e: log.warning("[xp-mirror] aiohttp missing: %r", e); return (False,None)
+        out={}
+        try:
+            headers={"Authorization": f"Bearer {UPSTASH_TOKEN}"}
+            async with aiohttp.ClientSession(headers=headers) as s:
+                for k in KEYS:
+                    from urllib.parse import quote
+                    url=f"{UPSTASH_URL.rstrip('/')}/get/{quote(k,safe='')}"
+                    async with s.get(url, timeout=8) as r:
+                        if r.status!=200: log.warning("[xp-mirror] upstash get %s -> %s", k, r.status); return (False,None)
+                        data=await r.json(content_type=None); out[k]=("" if data.get("result") is None else str(data.get("result")))
+            return (True,out)
+        except Exception as e: log.warning("[xp-mirror] fetch upstash failed: %r", e); return (False,None)
+    async def _set_upstash(self,snap):
+        if not (UPSTASH_URL and UPSTASH_TOKEN): return False
+        try: import aiohttp
+        except Exception as e: log.warning("[xp-mirror] aiohttp missing: %r", e); return False
+        try:
+            headers={"Authorization": f"Bearer {UPSTASH_TOKEN}"}
+            async with aiohttp.ClientSession(headers=headers) as sess:
+                for k in KEYS:
+                    from urllib.parse import quote
+                    v=snap.get(k,"")
+                    url=f"{UPSTASH_URL.rstrip('/')}/set/{quote(k,safe='')}/{quote(v,safe='')}"
+                    async with sess.get(url, timeout=8) as r:
+                        if r.status!=200: log.warning("[xp-mirror] upstash set %s -> %s", k, r.status); return False
+            return True
+        except Exception as e: log.warning("[xp-mirror] write upstash failed: %r", e); return False
+    async def _get_pin(self):
+        if not (PIN_CH_ID and PIN_MSG_ID): return (False,None)
+        try:
+            ch=await self._resolve(PIN_CH_ID)
+            if not ch: log.warning("[xp-mirror] pin channel not found: %s", PIN_CH_ID); return (False,None)
+            msg=await ch.fetch_message(PIN_MSG_ID)
+        except discord.NotFound: log.warning("[xp-mirror] pin message not found: %s", PIN_MSG_ID); return (False,None)
+        except Exception as e: log.warning("[xp-mirror] fetch pinned failed: %r", e); return (False,None)
+        m=JSON_BLOCK_RE.search(msg.content or "")
+        if not m: return (False,None)
+        try:
+            parsed=json.loads(m.group("body"))
+        except Exception as e: log.warning("[xp-mirror] pinned JSON parse failed: %r", e); return (False,None)
+        snap={k:"" for k in KEYS}
+        snap["learning:status_json"]=json.dumps(parsed, ensure_ascii=False)
+        lab=parsed.get("label"); pct=parsed.get("percent")
+        if lab is not None and pct is not None:
+            snap["learning:status"]=f"{lab} ({pct:.1f}%)" if isinstance(pct,(int,float)) else str(pct)
+        for line in (msg.content or "").splitlines():
+            if ":" in line:
+                k,v=line.split(":",1); k=k.strip(); v=v.strip()
+                if k in KEYS and k not in ("learning:status_json","learning:status") and v: 
+                    snap[k]=v
+        return (True,snap)
+    async def _set_pin(self,snap):
+        if not (PIN_CH_ID and PIN_MSG_ID): return False
+        try:
+            ch=await self._resolve(PIN_CH_ID)
+            if not ch: return False
+            msg=await ch.fetch_message(PIN_MSG_ID)
+        except discord.NotFound:
+            if STRICT_EDIT_ONLY: log.warning("[xp-mirror] pin missing & STRICT_EDIT_ONLY=1"); return False
+            try:
+                ch=await self._resolve(PIN_CH_ID)
+                if not ch: return False
+                msg=await ch.send(self._compose(snap)); await msg.pin(reason="XP mirror bootstrap"); return True
+            except Exception as e: log.warning("[xp-mirror] create pinned failed: %r", e); return False
+        except Exception as e: log.warning("[xp-mirror] fetch pinned failed: %r", e); return False
+        new=self._compose(snap)
+        if (msg.content or "")==new: return True
+        try: await msg.edit(content=new); return True
+        except Exception as e: log.warning("[xp-mirror] edit pinned failed: %r", e); return False
+    async def _resolve(self,ch_id):
+        ch=self.bot.get_channel(ch_id)
+        if isinstance(ch, discord.TextChannel): return ch
+        try:
+            ch=await self.bot.fetch_channel(ch_id)
+            if isinstance(ch, discord.TextChannel): return ch
+        except Exception: return None
+        return None
+    def _compose(self,snap):
+        try: js=json.dumps(json.loads(snap.get("learning:status_json") or "{}"), ensure_ascii=False, separators=(",",":"))
+        except Exception: js="{}"
+        header=f"**{(snap.get('learning:status') or 'XP Snapshot')}**"
+        lines=[header,"","```json",js,"```",""]
+        for k in KEYS:
+            if k in ("learning:status_json","learning:status"): continue
+            v=(snap.get(k) or "").strip()
+            if v: lines.append(f"{k}: {v}")
+        return "\n".join(lines)
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(XpEventDualMirrorBridge(bot))
+    if not ENABLE or SMOKE_MODE: log.info("[xp-mirror] loaded but disabled")
+    await bot.add_cog(XPEventDualMirrorBridge(bot))

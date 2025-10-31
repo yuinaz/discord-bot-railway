@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from typing import Any, Optional
 from discord.ext import commands
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,22 @@ class XPEventBridgeOverlay(commands.Cog):
             log.info("[xp-bridge] SET -> %s (+%s)", newv, delta)
 
     @commands.Cog.listener()
-    async def on_xp_add(self, uid, amt, reason: str):
+    async def on_xp_add(self, *args: Any, **kwargs: Any):
+        
+        # tolerant signature adapter (accepts 3..5 args)
+        uid = kwargs.get("uid") or kwargs.get("user_id")
+        amt = kwargs.get("amt") or kwargs.get("amount")
+        reason = kwargs.get("reason")
+        ints = [a for a in args if isinstance(a, int)]
+        strs = [a for a in args if isinstance(a, str)]
+        if uid is None and ints:
+            uid = ints[0]
+        if amt is None and len(ints) >= 2:
+            amt = ints[1]
+        if reason is None and strs:
+            reason = strs[0]
+        if uid is None or amt is None:
+            return
         d = _to_int(amt, 0)
         if not d: return
         rs = (reason or "").strip().lower()

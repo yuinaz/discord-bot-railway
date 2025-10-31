@@ -9,8 +9,8 @@ log = logging.getLogger(__name__)
 # --- QnA Dual-Mode Markers (for prerender check) ---
 # MODE A: isolation channel
 # MODE B: public mention
-QNA_EMBED_TITLE_LEINA = "Answer by Leina"
-QNA_EMBED_TITLE_PROVIDER = "Answer by {provider}"
+QNA_EMBED_TITLE_LEINA = os.getenv("QNA_TITLE_PUBLIC", "Answer by Leina")
+QNA_EMBED_TITLE_PROVIDER = os.getenv("QNA_TITLE_ISOLATION", "Answer by {provider}")
 
 def _env_bool(key: str, default: bool=False) -> bool:
     v = os.getenv(key)
