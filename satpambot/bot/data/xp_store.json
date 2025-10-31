@@ -94,7 +94,7 @@
       ]
     },
     "1331765056974753934": {
-      "xp": 300,
+      "xp": 510,
       "awards": [
         {
           "ts": "2025-10-28T12:40:49.997227+00:00",
@@ -235,11 +235,81 @@
           "ts": "2025-10-28T13:15:14.769766+00:00",
           "amount": 10,
           "reason": "normalize:force-include"
+        },
+        {
+          "ts": "2025-10-31T15:27:00.505809+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:27:00.544959+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:27:00.813071+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:04.620092+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:04.656389+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:05.307712+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:52.102099+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:52.142886+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:52.720386+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:52.747511+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:36:52.784200+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:38:03.208362+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:03.282846+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:03.566955+00:00",
+          "amount": 15,
+          "reason": "passive_message"
         }
       ]
     },
     "lukaze89": {
-      "xp": 40,
+      "xp": 160,
       "awards": [
         {
           "ts": "2025-10-28T12:40:51.343565+00:00",
@@ -270,6 +340,46 @@
           "ts": "2025-10-28T13:15:14.805305+00:00",
           "amount": 10,
           "reason": "normalize:chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:27:00.840673+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:27:00.870743+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:28:05.335271+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:28:05.365320+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:36:53.274937+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:36:53.303242+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:38:03.609047+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:38:03.646897+00:00",
+          "amount": 15,
+          "reason": "chat:message"
         }
       ]
     },
@@ -509,262 +619,262 @@
       ]
     },
     "228126085160763392": {
-      "xp": 861,
+      "xp": 1943,
       "awards": [
         {
-          "ts": "2025-10-29T17:12:44.281194+00:00",
+          "ts": "2025-10-31T15:31:12.994371+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-29T17:12:44.443824+00:00",
+          "ts": "2025-10-31T15:31:13.254640+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-29T17:12:45.037555+00:00",
+          "ts": "2025-10-31T15:31:14.314096+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-29T17:12:45.185840+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-29T17:12:45.322257+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T02:10:05.120215+00:00",
+          "ts": "2025-10-31T15:31:14.350397+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T02:10:05.256733+00:00",
+          "ts": "2025-10-31T15:31:14.610424+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T02:10:05.976753+00:00",
+          "ts": "2025-10-31T15:31:25.003071+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T02:39:51.707891+00:00",
+          "ts": "2025-10-31T15:31:25.046769+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T02:39:52.065510+00:00",
+          "ts": "2025-10-31T15:31:26.579310+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T02:39:52.547883+00:00",
+          "ts": "2025-10-31T15:31:40.769245+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T11:34:25.173390+00:00",
+          "ts": "2025-10-31T15:31:40.807247+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T11:34:26.491364+00:00",
+          "ts": "2025-10-31T15:31:41.272309+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T11:34:30.838697+00:00",
+          "ts": "2025-10-31T15:31:45.135321+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T11:34:30.864679+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T11:34:34.167657+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T14:46:36.314520+00:00",
+          "ts": "2025-10-31T15:31:45.176411+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T14:46:36.701379+00:00",
+          "ts": "2025-10-31T15:31:47.364836+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T14:46:38.588794+00:00",
+          "ts": "2025-10-31T15:33:12.179201+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T14:46:38.626433+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T14:46:39.021640+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T15:09:28.406777+00:00",
+          "ts": "2025-10-31T15:33:12.240464+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T15:09:28.724187+00:00",
+          "ts": "2025-10-31T15:33:12.631983+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T15:09:29.479193+00:00",
+          "ts": "2025-10-31T15:33:25.218338+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T15:09:29.515344+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T15:09:29.695370+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T15:11:48.565093+00:00",
+          "ts": "2025-10-31T15:33:25.308280+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T15:11:48.729106+00:00",
+          "ts": "2025-10-31T15:33:25.794054+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T15:11:49.075918+00:00",
+          "ts": "2025-10-31T15:33:28.602002+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:01.535190+00:00",
+          "ts": "2025-10-31T15:33:28.681165+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:01.989563+00:00",
+          "ts": "2025-10-31T15:33:29.173830+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:02.880667+00:00",
+          "ts": "2025-10-31T15:33:30.362002+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:02.907838+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T17:22:03.601018+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T17:22:09.841403+00:00",
+          "ts": "2025-10-31T15:33:30.403808+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:11.111676+00:00",
+          "ts": "2025-10-31T15:33:30.654615+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:12.217955+00:00",
+          "ts": "2025-10-31T15:36:12.747505+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-30T17:22:12.249860+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T17:22:12.434399+00:00",
-          "amount": 15,
-          "reason": "force-include"
-        },
-        {
-          "ts": "2025-10-30T17:33:28.490795+00:00",
-          "amount": 1,
-          "reason": "history-catchup"
-        },
-        {
-          "ts": "2025-10-30T17:33:29.755061+00:00",
-          "amount": 1,
-          "reason": "history-catchup"
-        },
-        {
-          "ts": "2025-10-31T12:41:04.196569+00:00",
-          "amount": 1,
-          "reason": "history-catchup"
-        },
-        {
-          "ts": "2025-10-31T12:41:04.225891+00:00",
-          "amount": 1,
-          "reason": "history-catchup"
-        },
-        {
-          "ts": "2025-10-31T12:47:50.534896+00:00",
-          "amount": 1,
-          "reason": "history-catchup"
-        },
-        {
-          "ts": "2025-10-31T12:47:50.563884+00:00",
-          "amount": 1,
-          "reason": "history-catchup"
-        },
-        {
-          "ts": "2025-10-31T12:49:01.716393+00:00",
+          "ts": "2025-10-31T15:36:12.788646+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-31T12:49:01.760027+00:00",
+          "ts": "2025-10-31T15:36:13.086241+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-31T12:49:02.022760+00:00",
+          "ts": "2025-10-31T15:36:13.582869+00:00",
           "amount": 15,
           "reason": "passive_message"
         },
         {
-          "ts": "2025-10-31T12:49:02.049027+00:00",
+          "ts": "2025-10-31T15:36:13.623095+00:00",
           "amount": 15,
-          "reason": "force-include"
+          "reason": "passive_message"
         },
         {
-          "ts": "2025-10-31T12:49:02.084570+00:00",
+          "ts": "2025-10-31T15:36:14.596029+00:00",
           "amount": 15,
-          "reason": "force-include"
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:28.737023+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:28.776343+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:29.252296+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:31.743102+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:31.787180+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:38:32.455133+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:59.024233+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:59.066839+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:59.603933+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:02.814667+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:02.857529+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.108407+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:26.060612+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:26.100710+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:26.359375+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:45.972695+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:46.012762+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:46.263068+00:00",
+          "amount": 15,
+          "reason": "passive_message"
         }
       ]
     },
     "zenarius": {
-      "xp": 350,
+      "xp": 620,
       "awards": [
         {
           "ts": "2025-10-28T13:15:37.849424+00:00",
@@ -888,6 +998,96 @@
         },
         {
           "ts": "2025-10-31T12:49:02.371212+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:26:22.184354+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:26:22.213928+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:27:30.324350+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:27:30.355929+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:30:54.887865+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:30:54.917423+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:41.303023+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:41.333174+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:33:12.662197+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:33:12.691239+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:36:13.121811+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:36:13.156866+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:38:29.282364+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:38:29.318088+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:48:59.635049+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:48:59.675161+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.137954+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.169407+00:00",
           "amount": 15,
           "reason": "chat:message"
         }
@@ -1144,7 +1344,7 @@
       ]
     },
     "897654545423945758": {
-      "xp": 120,
+      "xp": 165,
       "awards": [
         {
           "ts": "2025-10-29T10:56:44.631233+00:00",
@@ -1185,11 +1385,26 @@
           "ts": "2025-10-29T15:09:40.118458+00:00",
           "amount": 15,
           "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:31:08.035238+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:08.077319+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:08.766521+00:00",
+          "amount": 15,
+          "reason": "passive_message"
         }
       ]
     },
     "terumi612": {
-      "xp": 60,
+      "xp": 90,
       "awards": [
         {
           "ts": "2025-10-29T10:56:45.533338+00:00",
@@ -1208,6 +1423,16 @@
         },
         {
           "ts": "2025-10-29T15:09:40.958088+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:08.795602+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:08.824177+00:00",
           "amount": 15,
           "reason": "chat:message"
         }
@@ -1869,7 +2094,7 @@
       ]
     },
     "465359978686054401": {
-      "xp": 150,
+      "xp": 195,
       "awards": [
         {
           "ts": "2025-10-29T11:58:44.908782+00:00",
@@ -1920,11 +2145,26 @@
           "ts": "2025-10-29T15:22:26.627784+00:00",
           "amount": 15,
           "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:28:45.455761+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:45.494569+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:45.771228+00:00",
+          "amount": 15,
+          "reason": "passive_message"
         }
       ]
     },
     "glux0s": {
-      "xp": 60,
+      "xp": 90,
       "awards": [
         {
           "ts": "2025-10-29T11:58:47.185938+00:00",
@@ -1943,6 +2183,16 @@
         },
         {
           "ts": "2025-10-29T15:22:27.018785+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:28:45.800828+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:28:45.831881+00:00",
           "amount": 15,
           "reason": "chat:message"
         }
@@ -3374,7 +3624,7 @@
       ]
     },
     "384980425120153621": {
-      "xp": 45,
+      "xp": 225,
       "awards": [
         {
           "ts": "2025-10-30T15:11:32.208556+00:00",
@@ -3390,11 +3640,71 @@
           "ts": "2025-10-30T15:11:33.293130+00:00",
           "amount": 15,
           "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:02.394667+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:02.433061+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:28:03.434390+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:19.311086+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:19.351853+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:19.659191+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:26.637020+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:26.672717+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:27.193926+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:51.354691+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:51.396281+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:51.872487+00:00",
+          "amount": 15,
+          "reason": "passive_message"
         }
       ]
     },
     "kazenaraka": {
-      "xp": 30,
+      "xp": 90,
       "awards": [
         {
           "ts": "2025-10-30T15:11:33.323706+00:00",
@@ -3403,6 +3713,26 @@
         },
         {
           "ts": "2025-10-30T15:11:33.549727+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:28:03.461915+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:28:03.490323+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:19.695505+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:19.739087+00:00",
           "amount": 15,
           "reason": "chat:message"
         }
@@ -3637,12 +3967,667 @@
           "reason": "chat:message"
         }
       ]
+    },
+    "334952435300696074": {
+      "xp": 45,
+      "awards": [
+        {
+          "ts": "2025-10-31T14:47:48.288505+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T14:47:48.340508+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T14:47:48.622447+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "yangwenz": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-31T14:47:48.649444+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T14:47:48.679441+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "1272636358447599731": {
+      "xp": 90,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:26:09.766848+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:09.804424+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:10.060031+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:46.297156+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:46.338268+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:46.977918+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "ziar101": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:26:10.088613+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:26:10.117780+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "396556438924689409": {
+      "xp": 75,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:26:25.395244+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:25.434398+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:26.448778+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:26:26.477341+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:26:26.517181+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        }
+      ]
+    },
+    "chunkybarzz": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:26:26.986106+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:26:27.016680+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "555971078066012173": {
+      "xp": 75,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:31:00.787845+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:00.826916+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:01.242868+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:01.272153+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:31:01.311271+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        }
+      ]
+    },
+    "diskodok.": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:31:01.673531+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:01.700103+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "516820220896083978": {
+      "xp": 135,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:31:02.850430+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:02.892196+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:31:03.267200+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:32:57.407801+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:32:57.446833+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:32:57.908927+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:03.084072+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:03.132644+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:36:03.611975+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "kzubmo": {
+      "xp": 90,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:31:03.299246+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:31:03.332926+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:32:57.937154+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:32:57.969005+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:36:03.642513+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:36:03.672293+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "401354758985744384": {
+      "xp": 45,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:41:00.243981+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:41:00.280167+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:41:00.766239+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "senin9414": {
+      "xp": 30,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:41:00.794781+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:41:00.825503+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "501690466555920384": {
+      "xp": 540,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:47:11.283373+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:47:11.322529+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:47:12.006304+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:47:12.046950+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:47:12.085974+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:47:15.695593+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:47:15.732645+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:47:16.498726+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:00.662407+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:00.704553+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:00.960663+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:00.993728+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:49:01.032700+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:49:55.973136+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:56.011833+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:56.880798+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:56.908934+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:49:56.947990+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:50:05.190763+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:05.232421+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:05.918791+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:05.946330+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:50:05.983408+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:50:24.136234+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:24.177344+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:24.467625+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:24.506273+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:50:24.548847+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:51:07.125214+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:51:07.172882+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:51:07.849137+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:51:07.878677+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:51:07.919800+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:51:09.890285+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:51:09.929877+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:51:10.398252+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        }
+      ]
+    },
+    "krisss241204": {
+      "xp": 120,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:47:12.546805+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:47:12.578976+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:49:01.512944+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:49:01.541552+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:49:57.195952+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:49:57.225443+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:51:08.611630+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:51:08.641452+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
+    },
+    "270863981953024000": {
+      "xp": 300,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:48:21.781732+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:21.819355+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:22.254854+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:22.284413+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:48:22.322755+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:48:29.773170+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:29.892789+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:30.584524+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:48:30.612616+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:48:30.652690+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:49:37.453534+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:37.493743+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:38.012228+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:49:38.041913+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:49:38.086960+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.655642+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.693478+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.954843+00:00",
+          "amount": 15,
+          "reason": "passive_message"
+        },
+        {
+          "ts": "2025-10-31T15:50:03.985788+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        },
+        {
+          "ts": "2025-10-31T15:50:04.024384+00:00",
+          "amount": 15,
+          "reason": "force-include"
+        }
+      ]
+    },
+    "2616517578084292635": {
+      "xp": 60,
+      "awards": [
+        {
+          "ts": "2025-10-31T15:48:22.876171+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:48:22.905151+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:49:38.688701+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        },
+        {
+          "ts": "2025-10-31T15:49:38.717048+00:00",
+          "amount": 15,
+          "reason": "chat:message"
+        }
+      ]
     }
   },
   "stats": {
     "total_awards": 8,
     "total_users": 1
   },
-  "updated_at": "2025-10-31T12:50:51.356612+00:00",
+  "updated_at": "2025-10-31T15:51:10.398252+00:00",
   "awards": {}
 }

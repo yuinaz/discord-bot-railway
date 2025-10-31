@@ -1,67 +1,93 @@
+
 from __future__ import annotations
+import os, json, logging, asyncio, random
+from typing import Any, Dict, List, Optional, Tuple
 
-import asyncio
-import json
-import logging
-import os
-from pathlib import Path
-from typing import List, Optional
-
-import discord
-from discord.ext import commands
+try:
+    from discord.ext import commands
+except Exception as _e:  # loader-agnostic import guard
+    commands = None  # type: ignore
+    _IMPORT_ERR = _e
+else:
+    _IMPORT_ERR = None
 
 log = logging.getLogger(__name__)
 
-# ===== Config via ENV =====
 ENABLE = os.getenv("QNA_AUTOLEARN_ENABLE", "1") == "1"
-SMOKE_MODE = os.getenv("SMOKE_TEST", "0") == "1" or os.getenv("UNIT_TEST", "0") == "1" or os.getenv("CI", "0") == "1"
+TOPICS_PATH = os.getenv("QNA_TOPICS_PATH", "data/config/qna_topics.json")
+PERIOD = int(os.getenv("QNA_AUTOLEARN_PERIOD_SEC", "180"))  # 3 menit per permintaan user
+CHANNEL_ID = int(os.getenv("QNA_CHANNEL_ID", "0") or 0)     # channel isolasi untuk seed pertanyaan
+TITLE_ISO = os.getenv("QNA_TITLE_ISOLATION", "Answer by {provider}")
+TITLE_PUB = os.getenv("QNA_TITLE_PUBLIC", "Answer by Leina")
 
-INTERVAL_SEC = int(os.getenv("QNA_INTERVAL_SEC", "180"))  # user asked for ~3 minutes
-QNA_CH_ID = int(os.getenv("QNA_CHANNEL_ID", "0") or 0)    # MUST use this key (not QNA_ISOLATED_ID)
-QNA_CH_NAME = os.getenv("QNA_CHANNEL_NAME", "").strip()
+def _flatten_topics(data: Any) -> List[str]:
+    topics: List[str] = []
+    if isinstance(data, list):
+        for x in data:
+            if isinstance(x, str):
+                s = x.strip()
+                if s:
+                    topics.append(s)
+            elif isinstance(x, dict):
+                q = x.get("q")
+                if isinstance(q, str) and q.strip():
+                    topics.append(q.strip())
+    elif isinstance(data, dict):
+        # dict-of-lists (kategori -> [pertanyaan])
+        for _cat, arr in data.items():
+            if not isinstance(arr, list):
+                continue
+            for x in arr:
+                if isinstance(x, str) and x.strip():
+                    topics.append(x.strip())
+                elif isinstance(x, dict):
+                    q = x.get("q")
+                    if isinstance(q, str) and q.strip():
+                        topics.append(q.strip())
+    # normalize & dedupe
+    seen = set(); out = []
+    for t in topics:
+        if t and t not in seen:
+            seen.add(t); out.append(t)
+    return out
 
-QNA_EMBED_TITLE_QUESTION = os.getenv("QNA_EMBED_TITLE_QUESTION", "Question by Leina")
-QNA_TOPICS_PATH = os.getenv("QNA_TOPICS_PATH", "data/config/qna_topics.json")  # do not modify/remove file; just read
+def _load_topics() -> List[str]:
+    try:
+        with open(TOPICS_PATH, "r", encoding="utf-8") as f:
+            js = json.load(f)
+    except FileNotFoundError:
+        log.warning("[qna-autolearn] topics file not found: %s", TOPICS_PATH)
+        return []
+    except Exception as e:
+        log.warning("[qna-autolearn] topics file error: %r", e)
+        return []
+    items = _flatten_topics(js)
+    if not isinstance(items, list) or not items:
+        log.warning("[qna-autolearn] topics empty or invalid -> skip")
+        return []
+    log.info("[qna-autolearn] loaded %s topics from %s", len(items), TOPICS_PATH)
+    return items
 
-ALLOWED_MENTIONS = discord.AllowedMentions.none()
-
-
-class QnAAutoLearnScheduler(commands.Cog):
-    """
-    Periodically post QnA seed questions in the isolation channel.
-    - Safe on import (no side effects)
-    - Starts only on_ready
-    - Uses ENV QNA_CHANNEL_ID or fallback QNA_CHANNEL_NAME
-    - Respects SMOKE/UNIT/CI flags
-    - No spam: interval-based, single runner
-    """
-    def __init__(self, bot: commands.Bot):
+class QnAAutoLearnScheduler(commands.Cog):  # type: ignore[misc]
+    def __init__(self, bot: Any):
         self.bot = bot
-        self.interval_sec = INTERVAL_SEC   # ensure attribute exists (fixes AttributeError)
         self._task: Optional[asyncio.Task] = None
         self._stop = asyncio.Event()
-        self._busy = asyncio.Lock()
         self._topics: List[str] = []
-        self._idx = 0
 
-    async def cog_load(self) -> None:
-        if not ENABLE or SMOKE_MODE:
-            log.info("[qna-autolearn] disabled (ENABLE=%s SMOKE=%s)", ENABLE, SMOKE_MODE)
+    async def cog_load(self):
+        if not ENABLE:
+            log.info("[qna-autolearn] disabled")
             return
-        # pre-load topics once
-        self._topics = await self._load_topics()
-        log.info("[qna-autolearn] loaded %d topics", len(self._topics))
-
-    @commands.Cog.listener()
-    async def on_ready(self) -> None:
-        if not ENABLE or SMOKE_MODE:
+        self._topics = _load_topics()
+        if not self._topics:
+            log.warning("[qna-autolearn] topics empty -> skip run loop")
             return
-        if self._task is None or self._task.done():
-            self._stop.clear()
-            self._task = self.bot.loop.create_task(self._runner(), name="qna_autolearn_scheduler")
-            log.info("[qna-autolearn] background scheduler started (interval=%ss)", self.interval_sec)
+        self._task = self.bot.loop.create_task(self._runner(), name="qna_autolearn")
+        log.info("[qna-autolearn] started: %s topics | interval=%ss | chan=%s",
+                 len(self._topics), PERIOD, CHANNEL_ID or "auto")
 
-    async def cog_unload(self) -> None:
+    async def cog_unload(self):
         if self._task and not self._task.done():
             self._stop.set()
             self._task.cancel()
@@ -69,131 +95,80 @@ class QnAAutoLearnScheduler(commands.Cog):
                 await self._task
             except asyncio.CancelledError:
                 pass
-            log.info("[qna-autolearn] scheduler stopped")
+            log.info("[qna-autolearn] stopped")
 
-    # ===== Admin commands =====
-    @commands.group(name="qna_auto", invoke_without_command=True)
-    @commands.is_owner()
-    async def qna_auto_group(self, ctx: commands.Context):
-        ch = await self._resolve_channel()
-        await ctx.send(f"[qna-autolearn] enable={ENABLE} smoke={SMOKE_MODE} interval={self.interval_sec}s "
-                       f"channel={'OK' if ch else 'MISSING'} topics={len(self._topics)} idx={self._idx}")
+    @commands.command(name="qna_topics")  # type: ignore[attr-defined]
+    @commands.is_owner()                   # type: ignore[attr-defined]
+    async def qna_topics_cmd(self, ctx: Any, sub: str="count"):
+        if sub == "count":
+            await ctx.reply(f"[qna-autolearn] topics={len(self._topics)}; file={TOPICS_PATH}")
+            return
+        if sub == "dump":
+            sample = self._topics[:10]
+            await ctx.reply("• " + "\n• ".join(sample) if sample else "(empty)")
+            return
+        await ctx.reply("usage: !qna_topics [count|dump]")
 
-    @qna_auto_group.command(name="next")
-    @commands.is_owner()
-    async def qna_auto_next(self, ctx: commands.Context):
-        """Send next seed immediately (one-shot)."""
-        ok = await self._send_next_seed()
-        await ctx.send(f"[qna-autolearn] next -> {'OK' if ok else 'FAIL'}")
-
-    @qna_auto_group.command(name="reload")
-    @commands.is_owner()
-    async def qna_auto_reload(self, ctx: commands.Context):
-        self._topics = await self._load_topics()
-        self._idx = 0
-        await ctx.send(f"[qna-autolearn] topics reloaded: {len(self._topics)} items")
-
-    # ===== Runner =====
     async def _runner(self):
-        # small warmup to let caches/guilds resolve
+        # Small stagger to avoid clash with other schedulers
         await asyncio.sleep(5)
+        idx = 0
         while not self._stop.is_set():
             try:
-                await self._send_next_seed()
+                if not self._topics:
+                    self._topics = _load_topics()
+                    if not self._topics:
+                        await asyncio.sleep(PERIOD)
+                        continue
+                topic = self._topics[idx % len(self._topics)]
+                await self._post_seed(topic)
+                idx += 1
             except Exception:
-                log.exception("[qna-autolearn] unhandled error in tick")
+                log.exception("[qna-autolearn] tick error")
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=self.interval_sec)
+                await asyncio.wait_for(self._stop.wait(), timeout=PERIOD)
             except asyncio.TimeoutError:
                 pass
 
-    async def _send_next_seed(self) -> bool:
-        if not self._topics:
-            # reload on the fly
-            self._topics = await self._load_topics()
-            if not self._topics:
-                log.warning("[qna-autolearn] topics empty -> skip")
-                return False
-
-        ch = await self._resolve_channel()
+    async def _post_seed(self, topic: str):
+        if not topic:
+            return
+        # Prefer isolation channel if provided; otherwise skip quietly
+        if not CHANNEL_ID:
+            log.warning("[qna-autolearn] CHANNEL_ID not set; skip post")
+            return
+        ch = await self._resolve_channel(CHANNEL_ID)
         if not ch:
-            log.warning("[qna-autolearn] channel not found. Set QNA_CHANNEL_ID or QNA_CHANNEL_NAME.")
-            return False
+            log.warning("[qna-autolearn] channel not found: %s", CHANNEL_ID)
+            return
+        # Simple seed embed (title uses isolation title)
+        content = f"**{TITLE_ISO}**\n\n{topic}"
+        await ch.send(content)
+        log.info("[qna-autolearn] posted seed -> %s", topic[:80])
 
-        async with self._busy:  # prevent overlap
-            question = self._topics[self._idx % len(self._topics)]
-            self._idx += 1
-
-            embed = discord.Embed(title=QNA_EMBED_TITLE_QUESTION, description=str(question), colour=0x2b90d9)
-            embed.set_footer(text="Auto-learn seed • QnA isolation channel")
-            try:
-                await ch.send(embed=embed, allowed_mentions=ALLOWED_MENTIONS)
-                log.info("[qna-autolearn] sent seed: %s", question[:80])
-                return True
-            except Exception as e:
-                log.warning("[qna-autolearn] failed to send seed embed: %r", e)
-                return False
-
-    # ===== Helpers =====
-    async def _resolve_channel(self) -> Optional[discord.TextChannel]:
-        if QNA_CH_ID:
-            ch = self.bot.get_channel(QNA_CH_ID)
-            if isinstance(ch, discord.TextChannel):
-                return ch
-            try:
-                ch = await self.bot.fetch_channel(QNA_CH_ID)
-                if isinstance(ch, discord.TextChannel):
-                    return ch
-            except Exception:
-                pass
-        if QNA_CH_NAME:
-            # fallback by name (first match)
-            for guild in self.bot.guilds:
-                for ch in guild.text_channels:
-                    if ch.name == QNA_CH_NAME:
-                        return ch
-        return None
-
-    async def _load_topics(self) -> List[str]:
-        path = self._resolve_topics_path()
+    async def _resolve_channel(self, ch_id: int):
         try:
-            text = path.read_text(encoding="utf-8", errors="ignore")
-            data = json.loads(text)
-            # accept list of strings or objects with "q" field
-            if isinstance(data, list):
-                out = []
-                for item in data:
-                    if isinstance(item, str):
-                        out.append(item)
-                    elif isinstance(item, dict) and "q" in item:
-                        out.append(str(item["q"]))
-                return [x for x in out if x]
-            log.warning("[qna-autolearn] qna_topics.json format is not a list -> empty")
-            return []
-        except FileNotFoundError:
-            log.warning("[qna-autolearn] topics file not found at %s", path)
-            return []
+            ch = self.bot.get_channel(ch_id)
+            if ch:
+                return ch
+            return await self.bot.fetch_channel(ch_id)
         except Exception:
-            log.exception("[qna-autolearn] failed to load topics")
-            return []
+            return None
 
-    def _resolve_topics_path(self) -> Path:
-        # try env path (absolute or relative to repo root)
-        p = Path(QNA_TOPICS_PATH)
-        if p.is_file():
-            return p
-        # derive repo root from this file location
-        here = Path(__file__).resolve()
-        # go up until we find 'data' directory
-        for parent in [here] + list(here.parents):
-            candidate = parent / "data" / "config" / "qna_topics.json"
-            if candidate.is_file():
-                return candidate
-        # default fallback
-        return Path("data/config/qna_topics.json")
+# loader-agnostic setup
+async def setup(bot: Any):
+    if _IMPORT_ERR is not None:
+        raise _IMPORT_ERR
+    await bot.add_cog(QnAAutoLearnScheduler(bot))  # type: ignore[attr-defined]
 
-
-async def setup(bot: commands.Bot):
-    if not ENABLE or SMOKE_MODE:
-        log.info("[qna-autolearn] extension loaded but disabled (ENABLE=%s SMOKE=%s)", ENABLE, SMOKE_MODE)
-    await bot.add_cog(QnAAutoLearnScheduler(bot))
+def setup(bot: Any):
+    if _IMPORT_ERR is not None:
+        raise _IMPORT_ERR
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(bot.add_cog(QnAAutoLearnScheduler(bot)))  # type: ignore[attr-defined]
+            return
+    except Exception:
+        pass
+    bot.add_cog(QnAAutoLearnScheduler(bot))  # type: ignore[attr-defined]

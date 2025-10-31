@@ -1,0 +1,15 @@
+{
+  "QNA": [
+    "satpambot.bot.modules.discord_bot.cogs.a24_qna_autolearn_scheduler",
+    "satpambot.bot.modules.discord_bot.cogs.a06_autolearn_qna_answer_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a24_qna_auto_answer_overlay"
+  ],
+  "XP / LADDER": [
+    "satpambot.bot.modules.discord_bot.cogs.a08y_phase_autoswitch_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a08_xp_event_bridge_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a08f_passive_to_bot_bridge_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a08_xp_stage_recompute_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a09_leina_xp_status_embed_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.a09_work_xp_overlay"
+  ]
+}
