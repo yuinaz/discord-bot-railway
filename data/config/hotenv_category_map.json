@@ -11,5 +11,13 @@
     "satpambot.bot.modules.discord_bot.cogs.a08_xp_stage_recompute_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a09_leina_xp_status_embed_overlay",
     "satpambot.bot.modules.discord_bot.cogs.a09_work_xp_overlay"
+  ],
+  "RUNTIME: MEMORY / PERSONA": [
+    "satpambot.bot.modules.discord_bot.cogs.persona_loader_overlay",
+    "satpambot.bot.modules.discord_bot.cogs.short_memory_manager"
+  ],
+  "RUNTIME: LEARN / NEURO / MINER": [
+    "satpambot.bot.modules.discord_bot.cogs.neuro_autolearn_moderated_v2",
+    "satpambot.bot.modules.discord_bot.cogs.learning_passive_observer"
   ]
 }

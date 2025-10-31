@@ -323,7 +323,7 @@
     "HOTENV_WATCH_FILES": "data/config/overrides.render-free.json,data/config/runtime_env.json,.env",
     "HOTENV_EXCLUDE": "satpambot.bot.modules.discord_bot.cogs.a00_hotenv_autoreload_overlay",
     "HOTENV_BROADCAST_EVENT": "1",
-    "HOTENV_CATEGORY_MAP_JSON": "{\"QNA\":[\"satpambot.bot.modules.discord_bot.cogs.a24_qna_autolearn_scheduler\",\"satpambot.bot.modules.discord_bot.cogs.a06_autolearn_qna_answer_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a24_qna_auto_answer_overlay\"],\"XP / LADDER\":[\"satpambot.bot.modules.discord_bot.cogs.a08y_phase_autoswitch_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a08_xp_event_bridge_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a08f_passive_to_bot_bridge_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a08_xp_stage_recompute_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a09_leina_xp_status_embed_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a09_work_xp_overlay\"]}",
+    "HOTENV_CATEGORY_MAP_JSON": "{\"QNA\":[\"satpambot.bot.modules.discord_bot.cogs.a24_qna_autolearn_scheduler\",\"satpambot.bot.modules.discord_bot.cogs.a06_autolearn_qna_answer_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a24_qna_auto_answer_overlay\"],\"XP / LADDER\":[\"satpambot.bot.modules.discord_bot.cogs.a08y_phase_autoswitch_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a08_xp_event_bridge_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a08f_passive_to_bot_bridge_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a08_xp_stage_recompute_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a09_leina_xp_status_embed_overlay\",\"satpambot.bot.modules.discord_bot.cogs.a09_work_xp_overlay\"],\"RUNTIME: MEMORY / PERSONA\":[\"satpambot.bot.modules.discord_bot.cogs.persona_loader_overlay\",\"satpambot.bot.modules.discord_bot.cogs.short_memory_manager\"],\"RUNTIME: LEARN / NEURO / MINER\":[\"satpambot.bot.modules.discord_bot.cogs.neuro_autolearn_moderated_v2\",\"satpambot.bot.modules.discord_bot.cogs.learning_passive_observer\"]}",
     "REQUIREMENTS_FILE": "requirements.latest.txt",
     "SATPAMBOT_ENV_FILE": "/dev/null",
     "---------------- RUNTIME: OAUTH / WEB ----------------": "",
@@ -418,6 +418,14 @@
     "WORK_XP_KEY": "xp:work:total",
     "WORK_XP_LADDER_KEY": "xp:work:ladder",
     "WORK_XP_LEVELS_PATH": "data/config/xp_work_ladder.json",
-    "WORK_XP_AWARD_PER_QNA_ANSWER": "1000"
+    "WORK_XP_AWARD_PER_QNA_ANSWER": "1000",
+    "SHORT_MEM_ENABLE": "1",
+    "SHORT_MEM_MAX": "50",
+    "LEINA_MEMORY_ENABLE": "1",
+    "LEINA_MEMORY_DIR": "data/memory",
+    "LEINA_MEMORY_FLUSH_SEC": "900",
+    "NEURO_ENABLE": "1",
+    "PUBLIC_GATE_ENABLE": "0",
+    "PUBLIC_GATE_COOLDOWN_SEC": "3"
   }
 }
