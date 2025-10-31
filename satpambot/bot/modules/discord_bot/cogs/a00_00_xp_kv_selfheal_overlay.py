@@ -1,89 +1,129 @@
 from __future__ import annotations
-import asyncio, logging, json, urllib.request, os
-from typing import Optional
+import asyncio, logging, os, json, re
+from typing import Optional, Any, Dict, List
+try:
+    import aiohttp
+except Exception as _e:
+    aiohttp = None  # type: ignore
 from discord.ext import commands, tasks
-from satpambot.bot.modules.discord_bot.helpers.intish import parse_intish
-import re, json
-
-def _smart_coerce(raw):
-    """
-    Try very hard to turn raw into a meaningful integer:
-    - If JSON dict with "senior_total"/"total"/"xp" fields -> use that
-    - If JSON number/string int -> use it
-    - Else choose the *largest* integer substring to avoid picking "2" from "KULIAH-S2"
-    """
-    try:
-        j = json.loads(raw)
-        if isinstance(j, (int, float)): return int(j)
-        if isinstance(j, str) and re.fullmatch(r"[-+]?\d+", j): return int(j)
-        if isinstance(j, dict):
-            for k in ("senior_total","total","xp","amount","value"):
-                v = j.get(k)
-                if isinstance(v,(int,float)): return int(v)
-                if isinstance(v,str) and re.fullmatch(r"[-+]?\d+", v): return int(v)
-    except Exception:
-        pass
-    # fallback: pick the longest integer-looking chunk
-    ints = re.findall(r"[-+]?\d+", str(raw))
-    if ints:
-        # prefer longer/larger magnitudes
-        ints.sort(key=lambda s: (len(s.lstrip("+-")), int(s)), reverse=True)
-        return int(ints[0])
-    return 0
 
 log = logging.getLogger(__name__)
-def _env(k: str, d: Optional[str]=None) -> Optional[str]:
-    v = os.getenv(k); return v if v not in (None,"") else d
-def _upstash_base() -> Optional[str]: return _env("UPSTASH_REDIS_REST_URL", None)
-def _upstash_hdr() -> Optional[str]:
-    tok = _env("UPSTASH_REDIS_REST_TOKEN", None); return f"Bearer {tok}" if tok else None
-def _keys():
-    main = _env("XP_TOTAL_KEY", "xp:bot:senior_total") or "xp:bot:senior_total"
-    return [main, "xp:bot:senior_total_v2"]
-async def _pipe(cmds):
-    base, hdr = _upstash_base(), _upstash_hdr()
-    if not base or not hdr: return None
-    body = json.dumps(cmds).encode("utf-8")
-    req = urllib.request.Request(f"{base}/pipeline", method="POST", data=body)
-    req.add_header("Authorization", hdr); req.add_header("Content-Type","application/json")
-    with urllib.request.urlopen(req, timeout=3.5) as r:
-        return json.loads(r.read().decode("utf-8","ignore"))
-async def _get_raw(key: str) -> Optional[str]:
+
+UPSTASH_URL = os.getenv("UPSTASH_REDIS_REST_URL", "")
+UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+ENABLE = os.getenv("XP_KV_SELFHEAL_ENABLE", "1") == "1"
+INTERVAL = float(os.getenv("XP_KV_SELFHEAL_INTERVAL_SEC", "15"))
+CONNECT_TIMEOUT = float(os.getenv("UPSTASH_CONNECT_TIMEOUT_SEC", "1.8"))
+READ_TIMEOUT = float(os.getenv("UPSTASH_READ_TIMEOUT_SEC", "1.8"))
+
+# Keys we keep healthy
+XP_TOTAL_KEY = os.getenv("XP_TOTAL_KEY","xp:bot:senior_total")
+XP_STAGE_LABEL_KEY = os.getenv("XP_STAGE_LABEL_KEY","xp:stage:label")
+XP_STAGE_CURRENT_KEY = os.getenv("XP_STAGE_CURRENT_KEY","xp:stage:current")
+XP_STAGE_REQUIRED_KEY = os.getenv("XP_STAGE_REQUIRED_KEY","xp:stage:required")
+XP_STAGE_PERCENT_KEY = os.getenv("XP_STAGE_PERCENT_KEY","xp:stage:percent")
+
+_KEYS = [XP_TOTAL_KEY, XP_STAGE_LABEL_KEY, XP_STAGE_CURRENT_KEY, XP_STAGE_REQUIRED_KEY, XP_STAGE_PERCENT_KEY]
+
+def _smart_coerce(raw: str) -> Optional[int]:
     try:
-        r = await _pipe([["GET", key]]); return r and r[0].get("result")
-    except Exception as e:
-        log.debug("[xp-kv-selfheal] GET fail %s: %r", key, e); return None
-async def _set_int(key: str, val: int) -> bool:
+        j = json.loads(raw)
+        if isinstance(j, dict):
+            for k in ("senior_total","total","xp","value"):
+                if k in j:
+                    try: return int(float(j[k]))
+                    except Exception: pass
+        if isinstance(j, (int, float)): return int(j)
+        if isinstance(j, str):
+            return int(float(j))
+    except Exception:
+        pass
+    # largest integer substring
+    m = re.findall(r"-?\d+", str(raw))
+    if not m: return None
     try:
-        _ = await _pipe([["SET", key, str(int(val))]]); return True
+        nums = [int(x) for x in m]
+        return max(nums, key=abs)
+    except Exception:
+        return None
+
+async def _fetch_upstash(keys: List[str]) -> Dict[str, Optional[str]]:
+    if not (UPSTASH_URL and UPSTASH_TOKEN and aiohttp):
+        return {k: None for k in keys}
+    headers = {"Authorization": f"Bearer {UPSTASH_TOKEN}"}
+    payload = {"pipeline": [[ "GET", k ] for k in keys]}
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=CONNECT_TIMEOUT, sock_read=READ_TIMEOUT)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as sess:
+            async with sess.post(f"{UPSTASH_URL}/pipeline", headers=headers, json=payload) as resp:
+                if resp.status != 200:
+                    log.info("[xp-kv-selfheal] upstash non-200: %s", resp.status)
+                    return {k: None for k in keys}
+                data = await resp.json()
+                out: Dict[str, Optional[str]] = {}
+                for k, row in zip(keys, data):
+                    try:
+                        out[k] = None if row is None else (row.get("result") if isinstance(row, dict) else None)
+                    except Exception:
+                        out[k] = None
+                return out
     except Exception as e:
-        log.debug("[xp-kv-selfheal] SET fail %s: %r", key, e); return False
+        log.info("[xp-kv-selfheal] upstash fetch failed: %r", e)
+        return {k: None for k in keys}
+
+async def _set_upstash(pairs: Dict[str, Any]) -> None:
+    if not (UPSTASH_URL and UPSTASH_TOKEN and aiohttp): return
+    headers = {"Authorization": f"Bearer {UPSTASH_TOKEN}"}
+    cmds = [[ "SET", k, str(v) ] for k, v in pairs.items()]
+    if not cmds: return
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=CONNECT_TIMEOUT, sock_read=READ_TIMEOUT)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as sess:
+            async with sess.post(f"{UPSTASH_URL}/pipeline", headers=headers, json={"pipeline": cmds}) as resp:
+                if resp.status != 200:
+                    log.info("[xp-kv-selfheal] upstash set non-200: %s", resp.status)
+    except Exception as e:
+        log.info("[xp-kv-selfheal] upstash set failed: %r", e)
+
 class XpKvSelfhealOverlay(commands.Cog):
     def __init__(self, bot):
-        self.bot = bot; self.task.start()
-    def cog_unload(self):
-        try: self.task.cancel()
-        except Exception: pass
-    @tasks.loop(seconds=30)
+        self.bot = bot
+        if ENABLE:
+            self.task.start()
+
+    @tasks.loop(seconds=INTERVAL)
     async def task(self):
-        if not _upstash_base() or not _upstash_hdr(): return
-        for k in _keys():
-            raw = await _get_raw(k)
-            ok, val = parse_intish(raw)
-            if not ok or val is None:
-                val = _smart_coerce(raw)
-                ok = True
-            must_fix = False
-            try:
-                if str(int(raw)) != str(val):
-                    must_fix = True
-            except Exception:
-                must_fix = True
-            if must_fix and await _set_int(k, val):
-                log.warning("[xp-kv-selfheal] coerced %s -> %s", k, val)
+        # never block the event loop if network is slow
+        try:
+            vals = await _fetch_upstash(_KEYS)
+            fixes: Dict[str, Any] = {}
+            # Only coerce the numeric fields; label/percent are left intact
+            for k in (XP_TOTAL_KEY, XP_STAGE_CURRENT_KEY, XP_STAGE_REQUIRED_KEY):
+                raw = vals.get(k)
+                if raw is None: 
+                    continue
+                coerced = _smart_coerce(raw)
+                if coerced is None: 
+                    continue
+                # if the stored raw is not exactly the coerced int, write back the int
+                try:
+                    if str(int(raw)) != str(coerced):
+                        fixes[k] = coerced
+                except Exception:
+                    fixes[k] = coerced
+            if fixes:
+                await _set_upstash(fixes)
+                for k, v in fixes.items():
+                    log.warning("[xp-kv-selfheal] coerced %s -> %s", k, v)
+        except Exception as e:
+            log.info("[xp-kv-selfheal] task err: %r", e)
+
     @task.before_loop
-    async def _delay(self): import asyncio; await asyncio.sleep(8)
-async def setup(bot): await bot.add_cog(XpKvSelfhealOverlay(bot))
-def setup(bot):
-    try: bot.add_cog(XpKvSelfhealOverlay(bot))
-    except Exception: pass
+    async def _delay(self):
+        await asyncio.sleep(6.0)
+
+async def setup(bot): 
+    try:
+        await bot.add_cog(XpKvSelfhealOverlay(bot))
+    except Exception as e:
+        log.info("[xp-kv-selfheal] setup swallowed: %r", e)
